@@ -1,0 +1,24 @@
+repos:
+  -   repo: https://github.com/ambv/black
+      rev: stable
+      hooks:
+      - id: black
+        exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
+  -   repo: https://github.com/timothycrosley/isort
+      rev: 4.3.21-2
+      hooks:
+      - id: isort
+        exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
+  -   repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v2.5.0
+      hooks:
+      - id: check-ast
+      - id: check-case-conflict
+      - id: trailing-whitespace
+        exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
+      - id: mixed-line-ending
+        exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
+      - id: end-of-file-fixer
+        exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
+      - id: check-yaml
+      - id: debug-statements

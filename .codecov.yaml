@@ -1,0 +1,8 @@
+codecov:
+  token: Fill In
+comment: off
+coverage:
+  status:
+    project:
+      default:
+        threshold: 0.2%
