@@ -117,7 +117,7 @@ in each folder to install the current development version of these packages.
 
 .. _SunPy: http://sunpy.org
 .. _anaconda website: https://docs.anaconda.com/anaconda/install.html
-.. _irispy repository: https://github.com/sunpy/irispy
+.. _irispy repository: https://gitlab.com/LMSAL_HUB/iris_hub/irispy-lmsal/
 .. _GitLab: https://gitlab.com/
 .. _sunraster: https://github.com/sunpy/sunraster
 .. _ndcube: https://github.com/sunpy/ndcube
