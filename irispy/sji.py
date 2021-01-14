@@ -71,6 +71,7 @@ class IRISMapCube(SpectrogramCube):
         copy=False,
         missing_axes=None,
         scaled=None,
+        **kwargs,
     ):
         """
         Initialization of Slit Jaw Imager.
