@@ -135,7 +135,9 @@ class ObsID(dict):
         data["sji_fov"] = meta["SJI FOV"]
         data["raster_desc"] = meta["Description"]
         data["raster_fulldesc"] = "{} {} {}".format(
-            data["raster_desc"], data["raster_fov"], data["spec_cadence"],
+            data["raster_desc"],
+            data["raster_fov"],
+            data["spec_cadence"],
         )
         field_ranges = np.concatenate(
             [  # find all dividers between fields
