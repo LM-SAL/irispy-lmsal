@@ -5,41 +5,41 @@ before_script:
 
 stages:
 - Install
-- Static
-- Test
-- Docs
+#- Static
+#- Test
+#- Docs
 
-install:
-  stage: Install
-  script:
-    - pip install .
+#install:
+#  stage: Install
+#  script:
+#    - pip install .
 
-codestyle:
-  stage: Static
-  script:
-    - tox -e codestyle
+#codestyle:
+#  stage: Static
+#  script:
+#    - tox -e codestyle
 
-twine:
-  stage: Static
-  script:
-    - tox -e twine
+#twine:
+#  stage: Static
+#  script:
+#    - tox -e twine
 
-py37-online:
-  stage: Test
-  script:
-    - tox -e py37-online
+#py37-online:
+#  stage: Test
+#  script:
+#    - tox -e py37-online
 
-py38-online:
-  stage: Test
-  image: python:3.8
-  script:
-    - tox -e py38-online
+#py38-online:
+#  stage: Test
+#  image: python:3.8
+#  script:
+#    - tox -e py38-online
 
-py37-devdeps:
-  allow_failure: true
-  stage: Test
-  script:
-    - tox -e py37-devdeps
+#py37-devdeps:
+#  allow_failure: true
+#  stage: Test
+#  script:
+#    - tox -e py37-devdeps
 
 build_docs:
   stage: Docs
