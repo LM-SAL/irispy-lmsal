@@ -64,10 +64,7 @@ def convert_between_DN_and_photons(old_data_arrays, old_unit, new_unit):
             old_unit_without_time = old_unit
             new_unit_time_accounted = new_unit
         # Convert data and uncertainty to new unit.
-        new_data_arrays = [
-            (data * old_unit_without_time).to(new_unit).value
-            for data in old_data_arrays
-        ]
+        new_data_arrays = [(data * old_unit_without_time).to(new_unit).value for data in old_data_arrays]
     return new_data_arrays, new_unit_time_accounted
 
 
@@ -150,13 +147,11 @@ def convert_or_undo_photons_per_sec_to_radiance(
     # Perform (or undo) radiometric conversion.
     if undo is True:
         new_data_quantities = [
-            (data / photons_per_sec_to_radiance_factor).to(u.photon / u.s)
-            for data in data_quantities
+            (data / photons_per_sec_to_radiance_factor).to(u.photon / u.s) for data in data_quantities
         ]
     else:
         new_data_quantities = [
-            (data * photons_per_sec_to_radiance_factor).to(RADIANCE_UNIT)
-            for data in data_quantities
+            (data * photons_per_sec_to_radiance_factor).to(RADIANCE_UNIT) for data in data_quantities
         ]
     return new_data_quantities
 
@@ -228,9 +223,7 @@ def reshape_1D_wavelength_dimensions_for_broadcast(wavelength, n_data_dim):
 
 
 def produce_obs_repr_string(meta):
-    obs_info = [
-        meta.get(key, "Unknown") for key in ["OBSID", "OBS_DESC", "STARTOBS", "ENDOBS"]
-    ]
+    obs_info = [meta.get(key, "Unknown") for key in ["OBSID", "OBS_DESC", "STARTOBS", "ENDOBS"]]
     return """OBS ID: {obs_id}
 OBS Description: {obs_desc}
 OBS period: {obs_start} -- {obs_end}""".format(
@@ -322,16 +315,12 @@ def calculate_orbital_wavelength_variation(
     # of Angstroms.
     wavelength_roi = wavelength_window.to(u.Angstrom).value[wavelength_roi_index]
     # Keep only data within wavelength region of interest.
-    data_array = data_array.isel(
-        spectral_axis=slice(wavelength_roi_index[0], wavelength_roi_index[-1] + 1)
-    )
+    data_array = data_array.isel(spectral_axis=slice(wavelength_roi_index[0], wavelength_roi_index[-1] + 1))
     # If user selected a sub-region of the slit, reduce data to just
     # that region.
     if slit_pixel_range:
         if len(slit_pixel_range) == 2:
-            data_array = data_array.isel(
-                slit_axis, slice(slit_pixel_range[0], slit_pixel_range[1])
-            )
+            data_array = data_array.isel(slit_axis, slice(slit_pixel_range[0], slit_pixel_range[1]))
         else:
             raise TypeError(
                 "slit_pixel_range must be tuple of length 2 giving lower and "
@@ -364,20 +353,14 @@ def calculate_orbital_wavelength_variation(
             # Ni I line.
             for j in range(2, pixels_in_slit - 2):
                 # Average over 5 pixels to improve signal-to-noise.
-                intensity_mean_5pix = data_single_time.isel(
-                    slit_axis=slice(j - 2, j + 3)
-                ).mean(axis=0)
+                intensity_mean_5pix = data_single_time.isel(slit_axis=slice(j - 2, j + 3)).mean(axis=0)
                 # Fit gaussian to Ni I line.
                 g = fit_g(g_init, wavelength_roi, intensity_mean_5pix)
                 # Check that fit is within physically reasonable
                 # limits.  If so, store line center wavelength in
                 # mean_line_wavelengths array. Else leave element as
                 # defined, i.e. NaN.
-                if (
-                    np.isfinite(g.amplitude)
-                    and g.amplitude < 0.0
-                    and wavelength_roi[0] < g.mean < wavelength_roi[-1]
-                ):
+                if np.isfinite(g.amplitude) and g.amplitude < 0.0 and wavelength_roi[0] < g.mean < wavelength_roi[-1]:
                     pixel_line_wavelengths[j] = g.mean
             # Take average of Ni I line position from fits in each
             # pixel.
@@ -397,26 +380,18 @@ def calculate_orbital_wavelength_variation(
             # If so, store line center wavelength in
             # mean_line_wavelengths array. Else leave element as
             # defined, i.e. NaN.
-            if (
-                np.isfinite(g.amplitude)
-                and g.amplitude < 0.0
-                and wavelength_roi[0] < g.mean < wavelength_roi[-1]
-            ):
+            if np.isfinite(g.amplitude) and g.amplitude < 0.0 and wavelength_roi[0] < g.mean < wavelength_roi[-1]:
                 mean_line_wavelengths[k] = g.mean
             # If data produced by old pipeline, subtract spacecraft velocity
             # from the line position.
             if date_created < date_new_pipeline:
                 mean_line_wavelengths[k] = (
-                    mean_line_wavelengths[k]
-                    - spacecraft_velocity[k] / 3e8 * wavelength_nii.to(u.Angstrom).value
+                    mean_line_wavelengths[k] - spacecraft_velocity[k] / 3e8 * wavelength_nii.to(u.Angstrom).value
                 )
 
     # Mark abnormal values.  Thermal drift is of the order of 2
     # unsummed wavelength pixels peak-to-peak.
-    w_abnormal = np.where(
-        np.abs(mean_line_wavelengths - np.nanmedian(mean_line_wavelengths))
-        >= specsize * 2
-    )[0]
+    w_abnormal = np.where(np.abs(mean_line_wavelengths - np.nanmedian(mean_line_wavelengths)) >= specsize * 2)[0]
     if len(w_abnormal) > 0:
         mean_line_wavelengths[w_abnormal] = np.nan
     # Further data reduction required for files from old pipeline.
@@ -426,16 +401,12 @@ def calculate_orbital_wavelength_variation(
         dw_th_p = dw_th_A / specsize
         # Adjust reference wavelength using orbital phase information.
         if not (np.isfinite(orbital_phase)).all():
-            warnings.warn(
-                "Orbital phase values are invalid.  Thermal drift may be offset by at most one pixel."
-            )
+            warnings.warn("Orbital phase values are invalid.  Thermal drift may be offset by at most one pixel.")
             dw_th = dw_th
             # For absolute wavelength calibration of NUV, the
             # following amount (unit Angstrom) has to be
             # subtracted from the wavelengths.
-            abswvl_nuv = (
-                np.nanmean(mean_line_wavelengths) - wavelength_nii.to(u.Angstrom).value
-            )
+            np.nanmean(mean_line_wavelengths) - wavelength_nii.to(u.Angstrom).value
         else:
             # Define empirical sine fitting at 0 roll angle shifted by
             # different phase.
@@ -444,19 +415,13 @@ def calculate_orbital_wavelength_variation(
                 -1.0,
                 53.106583 - roll_angle / 360.0 * 2 * np.pi,
             ]
-            phase_adj = np.nanmean(
-                sine_params[0] * np.sin(sine_params[1] * orbital_phase + sine_params[2])
-            )
+            phase_adj = np.nanmean(sine_params[0] * np.sin(sine_params[1] * orbital_phase + sine_params[2]))
             # thermal component of the orbital variation, in the unit of unsummed wavelength pixel
             dw_th = dw_th_p + phase_adj
             # For absolute wavelength calibration of NUV the following
             # amount (unit Angstrom) has to be subtracted from the
             # wavelengths.
-            abswvl_nuv = (
-                np.nanmean(mean_line_wavelengths)
-                - wavelength_nii.to(u.Angstrom).value
-                - phase_adj * specsize
-            )
+            np.nanmean(mean_line_wavelengths) - wavelength_nii.to(u.Angstrom).value - phase_adj * specsize
     else:
         # Calculate relative variation of the line position.
         dw_th = mean_line_wavelengths - np.nanmean(mean_line_wavelengths)
@@ -484,15 +449,9 @@ def calculate_orbital_wavelength_variation(
         # 5-min photospheric oscillation.
         # Determine number of smoothing point using 3 point
         # lagrangian derivative.
-        deriv_time = np.array(
-            [(time_s[i + 1] - time_s[i - 1]) / 2.0 for i in range(1, len(time_s) - 1)]
-        )
-        deriv_time = np.insert(
-            deriv_time, 0, (-3 * time_s[0] + 4 * time_s[1] - time_s[2]) / 2
-        )
-        deriv_time = np.insert(
-            deriv_time, -1, (3 * time_s[-1] - 4 * time_s[-2] + time_s[-3]) / 2
-        )
+        deriv_time = np.array([(time_s[i + 1] - time_s[i - 1]) / 2.0 for i in range(1, len(time_s) - 1)])
+        deriv_time = np.insert(deriv_time, 0, (-3 * time_s[0] + 4 * time_s[1] - time_s[2]) / 2)
+        deriv_time = np.insert(deriv_time, -1, (3 * time_s[-1] - 4 * time_s[-2] + time_s[-3]) / 2)
         n_smooth = int(spline_knot_spacing / deriv_time.mean())
         if n_smooth < len(wgood):
             dw_good = convolve(dw_th[good], Box1DKernel(n_smooth))
@@ -505,20 +464,11 @@ def calculate_orbital_wavelength_variation(
 
     # Derive residual orbital curves in FUV and NUV and store
     # in a table.
-    times = [
-        datetime.datetime.utcfromtimestamp(t / 1e9)
-        for t in raster.coords["time"].values.tolist()
-    ]
+    times = [datetime.datetime.utcfromtimestamp(t / 1e9) for t in raster.coords["time"].values.tolist()]
     # Depeding on which pipeline produced the files...
     if date_created < date_new_pipeline:
-        dw_orb_fuv = (
-            dw_th * (-0.013)
-            + spacecraft_velocity.to(u.km / u.s).value / (3.0e5) * 1370.0 * u.Angstrom
-        )
-        dw_orb_nuv = (
-            dw_th * 0.0255
-            + spacecraft_velocity.to(u.km / u.s).value / (3.0e5) * 2800.0 * u.Angstrom
-        )
+        dw_orb_fuv = dw_th * (-0.013) + spacecraft_velocity.to(u.km / u.s).value / (3.0e5) * 1370.0 * u.Angstrom
+        dw_orb_nuv = dw_th * 0.0255 + spacecraft_velocity.to(u.km / u.s).value / (3.0e5) * 2800.0 * u.Angstrom
     else:
         dw_orb_fuv = dw_th * (-1) * u.Angstrom
         dw_orb_nuv = dw_th * u.Angstrom

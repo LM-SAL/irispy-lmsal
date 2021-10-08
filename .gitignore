@@ -208,7 +208,7 @@ docs/_build
 docs/generated
 docs/api/
 docs/whatsnew/latest_changelog.txt
-irispy/version.py
+irispy/_version.py
 
 ### Pycharm(?)
 .idea

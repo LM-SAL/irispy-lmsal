@@ -63,10 +63,7 @@ def read_iris_sji_level2_fits(filenames, uncertainty=True, memmap=False):
             if uncertainty:
                 out_uncertainty = (
                     u.Quantity(
-                        np.sqrt(
-                            (data_nan_masked * unit).to(u.photon).value
-                            + readout_noise.to(u.photon).value ** 2
-                        ),
+                        np.sqrt((data_nan_masked * unit).to(u.photon).value + readout_noise.to(u.photon).value ** 2),
                         unit=u.photon,
                     )
                     .to(unit)
@@ -75,7 +72,7 @@ def read_iris_sji_level2_fits(filenames, uncertainty=True, memmap=False):
             else:
                 out_uncertainty = None
         # Derive exposure time from detector.
-        exposure_times = hdulist[1].data[:, hdulist[1].header["EXPTIMES"]]
+        exposure_times = hdulist[1].data[:, hdulist[1].header["EXPTIMES"]] * u.s
         # Derive extra coordinates for NDCube from fits file.
         times = Time(hdulist[0].header["STARTOBS"]) + TimeDelta(
             hdulist[1].data[:, hdulist[1].header["TIME"]], format="sec"
@@ -85,9 +82,9 @@ def read_iris_sji_level2_fits(filenames, uncertainty=True, memmap=False):
         xcenix = hdulist[1].data[:, hdulist[1].header["XCENIX"]] * u.arcsec
         ycenix = hdulist[1].data[:, hdulist[1].header["YCENIX"]] * u.arcsec
         obs_vrix = hdulist[1].data[:, hdulist[1].header["OBS_VRIX"]] * u.m / u.s
-        ophaseix = hdulist[1].data[:, hdulist[1].header["OPHASEIX"]]
-        slit_pos_x = hdulist[1].data[:, hdulist[1].header["SLTPX1IX"]]
-        slit_pos_y = hdulist[1].data[:, hdulist[1].header["SLTPX2IX"]]
+        ophaseix = hdulist[1].data[:, hdulist[1].header["OPHASEIX"]] * u.arcsec
+        slit_pos_x = hdulist[1].data[:, hdulist[1].header["SLTPX1IX"]] * u.arcsec
+        slit_pos_y = hdulist[1].data[:, hdulist[1].header["SLTPX2IX"]] * u.arcsec
         extra_coords = [
             ("time", 0, times),
             ("pztx", 0, pztx),
@@ -121,38 +118,25 @@ def read_iris_sji_level2_fits(filenames, uncertainty=True, memmap=False):
             "XCEN": hdulist[0].header["XCEN"] * u.arcsec,
             "YCEN": hdulist[0].header["YCEN"] * u.arcsec,
         }
-        list_of_cubes.append(
-            IRISMapCube(
-                data_nan_masked,
-                wcs,
-                uncertainty=out_uncertainty,
-                unit=unit,
-                meta=meta,
-                mask=mask,
-                extra_coords=extra_coords,
-                scaled=scaled,
-            )
+        map_cube = IRISMapCube(
+            data_nan_masked,
+            wcs,
+            uncertainty=out_uncertainty,
+            unit=unit,
+            meta=meta,
+            mask=mask,
+            scaled=scaled,
         )
+        [map_cube.extra_coords.add(*extra_coord) for extra_coord in extra_coords]
+        list_of_cubes.append(map_cube)
         hdulist.close()
     if len(filenames) == 1:
         return list_of_cubes[0]
     else:
         # In Sequence, all cubes must have the same Observation Identification.
-        if np.any(
-            [
-                cube.meta["OBSID"] != list_of_cubes[0].meta["OBSID"]
-                for cube in list_of_cubes
-            ]
-        ):
-            raise ValueError(
-                "Inputed files must have the same Observation Identification"
-            )
+        if np.any([cube.meta["OBSID"] != list_of_cubes[0].meta["OBSID"] for cube in list_of_cubes]):
+            raise ValueError("Inputed files must have the same Observation Identification")
         # In Sequence, all cubes must have the same passband.
-        if np.any(
-            [
-                cube.meta["TWAVE1"] != list_of_cubes[0].meta["TWAVE1"]
-                for cube in list_of_cubes
-            ]
-        ):
+        if np.any([cube.meta["TWAVE1"] != list_of_cubes[0].meta["TWAVE1"] for cube in list_of_cubes]):
             raise ValueError("Inputed files must have the same passband")
         return IRISMapCubeSequence(list_of_cubes, meta=meta, common_axis=0)

@@ -33,11 +33,7 @@ TEST_DATA["linelist"] = ["Flare linelist 1", "Full readout", "Small linelist"]
 
 @pytest.mark.parametrize(
     "attr_name, test_input, expected_output",
-    [
-        (name, obs, output[i])
-        for (name, output) in TEST_DATA.items()
-        for i, obs in enumerate(OBSIDS)
-    ],
+    [(name, obs, output[i]) for (name, output) in TEST_DATA.items() for i, obs in enumerate(OBSIDS)],
 )
 def test_attribute(attr_name, test_input, expected_output):
     assert ObsID(test_input)[attr_name] == expected_output

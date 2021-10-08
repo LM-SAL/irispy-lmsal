@@ -39,10 +39,6 @@ class IRISMapCube(SpectrogramCube):
         Mask for the dataset. Masks should follow the numpy convention
         that valid data points are marked by False and invalid ones with True.
         Defaults to None.
-    extra_coords : iterable of `tuple`, each with three entries
-        (`str`, `int`, `astropy.units.quantity` or array-like)
-        Gives the name, axis of data, and values of coordinates of a data axis
-        not included in the WCS object.
     copy : `bool`, optional
         Indicates whether to save the arguments as copy. True copies every
         attribute before saving it while False tries to save every parameter
@@ -67,9 +63,7 @@ class IRISMapCube(SpectrogramCube):
         unit=None,
         meta=None,
         mask=None,
-        extra_coords=None,
         copy=False,
-        missing_axes=None,
         scaled=None,
         **kwargs,
     ):
@@ -80,7 +74,6 @@ class IRISMapCube(SpectrogramCube):
         self.scaled = scaled
         # Dust_masked variable shows whether the dust pixels are set to True in the data mask.
         self.dust_masked = False
-        # Initialize IRISMapCube.
         super().__init__(
             data,
             wcs,
@@ -88,9 +81,7 @@ class IRISMapCube(SpectrogramCube):
             mask=mask,
             meta=meta,
             unit=unit,
-            extra_coords=extra_coords,
             copy=copy,
-            missing_axes=missing_axes,
         )
 
     def __repr__(self):
@@ -102,9 +93,10 @@ class IRISMapCube(SpectrogramCube):
         endobs = self.meta.get("ENDOBS", None)
         endobs = endobs.isot if endobs else None
         # Conversion of the instance start and end of OBS
-        if isinstance(self.extra_coords["time"]["value"], Time):
-            instance_start = self.extra_coords["time"]["value"].min().isot
-            instance_end = self.extra_coords["time"]["value"].max().isot
+        # self.axis_world_coords("time", wcs=self.extra_coords)[0][0].isot
+        if isinstance(self.axis_world_coords("time", wcs=self.extra_coords)[0], Time):
+            instance_start = self.axis_world_coords("time", wcs=self.extra_coords)[0].min().isot
+            instance_end = self.axis_world_coords("time", wcs=self.extra_coords)[0].max().isot
         else:
             instance_start = None
             instance_end = None
@@ -149,11 +141,6 @@ class IRISMapCube(SpectrogramCube):
         return sliced_self
 
     def plot(self, *args, **kwargs):
-        """
-        See parent class for docstring.
-
-        TODO: Inherit parent docstring.
-        """
         # If colormap not set, load one default sunpy colormap based on SJI passband.
         cmap = kwargs.pop("cmap", None)
         if not cmap:
@@ -266,15 +253,7 @@ Axis Types:\t\t {axis_types}
     def world_axis_physical_types(self):
         return self.cube_like_world_axis_physical_types
 
-    def plot(
-        self,
-        axes=None,
-        plot_axis_indices=None,
-        axes_coordinates=None,
-        axes_units=None,
-        data_unit=None,
-        **kwargs
-    ):
+    def plot(self, axes=None, plot_axis_indices=None, axes_coordinates=None, axes_units=None, data_unit=None, **kwargs):
         """
         Visualizes data in the IRISMapCubeSequence with the sequence axis
         folded into the common axis.
@@ -347,7 +326,7 @@ Axis Types:\t\t {axis_types}
             axes_coordinates=axes_coordinates,
             axes_units=axes_units,
             data_unit=data_unit,
-            **kwargs
+            **kwargs,
         )
 
     def apply_dust_mask(self, undo=False):
