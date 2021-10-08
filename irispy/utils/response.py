@@ -98,10 +98,7 @@ def get_iris_response(
     else:
         response_version_set = False
     if pre_launch_set + response_file_set + response_version_set > 1:
-        raise ValueError(
-            "One and only one of kwargs pre_launch, response_file "
-            "and response_version must be set."
-        )
+        raise ValueError("One and only one of kwargs pre_launch, response_file " "and response_version must be set.")
     # If pre_launch set, define response_version to 2.
     if pre_launch:
         response_version = 2
@@ -125,10 +122,7 @@ def get_iris_response(
         # Define response file as path + filename.
     # Read response file and store in a dictionary.
     raw_response_data = scipy.io.readsav(path)
-    iris_response = {
-        name: raw_response_data["p0"][name][0]
-        for name in raw_response_data["p0"].dtype.names
-    }
+    iris_response = {name: raw_response_data["p0"][name][0] for name in raw_response_data["p0"].dtype.names}
     # Convert some properties to more convenient types.
     iris_response["LAMBDA"] = Quantity(iris_response["LAMBDA"], unit=u.nm)
     iris_response["AREA_SG"] = Quantity(iris_response["AREA_SG"], unit=u.cm ** 2)
@@ -140,9 +134,7 @@ def get_iris_response(
     if int(iris_response["VERSION"]) > 2:
         # If DATE_OBS has a value, convert to `astropy.time.Time`, else set to None.
         try:
-            iris_response["DATE_OBS"] = parse_time(
-                iris_response["DATE_OBS"], format="utime"
-            )
+            iris_response["DATE_OBS"] = parse_time(iris_response["DATE_OBS"], format="utime")
         except Exception:
             iris_response["DATE_OBS"] = None
 
@@ -228,9 +220,7 @@ def get_iris_response(
                     np.squeeze(iris_fit_fuv[k, j : j + 2]),
                     fill_value="extrapolate",
                 )
-                iris_response["AREA_SG"][0, w_fuv] = interpol_fuv(
-                    iris_response["LAMBDA"][w_fuv]
-                )
+                iris_response["AREA_SG"][0, w_fuv] = interpol_fuv(iris_response["LAMBDA"][w_fuv])
 
         # 2. NUV SG effective areas
         lambran_nuv = np.array([278.2, 283.5])
@@ -258,9 +248,7 @@ def get_iris_response(
                     np.squeeze(iris_fit_nuv[k, :]),
                     fill_value="extrapolate",
                 )
-                iris_response["AREA_SG"][1, w_nuv] = interpol_nuv(
-                    iris_response["LAMBDA"][w_nuv]
-                )
+                iris_response["AREA_SG"][1, w_nuv] = interpol_nuv(iris_response["LAMBDA"][w_nuv])
         else:
             for k in range(n_time_obs):
                 interpol_nuv = scipy.interpolate.CubicSpline(
@@ -270,9 +258,7 @@ def get_iris_response(
                     bc_type="natural",
                     axis=0,
                 )
-                iris_response["AREA_SG"][1, w_nuv] = interpol_nuv(
-                    iris_response["LAMBDA"][w_nuv]
-                )
+                iris_response["AREA_SG"][1, w_nuv] = interpol_nuv(iris_response["LAMBDA"][w_nuv])
 
         # 3. SJI effective areas
         if int(iris_response["VERSION"]) <= 3:  # Meaning for version 3 only
@@ -282,9 +268,7 @@ def get_iris_response(
                 prelaunch_area = iris_response["GEOM_AREA"]
                 for k in range(len(iris_response["INDEX_EL_SJI"][j, :])):
                     index_values0 = iris_response["INDEX_EL_SJI"][j, k]
-                    prelaunch_area = (
-                        prelaunch_area * iris_response["ELEMENTS"][index_values0].trans
-                    )
+                    prelaunch_area = prelaunch_area * iris_response["ELEMENTS"][index_values0].trans
                 # Time dependent response
                 iris_fit_sji = fit_iris_xput(
                     time_obs,
@@ -299,9 +283,7 @@ def get_iris_response(
                 # Calculate baseline SJI area curves
                 area_sji = iris_response["GEOM_AREA"]
                 for m in range(len(iris_response["INDEX_EL_SJI"][nuv * 2, :])):
-                    index_values1 = iris_response["INDEX_EL_SJI"][
-                        nuv * 2 : nuv * 2 + 2, m
-                    ]
+                    index_values1 = iris_response["INDEX_EL_SJI"][nuv * 2 : nuv * 2 + 2, m]
                     area_sji = area_sji * iris_response["ELEMENTS"][index_values1].trans
                 # Apply time dependent profile shape adjustment to FUV SJI
                 if nuv == 0:
@@ -313,20 +295,14 @@ def get_iris_response(
                     wavelength = np.array(
                         [
                             wavelength[0].value,
-                            (
-                                wavelength[n_wavelength - 2].value * 2.0
-                                + wavelength[n_wavelength - 1].value
-                            )
-                            / 3.0,
+                            (wavelength[n_wavelength - 2].value * 2.0 + wavelength[n_wavelength - 1].value) / 3.0,
                         ]
                     )  # 2 wavelengths in nm
                     # Calculate baseline SG area for scaling purposes
                     area_sg = iris_response["GEOM_AREA"]
                     for n in range(len(iris_response["INDEX_EL_SG"][nuv, :])):
                         index_values2 = iris_response["INDEX_EL_SG"][nuv, n]
-                        area_sg = (
-                            area_sg * iris_response["ELEMENTS"][index_values2].trans
-                        )
+                        area_sg = area_sg * iris_response["ELEMENTS"][index_values2].trans
                     # SG and SJI areas at wavelength
                     interpol_sg = scipy.interpolate.interp1d(
                         iris_response["LAMBDA"],
@@ -353,11 +329,7 @@ def get_iris_response(
                         sca2 = interpol_sg2(wavelength) / area_sg2
                         # Normalize slant so that total(wei*asj2*sca2)/total(wei*asj2)=1
                         for m in range(2):
-                            sca2n = (
-                                sca2
-                                * np.sum(weight * area_sj2[m, :])
-                                / np.sum(weight * area_sj2[m, :] * sca2)
-                            )
+                            sca2n = sca2 * np.sum(weight * area_sj2[m, :]) / np.sum(weight * area_sj2[m, :] * sca2)
                             interpol_sca = scipy.interpolate.interp1d(
                                 wavelength, np.squeeze(sca2n), fill_value="extrapolate"
                             )
@@ -367,10 +339,7 @@ def get_iris_response(
                 else:
                     # NUV: essentially same calculation as r.version=3
                     for n in range(n_time_obs):
-                        iris_response["AREA_SJI"] = [
-                            Quantity(x, unit=u.cm ** 2)
-                            for x in iris_response["AREA_SJI"]
-                        ]
+                        iris_response["AREA_SJI"] = [Quantity(x, unit=u.cm ** 2) for x in iris_response["AREA_SJI"]]
                         area_sji = [x for x in area_sji]
                         iris_response["AREA_SJI"][2:4] = area_sji[:]
             for j in range(4):
@@ -381,9 +350,7 @@ def get_iris_response(
                     iris_response["COEFFS_SJI"][j, :, :],
                 )
                 for k in range(n_time_obs):
-                    iris_response["AREA_SJI"][j] = (
-                        iris_response["AREA_SJI"][j] * iris_fit_sji[k]
-                    )
+                    iris_response["AREA_SJI"][j] = iris_response["AREA_SJI"][j] * iris_fit_sji[k]
 
     if not isinstance(iris_response["AREA_SG"], Quantity):
         iris_response["AREA_SG"] = Quantity(iris_response["AREA_SG"], unit=u.cm ** 2)
@@ -427,9 +394,7 @@ def fit_iris_xput(time_obs, time_cal_coeffs, cal_coeffs):
 
     if size_time_cal_coeffs[1] != 2 or size_cal_coeffs[1] < 2:
         # Raise ValueError as time coefficient have the wrong format.
-        raise ValueError(
-            "Incorrect number of elements either in time_cal_coeffs or in cal_coeffs."
-        )
+        raise ValueError("Incorrect number of elements either in time_cal_coeffs or in cal_coeffs.")
 
     # Some time transformations.
     # Convert the time_cal_coeffs given in the .geny file into a ``astropy.time.Time``
@@ -478,13 +443,9 @@ def fit_iris_xput(time_obs, time_cal_coeffs, cal_coeffs):
             dtt_0 = 1.0 - dtt_1
             exp_0 = np.exp(cal_coeffs[(w // 2) - 1, 2] * (t_diff[w - 2]))
             exp_1 = np.exp(cal_coeffs[w // 2, 2] * (t_diff[w]))
-            aux_cal_coeffs[w - 2 : w + 2] = np.array(
-                [dtt_0, dtt_0 * exp_0, dtt_1, dtt_1 * exp_1]
-            )
+            aux_cal_coeffs[w - 2 : w + 2] = np.array([dtt_0, dtt_0 * exp_0, dtt_1, dtt_1 * exp_1])
         # print(aux_cal_coeffs)
         # print(cal_coeffs[:,:2].reshape((aux_cal_coeffs.shape[0])))
-        fit_out[i] = np.matmul(
-            aux_cal_coeffs, cal_coeffs[:, :2].reshape(aux_cal_coeffs.shape[0])
-        )
+        fit_out[i] = np.matmul(aux_cal_coeffs, cal_coeffs[:, :2].reshape(aux_cal_coeffs.shape[0]))
 
     return fit_out
