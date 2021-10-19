@@ -1,3 +1,5 @@
+import textwrap
+
 import astropy.units as u
 import numpy as np
 from astropy.time import Time
@@ -81,29 +83,30 @@ class IRISSpectrogramCube(SpectrogramCube):
         )
 
     def __repr__(self):
+        return f"{object.__repr__(self)}\n{str(self)}"
+
+    def __str__(self):
         roll = self.meta.get("SAT_ROT", None)
-        if isinstance(self.axis_world_coords("time", wcs=self.extra_coords)[0], Time):
+        if self.global_coords and "time" in self.global_coords:
+            instance_start = self.global_coords["time"].min().isot
+            instance_end = self.global_coords["time"].max().isot
+        elif self.extra_coords and isinstance(self.axis_world_coords("time", wcs=self.extra_coords)[0], Time):
             instance_start = self.axis_world_coords("time", wcs=self.extra_coords)[0].min().isot
             instance_end = self.axis_world_coords("time", wcs=self.extra_coords)[0].max().isot
         else:
             instance_start = None
             instance_end = None
-        return """
-IRISSpectrogramCube
--------------------
-{obs_repr}
+        return textwrap.dedent(
+            f"""
+                IRISSpectrogramCube
+                -------------------
+                {utils.produce_obs_repr_string(self.meta)}
 
-Spectrogram period: {inst_start} -- {inst_end}
-Data shape: {shape}
-Axis Types: {axis_types}
-Roll: {roll}
-""".format(
-            obs_repr=utils.produce_obs_repr_string(self.meta),
-            inst_start=instance_start,
-            inst_end=instance_end,
-            shape=self.dimensions,
-            axis_types=self.world_axis_physical_types,
-            roll=roll,
+                Spectrogram period: {instance_start} -- {instance_end}
+                Data shape: {self.dimensions}
+                Axis Types: {self.array_axis_physical_types}
+                Roll: {roll}
+                """
         )
 
     def convert_to(self, new_unit_type, time_obs=None, response_version=4):
@@ -286,7 +289,7 @@ Roll: {roll}
             inst_start=self[0].extra_coords["time"]["value"][0],
             inst_end=self[-1].extra_coords["time"]["value"][-1],
             seq_shape=self.dimensions,
-            axis_types=self.world_axis_physical_types,
+            axis_types=self.array_axis_physical_types,
             roll=roll,
         )
 
