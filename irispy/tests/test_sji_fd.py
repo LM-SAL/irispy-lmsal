@@ -289,7 +289,7 @@ sequence_per_s_per_s = IRISMapCubeSequence(
 )
 sequence_s = IRISMapCubeSequence(data_list=[cube_seq_s, cube_seq_s], meta=meta_1, common_axis=0)
 sequence_s_s = IRISMapCubeSequence(data_list=[cube_seq_s_s, cube_seq_s_s], meta=meta_1, common_axis=0)
-seq_dust = IRISMapCubeSequence(data_list=[cube_dust, cube_dust])
+seq_dust = IRISMapCubeSequence(data_list=[cube_dust, cube_dust], common_axis=0)
 
 ##############################################################################
 # IRISMapCube Tests
@@ -353,8 +353,8 @@ def test_dimensions(test_input, expected):
         )
     ],
 )
-def test_world_axis_physical_types(test_input, expected):
-    assert test_input.world_axis_physical_types == expected
+def test_array_axis_physical_types(test_input, expected):
+    assert test_input.array_axis_physical_types == expected
 
 
 @pytest.mark.parametrize(

@@ -217,15 +217,13 @@ def test_fits_data_comparison(iris_l2_test_raster):
     """
     Make sure the data is the same in pyfits and irispy.
     """
-    hdulist = fits.open(os.path.join(testpath, "iris_l2_20170502_052551_3893010094_raster_t000_r00000.fits"))
-    spectral_window1 = hdulist[0].header["TDESC1"]
-    spectral_window2 = hdulist[0].header["TDESC2"]
-    spectral_window3 = hdulist[0].header["TDESC3"]
-
-    data1 = copy.deepcopy(hdulist[1].data)
-    data2 = copy.deepcopy(hdulist[2].data)
-    data3 = copy.deepcopy(hdulist[3].data)
-
-    np.testing.assert_array_almost_equal(iris_l2_test_raster[spectral_window1].data[0].data, data1)
-    np.testing.assert_array_almost_equal(iris_l2_test_raster[spectral_window2].data[0].data, data2)
-    np.testing.assert_array_almost_equal(iris_l2_test_raster[spectral_window3].data[0].data, data3)
+    with fits.open(os.path.join(testpath, "iris_l2_20170502_052551_3893010094_raster_t000_r00000.fits")) as hdulist:
+        spectral_window1 = hdulist[0].header["TDESC1"]
+        spectral_window2 = hdulist[0].header["TDESC2"]
+        spectral_window3 = hdulist[0].header["TDESC3"]
+        data1 = copy.deepcopy(hdulist[1].data)
+        data2 = copy.deepcopy(hdulist[2].data)
+        data3 = copy.deepcopy(hdulist[3].data)
+        np.testing.assert_array_almost_equal(iris_l2_test_raster[spectral_window1].data[0].data, data1)
+        np.testing.assert_array_almost_equal(iris_l2_test_raster[spectral_window2].data[0].data, data2)
+        np.testing.assert_array_almost_equal(iris_l2_test_raster[spectral_window3].data[0].data, data3)

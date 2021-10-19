@@ -1,6 +1,8 @@
 """
 This module provides movie tools for level 2 IRIS SJI fits file.
 """
+import textwrap
+
 import matplotlib.pyplot as plt
 import sunpy.visualization.colormaps as cm  # NOQA
 from astropy.time import Time
@@ -85,6 +87,9 @@ class IRISMapCube(SpectrogramCube):
         )
 
     def __repr__(self):
+        return f"{object.__repr__(self)}\n{str(self)}"
+
+    def __str__(self):
         roll = self.meta.get("SAT_ROT", None)
         # Conversion of the start date of OBS
         startobs = self.meta.get("STARTOBS", None)
@@ -93,44 +98,34 @@ class IRISMapCube(SpectrogramCube):
         endobs = self.meta.get("ENDOBS", None)
         endobs = endobs.isot if endobs else None
         # Conversion of the instance start and end of OBS
-        # self.axis_world_coords("time", wcs=self.extra_coords)[0][0].isot
-        if isinstance(self.axis_world_coords("time", wcs=self.extra_coords)[0], Time):
+        if self.global_coords and "time" in self.global_coords:
+            instance_start = self.global_coords["time"].min().isot
+            instance_end = self.global_coords["time"].max().isot
+        elif self.extra_coords and isinstance(self.axis_world_coords("time", wcs=self.extra_coords)[0], Time):
             instance_start = self.axis_world_coords("time", wcs=self.extra_coords)[0].min().isot
             instance_end = self.axis_world_coords("time", wcs=self.extra_coords)[0].max().isot
         else:
             instance_start = None
             instance_end = None
         # Representation of IRISMapCube object
-        return """
-    IRISMapCube
-    -----------
-    Observatory:\t\t {obs}
-    Instrument:\t\t\t {instrument}
-    Bandpass:\t\t\t {bandpass}
-    Obs. Start:\t\t\t {startobs}
-    Obs. End:\t\t\t {endobs}
-    Instance Start:\t\t {instance_start}
-    Instance End:\t\t {instance_end}
-    Roll:\t\t\t {roll}
-    Total Frames in Obs.:\t {frame_num}
-    IRIS Obs. id:\t\t {obs_id}
-    IRIS Obs. Description:\t {obs_desc}
-    Cube dimensions:\t\t {dimensions}
-    Axis Types:\t\t\t {axis_types}
-    """.format(
-            obs=self.meta.get("TELESCOP", None),
-            instrument=self.meta.get("INSTRUME", None),
-            bandpass=self.meta.get("TWAVE1", None),
-            startobs=startobs,
-            endobs=endobs,
-            instance_start=instance_start,
-            instance_end=instance_end,
-            roll=roll,
-            frame_num=self.meta.get("NBFRAMES", None),
-            obs_id=self.meta.get("OBSID", None),
-            obs_desc=self.meta.get("OBS_DESC", None),
-            axis_types=self.world_axis_physical_types,
-            dimensions=self.dimensions,
+        return textwrap.dedent(
+            f"""
+            IRISMapCube
+            -----------
+            Observatory:\t\t {self.meta.get("TELESCOP", None)}
+            Instrument:\t\t\t {self.meta.get("INSTRUME", None)}
+            Bandpass:\t\t\t {self.meta.get("TWAVE1", None)}
+            Obs. Start:\t\t\t {startobs}
+            Obs. End:\t\t\t {endobs}
+            Instance Start:\t\t {instance_start}
+            Instance End:\t\t {instance_end}
+            Roll:\t\t\t {roll}
+            Total Frames in Obs.:\t {self.meta.get("NBFRAMES", None)}
+            IRIS Obs. id:\t\t {self.meta.get("OBSID", None)}
+            IRIS Obs. Description:\t {self.meta.get("OBS_DESC", None)}
+            Axis Types:\t\t\t {self.array_axis_physical_types}
+            Cube dimensions:\t\t {self.dimensions}
+            """
         )
 
     def __getitem__(self, item):
@@ -199,6 +194,9 @@ class IRISMapCubeSequence(RasterSequence):
         super().__init__(data_list, meta=meta, common_axis=common_axis)
 
     def __repr__(self):
+        return f"{object.__repr__(self)}\n{str(self)}"
+
+    def __str__(self):
         roll = self.meta.get("SAT_ROT", None)
         # Conversion of the start date of OBS
         startobs = self.meta.get("STARTOBS", None)
@@ -213,33 +211,35 @@ class IRISMapCubeSequence(RasterSequence):
         instance_end = self[-1].extra_coords["time"]["value"]
         instance_end = instance_end.isot if instance_end else None
         # Representation of IRISMapCube object
-        return """
-IRISMapCubeSequence
--------------------
-Observatory:\t\t {obs}
-Instrument:\t\t {instrument}
+        return textwrap.dedent(
+            f"""
+                IRISMapCubeSequence
+                -------------------
+                Observatory:\t\t {self.meta.get("TELESCOP", None)}
+                Instrument:\t\t {self.meta.get("INSTRUME", None)}
 
-OBS ID:\t\t\t {obs_id}
-OBS Description:\t {obs_desc}
-OBS period:\t\t {obs_start} -- {obs_end}
+                OBS ID:\t\t\t {self.meta.get("OBSID", None)}
+                OBS Description:\t {self.meta.get("OBS_DESC", None)}
+                OBS period:\t\t {startobs} -- {endobs}
 
-Sequence period:\t {inst_start} -- {inst_end}
-Sequence Shape:\t\t {seq_shape}
-Roll:\t\t\t {roll}
-Axis Types:\t\t {axis_types}
+                Sequence period:\t {instance_start} -- {inst_end}
+                Sequence Shape:\t\t {seq_shape}
+                Roll:\t\t\t {roll}
+                Axis Types:\t\t {axis_types}
 
-""".format(
-            obs=self.meta.get("TELESCOP", None),
-            instrument=self.meta.get("INSTRUME", None),
-            obs_id=self.meta.get("OBSID", None),
-            obs_desc=self.meta.get("OBS_DESC", None),
-            obs_start=startobs,
-            obs_end=endobs,
-            inst_start=instance_start,
-            inst_end=instance_end,
-            seq_shape=self.dimensions,
-            roll=roll,
-            axis_types=self.world_axis_physical_types,
+                """.format(
+                obs=self.meta.get("TELESCOP", None),
+                instrument=self.meta.get("INSTRUME", None),
+                obs_id=self.meta.get("OBSID", None),
+                obs_desc=self.meta.get("OBS_DESC", None),
+                obs_start=startobs,
+                obs_end=endobs,
+                inst_start=instance_start,
+                inst_end=instance_end,
+                seq_shape=self.dimensions,
+                roll=roll,
+                axis_types=self.array_axis_physical_types,
+            )
         )
 
     def __getitem__(self, item):
@@ -248,10 +248,6 @@ Axis Types:\t\t {axis_types}
     @property
     def dimensions(self):
         return self.cube_like_dimensions
-
-    @property
-    def world_axis_physical_types(self):
-        return self.cube_like_world_axis_physical_types
 
     def plot(self, axes=None, plot_axis_indices=None, axes_coordinates=None, axes_units=None, data_unit=None, **kwargs):
         """
