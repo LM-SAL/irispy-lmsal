@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import sunpy.visualization.colormaps as cm  # NOQA
 from astropy.time import Time
 
-from sunraster import RasterSequence, SpectrogramCube
+from sunraster import SpectrogramCube, SpectrogramSequence
 
 from irispy import utils
 
@@ -171,7 +171,7 @@ class IRISMapCube(SpectrogramCube):
             self.dust_masked = True
 
 
-class IRISMapCubeSequence(RasterSequence):
+class IRISMapCubeSequence(SpectrogramSequence):
     """
     Class for holding, slicing and plotting IRIS SJI data.
 
