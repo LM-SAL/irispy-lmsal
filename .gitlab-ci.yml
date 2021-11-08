@@ -1,47 +1,64 @@
-image: python:3.7
+image: python:3.8
 
 before_script:
   - pip install tox
 
 stages:
-- Install
-#- Static
-#- Test
-#- Docs
+  - Basic
+  - Test
+  - Extra
+  - Deploy
 
-#install:
-#  stage: Install
-#  script:
-#    - pip install .
+codestyle:
+  stage: Basic
+  script:
+    - tox -e codestyle
 
-#codestyle:
-#  stage: Static
-#  script:
-#    - tox -e codestyle
+py39:
+  stage: Basic
+  image: python:3.9
+  script:
+    - tox -e py39
 
-#twine:
-#  stage: Static
-#  script:
-#    - tox -e twine
+py37:
+  stage: Test
+  image: python:3.7
+  script:
+    - tox -e py37
 
-#py37-online:
-#  stage: Test
-#  script:
-#    - tox -e py37-online
+py38-online:
+  stage: Test
+  script:
+    - tox -e py38-online
+    - pip install --upgrade codecov
+    - codecov
 
-#py38-online:
-#  stage: Test
-#  image: python:3.8
-#  script:
-#    - tox -e py38-online
-
-#py37-devdeps:
-#  allow_failure: true
-#  stage: Test
-#  script:
-#    - tox -e py37-devdeps
+py38-devdeps:
+  allow_failure: true
+  stage: Extra
+  script:
+    - tox -e py38-devdeps
 
 build_docs:
-  stage: Docs
+  stage: Extra
+  before_script:
+    # Need graphviz binary for generating inheritance diagrams
+    - apt-get update -qq && apt-get install -y -qq graphviz
+    - pip install tox
   script:
     - tox -e build_docs
+
+# # Upload to PyPI when we push to a tag
+# pypi:
+#   stage: Deploy
+#   # only run on parent tags with semantic versioning names, excluding dev tags
+#   only:
+#     - /v\d+\.\d+\.\d+(?!(dev))/@LMSAL_HUB/aia_hub/aiapy
+#   except:
+#     - branches
+#     - merge_requests
+#   before_script:
+#     - pip install --upgrade twine pep517
+#   script:
+#     - python -m pep517.build --source --out-dir dist .
+#     - twine upload dist/aiapy*.tar.gz

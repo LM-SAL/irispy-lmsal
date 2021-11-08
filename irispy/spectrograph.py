@@ -1,6 +1,8 @@
+import textwrap
+
 import astropy.units as u
 import numpy as np
-from ndcube.utils.cube import convert_extra_coords_dict_to_input_format
+from astropy.time import Time
 
 from sunraster import SpectrogramCube, SpectrogramSequence
 from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
@@ -39,10 +41,6 @@ class IRISSpectrogramCube(SpectrogramCube):
         Mask for the dataset. Masks should follow the numpy convention
         that valid data points are marked by False and invalid ones with True.
         Defaults to None.
-    extra_coords : iterable of `tuple`, each with three entries
-        (`str`, `int`, `astropy.units.quantity` or array-like)
-        Gives the name, axis of data, and values of coordinates of a data axis not
-        included in the WCS object.
     copy : `bool`, optional
         Indicates whether to save the arguments as copy. True copies every attribute
         before saving it while False tries to save every parameter as reference.
@@ -57,35 +55,20 @@ class IRISSpectrogramCube(SpectrogramCube):
         uncertainty,
         unit,
         meta,
-        extra_coords,
         mask=None,
         copy=False,
-        missing_axes=None,
     ):
-        # Check required meta data is provided.
         required_meta_keys = ["detector type"]
         if not all([key in list(meta) for key in required_meta_keys]):
             raise ValueError(f"Meta must contain following keys: {required_meta_keys}")
-        # Check extra_coords contains required coords.
-        required_extra_coords_keys = ["time", "exposure time"]
-        extra_coords_keys = [coord[0] for coord in extra_coords]
-        if not all([key in extra_coords_keys for key in required_extra_coords_keys]):
-            raise ValueError(
-                "The following extra coords must be supplied: {} vs. {} from {}".format(
-                    required_extra_coords_keys, extra_coords_keys, extra_coords
-                )
-            )
-        # Initialize IRISSpectrogramCube.
         super().__init__(
             data,
             wcs,
+            unit=unit,
             uncertainty=uncertainty,
             mask=mask,
             meta=meta,
-            unit=unit,
-            extra_coords=extra_coords,
             copy=copy,
-            missing_axes=missing_axes,
         )
 
     def __getitem__(self, item):
@@ -96,40 +79,34 @@ class IRISSpectrogramCube(SpectrogramCube):
             result.uncertainty,
             result.unit,
             result.meta,
-            convert_extra_coords_dict_to_input_format(
-                result.extra_coords, result.missing_axes
-            ),
             mask=result.mask,
-            missing_axes=result.missing_axes,
         )
 
     def __repr__(self):
-        roll = self.meta.get("SAT_ROT", None)
-        if self.extra_coords["time"]["axis"] is None:
-            axis_missing = True
-        else:
-            axis_missing = self.missing_axes[::-1][self.extra_coords["time"]["axis"]]
-        if axis_missing is True:
-            instance_start = instance_end = self.extra_coords["time"]["value"]
-        else:
-            instance_start = self.extra_coords["time"]["value"][0].isot
-            instance_end = self.extra_coords["time"]["value"][-1].isot
-        return """
-IRISSpectrogramCube
--------------------
-{obs_repr}
+        return f"{object.__repr__(self)}\n{str(self)}"
 
-Spectrogram period: {inst_start} -- {inst_end}
-Data shape: {shape}
-Axis Types: {axis_types}
-Roll: {roll}
-""".format(
-            obs_repr=utils.produce_obs_repr_string(self.meta),
-            inst_start=instance_start,
-            inst_end=instance_end,
-            shape=self.dimensions,
-            axis_types=self.world_axis_physical_types,
-            roll=roll,
+    def __str__(self):
+        roll = self.meta.get("SAT_ROT", None)
+        if self.global_coords and "time" in self.global_coords:
+            instance_start = self.global_coords["time"].min().isot
+            instance_end = self.global_coords["time"].max().isot
+        elif self.extra_coords and isinstance(self.axis_world_coords("time", wcs=self.extra_coords)[0], Time):
+            instance_start = self.axis_world_coords("time", wcs=self.extra_coords)[0].min().isot
+            instance_end = self.axis_world_coords("time", wcs=self.extra_coords)[0].max().isot
+        else:
+            instance_start = None
+            instance_end = None
+        return textwrap.dedent(
+            f"""
+                IRISSpectrogramCube
+                -------------------
+                {utils.produce_obs_repr_string(self.meta)}
+
+                Spectrogram period: {instance_start} -- {instance_end}
+                Data shape: {self.dimensions}
+                Axis Types: {self.array_axis_physical_types}
+                Roll: {roll}
+                """
         )
 
     def convert_to(self, new_unit_type, time_obs=None, response_version=4):
@@ -170,23 +147,16 @@ Roll: {roll}
             # Get spectral dispersion per pixel.
             spectral_wcs_index = np.where(np.array(self.wcs.wcs.ctype) == "WAVE")[0][0]
             spectral_dispersion_per_pixel = (
-                self.wcs.wcs.cdelt[spectral_wcs_index]
-                * self.wcs.wcs.cunit[spectral_wcs_index]
+                self.wcs.wcs.cdelt[spectral_wcs_index] * self.wcs.wcs.cunit[spectral_wcs_index]
             )
             # Get solid angle from slit width for a pixel.
             lat_wcs_index = ["HPLT" in c for c in self.wcs.wcs.ctype]
             lat_wcs_index = np.arange(len(self.wcs.wcs.ctype))[lat_wcs_index]
             lat_wcs_index = lat_wcs_index[0]
-            solid_angle = (
-                self.wcs.wcs.cdelt[lat_wcs_index]
-                * self.wcs.wcs.cunit[lat_wcs_index]
-                * utils.SLIT_WIDTH
-            )
+            solid_angle = self.wcs.wcs.cdelt[lat_wcs_index] * self.wcs.wcs.cunit[lat_wcs_index] * utils.SLIT_WIDTH
             # Get wavelength for each pixel.
             # TODO: spectral_data_index UNUSED
-            spectral_data_index = (-1) * (np.arange(len(self.dimensions)) + 1)[
-                spectral_wcs_index
-            ]
+            spectral_data_index = (-1) * (np.arange(len(self.dimensions)) + 1)[spectral_wcs_index]  # NOQA
             obs_wavelength = self.axis_world_coords(2)
 
         if new_unit_type == "DN" or new_unit_type == "photons":
@@ -211,12 +181,9 @@ Roll: {roll}
                     new_uncertainty,
                     new_unit,
                     self.meta,
-                    convert_extra_coords_dict_to_input_format(
-                        self.extra_coords, self.missing_axes
-                    ),
                     mask=self.mask,
-                    missing_axes=self.missing_axes,
                 )
+                self._extra_coords = self.extra_coords
             if new_unit_type == "DN":
                 new_unit = utils.DN_UNIT[detector_type]
             else:
@@ -253,18 +220,16 @@ Roll: {roll}
                 new_unit = new_data_quantities[0].unit
         else:
             raise ValueError("Input unit type not recognized.")
-        return IRISSpectrogramCube(
+        new_cube = IRISSpectrogramCube(
             new_data,
             self.wcs,
             new_uncertainty,
             new_unit,
             self.meta,
-            convert_extra_coords_dict_to_input_format(
-                self.extra_coords, self.missing_axes
-            ),
             mask=self.mask,
-            missing_axes=self.missing_axes,
         )
+        new_cube._extra_coords = self.extra_coords
+        return new_cube
 
 
 class IRISSpectrogramCubeSequence(SpectrogramSequence):
@@ -299,14 +264,10 @@ class IRISSpectrogramCubeSequence(SpectrogramSequence):
             raise ValueError(f"Meta must contain following keys: {required_meta_keys}")
         # Check that all spectrograms are from same specral window and OBS ID.
         if len(np.unique([cube.meta["OBSID"] for cube in data_list])) != 1:
-            raise ValueError(
-                "Constituent IRISSpectrogramCube objects must have same "
-                "value of 'OBSID' in its meta."
-            )
+            raise ValueError("Constituent IRISSpectrogramCube objects must have same " "value of 'OBSID' in its meta.")
         if len(np.unique([cube.meta["spectral window"] for cube in data_list])) != 1:
             raise ValueError(
-                "Constituent IRISSpectrogramCube objects must have same "
-                "value of 'spectral window' in its meta."
+                "Constituent IRISSpectrogramCube objects must have same " "value of 'spectral window' in its meta."
             )
         # Initialize Sequence.
         super().__init__(data_list, meta=meta, common_axis=common_axis)
@@ -328,7 +289,7 @@ Roll: {roll}
             inst_start=self[0].extra_coords["time"]["value"][0],
             inst_end=self[-1].extra_coords["time"]["value"][-1],
             seq_shape=self.dimensions,
-            axis_types=self.world_axis_physical_types,
+            axis_types=self.array_axis_physical_types,
             roll=roll,
         )
 
@@ -353,8 +314,6 @@ Roll: {roll}
         for cube in self.data:
             converted_data_list.append(cube.convert_to(new_unit_type))
         if copy is True:
-            return IRISSpectrogramCubeSequence(
-                converted_data_list, meta=self.meta, common_axis=self._common_axis
-            )
+            return IRISSpectrogramCubeSequence(converted_data_list, meta=self.meta, common_axis=self._common_axis)
         else:
             self.data = converted_data_list
