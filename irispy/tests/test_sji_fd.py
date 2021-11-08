@@ -7,6 +7,8 @@ from astropy import units as u
 from astropy.time import Time
 from astropy.wcs import WCS
 
+from sunraster.extern.meta import Meta
+
 from irispy import IRISMapCube, IRISMapCubeSequence, utils
 
 ##############################################################################
@@ -113,7 +115,8 @@ uncertainty_1D = np.sqrt(data_1D)
 uncertainty_4D = np.sqrt(data_4D)
 times = Time(["2014-12-11T19:39:00.48", "2014-12-11T19:43:07.6"])
 exposure_times = 2 * np.ones((2), float) * u.s
-extra_coords = [("time", 0, times), ("exposure time", 0, exposure_times)]
+meta = Meta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_shape=data.shape)
+extra_coords = [("time", 0, times)]
 scaled_T = True
 scaled_F = False
 cube = IRISMapCube(
@@ -123,9 +126,9 @@ cube = IRISMapCube(
     mask=mask_cube,
     unit=unit,
     scaled=scaled_T,
+    meta=meta,
 )
 cube.extra_coords.add(*extra_coords[0])
-cube.extra_coords.add(*extra_coords[1])
 cube_2D = IRISMapCube(
     data_2D,
     wcs_2D,
@@ -133,9 +136,9 @@ cube_2D = IRISMapCube(
     mask=mask_cube,
     unit=unit,
     scaled=scaled_T,
+    meta=meta,
 )
 cube_2D.extra_coords.add(*extra_coords[0])
-cube_2D.extra_coords.add(*extra_coords[1])
 cube_1D = IRISMapCube(
     data_1D,
     wcs_1D,
@@ -143,9 +146,9 @@ cube_1D = IRISMapCube(
     mask=mask_cube,
     unit=unit,
     scaled=scaled_T,
+    meta=meta,
 )
 cube_1D.extra_coords.add(*extra_coords[0])
-cube_1D.extra_coords.add(*extra_coords[1])
 cube_F = IRISMapCube(
     data,
     wcs,
@@ -153,9 +156,9 @@ cube_F = IRISMapCube(
     mask=mask_cube,
     unit=unit,
     scaled=scaled_F,
+    meta=meta,
 )
 cube_F.extra_coords.add(*extra_coords[0])
-cube_F.extra_coords.add(*extra_coords[1])
 cube_4D = IRISMapCube(
     data_4D,
     wcs_4D,
@@ -163,9 +166,9 @@ cube_4D = IRISMapCube(
     mask=mask_4D,
     unit=unit,
     scaled=scaled_T,
+    meta=meta,
 )
 cube_4D.extra_coords.add(*extra_coords[0])
-cube_4D.extra_coords.add(*extra_coords[1])
 data_dust = np.array(
     [
         [[-1, 2, -3, 4], [2, -200, 5, 3], [0, 1, 2, -300]],
@@ -208,9 +211,9 @@ dust_mask_expected = np.array(
 uncertainty = 1
 times = Time(["2014-12-11T19:39:00.48", "2014-12-11T19:43:07.6"])
 exposure_times = 2 * np.ones((2), float) * u.s
-extra_coords = [("time", 0, times), ("exposure time", 0, exposure_times)]
+extra_coords = [("time", 0, times)]
 scaled_T = True
-meta = {"OBSID": 1}
+meta = Meta({"exposure time": exposure_times, "OBSID": 1}, axes={"exposure time": 0}, data_shape=data_dust.shape)
 cube_dust = IRISMapCube(
     data_dust,
     wcs,
@@ -221,75 +224,68 @@ cube_dust = IRISMapCube(
     meta=meta,
 )
 cube_dust.extra_coords.add(*extra_coords[0])
-cube_dust.extra_coords.add(*extra_coords[1])
 
 ##############################################################################
 # IRISMapCubeSequence Fixtures
 ##############################################################################
-meta_1 = {"OBSID": 1}
 cube_seq = IRISMapCube(
     data,
     wcs,
     uncertainty=uncertainty,
     mask=mask_cube,
     unit=unit,
-    meta=meta_1,
+    meta=meta,
     scaled=scaled_T,
 )
 cube_seq.extra_coords.add(*extra_coords[0])
-cube_seq.extra_coords.add(*extra_coords[1])
 cube_seq_per_s = IRISMapCube(
     data / 2,
     wcs,
     uncertainty=uncertainty,
     mask=mask_cube,
     unit=unit / u.s,
-    meta=meta_1,
+    meta=meta,
     scaled=scaled_T,
 )
 cube_seq_per_s.extra_coords.add(*extra_coords[0])
-cube_seq_per_s.extra_coords.add(*extra_coords[1])
 cube_seq_per_s_per_s = IRISMapCube(
     data / 2 / 2,
     wcs,
     uncertainty=uncertainty,
     mask=mask_cube,
     unit=unit / u.s / u.s,
-    meta=meta_1,
+    meta=meta,
     scaled=scaled_T,
 )
 cube_seq_per_s_per_s.extra_coords.add(*extra_coords[0])
-cube_seq_per_s_per_s.extra_coords.add(*extra_coords[1])
 cube_seq_s = IRISMapCube(
     data * 2,
     wcs,
     uncertainty=uncertainty,
     mask=mask_cube,
     unit=unit * u.s,
-    meta=meta_1,
+    meta=meta,
     scaled=scaled_T,
 )
 cube_seq_s.extra_coords.add(*extra_coords[0])
-cube_seq_s.extra_coords.add(*extra_coords[1])
 cube_seq_s_s = IRISMapCube(
     data * 2 * 2,
     wcs,
     uncertainty=uncertainty,
     mask=mask_cube,
     unit=unit * u.s * u.s,
-    meta=meta_1,
+    meta=meta,
     scaled=scaled_T,
 )
 cube_seq_s_s.extra_coords.add(*extra_coords[0])
-cube_seq_s_s.extra_coords.add(*extra_coords[1])
-sequence = IRISMapCubeSequence(data_list=[cube_seq, cube_seq], meta=meta_1, common_axis=0)
-sequence_per_s = IRISMapCubeSequence(data_list=[cube_seq_per_s, cube_seq_per_s], meta=meta_1, common_axis=0)
+sequence = IRISMapCubeSequence(data_list=[cube_seq, cube_seq], meta=meta, common_axis=0)
+sequence_per_s = IRISMapCubeSequence(data_list=[cube_seq_per_s, cube_seq_per_s], meta=meta, common_axis=0)
 sequence_per_s_per_s = IRISMapCubeSequence(
-    data_list=[cube_seq_per_s_per_s, cube_seq_per_s_per_s], meta=meta_1, common_axis=0
+    data_list=[cube_seq_per_s_per_s, cube_seq_per_s_per_s], meta=meta, common_axis=0
 )
-sequence_s = IRISMapCubeSequence(data_list=[cube_seq_s, cube_seq_s], meta=meta_1, common_axis=0)
-sequence_s_s = IRISMapCubeSequence(data_list=[cube_seq_s_s, cube_seq_s_s], meta=meta_1, common_axis=0)
-seq_dust = IRISMapCubeSequence(data_list=[cube_dust, cube_dust], common_axis=0)
+sequence_s = IRISMapCubeSequence(data_list=[cube_seq_s, cube_seq_s], meta=meta, common_axis=0)
+sequence_s_s = IRISMapCubeSequence(data_list=[cube_seq_s_s, cube_seq_s_s], meta=meta, common_axis=0)
+seq_dust = IRISMapCubeSequence(data_list=[cube_dust, cube_dust], meta=meta, common_axis=0)
 
 ##############################################################################
 # IRISMapCube Tests
@@ -316,12 +312,6 @@ def test_IRISMapCube_apply_exposure_time_correction_undo(test_input, expected):
     )
 
 
-@pytest.mark.parametrize("test_input", [(ValueError, cube_F), (ValueError, cube_4D)])
-def test_IRISMapCube_apply_exposure_time_correction_error(test_input):
-    with pytest.raises(test_input[0]):
-        test_input[1].apply_exposure_time_correction()
-
-
 @pytest.mark.parametrize("test_input,expected", [(cube_dust, dust_mask_expected)])
 def test_IRISMapCube_apply_dust_mask(test_input, expected):
     test_input.apply_dust_mask()
@@ -346,9 +336,12 @@ def test_dimensions(test_input, expected):
         (
             sequence,
             (
-                "time",
-                "custom:pos.helioprojective.lat",
-                "custom:pos.helioprojective.lon",
+                [
+                    ("meta.obs.sequence",),
+                    ("time", "time"),
+                    ("custom:pos.helioprojective.lon", "custom:pos.helioprojective.lat"),
+                    ("custom:pos.helioprojective.lon", "custom:pos.helioprojective.lat"),
+                ]
             ),
         )
     ],
