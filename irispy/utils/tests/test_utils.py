@@ -38,8 +38,6 @@ def test_get_detector_type(test_input, expected_output):
     assert utils.get_detector_type(test_input) == expected_output
 
 
-@pytest.mark.parametrize(
-    "input_array, expected_array", [(data_dust, dust_mask_expected)]
-)
+@pytest.mark.parametrize("input_array, expected_array", [(data_dust, dust_mask_expected)])
 def test_calculate_dust_mask(input_array, expected_array):
     np_test.assert_array_equal(utils.calculate_dust_mask(input_array), expected_array)

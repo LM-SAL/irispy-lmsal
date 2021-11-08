@@ -26,11 +26,7 @@ def gaussian1d_on_linear_bg(
     constant_term=None,
     linear_term=None,
 ):
-    return (
-        amplitude * np.exp(-(((x - mean) / standard_deviation) ** 2))
-        + constant_term
-        + linear_term * x
-    )
+    return amplitude * np.exp(-(((x - mean) / standard_deviation) ** 2)) + constant_term + linear_term * x
 
 
 def get_detector_type(meta):
@@ -56,9 +52,7 @@ def get_detector_type(meta):
     return detector_type
 
 
-def get_interpolated_effective_area(
-    time_obs, response_version, detector_type, obs_wavelength
-):
+def get_interpolated_effective_area(time_obs, response_version, detector_type, obs_wavelength):
     """
     To compute the interpolated time-dependent effective area.
 
@@ -103,9 +97,9 @@ def get_interpolated_effective_area(
         eff_area.to(eff_area_interp_base_unit ** 2).value,
         s=0,
     )
-    eff_area_interp = interpolate.splev(
-        obs_wavelength.to(eff_area_interp_base_unit).value, tck
-    ) * (eff_area_interp_base_unit ** 2)
+    eff_area_interp = interpolate.splev(obs_wavelength.to(eff_area_interp_base_unit).value, tck) * (
+        eff_area_interp_base_unit ** 2
+    )
     return eff_area_interp
 
 

@@ -22,15 +22,9 @@ BAD_PIXEL_VALUE_UNSCALED = -32768
 DETECTOR_GAIN = {"NUV": 18.0, "FUV": 6.0, "SJI": 18.0}
 DETECTOR_YIELD = {"NUV": 1.0, "FUV": 1.5, "SJI": 1.0}
 DN_UNIT = {
-    "NUV": u.def_unit(
-        "DN_IRIS_NUV", DETECTOR_GAIN["NUV"] / DETECTOR_YIELD["NUV"] * u.photon
-    ),
-    "FUV": u.def_unit(
-        "DN_IRIS_FUV", DETECTOR_GAIN["FUV"] / DETECTOR_YIELD["FUV"] * u.photon
-    ),
-    "SJI": u.def_unit(
-        "DN_IRIS_SJI", DETECTOR_GAIN["SJI"] / DETECTOR_YIELD["SJI"] * u.photon
-    ),
+    "NUV": u.def_unit("DN_IRIS_NUV", DETECTOR_GAIN["NUV"] / DETECTOR_YIELD["NUV"] * u.photon),
+    "FUV": u.def_unit("DN_IRIS_FUV", DETECTOR_GAIN["FUV"] / DETECTOR_YIELD["FUV"] * u.photon),
+    "SJI": u.def_unit("DN_IRIS_SJI", DETECTOR_GAIN["SJI"] / DETECTOR_YIELD["SJI"] * u.photon),
     "SJI_UNSCALED": u.def_unit("DN_IRIS_SJI_UNSCALED", u.ct),
 }
 

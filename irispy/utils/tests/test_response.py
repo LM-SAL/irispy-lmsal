@@ -12,12 +12,7 @@ from irispy.data.test import rootdir
 # Arrays for the fit_iris_xput method
 r = os.path.join(rootdir, "..", "iris_sra_c_20161022.geny")
 raw_response_data = scipy.io.readsav(r, python_dict=True, verbose=False)
-iris_response = dict(
-    [
-        (name, raw_response_data["p0"][name][0])
-        for name in raw_response_data["p0"].dtype.names
-    ]
-)
+iris_response = dict([(name, raw_response_data["p0"][name][0]) for name in raw_response_data["p0"].dtype.names])
 time_obs = parse_time("2013-09-03", format="utime")
 time_cal_coeffs0 = iris_response.get("C_F_TIME")
 time_cal_coeffs1 = iris_response.get("C_N_TIME")
@@ -46,16 +41,12 @@ def test_get_iris_response_not_equal_to_one():
 
 
 def test_get_iris_response_response_file():
-    assert pytest.raises(
-        KeyError, utils.get_iris_response, time_obs, response_file="hello.py"
-    )
+    assert pytest.raises(KeyError, utils.get_iris_response, time_obs, response_file="hello.py")
 
 
 # Tests for get_iris_response function
 # Version 1
-sav_file_path1 = os.path.join(
-    rootdir, "idl_iris_get_response_20130903_new_version001.sav"
-)
+sav_file_path1 = os.path.join(rootdir, "idl_iris_get_response_20130903_new_version001.sav")
 test_iris_response1 = scipy.io.readsav(sav_file_path1, python_dict=True, verbose=False)
 iris_response_load1 = test_iris_response1["iris_response"][0]
 
@@ -75,9 +66,7 @@ date_load1 = iris_response_load1.date
 # Version 2
 # Tests for get_iris_response function
 # Version 1
-sav_file_path1 = os.path.join(
-    rootdir, "idl_iris_get_response_20130903_new_version001.sav"
-)
+sav_file_path1 = os.path.join(rootdir, "idl_iris_get_response_20130903_new_version001.sav")
 test_iris_response1 = scipy.io.readsav(sav_file_path1, python_dict=True, verbose=False)
 iris_response_load1 = test_iris_response1["iris_response"][0]
 
@@ -94,9 +83,7 @@ comment_load1 = iris_response_load1.comment
 version_load1 = iris_response_load1.version
 date_load1 = iris_response_load1.date
 
-sav_file_path2 = os.path.join(
-    rootdir, "idl_iris_get_response_20130903_new_version002.sav"
-)
+sav_file_path2 = os.path.join(rootdir, "idl_iris_get_response_20130903_new_version002.sav")
 test_iris_response2 = scipy.io.readsav(sav_file_path2, python_dict=True, verbose=False)
 iris_response_load2 = test_iris_response2["iris_response"][0]
 
@@ -113,9 +100,7 @@ version_load2 = iris_response_load2.version
 date_load2 = iris_response_load2.date
 
 # Version 3
-sav_file_path3 = os.path.join(
-    rootdir, "idl_iris_get_response_20130903_new_version003.sav"
-)
+sav_file_path3 = os.path.join(rootdir, "idl_iris_get_response_20130903_new_version003.sav")
 
 test_iris_response3 = scipy.io.readsav(sav_file_path3, python_dict=True, verbose=False)
 iris_response_load3 = test_iris_response3["iris_response"][0]
@@ -133,9 +118,7 @@ version_load3 = iris_response_load3.version
 version_date_load3 = iris_response_load3.version_date
 
 # Version 4
-sav_file_path4 = os.path.join(
-    rootdir, "idl_iris_get_response_20130903_new_version004.sav"
-)
+sav_file_path4 = os.path.join(rootdir, "idl_iris_get_response_20130903_new_version004.sav")
 test_iris_response4 = scipy.io.readsav(sav_file_path4, python_dict=True, verbose=False)
 iris_response_load4 = test_iris_response4["iris_response"][0]
 
@@ -156,77 +139,52 @@ version_date_load4 = iris_response_load4.version_date
 @pytest.mark.remote_data
 def iris_response1():
     # For testing of version 1
-    return utils.get_iris_response(
-        time_obs=parse_time("2013-09-03", format="utime"), response_version=1
-    )
+    return utils.get_iris_response(time_obs=parse_time("2013-09-03", format="utime"), response_version=1)
 
 
 @pytest.mark.remote_data
 def test_get_iris_response_version1(iris_response1):
-    np_test.assert_almost_equal(
-        iris_response1["AREA_SG"].value, area_sg_load1, decimal=6
-    )
-    np_test.assert_almost_equal(
-        iris_response1["AREA_SJI"].value, area_sji_load1, decimal=6
-    )
+    np_test.assert_almost_equal(iris_response1["AREA_SG"].value, area_sg_load1, decimal=6)
+    np_test.assert_almost_equal(iris_response1["AREA_SJI"].value, area_sji_load1, decimal=6)
 
 
 @pytest.fixture
 @pytest.mark.remote_data
 def iris_response2():
     # For testing of version 2
-    return utils.get_iris_response(
-        time_obs=parse_time("2013-09-03", format="utime"), response_version=2
-    )
+    return utils.get_iris_response(time_obs=parse_time("2013-09-03", format="utime"), response_version=2)
 
 
 @pytest.mark.remote_data
 def test_get_iris_response_version2(iris_response2):
-    np_test.assert_almost_equal(
-        iris_response2["AREA_SG"].value, area_sg_load2, decimal=6
-    )
-    np_test.assert_almost_equal(
-        iris_response2["AREA_SJI"].value, area_sji_load2, decimal=6
-    )
+    np_test.assert_almost_equal(iris_response2["AREA_SG"].value, area_sg_load2, decimal=6)
+    np_test.assert_almost_equal(iris_response2["AREA_SJI"].value, area_sji_load2, decimal=6)
 
 
 @pytest.fixture
 @pytest.mark.remote_data
 def iris_response3():
     # For testing of version 3
-    return utils.get_iris_response(
-        time_obs=parse_time("2013-09-03", format="utime"), response_version=3
-    )
+    return utils.get_iris_response(time_obs=parse_time("2013-09-03", format="utime"), response_version=3)
 
 
 @pytest.mark.remote_data
 def test_get_iris_response_version3(iris_response3):
-    np_test.assert_almost_equal(
-        iris_response3["AREA_SG"].value, area_sg_load3, decimal=6
-    )
-    np_test.assert_almost_equal(
-        iris_response3["AREA_SJI"].value, area_sji_load3, decimal=6
-    )
+    np_test.assert_almost_equal(iris_response3["AREA_SG"].value, area_sg_load3, decimal=6)
+    np_test.assert_almost_equal(iris_response3["AREA_SJI"].value, area_sji_load3, decimal=6)
 
 
 @pytest.fixture
 @pytest.mark.remote_data
 def iris_response4():
     # For testing of version 4
-    return utils.get_iris_response(
-        time_obs=parse_time("2013-09-03", format="utime"), response_version=4
-    )
+    return utils.get_iris_response(time_obs=parse_time("2013-09-03", format="utime"), response_version=4)
 
 
-# TODO: to 6 DP, it failed.
 @pytest.mark.remote_data
 def test_get_iris_response_version4(iris_response4):
-    np_test.assert_almost_equal(
-        iris_response4["AREA_SG"].value, area_sg_load4, decimal=3
-    )
-    np_test.assert_almost_equal(
-        iris_response4["AREA_SJI"].value, area_sji_load4, decimal=3
-    )
+    np_test.assert_almost_equal(iris_response4["AREA_SG"].value, area_sg_load4, decimal=3)
+    np_test.assert_almost_equal(iris_response4["AREA_SJI"].value, area_sji_load4, decimal=3)
 
 
 @pytest.mark.parametrize(
