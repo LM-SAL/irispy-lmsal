@@ -8,12 +8,12 @@ from irispy import utils
 from irispy.sji import IRISMapCube, IRISMapCubeSequence
 from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, BAD_PIXEL_VALUE_UNSCALED
 
-__all__ = ["read_iris_sji_level2_fits"]
+__all__ = ["read_sji_lvl2"]
 
 
-def read_iris_sji_level2_fits(filenames, uncertainty=True, memmap=False):
+def read_sji_lvl2(filenames, uncertainty=True, memmap=False):
     """
-    Read IRIS level 2 SJI FITS from an OBS into an IRISMapCube instance.
+    Read level 2 SJI FITS into an IRISMapCube instance.
 
     Parameters
     ----------
