@@ -2,8 +2,14 @@
 This module provides general utility functions.
 """
 
+import shutil
+import numbers
+import tarfile
+from pathlib import Path
+
 import astropy.units as u
 import numpy as np
+import requests
 from astropy.modeling.models import custom_model
 from scipy import interpolate, ndimage
 
@@ -14,7 +20,78 @@ __all__ = [
     "get_interpolated_effective_area",
     "calculate_dust_mask",
     "gaussian1d_on_linear_bg",
+    "image_clipping",
 ]
+
+
+def _download_data(urls: list):
+    """
+    This only should be called in the irispy-lmsal example gallery.
+
+    THIS IS NOT A USER FACING FUNCTION TO DOWNLOAD DATA.
+    """
+    for url in urls:
+        filename = url.split("/")[-1]
+        if not Path(filename).exists():
+            with requests.get(url, stream=True) as r:
+                with open(filename, "wb") as f:
+                    shutil.copyfileobj(r.raw, f)
+        if ".tar.gz" in filename:
+            with tarfile.open(filename, "r") as tar:
+                tar.extractall(Path(filename).parent)
+
+
+def image_clipping(image, cutoff=1.5e-3, gamma=1.0):
+    """
+    Computes and returns the min and max values of the input (image), clipping
+    brightest and darkest pixels.
+
+    Parameters
+    ----------
+    image : `numpy.ndarray`
+        The input image.
+    cutoff : float, optional
+        The cutoff value for the histogram.
+        Defaults to 1.5e-3
+    gamma : float, optional
+        The gamma value for the histogram.
+        Defaults to 1.0
+
+    References
+    ----------
+    Based on original IDL routine by P.Suetterlin (06 Jul 1993)
+    Ported by V.Hansteen (15 Apr 2020)
+    """
+    hmin = np.min(image)
+    hmax = np.max(image)
+    if issubclass(image.dtype.type, numbers.Integral):
+        nbins = np.abs(np.max(image) - np.min(image))
+        hist = np.histogram(image, bins=nbins)
+        fak = 1
+    else:
+        nbins = 10000
+        fak = np.float(nbins) / (hmax - hmin)
+        hist = np.histogram((image - hmin) * fak, range=(0.0, float(nbins)), bins=nbins)
+    h = hist[0]
+    bin = hist[1]
+    nh = np.size(h)
+    # Integrate the histogram so that h(i) holds the number of points
+    # with equal or lower intensity.
+    for i in range(1, nh - 1):
+        h[i] = h[i] + h[i - 1]
+    h = h / float(h[nh - 2])
+    h[nh - 1] = 1
+    # As cutoff is in percent and h is normalized to unity,
+    # vmin/vmax are the indices of the point where the number of pixels
+    # with lower/higher intensity reach the given limit. This has to be
+    # converted to a real image value by dividing by the scalefactor
+    # fak and adding the min value of the image
+    # Note that the bottom value is taken off (addition of h[0] to cutoff),
+    # there are often very many points in IRIS images that are set to zero, this
+    # removes them from calculation... and seems to work.
+    vmin = (np.max(np.where(h <= (cutoff + h[0]), bin[1:] - bin[0], 0)) / fak + hmin) ** gamma
+    vmax = (np.min(np.where(h >= (1.0 - cutoff), bin[1:] - bin[0], nh - 2)) / fak + hmin) ** gamma
+    return vmin, vmax
 
 
 @custom_model

@@ -33,7 +33,7 @@ class IRISMapCube(SpectrogramCube):
         Uncertainty in the dataset. Should have an attribute uncertainty_type
         that defines what kind of uncertainty is stored, for example "std"
         for standard deviation or "var" for variance. A metaclass defining
-        such an interface is NDUncertainty - but isn’t mandatory. If the
+        such an interface is NDUncertainty - but isn't mandatory. If the
         uncertainty has no such attribute the uncertainty is stored as
         UnknownUncertainty.
         Defaults to None.
@@ -52,9 +52,10 @@ class IRISMapCube(SpectrogramCube):
 
     Examples
     --------
-    >>> from irispy.io import read_iris_sji_level2_fits  # doctest: +REMOTE_DATA
+    >>> from irispy.io import read_sji_lvl2  # doctest: +REMOTE_DATA
     >>> from irispy.data import sample  # doctest: +REMOTE_DATA
     >>> sji = read_iris_sji_level2_fits(sample.SJI_CUBE_1400)  # doctest: +REMOTE_DATA
+    >>> sji  # doctest: +REMOTE_DATA
     """
 
     def __init__(
@@ -157,7 +158,6 @@ class IRISMapCube(SpectrogramCube):
             If False, dust particles positions mask will be applied.
             If True, dust particles positions mask will be removed.
             Default=False
-
         """
         # Calculate position of dust pixels
         dust_mask = utils.calculate_dust_mask(self.data)

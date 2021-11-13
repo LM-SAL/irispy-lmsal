@@ -1,10 +1,9 @@
-A Python package that provides the tools to read in and analyze data from the IRIS solar-observing satellite.
-*************************************************************************************************************
-
+``irispy-lmsal``
+****************
 The Interface Region Imaging Spectrograph is a NASA-funded Small Explorer which uses a high-frame-rate ultraviolet imaging spectrometer to make observations of the Sun.
-It provides 0.3 arcsec angular resolution and sub-angstrom spectral resolution at a one second cadence.
-
 For more information see the mission/instrument paper which is available `online for free <https://www.lmsal.com/iris_science/doc?cmd=dcur&proj_num=IS0196&file_type=pdf>`__.
+
+``irispy-lmsal`` is a Python package that provides the tools to read in and analyze data from IRIS.
 
 .. image:: http://iris.lmsal.com/images/iris_full.jpg
   :width: 400
