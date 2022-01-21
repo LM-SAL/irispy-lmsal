@@ -1,25 +1,15 @@
-# Configuration file for the Sphinx documentation builder.
-#
-# This file does only contain a selection of the most common options. For a
-# full list see the documentation:
-# http://www.sphinx-doc.org/en/master/config
-
-
 # -- Project information -----------------------------------------------------
-
 from irispy import __version__
 
 project = "irispy-lmsal"
-copyright = "2020, LMSAL"
-author = "LMSAL"
+copyright = "2021, LMSAL"
+author = "IRIS Instrument Team"
 
 # The full version, including alpha/beta/rc tags
-
 release = __version__
 is_development = ".dev" in __version__
 
 # -- General configuration ---------------------------------------------------
-
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
@@ -29,6 +19,7 @@ extensions = [
     "sphinx_changelog",
     "sphinx.ext.autodoc",
     "sphinx.ext.coverage",
+    "sphinx_gallery.gen_gallery",
     "sphinx.ext.doctest",
     "sphinx.ext.inheritance_diagram",
     "sphinx.ext.intersphinx",
@@ -36,6 +27,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
+    "sphinx_panels",
 ]
 
 # Set automodapi to generate files inside the generated directory
@@ -85,15 +77,12 @@ intersphinx_mapping = {
 }
 
 # -- Options for HTML output -------------------------------------------------
-
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-
 try:
     from sunpy_sphinx_theme.conf import *
 except ImportError:
     html_theme = "default"
-
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -102,7 +91,6 @@ except ImportError:
 
 # Render inheritance diagrams in SVG
 graphviz_output_format = "svg"
-
 graphviz_dot_args = [
     "-Nfontsize=10",
     "-Nfontname=Helvetica Neue, Helvetica, Arial, sans-serif",
@@ -111,3 +99,19 @@ graphviz_dot_args = [
     "-Gfontsize=10",
     "-Gfontname=Helvetica Neue, Helvetica, Arial, sans-serif",
 ]
+
+from sphinx_gallery.sorting import ExampleTitleSortKey  # NOQA
+
+sphinx_gallery_conf = {
+    "backreferences_dir": os.path.join("generated", "modules"),
+    "filename_pattern": "^((?!skip_).)*$",
+    "examples_dirs": os.path.join("..", "examples"),
+    "within_subsection_order": ExampleTitleSortKey,
+    "gallery_dirs": os.path.join("generated", "gallery"),
+    "default_thumb_file": os.path.join(html_static_path[0], "img", "sunpy_icon_128x128.png"),
+    "abort_on_example_error": False,
+    "plot_gallery": "True",
+    "remove_config_comments": True,
+    "doc_module": ("sunpy"),
+    "only_warn_on_example_error": True,
+}

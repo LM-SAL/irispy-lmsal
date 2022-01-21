@@ -11,7 +11,7 @@ from astropy.wcs import WCS
 import irispy.data.test
 from irispy import IRISSpectrogramCube, IRISSpectrogramCubeSequence, utils
 from irispy.data.test import get_test_filepath
-from irispy.io import read_iris_spectrograph_level2_fits
+from irispy.io import read_spectrograph_lvl2
 
 testpath = irispy.data.test.rootdir
 # Arrays of DN
@@ -208,9 +208,7 @@ sequence_photon_s = IRISSpectrogramCubeSequence([spectrogram_photon_s0, spectrog
 
 @pytest.fixture
 def iris_l2_test_raster():
-    return read_iris_spectrograph_level2_fits(
-        get_test_filepath("iris_l2_20170502_052551_3893010094_raster_t000_r00000.fits")
-    )
+    return read_spectrograph_lvl2(get_test_filepath("iris_l2_20170502_052551_3893010094_raster_t000_r00000.fits"))
 
 
 def test_fits_data_comparison(iris_l2_test_raster):
