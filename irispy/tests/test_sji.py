@@ -3,27 +3,27 @@ import numpy as np
 import pytest
 
 from irispy.data.test import get_test_filepath
-from irispy.io.sji import read_iris_sji_level2_fits
+from irispy.io.sji import read_sji_lvl2
 
 
 @pytest.fixture
 def IRISMapCube_1330():
-    return read_iris_sji_level2_fits(get_test_filepath("iris_l2_20170502_052551_3893010094_SJI_1330_t000.fits"))
+    return read_sji_lvl2(get_test_filepath("iris_l2_20170502_052551_3893010094_SJI_1330_t000.fits"))
 
 
 @pytest.fixture
 def IRISMapCube_1400():
-    return read_iris_sji_level2_fits(get_test_filepath("iris_l2_20170502_052551_3893010094_SJI_1400_t000.fits"))
+    return read_sji_lvl2(get_test_filepath("iris_l2_20170502_052551_3893010094_SJI_1400_t000.fits"))
 
 
 @pytest.fixture
 def IRISMapCube_2796():
-    return read_iris_sji_level2_fits(get_test_filepath("iris_l2_20170502_052551_3893010094_SJI_2796_t000.fits"))
+    return read_sji_lvl2(get_test_filepath("iris_l2_20170502_052551_3893010094_SJI_2796_t000.fits"))
 
 
 @pytest.fixture
 def IRISMapCube_2832():
-    return read_iris_sji_level2_fits(get_test_filepath("iris_l2_20170502_052551_3893010094_SJI_2832_t000.fits"))
+    return read_sji_lvl2(get_test_filepath("iris_l2_20170502_052551_3893010094_SJI_2832_t000.fits"))
 
 
 AXIS = [

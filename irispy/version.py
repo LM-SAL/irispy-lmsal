@@ -2,10 +2,7 @@
 # This file is not included in wheels/tarballs, so otherwise it will
 # fall back on the generated _version module.
 try:
-    try:
-        from ._dev.scm_version import version
-    except ImportError:
-        from ._version import version
+    from ._version import version
 except Exception:
     import warnings
 
