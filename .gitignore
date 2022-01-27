@@ -6,7 +6,6 @@ __pycache__/
 *$py.class
 tmp/
 
-# C extensions
 *.so
 
 # Distribution / packaging
