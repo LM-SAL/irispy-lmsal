@@ -33,5 +33,5 @@ READOUT_NOISE = {
     "FUV": 3.1 * DN_UNIT["FUV"],
     "SJI": 1.2 * DN_UNIT["SJI"],
 }
-RADIANCE_UNIT = u.erg / u.cm ** 2 / u.s / u.steradian / u.Angstrom
+RADIANCE_UNIT = u.erg / u.cm**2 / u.s / u.steradian / u.Angstrom
 SLIT_WIDTH = 0.33 * u.arcsec
