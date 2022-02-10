@@ -125,9 +125,9 @@ def get_iris_response(
     iris_response = {name: raw_response_data["p0"][name][0] for name in raw_response_data["p0"].dtype.names}
     # Convert some properties to more convenient types.
     iris_response["LAMBDA"] = Quantity(iris_response["LAMBDA"], unit=u.nm)
-    iris_response["AREA_SG"] = Quantity(iris_response["AREA_SG"], unit=u.cm ** 2)
-    iris_response["AREA_SJI"] = Quantity(iris_response["AREA_SJI"], unit=u.cm ** 2)
-    iris_response["GEOM_AREA"] = Quantity(iris_response["GEOM_AREA"], unit=u.cm ** 2)
+    iris_response["AREA_SG"] = Quantity(iris_response["AREA_SG"], unit=u.cm**2)
+    iris_response["AREA_SJI"] = Quantity(iris_response["AREA_SJI"], unit=u.cm**2)
+    iris_response["GEOM_AREA"] = Quantity(iris_response["GEOM_AREA"], unit=u.cm**2)
     iris_response["VERSION"] = iris_response["VERSION"]
     # Convert some properties not found in version below version 3 to
     # more convenient types.
@@ -339,7 +339,7 @@ def get_iris_response(
                 else:
                     # NUV: essentially same calculation as r.version=3
                     for n in range(n_time_obs):
-                        iris_response["AREA_SJI"] = [Quantity(x, unit=u.cm ** 2) for x in iris_response["AREA_SJI"]]
+                        iris_response["AREA_SJI"] = [Quantity(x, unit=u.cm**2) for x in iris_response["AREA_SJI"]]
                         area_sji = [x for x in area_sji]
                         iris_response["AREA_SJI"][2:4] = area_sji[:]
             for j in range(4):
@@ -353,9 +353,9 @@ def get_iris_response(
                     iris_response["AREA_SJI"][j] = iris_response["AREA_SJI"][j] * iris_fit_sji[k]
 
     if not isinstance(iris_response["AREA_SG"], Quantity):
-        iris_response["AREA_SG"] = Quantity(iris_response["AREA_SG"], unit=u.cm ** 2)
+        iris_response["AREA_SG"] = Quantity(iris_response["AREA_SG"], unit=u.cm**2)
     if not isinstance(iris_response["AREA_SJI"], Quantity):
-        iris_response["AREA_SJI"] = Quantity(iris_response["AREA_SJI"], unit=u.cm ** 2)
+        iris_response["AREA_SJI"] = Quantity(iris_response["AREA_SJI"], unit=u.cm**2)
 
     return iris_response
 

@@ -70,7 +70,7 @@ def image_clipping(image, cutoff=1.5e-3, gamma=1.0):
         fak = 1
     else:
         nbins = 10000
-        fak = np.float(nbins) / (hmax - hmin)
+        fak = nbins / (hmax - hmin)
         hist = np.histogram((image - hmin) * fak, range=(0.0, float(nbins)), bins=nbins)
     h = hist[0]
     bin = hist[1]
@@ -171,11 +171,11 @@ def get_interpolated_effective_area(time_obs, response_version, detector_type, o
     eff_area_interp_base_unit = u.Angstrom
     tck = interpolate.splrep(
         response_wavelength.to(eff_area_interp_base_unit).value,
-        eff_area.to(eff_area_interp_base_unit ** 2).value,
+        eff_area.to(eff_area_interp_base_unit**2).value,
         s=0,
     )
     eff_area_interp = interpolate.splev(obs_wavelength.to(eff_area_interp_base_unit).value, tck) * (
-        eff_area_interp_base_unit ** 2
+        eff_area_interp_base_unit**2
     )
     return eff_area_interp
 
