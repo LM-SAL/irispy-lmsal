@@ -56,7 +56,7 @@ pypi:
   stage: Deploy
   # only run on parent tags with semantic versioning names, excluding dev tags
   only:
-    - /v\d+\.\d+\.\d+(?!(dev))/@LMSAL_HUB/iris_hub/irispy-lmsal
+      - tags
   except:
     - branches
     - merge_requests
