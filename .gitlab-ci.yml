@@ -1,6 +1,8 @@
 image: python:3.10
 
 before_script:
+  - apt update -qq
+  - apt install -qq --yes ffmpeg
   - pip install tox
 
 stages:
