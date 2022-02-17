@@ -57,9 +57,6 @@ pypi:
   # only run on parent tags with semantic versioning names, excluding dev tags
   only:
     - /v\d+\.\d+\.\d+(?!(dev))/@LMSAL_HUB/iris_hub/irispy-lmsal
-  except:
-    - branches
-    - merge_requests
   before_script:
     - python -m pip install --upgrade build check-manifest twine
   script:
