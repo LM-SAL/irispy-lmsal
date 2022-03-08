@@ -19,7 +19,7 @@ from irispy.utils.constants import DN_UNIT, READOUT_NOISE, SPECTRAL_BAND
 __all__ = ["read_spectrograph_lvl2"]
 
 
-def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=True, memmap=False):
+def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, memmap=False):
     """
     Reads IRIS level 2 spectrograph FITS from an OBS into an IRISSpectrograph
     instance.
