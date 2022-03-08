@@ -11,7 +11,7 @@ from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, BAD_PIXEL_VALUE_UNSCA
 __all__ = ["read_sji_lvl2"]
 
 
-def read_sji_lvl2(filenames, uncertainty=True, memmap=False):
+def read_sji_lvl2(filenames, uncertainty=False, memmap=False):
     """
     Read level 2 SJI FITS into an IRISMapCube instance.
 
@@ -21,7 +21,7 @@ def read_sji_lvl2(filenames, uncertainty=True, memmap=False):
         Filename or filenames to be read. They must all be associated with the same
         OBS number.
     uncertainty : `bool`, optional
-        Default value is `True`.
+        Default value is `False`.
         If `True`, will compute the uncertainty for the data (slower and
         uses more memory). If `memmap=True`, the uncertainty is never computed.
     memmap : `bool`, optional
