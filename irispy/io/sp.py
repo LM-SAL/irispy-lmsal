@@ -48,10 +48,10 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
         else:
             filenames = [filenames]
     for f, filename in enumerate(filenames):
-        hdulist = fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap)
+        hdulist = fits.open(filename, memmap=memmap)  # ,do_not_scale_image_data=memmap)
         hdulist.verify("fix")
         if f == 0:
-            # Collecting the window observations.
+            # Collecting the window observations
             windows_in_obs = np.array(
                 [hdulist[0].header["TDESC{0}".format(i)] for i in range(1, hdulist[0].header["NWIN"] + 1)]
             )
@@ -69,9 +69,7 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                 window_is_in_obs = np.asarray([window in windows_in_obs for window in spectral_windows_req])
                 if not all(window_is_in_obs):
                     missing_windows = window_is_in_obs == False
-                    raise ValueError(
-                        "Spectral windows {0} not in file {1}".format(spectral_windows[missing_windows], filenames[0])
-                    )
+                    raise ValueError(f"Spectral windows {spectral_windows[missing_windows]} not in file {filenames[0]}")
                 window_fits_indices = np.nonzero(np.in1d(windows_in_obs, spectral_windows))[0] + 1
             # Create a empty list for every spectral window and each
             # spectral window is a key for the dictionary.

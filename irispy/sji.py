@@ -49,6 +49,8 @@ class IRISMapCube(SpectrogramCube):
         Default is False.
     scaled : `bool`, optional
         Indicates if the data has been scaled.
+    header : `dict`, optional
+        The FITS header associated with the dataset.
 
     Examples
     --------
@@ -68,6 +70,7 @@ class IRISMapCube(SpectrogramCube):
         mask=None,
         copy=False,
         scaled=None,
+        header=None,
         **kwargs,
     ):
         """
@@ -77,6 +80,7 @@ class IRISMapCube(SpectrogramCube):
         self.scaled = scaled
         # Dust_masked variable shows whether the dust pixels are set to True in the data mask.
         self.dust_masked = False
+        self.header = header
         super().__init__(
             data,
             wcs,
