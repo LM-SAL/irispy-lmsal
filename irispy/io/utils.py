@@ -24,27 +24,38 @@ def fitsinfo(filename):
             print(f"{hdr[f'TWMIN{i+1}']:.2f} - {hdr[f'TWMAX{i+1}']:.2f} AA" + modifer)
 
 
-def load(filename):
+def read_files(filename):
     """
-    Temp workaround for a "unified" loader.
+    A wrapper function to read a raster or SJI IRIS Level 2 data file.
+
+    You can provide one SJI image or a one raster image or a list of raster images.
+
+    If you mix raster and SJI images, the function will raise an error.
 
     Parameters
     ----------
-    filename : str
-        Filename to load.
+    filename : `list of `str`, `str`
+        Filename(s) to load.
+        If given a string, will load that file.
+        If given a list of strings, it will check they are all raster files and load them.
 
     Returns
     -------
-    NDCube
+    The corresponding `irispy.sji.IRISMapCube` or `irispy.spectrogram.IRISSpectrogramCube`.
     """
-    from sunraster.instr.iris import read_iris_spectrograph_level2_fits
+    from irispy.io.sji import read_sji_lvl2
+    from irispy.io.sp import read_spectrograph_lvl2
 
-    from .sji import read_sji_lvl2
+    if isinstance(filename, str):
+        filename = [filename]
+    intrume = fits.getval(filename[0], "INSTRUME")
+    all_instrume = [fits.getval(f, "INSTRUME") for f in filename]
+    if not all(intrume == i for i in all_instrume):
+        raise ValueError("You cannot mix raster and SJI files.")
 
-    try:
+    if intrume == "SJI":
         return read_sji_lvl2(filename)
-    except Exception:
-        try:
-            return read_iris_spectrograph_level2_fits(filename)
-        except Exception:
-            print("Failed to load {filename}")
+    elif intrume == "SPEC":
+        return read_spectrograph_lvl2(filename)
+    else:
+        raise ValueError("Unsupported instrument")
