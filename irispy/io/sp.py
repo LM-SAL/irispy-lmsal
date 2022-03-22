@@ -71,8 +71,6 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                     missing_windows = window_is_in_obs == False
                     raise ValueError(f"Spectral windows {spectral_windows[missing_windows]} not in file {filenames[0]}")
                 window_fits_indices = np.nonzero(np.in1d(windows_in_obs, spectral_windows))[0] + 1
-            # Create a empty list for every spectral window and each
-            # spectral window is a key for the dictionary.
             data_dict = dict([(window_name, list()) for window_name in spectral_windows_req])
         # Extract axis-aligned metadata.
         times = Time(hdulist[0].header["STARTOBS"]) + TimeDelta(
@@ -89,13 +87,11 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
         exposure_times_fuv = hdulist[-2].data[:, hdulist[-2].header["EXPTIMEF"]] * u.s
         exposure_times_nuv = hdulist[-2].data[:, hdulist[-2].header["EXPTIMEN"]] * u.s
         for i, window_name in enumerate(spectral_windows_req):
-            # Define metadata object for window.
             meta = IRISSGMeta(
                 hdulist[0].header,
                 window_name,
                 data_shape=hdulist[window_fits_indices[i]].data.shape,
             )
-            # Determine values of properties dependent on detector type.
             if "FUV" in meta.detector:
                 exposure_times = exposure_times_fuv
                 DN_unit = DN_UNIT["FUV"]
@@ -118,7 +114,6 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                 data_mask = hdulist[window_fits_indices[i]].data == -200.0
             else:
                 data_mask = None
-            # Derive uncertainty of data
             if uncertainty:
                 out_uncertainty = (
                     u.Quantity(
@@ -145,11 +140,9 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
             cube.extra_coords.add("time", 0, times, physical_types="time")
             data_dict[window_name].append(cube)
         hdulist.close()
-    # Construct dictionary of SpectrogramSequences for spectral windows
     window_data_pairs = [
         (window_name, RasterSequence(data_dict[window_name], common_axis=0)) for window_name in spectral_windows_req
     ]
-    # Initialize an NDCollection object.
     return NDCollection(window_data_pairs, aligned_axes=(0, 1, 2))
 
 

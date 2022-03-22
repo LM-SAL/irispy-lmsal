@@ -48,14 +48,15 @@ def read_files(filename):
 
     if isinstance(filename, str):
         filename = [filename]
+
     intrume = fits.getval(filename[0], "INSTRUME")
     all_instrume = [fits.getval(f, "INSTRUME") for f in filename]
-    if not all(intrume == i for i in all_instrume):
+    if not all([intrume == i for i in all_instrume]):
         raise ValueError("You cannot mix raster and SJI files.")
 
     if intrume == "SJI":
-        return read_sji_lvl2(filename)
+        return read_sji_lvl2(filename[0])
     elif intrume == "SPEC":
         return read_spectrograph_lvl2(filename)
     else:
-        raise ValueError("Unsupported instrument")
+        raise ValueError(f"Unsupported instrument: {intrume}")
