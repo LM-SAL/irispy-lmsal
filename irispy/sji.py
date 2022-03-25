@@ -77,10 +77,9 @@ class IRISMapCube(SpectrogramCube):
         return f"{object.__repr__(self)}\n{str(self)}"
 
     def __str__(self):
-        roll = self.meta.get("SAT_ROT", None)
-        startobs = self.meta.get("STARTOBS", None)
+        startobs = self.meta.get("STARTOBS")
         startobs = startobs.isot if startobs else None
-        endobs = self.meta.get("ENDOBS", None)
+        endobs = self.meta.get("ENDOBS")
         endobs = endobs.isot if endobs else None
         if self.global_coords and "time" in self.global_coords:
             instance_start = self.global_coords["time"].min().isot
@@ -102,7 +101,7 @@ class IRISMapCube(SpectrogramCube):
             Obs. End:\t\t\t {endobs}
             Instance Start:\t\t {instance_start}
             Instance End:\t\t {instance_end}
-            Roll:\t\t\t {roll}
+            Roll:\t\t\t {self.meta.get("SAT_ROT")}
             Total Frames in Obs.:\t {self.meta.get("NBFRAMES")}
             IRIS Obs. id:\t\t {self.meta.get("OBSID")}
             IRIS Obs. Description:\t {self.meta.get("OBS_DESC")}
@@ -117,7 +116,7 @@ class IRISMapCube(SpectrogramCube):
         return sliced_self
 
     def plot(self, *args, **kwargs):
-        cmap = kwargs.pop("cmap", None)
+        cmap = kwargs.pop("cmap")
         if not cmap:
             cmap = plt.get_cmap(name="irissji{}".format(int(self.meta["TWAVE1"])))
         return super().plot(*args, cmap=cmap, **kwargs)
@@ -172,9 +171,9 @@ class IRISMapCubeSequence(SpectrogramSequence):
         return f"{object.__repr__(self)}\n{str(self)}"
 
     def __str__(self):
-        startobs = self.meta.get("STARTOBS", None)
+        startobs = self.meta.get("STARTOBS")
         startobs = startobs.isot if startobs else None
-        endobs = self.meta.get("ENDOBS", None)
+        endobs = self.meta.get("ENDOBS")
         endobs = endobs.isot if endobs else None
         instance_start = self[0].extra_coords["time"]["value"]
         instance_start = instance_start.isot if instance_start else None
@@ -195,16 +194,8 @@ class IRISMapCubeSequence(SpectrogramSequence):
                 Sequence Shape:\t\t {self.dimensions}
                 Roll:\t\t\t {self.meta.get("SAT_ROT")}
                 Axis Types:\t\t {self.array_axis_physical_types}
-
                 """
         )
-
-    def __getitem__(self, item):
-        return self.index_as_cube[item]
-
-    @property
-    def dimensions(self):
-        return self.cube_like_dimensions
 
     def apply_dust_mask(self, undo=False):
         """

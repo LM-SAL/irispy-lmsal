@@ -1,5 +1,7 @@
 from astropy.io import fits
 
+__all__ = ["fitsinfo", "read_files"]
+
 
 def fitsinfo(filename):
     """

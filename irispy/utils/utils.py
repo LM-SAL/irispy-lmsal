@@ -1,7 +1,6 @@
 """
 This module provides general utility functions.
 """
-
 import shutil
 import numbers
 import tarfile
@@ -21,6 +20,7 @@ __all__ = [
     "calculate_dust_mask",
     "gaussian1d_on_linear_bg",
     "image_clipping",
+    "calculate_uncertainty",
 ]
 
 
@@ -204,3 +204,31 @@ def calculate_dust_mask(data_array):
     struct = np.array([np.zeros((3, 3)), np.ones((3, 3)), np.zeros((3, 3))], dtype=bool)
     mask = ndimage.binary_dilation(mask, structure=struct).astype(mask.dtype)
     return mask
+
+
+def calculate_uncertainty(data: np.array, readout_noise: u.Quantity, unit: u.Quantity) -> float:
+    """
+    Calulautes the uncertinaity of a given data array.
+
+    Parameters
+    ----------
+    data : np.array
+        The data array.
+    readout_noise : u.Quantity
+        The readout noise, needs to be a unit that is convertable to photon.
+    unit : u.Quantity
+        The final unit that the value should be converted to.
+
+    Returns
+    -------
+    float
+        The readout noise with no unit.
+    """
+    return (
+        u.Quantity(
+            np.sqrt((data * unit).to(u.photon).value + readout_noise.to(u.photon).value ** 2),
+            unit=u.photon,
+        )
+        .to(unit)
+        .value
+    )
