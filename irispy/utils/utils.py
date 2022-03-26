@@ -208,7 +208,7 @@ def calculate_dust_mask(data_array):
 
 def calculate_uncertainty(data: np.array, readout_noise: u.Quantity, unit: u.Quantity) -> float:
     """
-    Calulautes the uncertinaity of a given data array.
+    Calculates the uncertainty of a given data array.
 
     Parameters
     ----------

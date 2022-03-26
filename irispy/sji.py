@@ -1,14 +1,31 @@
 import textwrap
 
 import matplotlib.pyplot as plt
-import sunpy.visualization.colormaps as cm  # NOQA
 from astropy.time import Time
 
 from sunraster import SpectrogramCube, SpectrogramSequence
 
-from irispy import utils
+from irispy.utils import calculate_dust_mask
+from irispy.visualization import IRISSequencePlotter, _set_axis_colors
 
 __all__ = ["IRISMapCube", "IRISMapCubeSequence"]
+
+
+def _get_times(iris_map_cube):
+    instance_start = None
+    instance_end = None
+    if hasattr(iris_map_cube, "global_coords") and "time" in iris_map_cube.global_coords:
+        instance_start = iris_map_cube.global_coords["time"].min().isot
+        instance_end = iris_map_cube.global_coords["time"].max().isot
+    elif hasattr(iris_map_cube, "extra_coords") and isinstance(
+        iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0], Time
+    ):
+        instance_start = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].min().isot
+        instance_end = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].max().isot
+    elif hasattr(iris_map_cube, "time"):
+        instance_start = iris_map_cube.time.min().isot
+        instance_end = iris_map_cube.time.max().isot
+    return instance_start, instance_end
 
 
 class IRISMapCube(SpectrogramCube):
@@ -17,9 +34,9 @@ class IRISMapCube(SpectrogramCube):
 
     Parameters
     ----------
-    data: `numpy.ndarray`
+    data : `numpy.ndarray`
         The array holding the actual data in this object.
-    wcs: `ndcube.wcs.wcs.WCS`
+    wcs : `ndcube.wcs.wcs.WCS`
         The WCS object containing the axes' information
     unit : `astropy.unit.Unit` or `str`
         Unit for the dataset.
@@ -81,15 +98,7 @@ class IRISMapCube(SpectrogramCube):
         startobs = startobs.isot if startobs else None
         endobs = self.meta.get("ENDOBS")
         endobs = endobs.isot if endobs else None
-        if self.global_coords and "time" in self.global_coords:
-            instance_start = self.global_coords["time"].min().isot
-            instance_end = self.global_coords["time"].max().isot
-        elif self.extra_coords and isinstance(self.axis_world_coords("time", wcs=self.extra_coords)[0], Time):
-            instance_start = self.axis_world_coords("time", wcs=self.extra_coords)[0].min().isot
-            instance_end = self.axis_world_coords("time", wcs=self.extra_coords)[0].max().isot
-        else:
-            instance_start = None
-            instance_end = None
+        instance_start, instance_end = _get_times(self)
         return textwrap.dedent(
             f"""
             IRISMapCube
@@ -116,10 +125,13 @@ class IRISMapCube(SpectrogramCube):
         return sliced_self
 
     def plot(self, *args, **kwargs):
-        cmap = kwargs.pop("cmap")
+        cmap = kwargs.get("cmap")
         if not cmap:
             cmap = plt.get_cmap(name="irissji{}".format(int(self.meta["TWAVE1"])))
-        return super().plot(*args, cmap=cmap, **kwargs)
+        kwargs["cmap"] = cmap
+        ax = super().plot(*args, **kwargs)
+        _set_axis_colors(ax)
+        return ax
 
     def apply_dust_mask(self, undo=False):
         """
@@ -135,7 +147,7 @@ class IRISMapCube(SpectrogramCube):
             If True, dust particles positions mask will be removed.
             Default=False
         """
-        dust_mask = utils.calculate_dust_mask(self.data)
+        dust_mask = calculate_dust_mask(self.data)
         if undo:
             # If undo kwarg IS set, unmask dust pixels.
             self.mask[dust_mask] = False
@@ -164,8 +176,14 @@ class IRISMapCubeSequence(SpectrogramSequence):
         The axis of the NDCubes corresponding to time.
     """
 
-    def __init__(self, data_list, meta=None, common_axis=0):
+    # We special case the default mpl plotter here so that we can only import
+    # matplotlib when `.plotter` is accessed and raise an ImportError at the
+    # last moment.
+    plotter = IRISSequencePlotter
+
+    def __init__(self, data_list, meta=None, common_axis=0, times=None):
         super().__init__(data_list, meta=meta, common_axis=common_axis)
+        self.time = times
 
     def __repr__(self):
         return f"{object.__repr__(self)}\n{str(self)}"
@@ -175,21 +193,16 @@ class IRISMapCubeSequence(SpectrogramSequence):
         startobs = startobs.isot if startobs else None
         endobs = self.meta.get("ENDOBS")
         endobs = endobs.isot if endobs else None
-        instance_start = self[0].extra_coords["time"]["value"]
-        instance_start = instance_start.isot if instance_start else None
-        instance_end = self[-1].extra_coords["time"]["value"]
-        instance_end = instance_end.isot if instance_end else None
+        instance_start, instance_end = _get_times(self)
         return textwrap.dedent(
             f"""
                 IRISMapCubeSequence
                 -------------------
                 Observatory:\t\t {self.meta.get("TELESCOP")}
                 Instrument:\t\t {self.meta.get("INSTRUME")}
-
                 OBS ID:\t\t\t {self.meta.get("OBSID")}
                 OBS Description:\t {self.meta.get("OBS_DESC")}
                 OBS period:\t\t {startobs} -- {endobs}
-
                 Sequence period:\t {instance_start} -- {instance_end}
                 Sequence Shape:\t\t {self.dimensions}
                 Roll:\t\t\t {self.meta.get("SAT_ROT")}
@@ -212,3 +225,11 @@ class IRISMapCubeSequence(SpectrogramSequence):
         """
         for cube in self.data:
             cube.apply_dust_mask(undo=undo)
+
+    @property
+    def time(self):
+        return self._time
+
+    @time.setter
+    def time(self, times):
+        self._time = times
