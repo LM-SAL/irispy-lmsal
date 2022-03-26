@@ -6,7 +6,6 @@ from astropy.io import fits
 from astropy.time import Time, TimeDelta
 from astropy.wcs import WCS
 
-from irispy.io.utils import calculate_uncertainty
 from irispy.sji import IRISMapCube, IRISMapCubeSequence
 from irispy.utils import calculate_uncertainty
 from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, BAD_PIXEL_VALUE_UNSCALED, DN_UNIT, READOUT_NOISE
@@ -128,4 +127,4 @@ def read_sji_lvl2(filename, uncertainty=False, memmap=False):
             )
             [map_cube.global_coords.add(*global_coord) for global_coord in global_coords]
             list_of_cubes.append(map_cube)
-    return IRISMapCubeSequence(list_of_cubes, meta=meta, common_axis=None)
+    return IRISMapCubeSequence(list_of_cubes, meta=meta, common_axis=None, times=times)
