@@ -4,6 +4,7 @@ Tests that use fake data (fd) instead of the test files.
 import numpy as np
 import pytest
 from astropy import units as u
+from astropy.tests.helper import assert_quantity_allclose
 from astropy.time import Time
 from astropy.wcs import WCS
 
@@ -327,7 +328,7 @@ def test_IRISMapCube_apply_dust_mask(test_input, expected):
 
 @pytest.mark.parametrize("test_input,expected", [(sequence, [4, 3, 4] * u.pix)])
 def test_dimensions(test_input, expected):
-    assert np.any(test_input.dimensions == expected)
+    assert assert_quantity_allclose(test_input.dimensions, expected)
 
 
 @pytest.mark.parametrize(

@@ -1,3 +1,4 @@
+import logging
 import tarfile
 import textwrap
 from pathlib import Path
@@ -118,7 +119,14 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                 header["PC3_2"] = hdulist[-2].data[:, 22].mean()
                 header["PC3_3"] = hdulist[-2].data[:, 23].mean()
                 header["PC2_3"] = hdulist[-2].data[:, 24].mean()
-                wcs = WCS(hdulist[window_fits_indices[i]].header)
+                try:
+                    wcs = WCS(header)
+                except Exception as e:
+                    logging.warning(
+                        f"WCS failed to load while reading one step of the raster due to {e}"
+                        " The loading will continue but this wil be missing in the final cube."
+                    )
+                    continue
                 out_uncertainty = None
                 data_mask = None
                 if not memmap:

@@ -24,7 +24,7 @@ from sunpy.coordinates.frames import Helioprojective
 from sunpy.net import Fido
 from sunpy.net import attrs as a
 
-from irispy.io import read_sji_lvl2, read_spectrograph_lvl2
+from irispy.io import read_files
 from irispy.obsid import ObsID
 from irispy.utils.utils import _download_data
 
@@ -54,7 +54,7 @@ sji_filename = "iris_l2_20140919_051712_3860608353_SJI_2832_t000.fits.gz"
 # directly without the scaling to Float32, the data values are no longer in DN,
 # but in scaled integer units that start at −2$^{16}$/2.
 
-raster = read_spectrograph_lvl2(raster_filename, memmap=True, uncertainty=False)
+raster = read_files(raster_filename, memmap=True, uncertainty=False)
 # Provide an overview of the data
 print(raster)
 # Will give us all the keys that corresponds to wavelengths.
@@ -181,7 +181,7 @@ print(mg_ii[0].global_coords["time"].isot)
 # Working with IRIS Slit-Jaw Image files
 #
 # We will now open the slit-jaw image file we downloaded at the start.
-sji_2832 = read_sji_lvl2(sji_filename)
+sji_2832 = read_files(sji_filename)
 
 print(sji_2832)
 print(sji_2832.meta)

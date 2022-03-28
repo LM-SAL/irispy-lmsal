@@ -11,7 +11,7 @@ from astropy.wcs import WCS
 import irispy.data.test
 from irispy import IRISSpectrogramCube, IRISSpectrogramCubeSequence, utils
 from irispy.data.test import get_test_filepath
-from irispy.io import read_spectrograph_lvl2
+from irispy.io.sp import read_spectrograph_lvl2
 
 testpath = irispy.data.test.rootdir
 # Arrays of DN
