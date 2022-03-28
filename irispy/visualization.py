@@ -9,10 +9,10 @@ def _set_axis_colors(ax):
     lon, lat = ax.coords
     lon.set_ticklabel_position("all")
     lat.set_ticklabel_position("all")
-    lon.set_axislabel(ax.get_xlabel(), color="tab:blue")
-    lon.set_ticklabel("tab:blue")
-    lat.set_axislabel(ax.get_ylabel(), color="tab:green")
-    lat.set_ticklabel("tab:green")
+    lon.set_axislabel(ax.get_xlabel(), color="black")
+    lon.set_ticklabel("black")
+    lat.set_axislabel(ax.get_ylabel(), color="red")
+    lat.set_ticklabel("red")
 
 
 class IRISSequencePlotter(MatplotlibSequencePlotter):

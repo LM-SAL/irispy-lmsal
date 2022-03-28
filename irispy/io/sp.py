@@ -14,6 +14,7 @@ from sunpy.coordinates import Helioprojective
 from sunraster import RasterSequence, SpectrogramCube
 from sunraster.meta import Meta, SlitSpectrographMetaABC
 
+from irispy.utils import calculate_uncertainty
 from irispy.utils.constants import DN_UNIT, READOUT_NOISE, SPECTRAL_BAND
 
 __all__ = ["read_spectrograph_lvl2"]
@@ -21,8 +22,8 @@ __all__ = ["read_spectrograph_lvl2"]
 
 def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, memmap=False):
     """
-    Reads IRIS level 2 spectrograph FITS from an OBS into an IRISSpectrograph
-    instance.
+    Reads IRIS level 2 spectrograph FITS from an OBS into an
+    `.IRISSpectrograph` instance.
 
     Parameters
     ----------
@@ -36,110 +37,106 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
 
     Returns
     -------
-    result: `ndcube.NDCollection`
+    `ndcube.NDCollection`
     """
-    if isinstance(filenames, str) or (isinstance(filenames, list) and len(filenames) == 1):
-        if isinstance(filenames, list):
-            filenames = filenames[0]
+    if isinstance(filenames, list) and len(filenames) == 1:
+        filenames = filenames[0]
+    if isinstance(filenames, str):
         if tarfile.is_tarfile(filenames):
             with tarfile.open(filenames, "r") as tar:
                 tar.extractall(Path(filenames).parent)
                 filenames = [Path(filenames).parent / file for file in tar.getnames()]
         else:
             filenames = [filenames]
-    for f, filename in enumerate(filenames):
-        hdulist = fits.open(filename, memmap=memmap)  # ,do_not_scale_image_data=memmap)
-        hdulist.verify("fix")
-        if f == 0:
-            # Collecting the window observations
-            windows_in_obs = np.array(
-                [hdulist[0].header["TDESC{0}".format(i)] for i in range(1, hdulist[0].header["NWIN"] + 1)]
-            )
-            # If spectral_window is not set then get every window.
-            # Else take the appropriate windows
-            if not spectral_windows:
-                spectral_windows_req = windows_in_obs
-                window_fits_indices = range(1, len(hdulist) - 2)
-            else:
-                if isinstance(spectral_windows, str):
-                    spectral_windows_req = [spectral_windows]
-                else:
-                    spectral_windows_req = spectral_windows
-                spectral_windows_req = np.asarray(spectral_windows_req, dtype="U")
-                window_is_in_obs = np.asarray([window in windows_in_obs for window in spectral_windows_req])
-                if not all(window_is_in_obs):
-                    missing_windows = window_is_in_obs == False
-                    raise ValueError(f"Spectral windows {spectral_windows[missing_windows]} not in file {filenames[0]}")
-                window_fits_indices = np.nonzero(np.in1d(windows_in_obs, spectral_windows))[0] + 1
-            data_dict = dict([(window_name, list()) for window_name in spectral_windows_req])
-        # Extract axis-aligned metadata.
-        times = Time(hdulist[0].header["STARTOBS"]) + TimeDelta(
-            hdulist[-2].data[:, hdulist[-2].header["TIME"]], format="sec"
+
+    # Collecting the window observations
+    with fits.open(filenames[0], memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
+        hdulist.verify("silentfix")
+        windows_in_obs = np.array(
+            [hdulist[0].header["TDESC{0}".format(i)] for i in range(1, hdulist[0].header["NWIN"] + 1)]
         )
-        fov_center = SkyCoord(
-            Tx=hdulist[-2].data[:, hdulist[-2].header["XCENIX"]],
-            Ty=hdulist[-2].data[:, hdulist[-2].header["YCENIX"]],
-            unit=u.arcsec,
-            frame=Helioprojective,
-        )
-        obs_vrix = hdulist[-2].data[:, hdulist[-2].header["OBS_VRIX"]] * u.m / u.s
-        ophaseix = hdulist[-2].data[:, hdulist[-2].header["OPHASEIX"]]
-        exposure_times_fuv = hdulist[-2].data[:, hdulist[-2].header["EXPTIMEF"]] * u.s
-        exposure_times_nuv = hdulist[-2].data[:, hdulist[-2].header["EXPTIMEN"]] * u.s
-        for i, window_name in enumerate(spectral_windows_req):
-            meta = IRISSGMeta(
-                hdulist[0].header,
-                window_name,
-                data_shape=hdulist[window_fits_indices[i]].data.shape,
+        # If spectral_window is not set then get every window.
+        # Else take the appropriate windows
+        if not spectral_windows:
+            spectral_windows_req = windows_in_obs
+            window_fits_indices = range(1, len(hdulist) - 2)
+        else:
+            if isinstance(spectral_windows, str):
+                spectral_windows_req = [spectral_windows]
+            else:
+                spectral_windows_req = spectral_windows
+            spectral_windows_req = np.asarray(spectral_windows_req, dtype="U")
+            window_is_in_obs = np.asarray([window in windows_in_obs for window in spectral_windows_req])
+            if not all(window_is_in_obs):
+                missing_windows = window_is_in_obs == False
+                raise ValueError(f"Spectral windows {spectral_windows[missing_windows]} not in file {filenames[0]}")
+            window_fits_indices = np.nonzero(np.in1d(windows_in_obs, spectral_windows))[0] + 1
+        data_dict = dict([(window_name, list()) for window_name in spectral_windows_req])
+
+    for filename in filenames:
+        with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
+            hdulist.verify("silentfix")
+            # Extract axis-aligned metadata.
+            times = Time(hdulist[0].header["STARTOBS"]) + TimeDelta(
+                hdulist[-2].data[:, hdulist[-2].header["TIME"]], format="sec"
             )
-            if "FUV" in meta.detector:
-                exposure_times = exposure_times_fuv
-                DN_unit = DN_UNIT["FUV"]
-                readout_noise = READOUT_NOISE["FUV"]
-            else:
-                exposure_times = exposure_times_nuv
-                DN_unit = DN_UNIT["NUV"]
-                readout_noise = READOUT_NOISE["NUV"]
-            meta.add("exposure time", exposure_times, None, 0)
-            meta.add("exposure FOV center", fov_center, None, 0)
-            meta.add("observer radial velocity", obs_vrix, None, 0)
-            meta.add("orbital phase", ophaseix, None, 0)
-            # Derive WCS, data and mask for NDCube from file.
-            # Sit-and-stare have a CDELT of 0 which causes issues in astropy WCS.
-            # In this case, set CDELT to a tiny non-zero number.
-            if hdulist[window_fits_indices[i]].header["CDELT3"] == 0:
-                hdulist[window_fits_indices[i]].header["CDELT3"] = 1e-10
-            wcs_ = WCS(hdulist[window_fits_indices[i]].header)
-            if not memmap:
-                data_mask = hdulist[window_fits_indices[i]].data == -200.0
-            else:
-                data_mask = None
-            if uncertainty:
-                out_uncertainty = (
-                    u.Quantity(
-                        np.sqrt(
-                            (hdulist[window_fits_indices[i]].data * DN_unit).to(u.photon).value
-                            + readout_noise.to(u.photon).value ** 2
-                        ),
-                        unit=u.photon,
-                    )
-                    .to(DN_unit)
-                    .value
+            fov_center = SkyCoord(
+                Tx=hdulist[-2].data[:, hdulist[-2].header["XCENIX"]],
+                Ty=hdulist[-2].data[:, hdulist[-2].header["YCENIX"]],
+                unit=u.arcsec,
+                frame=Helioprojective,
+            )
+            obs_vrix = hdulist[-2].data[:, hdulist[-2].header["OBS_VRIX"]] * u.m / u.s
+            ophaseix = hdulist[-2].data[:, hdulist[-2].header["OPHASEIX"]]
+            exposure_times_fuv = hdulist[-2].data[:, hdulist[-2].header["EXPTIMEF"]] * u.s
+            exposure_times_nuv = hdulist[-2].data[:, hdulist[-2].header["EXPTIMEN"]] * u.s
+            for i, window_name in enumerate(spectral_windows_req):
+                meta = IRISSGMeta(
+                    hdulist[0].header,
+                    window_name,
+                    data_shape=hdulist[window_fits_indices[i]].data.shape,
                 )
-            else:
+                if "FUV" in meta.detector:
+                    exposure_times = exposure_times_fuv
+                    DN_unit = DN_UNIT["FUV"]
+                    readout_noise = READOUT_NOISE["FUV"]
+                else:
+                    exposure_times = exposure_times_nuv
+                    DN_unit = DN_UNIT["NUV"]
+                    readout_noise = READOUT_NOISE["NUV"]
+                meta.add("exposure time", exposure_times, None, 0)
+                meta.add("exposure FOV center", fov_center, None, 0)
+                meta.add("observer radial velocity", obs_vrix, None, 0)
+                meta.add("orbital phase", ophaseix, None, 0)
+                # Sit-and-stare have a CDELT of 0 which causes issues in WCS.
+                # In this case, set CDELT to a small number.
+                if hdulist[window_fits_indices[i]].header["CDELT3"] == 0:
+                    hdulist[window_fits_indices[i]].header["CDELT3"] = 0.0005
+                # Update CRVAL and rotation matrix from the AUX header
+                header = hdulist[window_fits_indices[i]].header
+                header["PC2_2"] = hdulist[-2].data[:, 20].mean()
+                header["PC3_2"] = hdulist[-2].data[:, 22].mean()
+                header["PC3_3"] = hdulist[-2].data[:, 23].mean()
+                header["PC2_3"] = hdulist[-2].data[:, 24].mean()
+                wcs = WCS(hdulist[window_fits_indices[i]].header)
                 out_uncertainty = None
-            # Appending NDCube instance to the corresponding window key in dictionary's list.
-            cube = SpectrogramCube(
-                hdulist[window_fits_indices[i]].data,
-                wcs=wcs_,
-                uncertainty=out_uncertainty,
-                unit=DN_unit,
-                meta=meta,
-                mask=data_mask,
-            )
-            cube.extra_coords.add("time", 0, times, physical_types="time")
-            data_dict[window_name].append(cube)
-        hdulist.close()
+                data_mask = None
+                if not memmap:
+                    data_mask = hdulist[window_fits_indices[i]].data == -200.0
+                if uncertainty:
+                    out_uncertainty = calculate_uncertainty(
+                        hdulist[window_fits_indices[i]].data, readout_noise, DN_UNIT
+                    )
+                cube = SpectrogramCube(
+                    hdulist[window_fits_indices[i]].data,
+                    wcs=wcs,
+                    uncertainty=out_uncertainty,
+                    unit=DN_unit,
+                    meta=meta,
+                    mask=data_mask,
+                )
+                cube.extra_coords.add("time", 0, times, physical_types="time")
+                data_dict[window_name].append(cube)
     window_data_pairs = [
         (window_name, RasterSequence(data_dict[window_name], common_axis=0)) for window_name in spectral_windows_req
     ]
@@ -186,14 +183,12 @@ class IRISSGMeta(Meta, metaclass=SlitSpectrographMetaABC):
     def __repr__(self):
         return f"{object.__repr__(self)}\n{str(self)}"
 
-    # ---------- IRIS-specific convenience methods ----------
     def _construct_time(self, key):
         val = self.get(key, None)
         if val is not None:
             val = Time(val, format="fits", scale="utc")
         return val
 
-    # ---------- Inherited ABC properties ----------
     @property
     def spectral_window(self):
         return self.get(f"TDESC{self._iwin}")
