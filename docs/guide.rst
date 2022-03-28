@@ -33,14 +33,9 @@ This guide uses some "sample data" from the IRIS archive that can be accessed:
 
 Once the IRIS Level 2 data has downloaded, the next step is to read, extract, and inspect them.
 
-For now, there are two separate readers available:
-
 .. code-block:: python
 
-  >>> from irispy.io import read_sji_lvl2  # doctest: +REMOTE_DATA
-  >>> from irispy.io import read_spectrograph_lvl2  # doctest: +REMOTE_DATA
-
-In future these will be merged into one reader, but for now you need to use the correct one.
+  >>> from irispy.io import read_files  # doctest: +REMOTE_DATA
 
 The sample data is from this `observation
 <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20211001_060925_3683602040_2021-10-01T06%3A09%3A252021-10-01T06%3A09%3A25.xml>`__.
@@ -50,7 +45,7 @@ Let us recover the header of the raster file and show the description of the obs
 
 .. code-block:: python
 
-    >>> raster = read_spectrograph_lvl2(sample_data.RASTER, uncertainty=False)  # doctest: +REMOTE_DATA
+    >>> raster = read_files(sample_data.RASTER, uncertainty=False)  # doctest: +REMOTE_DATA
 
 .. note::
     This, by default will load the data into memory.
@@ -110,7 +105,7 @@ We use the following command to read and load the data from a SJI IRIS Level 2 f
 
 .. code-block:: python
 
-    >>> iris_sji = read_sji_lvl2(sample_data.SJI_1330, uncertainty=False)  # doctest: +REMOTE_DATA
+    >>> iris_sji = read_files(sample_data.SJI_1330, uncertainty=False)  # doctest: +REMOTE_DATA
     >>> iris_sji  # doctest: +REMOTE_DATA
     <irispy.sji.IRISMapCube object at ...>
     <BLANKLINE>

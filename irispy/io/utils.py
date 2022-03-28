@@ -1,3 +1,6 @@
+import tarfile
+from pathlib import Path
+
 from astropy.io import fits
 
 __all__ = ["fitsinfo", "read_files"]
@@ -49,7 +52,12 @@ def read_files(filename):
     from irispy.io.sp import read_spectrograph_lvl2
 
     if isinstance(filename, str):
-        filename = [filename]
+        if tarfile.is_tarfile(filename):
+            with tarfile.open(filename, "r") as tar:
+                tar.extractall(Path(filename).parent)
+                filename = [Path(filename).parent / file for file in tar.getnames()]
+        else:
+            filename = [filename]
 
     intrume = fits.getval(filename[0], "INSTRUME")
     all_instrume = [fits.getval(f, "INSTRUME") for f in filename]
