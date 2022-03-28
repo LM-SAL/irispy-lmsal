@@ -103,19 +103,19 @@ class IRISMapCube(SpectrogramCube):
             f"""
             IRISMapCube
             -----------
-            Observatory:\t\t {self.meta.get("TELESCOP")}
-            Instrument:\t\t\t {self.meta.get("INSTRUME")}
-            Bandpass:\t\t\t {self.meta.get("TWAVE1")}
-            Obs. Start:\t\t\t {startobs}
-            Obs. End:\t\t\t {endobs}
-            Instance Start:\t\t {instance_start}
-            Instance End:\t\t {instance_end}
-            Roll:\t\t\t {self.meta.get("SAT_ROT")}
-            Total Frames in Obs.:\t {self.meta.get("NBFRAMES")}
-            IRIS Obs. id:\t\t {self.meta.get("OBSID")}
-            IRIS Obs. Description:\t {self.meta.get("OBS_DESC")}
-            Axis Types:\t\t\t {self.array_axis_physical_types}
-            Cube dimensions:\t\t {self.dimensions}
+            Observatory:           {self.meta.get("TELESCOP")}
+            Instrument:            {self.meta.get("INSTRUME")}
+            Bandpass:              {self.meta.get("TWAVE1")}
+            Obs. Start:            {startobs}
+            Obs. End:              {endobs}
+            Instance Start:        {instance_start}
+            Instance End:          {instance_end}
+            Total Frames in Obs.:  {self.meta.get("NBFRAMES")}
+            IRIS Obs. id:          {self.meta.get("OBSID")}
+            IRIS Obs. Description: {self.meta.get("OBS_DESC")}
+            Axis Types:            {self.array_axis_physical_types}
+            Roll:                  {self.meta.get("SAT_ROT")}
+            Cube dimensions:       {self.dimensions}
             """
         )
 
@@ -127,7 +127,10 @@ class IRISMapCube(SpectrogramCube):
     def plot(self, *args, **kwargs):
         cmap = kwargs.get("cmap")
         if not cmap:
-            cmap = plt.get_cmap(name="irissji{}".format(int(self.meta["TWAVE1"])))
+            try:
+                cmap = plt.get_cmap(name="irissji{}".format(int(self.meta["TWAVE1"])))
+            except Exception:
+                cmap = "viridis"
         kwargs["cmap"] = cmap
         ax = super().plot(*args, **kwargs)
         _set_axis_colors(ax)
@@ -176,9 +179,6 @@ class IRISMapCubeSequence(SpectrogramSequence):
         The axis of the NDCubes corresponding to time.
     """
 
-    # We special case the default mpl plotter here so that we can only import
-    # matplotlib when `.plotter` is accessed and raise an ImportError at the
-    # last moment.
     plotter = IRISSequencePlotter
 
     def __init__(self, data_list, meta=None, common_axis=0, times=None):
@@ -198,15 +198,15 @@ class IRISMapCubeSequence(SpectrogramSequence):
             f"""
                 IRISMapCubeSequence
                 -------------------
-                Observatory:\t\t {self.meta.get("TELESCOP")}
-                Instrument:\t\t {self.meta.get("INSTRUME")}
-                OBS ID:\t\t\t {self.meta.get("OBSID")}
-                OBS Description:\t {self.meta.get("OBS_DESC")}
-                OBS period:\t\t {startobs} -- {endobs}
-                Sequence period:\t {instance_start} -- {instance_end}
-                Sequence Shape:\t\t {self.dimensions}
-                Roll:\t\t\t {self.meta.get("SAT_ROT")}
-                Axis Types:\t\t {self.array_axis_physical_types}
+                Observatory:     {self.meta.get("TELESCOP")}
+                Instrument:      {self.meta.get("INSTRUME")}
+                OBS ID:          {self.meta.get("OBSID")}
+                OBS Description: {self.meta.get("OBS_DESC")}
+                OBS period:      {startobs} -- {endobs}
+                Sequence period: {instance_start} -- {instance_end}
+                Sequence Shape:  {self.dimensions}
+                Axis Types:      {self.array_axis_physical_types}
+                Roll:            {self.meta.get("SAT_ROT")}
                 """
         )
 

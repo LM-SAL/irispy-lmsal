@@ -199,7 +199,9 @@ meta_seq = {
 sequence_DN = IRISSpectrogramCubeSequence([spectrogram_DN0, spectrogram_DN1], meta_seq)
 sequence_photon = IRISSpectrogramCubeSequence([spectrogram_photon0, spectrogram_photon1], meta_seq)
 sequence_DN_per_s = IRISSpectrogramCubeSequence([spectrogram_DN_per_s0, spectrogram_DN_per_s1], meta_seq)
-sequence_photon_per_s = IRISSpectrogramCubeSequence([spectrogram_photon_per_s0, spectrogram_photon_per_s1], meta_seq)
+sequence_photon_per_s = IRISSpectrogramCubeSequence(
+    [spectrogram_photon_per_s0, spectrogram_photon_per_s1], meta_seq
+)
 sequence_photon_per_s_per_s = IRISSpectrogramCubeSequence(
     [spectrogram_photon_per_s_per_s0, spectrogram_photon_per_s1], meta_seq
 )
@@ -215,7 +217,9 @@ def test_fits_data_comparison(iris_l2_test_raster):
     """
     Make sure the data is the same in pyfits and irispy.
     """
-    with fits.open(os.path.join(testpath, "iris_l2_20170502_052551_3893010094_raster_t000_r00000.fits")) as hdulist:
+    with fits.open(
+        os.path.join(testpath, "iris_l2_20170502_052551_3893010094_raster_t000_r00000.fits")
+    ) as hdulist:
         spectral_window1 = hdulist[0].header["TDESC1"]
         spectral_window2 = hdulist[0].header["TDESC2"]
         spectral_window3 = hdulist[0].header["TDESC3"]

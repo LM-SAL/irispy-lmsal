@@ -1,13 +1,14 @@
 import textwrap
 
 import astropy.units as u
+import matplotlib.pyplot as plt
 import numpy as np
-from astropy.time import Time
 
 from sunraster import SpectrogramCube, SpectrogramSequence
 from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
 
 from irispy import utils
+from irispy.visualization import IRISSequencePlotter, _set_axis_colors
 
 __all__ = ["IRISSpectrogramCube", "IRISSpectrogramCubeSequence"]
 
@@ -58,9 +59,6 @@ class IRISSpectrogramCube(SpectrogramCube):
         mask=None,
         copy=False,
     ):
-        required_meta_keys = ["detector type"]
-        if not all([key in list(meta) for key in required_meta_keys]):
-            raise ValueError(f"Meta must contain following keys: {required_meta_keys}")
         super().__init__(
             data,
             wcs,
@@ -86,28 +84,39 @@ class IRISSpectrogramCube(SpectrogramCube):
         return f"{object.__repr__(self)}\n{str(self)}"
 
     def __str__(self):
-        roll = self.meta.get("SAT_ROT", None)
+        instance_start = None
+        instance_end = None
         if self.global_coords and "time" in self.global_coords:
             instance_start = self.global_coords["time"].min().isot
             instance_end = self.global_coords["time"].max().isot
-        elif self.extra_coords and isinstance(self.axis_world_coords("time", wcs=self.extra_coords)[0], Time):
+        elif self.extra_coords and self.axis_world_coords("time", wcs=self.extra_coords):
             instance_start = self.axis_world_coords("time", wcs=self.extra_coords)[0].min().isot
             instance_end = self.axis_world_coords("time", wcs=self.extra_coords)[0].max().isot
-        else:
-            instance_start = None
-            instance_end = None
         return textwrap.dedent(
             f"""
-                IRISSpectrogramCube
-                -------------------
-                {utils.produce_obs_repr_string(self.meta)}
-
-                Spectrogram period: {instance_start} -- {instance_end}
-                Data shape: {self.dimensions}
-                Axis Types: {self.array_axis_physical_types}
-                Roll: {roll}
-                """
+            IRISSpectrogramCube
+            -------------------
+            OBS ID:             {self.meta.get("OBSID")}
+            OBS Description:    {self.meta.get("OBS_DESC")}
+            OBS period:         {self.meta.get("STARTOBS")} -- {self.meta.get("ENDOBS")}
+            Spectrogram period: {instance_start} -- {instance_end}
+            Data shape:         {self.dimensions}
+            Axis Types:         {self.array_axis_physical_types}
+            Roll:               {self.meta.get("SAT_ROT")}
+            """
         )
+
+    def plot(self, *args, **kwargs):
+        cmap = kwargs.get("cmap")
+        if not cmap:
+            try:
+                cmap = plt.get_cmap(name="irissji{}".format(int(self.meta.detector[:3])))
+            except Exception:
+                cmap = "viridis"
+        kwargs["cmap"] = cmap
+        ax = super().plot(*args, **kwargs)
+        _set_axis_colors(ax)
+        return ax
 
     def convert_to(self, new_unit_type, time_obs=None, response_version=4):
         """
@@ -125,12 +134,12 @@ class IRISSpectrogramCube(SpectrogramCube):
            "DN": Relevant IRIS data number based on detector type.
            "photons": photon counts
            "radiance": Perorms radiometric calibration conversion.
-        time_obs: an `astropy.time.Time` object, as a kwarg, valid for version > 2, optional
+        time_obs: `astropy.time.Time`, optional
            Observation times of the datapoints.
            Must be in the format of, e.g.,
-           time_obs=Time('2013-09-03', format='utime'),
+           ``time_obs=Time('2013-09-03', format='utime')``,
            which yields 1094169600.0 seconds in value.
-           The argument time_obs is ignored for versions 1 and 2.
+           The argument ``time_obs`` is ignored for versions 1 and 2.
         response_version: `int`, optional
             Version number of effective area file to be used. Cannot be set
             simultaneously with response_file or pre_launch kwarg. Default=4.
@@ -141,8 +150,6 @@ class IRISSpectrogramCube(SpectrogramCube):
             New IRISSpectrogramCube in new units.
         """
         detector_type = utils.get_detector_type(self.meta)
-        time_obs = time_obs
-        response_version = response_version  # Should default to latest
         if new_unit_type == "radiance" or self.unit.is_equivalent(utils.RADIANCE_UNIT):
             # Get spectral dispersion per pixel.
             spectral_wcs_index = np.where(np.array(self.wcs.wcs.ctype) == "WAVE")[0][0]
@@ -250,47 +257,29 @@ class IRISSpectrogramCubeSequence(SpectrogramSequence):
         The axis of the NDCubes corresponding to time.
     """
 
+    plotter = IRISSequencePlotter
+
     def __init__(self, data_list, meta=None, common_axis=0):
-        detector_type_key = "detector type"
-        # Check that meta contains required keys.
-        required_meta_keys = [
-            detector_type_key,
-            "spectral window",
-            "brightest wavelength",
-            "min wavelength",
-            "max wavelength",
-        ]
-        if not all([key in list(meta) for key in required_meta_keys]):
-            raise ValueError(f"Meta must contain following keys: {required_meta_keys}")
-        # Check that all spectrograms are from same specral window and OBS ID.
+        # Check that all spectrograms are from same spectral window and OBS ID.
         if len(np.unique([cube.meta["OBSID"] for cube in data_list])) != 1:
-            raise ValueError("Constituent IRISSpectrogramCube objects must have same " "value of 'OBSID' in its meta.")
-        if len(np.unique([cube.meta["spectral window"] for cube in data_list])) != 1:
             raise ValueError(
-                "Constituent IRISSpectrogramCube objects must have same " "value of 'spectral window' in its meta."
+                "Constituent IRISSpectrogramCube objects must have same value of 'OBSID' in its meta."
             )
-        # Initialize Sequence.
         super().__init__(data_list, meta=meta, common_axis=common_axis)
 
     def __repr__(self):
-        roll = self[0].meta.get("SAT_ROT", None)
-        return """
-IRISSpectrogramCubeSequence
----------------------------
-{obs_repr}
-
-Sequence period: {inst_start} -- {inst_end}
-Sequence Shape: {seq_shape}
-Axis Types: {axis_types}
-Roll: {roll}
-
-""".format(
-            obs_repr=utils.produce_obs_repr_string(self.data[0].meta),
-            inst_start=self[0].extra_coords["time"]["value"][0],
-            inst_end=self[-1].extra_coords["time"]["value"][-1],
-            seq_shape=self.dimensions,
-            axis_types=self.array_axis_physical_types,
-            roll=roll,
+        return textwrap.dedent(
+            f"""
+            IRISSpectrogramCubeSequence
+            ---------------------------
+            OBS ID:          {self.meta.get("OBSID")}
+            OBS Description: {self.meta.get("OBS_DESC")}
+            OBS period:      {self.meta.get("STARTOBS")} -- {self.meta.get("ENDOBS")}
+            Sequence period: {self[0].extra_coords["time"]["value"][0]} -- {self[-1].extra_coords["time"]["value"][-1]}
+            Sequence Shape:  {self.dimensions}
+            Axis Types:      {self.array_axis_physical_types}
+            Roll:            {self[0].meta.get("SAT_ROT")}
+            """
         )
 
     def convert_to(self, new_unit_type, copy=False):
