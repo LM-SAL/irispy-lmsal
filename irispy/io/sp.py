@@ -1,6 +1,7 @@
 import logging
 import tarfile
 import textwrap
+from copy import copy
 from pathlib import Path
 
 import astropy.units as u
@@ -12,13 +13,17 @@ from astropy.wcs import WCS
 from ndcube import NDCollection
 from sunpy.coordinates import Helioprojective
 
-from sunraster import RasterSequence, SpectrogramCube
 from sunraster.meta import Meta, SlitSpectrographMetaABC
 
+from irispy.spectrograph import IRISSpectrogramCube, IRISSpectrogramCubeSequence
 from irispy.utils import calculate_uncertainty
 from irispy.utils.constants import DN_UNIT, READOUT_NOISE, SPECTRAL_BAND
 
 __all__ = ["read_spectrograph_lvl2"]
+
+
+def _pc_matrix(lam, angle_1, angle_2):
+    return angle_1, -1 * lam * angle_2, 1 / lam * angle_2, angle_1
 
 
 def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, memmap=False):
@@ -70,7 +75,9 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
             window_is_in_obs = np.asarray([window in windows_in_obs for window in spectral_windows_req])
             if not all(window_is_in_obs):
                 missing_windows = window_is_in_obs == False
-                raise ValueError(f"Spectral windows {spectral_windows[missing_windows]} not in file {filenames[0]}")
+                raise ValueError(
+                    f"Spectral windows {spectral_windows[missing_windows]} not in file {filenames[0]}"
+                )
             window_fits_indices = np.nonzero(np.in1d(windows_in_obs, spectral_windows))[0] + 1
         data_dict = dict([(window_name, list()) for window_name in spectral_windows_req])
 
@@ -111,20 +118,29 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                 meta.add("orbital phase", ophaseix, None, 0)
                 # Sit-and-stare have a CDELT of 0 which causes issues in WCS.
                 # In this case, set CDELT to a small number.
-                if hdulist[window_fits_indices[i]].header["CDELT3"] == 0:
-                    hdulist[window_fits_indices[i]].header["CDELT3"] = 0.0005
-                # Update CRVAL and rotation matrix from the AUX header
-                header = hdulist[window_fits_indices[i]].header
-                header["PC2_2"] = hdulist[-2].data[:, 20].mean()
-                header["PC3_2"] = hdulist[-2].data[:, 22].mean()
-                header["PC3_3"] = hdulist[-2].data[:, 23].mean()
-                header["PC2_3"] = hdulist[-2].data[:, 24].mean()
+                header = copy(hdulist[window_fits_indices[i]].header)
+                # Account for a slit offset (POFFYNUV (45) or POFFYFUV (34))
+                # I set it to NUV as that seems to be the most correct.
+                header["CRVAL3"] -= hdulist[-2].data[:, 45].mean() * 0.16
+                if header["CDELT3"] == 0:
+                    header["CDELT3"] = 1e-10
+                # Update the rotation matrix
+                ang1, ang2, ang3, ang4 = _pc_matrix(
+                    header["CDELT3"] / header["CDELT2"],
+                    hdulist[-2].data[:, 20].mean(),
+                    hdulist[-2].data[:, 22].mean(),
+                )
+                header["PC2_2"] = ang1
+                header["PC2_3"] = ang2
+                header["PC3_2"] = ang3
+                header["PC3_3"] = ang4
                 try:
                     wcs = WCS(header)
                 except Exception as e:
                     logging.warning(
                         f"WCS failed to load while reading one step of the raster due to {e}"
                         " The loading will continue but this wil be missing in the final cube."
+                        f" Spectral window: {window_name}, step {i} in file: {filename}"
                     )
                     continue
                 out_uncertainty = None
@@ -135,7 +151,7 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                     out_uncertainty = calculate_uncertainty(
                         hdulist[window_fits_indices[i]].data, readout_noise, DN_UNIT
                     )
-                cube = SpectrogramCube(
+                cube = IRISSpectrogramCube(
                     hdulist[window_fits_indices[i]].data,
                     wcs=wcs,
                     uncertainty=out_uncertainty,
@@ -146,7 +162,8 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                 cube.extra_coords.add("time", 0, times, physical_types="time")
                 data_dict[window_name].append(cube)
     window_data_pairs = [
-        (window_name, RasterSequence(data_dict[window_name], common_axis=0)) for window_name in spectral_windows_req
+        (window_name, IRISSpectrogramCubeSequence(data_dict[window_name], common_axis=0))
+        for window_name in spectral_windows_req
     ]
     return NDCollection(window_data_pairs, aligned_axes=(0, 1, 2))
 
@@ -192,7 +209,7 @@ class IRISSGMeta(Meta, metaclass=SlitSpectrographMetaABC):
         return f"{object.__repr__(self)}\n{str(self)}"
 
     def _construct_time(self, key):
-        val = self.get(key, None)
+        val = self.get(key)
         if val is not None:
             val = Time(val, format="fits", scale="utc")
         return val

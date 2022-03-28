@@ -98,7 +98,9 @@ def get_iris_response(
     else:
         response_version_set = False
     if pre_launch_set + response_file_set + response_version_set > 1:
-        raise ValueError("One and only one of kwargs pre_launch, response_file " "and response_version must be set.")
+        raise ValueError(
+            "One and only one of kwargs pre_launch, response_file " "and response_version must be set."
+        )
     # If pre_launch set, define response_version to 2.
     if pre_launch:
         response_version = 2
@@ -339,7 +341,9 @@ def get_iris_response(
                 else:
                     # NUV: essentially same calculation as r.version=3
                     for n in range(n_time_obs):
-                        iris_response["AREA_SJI"] = [Quantity(x, unit=u.cm**2) for x in iris_response["AREA_SJI"]]
+                        iris_response["AREA_SJI"] = [
+                            Quantity(x, unit=u.cm**2) for x in iris_response["AREA_SJI"]
+                        ]
                         area_sji = [x for x in area_sji]
                         iris_response["AREA_SJI"][2:4] = area_sji[:]
             for j in range(4):

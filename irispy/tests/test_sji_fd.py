@@ -326,7 +326,7 @@ def test_IRISMapCube_apply_dust_mask(test_input, expected):
 ##############################################################################
 
 
-@pytest.mark.parametrize("test_input,expected", [(sequence, [4, 3, 4] * u.pix)])
+@pytest.mark.parametrize("test_input,expected", [(sequence, [2, 2, 3, 4] * u.pix)])
 def test_dimensions(test_input, expected):
     assert assert_quantity_allclose(test_input.dimensions, expected)
 

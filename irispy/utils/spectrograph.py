@@ -15,7 +15,6 @@ __all__ = [
     "convert_or_undo_photons_per_sec_to_radiance",
     "calculate_photons_per_sec_to_radiance_factor",
     "reshape_1D_wavelength_dimensions_for_broadcast",
-    "produce_obs_repr_string",
 ]
 
 
@@ -213,15 +212,3 @@ def reshape_1D_wavelength_dimensions_for_broadcast(wavelength, n_data_dim):
     else:
         raise ValueError("IRISSpectrogram dimensions must be 2 or 3.")
     return wavelength
-
-
-def produce_obs_repr_string(meta):
-    obs_info = [meta.get(key, "Unknown") for key in ["OBSID", "OBS_DESC", "STARTOBS", "ENDOBS"]]
-    return """OBS ID: {obs_id}
-OBS Description: {obs_desc}
-OBS period: {obs_start} -- {obs_end}""".format(
-        obs_id=obs_info[0],
-        obs_desc=obs_info[1],
-        obs_start=obs_info[2],
-        obs_end=obs_info[3],
-    )

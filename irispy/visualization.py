@@ -1,12 +1,20 @@
 import matplotlib.pyplot as plt
 import sunpy.visualization.colormaps as cm  # NOQA
+from mpl_animators.wcs import ArrayAnimatorWCS
 from ndcube.visualization.mpl_sequence_plotter import MatplotlibSequencePlotter, SequenceAnimator
 
 __all__ = ["IRISSequencePlotter", "IRISSequenceAnimator"]
 
 
 def _set_axis_colors(ax):
-    lon, lat = ax.coords
+    if isinstance(ax, ArrayAnimatorWCS):
+        ax = ax.axes
+    if len(ax.coords._as_table()) == 2:
+        lon, lat = ax.coords
+    elif len(ax.coords._as_table()) == 3:
+        _, lat, lon = ax.coords
+    else:
+        raise ValueError("Too many axes")
     lon.set_ticklabel_position("all")
     lat.set_ticklabel_position("all")
     lon.set_axislabel(ax.get_xlabel(), color="black")
@@ -19,14 +27,20 @@ class IRISSequencePlotter(MatplotlibSequencePlotter):
     def plot(self, sequence_axis_coords=None, sequence_axis_unit=None, **kwargs):
         cmap = kwargs.get("cmap")
         if not cmap:
-            cmap = plt.get_cmap(name="irissji{}".format(int(self.meta["TWAVE1"])))
+            try:
+                cmap = plt.get_cmap(name="irissji{}".format(int(self.meta["TWAVE1"])))
+            except Exception:
+                cmap = "viridis"
         kwargs["cmap"] = cmap
         return IRISSequenceAnimator(self, sequence_axis_coords, sequence_axis_unit, **kwargs)
 
     def animate(self, sequence_axis_coords=None, sequence_axis_unit=None, **kwargs):
         cmap = kwargs.get("cmap")
         if not cmap:
-            cmap = plt.get_cmap(name="irissji{}".format(int(self.meta["TWAVE1"])))
+            try:
+                cmap = plt.get_cmap(name="irissji{}".format(int(self.meta["TWAVE1"])))
+            except Exception:
+                cmap = "viridis"
         kwargs["cmap"] = cmap
         return IRISSequenceAnimator(self, sequence_axis_coords, sequence_axis_unit, **kwargs)
 
