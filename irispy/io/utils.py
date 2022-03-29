@@ -49,13 +49,14 @@ def read_files(filename):
     The corresponding `irispy.sji.IRISMapCube` or `irispy.spectrogram.IRISSpectrogramCube`.
     """
     from irispy.io.sji import read_sji_lvl2
-    from irispy.io.sp import read_spectrograph_lvl2
+    from irispy.io.spectrograph import read_spectrograph_lvl2
 
     if isinstance(filename, str):
         if tarfile.is_tarfile(filename):
+            parent = Path(filename.replace(".tar.gz", "")).mkdir(parents=True, exist_ok=True)
             with tarfile.open(filename, "r") as tar:
-                tar.extractall(Path(filename).parent)
-                filename = [Path(filename).parent / file for file in tar.getnames()]
+                tar.extractall(parent)
+                filename = [parent / file for file in tar.getnames()]
         else:
             filename = [filename]
 

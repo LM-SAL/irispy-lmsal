@@ -49,9 +49,10 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
         filenames = filenames[0]
     if isinstance(filenames, str):
         if tarfile.is_tarfile(filenames):
+            parent = Path(filenames.replace(".tar.gz", "")).mkdir(parents=True, exist_ok=True)
             with tarfile.open(filenames, "r") as tar:
-                tar.extractall(Path(filenames).parent)
-                filenames = [Path(filenames).parent / file for file in tar.getnames()]
+                tar.extractall(parent)
+                filenames = [parent / file for file in tar.getnames()]
         else:
             filenames = [filenames]
 
@@ -124,22 +125,23 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                 header["CRVAL3"] -= hdulist[-2].data[:, 45].mean() * 0.16
                 if header["CDELT3"] == 0:
                     header["CDELT3"] = 1e-10
-                # Update the rotation matrix
-                ang1, ang2, ang3, ang4 = _pc_matrix(
-                    header["CDELT3"] / header["CDELT2"],
-                    hdulist[-2].data[:, 20].mean(),
-                    hdulist[-2].data[:, 22].mean(),
-                )
-                header["PC2_2"] = ang1
-                header["PC2_3"] = ang2
-                header["PC3_2"] = ang3
-                header["PC3_3"] = ang4
+                # Update the rotation matrix only if there is no rotation
+                if np.round(hdulist[0].header["SAT_ROT"]) == 0:
+                    ang1, ang2, ang3, ang4 = _pc_matrix(
+                        header["CDELT3"] / header["CDELT2"],
+                        hdulist[-2].data[:, 20].mean(),
+                        hdulist[-2].data[:, 22].mean(),
+                    )
+                    header["PC2_2"] = ang1
+                    header["PC2_3"] = ang2
+                    header["PC3_2"] = ang3
+                    header["PC3_3"] = ang4
                 try:
                     wcs = WCS(header)
                 except Exception as e:
                     logging.warning(
                         f"WCS failed to load while reading one step of the raster due to {e}"
-                        " The loading will continue but this wil be missing in the final cube."
+                        " The loading will continue but this will be missing in the final cube."
                         f" Spectral window: {window_name}, step {i} in file: {filename}"
                     )
                     continue

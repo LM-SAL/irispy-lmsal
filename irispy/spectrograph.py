@@ -3,14 +3,28 @@ import textwrap
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+from ndcube import NDCollection
 
 from sunraster import SpectrogramCube, SpectrogramSequence
 from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
 
 from irispy import utils
-from irispy.visualization import IRISSequencePlotter, _set_axis_colors
 
-__all__ = ["IRISSpectrogramCube", "IRISSpectrogramCubeSequence"]
+__all__ = ["IRISCollection", "IRISSpectrogramCube", "IRISSpectrogramCubeSequence"]
+
+
+class IRISCollection(NDCollection):
+    def __str__(self):
+        return textwrap.dedent(
+            f"""
+            IRISCollection
+            --------------
+            Cube keys: {tuple(self.keys())}
+            Number of Cubes: {len(self)}
+            Aligned dimensions: {self.aligned_dimensions}
+            Aligned physical types: {self.aligned_axis_physical_types}
+            """
+        )
 
 
 class IRISSpectrogramCube(SpectrogramCube):
@@ -114,8 +128,7 @@ class IRISSpectrogramCube(SpectrogramCube):
             except Exception:
                 cmap = "viridis"
         kwargs["cmap"] = cmap
-        ax = super().plot(*args, **kwargs)
-        _set_axis_colors(ax)
+        ax = super().plot(*args, axes_units=[None, None, u.nm], **kwargs)
         return ax
 
     def convert_to(self, new_unit_type, time_obs=None, response_version=4):
@@ -250,14 +263,11 @@ class IRISSpectrogramCubeSequence(SpectrogramSequence):
     ----------
     data_list: `list`
         List of `IRISSpectrogramCube` objects from the same spectral window and OBS ID.
-        Must also contain the 'detector type' in its meta attribute.
     meta: `dict` or header object, optional
         Metadata associated with the sequence.
     common_axis: `int`, optional
         The axis of the NDCubes corresponding to time.
     """
-
-    plotter = IRISSequencePlotter
 
     def __init__(self, data_list, meta=None, common_axis=0):
         # Check that all spectrograms are from same spectral window and OBS ID.
@@ -267,20 +277,9 @@ class IRISSpectrogramCubeSequence(SpectrogramSequence):
             )
         super().__init__(data_list, meta=meta, common_axis=common_axis)
 
-    def __repr__(self):
-        return textwrap.dedent(
-            f"""
-            IRISSpectrogramCubeSequence
-            ---------------------------
-            OBS ID:          {self.meta.get("OBSID")}
-            OBS Description: {self.meta.get("OBS_DESC")}
-            OBS period:      {self.meta.get("STARTOBS")} -- {self.meta.get("ENDOBS")}
-            Sequence period: {self[0].extra_coords["time"]["value"][0]} -- {self[-1].extra_coords["time"]["value"][-1]}
-            Sequence Shape:  {self.dimensions}
-            Axis Types:      {self.array_axis_physical_types}
-            Roll:            {self[0].meta.get("SAT_ROT")}
-            """
-        )
+    def __str__(self):
+        # Overload it get the class name in the string
+        return super().__str__()
 
     def convert_to(self, new_unit_type, copy=False):
         """

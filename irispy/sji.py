@@ -22,7 +22,7 @@ def _get_times(iris_map_cube):
     ):
         instance_start = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].min().isot
         instance_end = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].max().isot
-    elif hasattr(iris_map_cube, "time"):
+    elif hasattr(iris_map_cube, "time") and iris_map_cube.time:
         instance_start = iris_map_cube.time.min().isot
         instance_end = iris_map_cube.time.max().isot
     return instance_start, instance_end
@@ -196,18 +196,18 @@ class IRISMapCubeSequence(SpectrogramSequence):
         instance_start, instance_end = _get_times(self)
         return textwrap.dedent(
             f"""
-                IRISMapCubeSequence
-                -------------------
-                Observatory:     {self.meta.get("TELESCOP")}
-                Instrument:      {self.meta.get("INSTRUME")}
-                OBS ID:          {self.meta.get("OBSID")}
-                OBS Description: {self.meta.get("OBS_DESC")}
-                OBS period:      {startobs} -- {endobs}
-                Sequence period: {instance_start} -- {instance_end}
-                Sequence Shape:  {self.dimensions}
-                Axis Types:      {self.array_axis_physical_types}
-                Roll:            {self.meta.get("SAT_ROT")}
-                """
+            IRISMapCubeSequence
+            -------------------
+            Observatory:     {self.meta.get("TELESCOP")}
+            Instrument:      {self.meta.get("INSTRUME")}
+            OBS ID:          {self.meta.get("OBSID")}
+            OBS Description: {self.meta.get("OBS_DESC")}
+            OBS period:      {startobs} -- {endobs}
+            Sequence period: {instance_start} -- {instance_end}
+            Sequence Shape:  {self.dimensions}
+            Axis Types:      {self.array_axis_physical_types}
+            Roll:            {self.meta.get("SAT_ROT")}
+            """
         )
 
     def apply_dust_mask(self, undo=False):
