@@ -328,7 +328,7 @@ def test_IRISMapCube_apply_dust_mask(test_input, expected):
 
 @pytest.mark.parametrize("test_input,expected", [(sequence, [2, 2, 3, 4] * u.pix)])
 def test_dimensions(test_input, expected):
-    assert assert_quantity_allclose(test_input.dimensions, expected)
+    assert_quantity_allclose(test_input.dimensions, expected)
 
 
 @pytest.mark.parametrize(
@@ -383,3 +383,16 @@ def test_IRISMapCubeSequence_apply_dust_mask(test_input, expected):
     test_input.apply_dust_mask(undo=True)
     for cube_test in seq_dust.data:
         np.testing.assert_array_equal(cube_test.mask, mask_dust)
+
+
+@pytest.mark.parametrize(
+    "test_input",
+    [
+        sequence_s_s,
+        sequence,
+        sequence_per_s_per_s,
+        sequence_per_s,
+    ],
+)
+def test_repr(test_input):
+    assert repr(test_input)

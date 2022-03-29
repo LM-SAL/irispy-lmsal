@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import sunpy.visualization.colormaps as cm  # NOQA
-from mpl_animators.wcs import ArrayAnimatorWCS
+from mpl_animators import ArrayAnimatorWCS
 from ndcube.visualization.mpl_sequence_plotter import MatplotlibSequencePlotter, SequenceAnimator
 
 __all__ = ["IRISSequencePlotter", "IRISSequenceAnimator"]
