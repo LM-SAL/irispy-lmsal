@@ -73,7 +73,7 @@ plt.show()
 #
 # Let us now load the 1400 slit-jaw and plot it for context
 
-vmin, vmax = image_clipping(sji_1400.data[0])
+vmin, vmax = image_clipping(sji_1400[0].data)
 sji_1400.plot(vmin=vmin, vmax=vmax)
 
 plt.show()
@@ -98,15 +98,14 @@ plt.show()
 # taken at a different cadence, so you will need to load the corresponding
 # time array for the 1400 slit-jaw
 
-times_sji = sji_1400.axis_world_coords("time", wcs=sji_1400.extra_coords)[0][:50]
+times_sji = sji_1400.time[:50]
 
 ###############################################################################
 # Now we can plot both spectral lines and slit-jaw for a pixel close
 # to the slit at the same y position (index 220)
-
 plt.plot(mg_ii_times, mg_ii.data[:200, 220, 103])
 plt.plot(c_ii_times, c_ii.data[:200, 220, 90])
-plt.plot(times_sji, sji_1400.data[:50, 190, 220], "y-")
+plt.plot(times_sji, sji_1400.data_as_array[:50, 190, 220], "y-")
 
 plt.show()
 

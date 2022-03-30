@@ -1,3 +1,4 @@
+import astropy.units as u
 import matplotlib.pyplot as plt
 import sunpy.visualization.colormaps as cm  # NOQA
 from mpl_animators import ArrayAnimatorWCS
@@ -9,12 +10,19 @@ __all__ = ["IRISSequencePlotter", "IRISSequenceAnimator"]
 def _set_axis_colors(ax):
     if isinstance(ax, ArrayAnimatorWCS):
         ax = ax.axes
+    if len(ax.coords._as_table()) == 1:
+        wave = ax.coords[0]
+        wave.set_format_unit(u.nm)
+        wave.set_major_formatter("x.x")
+        return
     if len(ax.coords._as_table()) == 2:
         lon, lat = ax.coords
     elif len(ax.coords._as_table()) == 3:
-        _, lat, lon = ax.coords
+        wave, lat, lon = ax.coords
+        wave.set_format_unit(u.nm)
+        wave.set_major_formatter("x.x")
     else:
-        raise ValueError("Too many axes")
+        raise ValueError(f"Too many axes: {len(ax.coords._as_table())}")
     lon.set_ticklabel_position("all")
     lat.set_ticklabel_position("all")
     lon.set_axislabel(ax.get_xlabel(), color="black")

@@ -167,20 +167,16 @@ print(mg_ii.meta)
 ###############################################################################
 # But this is mostly about the observation in general.
 # Times of individual scans are saved in .extra_coords['time'].
-# Getting access to them can be done in two ways:
-#
-# 1. Using axis_world_coords
-# 2. "slice" the data object and access the .global_coords attribute.
+# Getting access to it can be done in the following  way:
 
 # The first index is to escape the tuple that `axis_world_coords` returns
 print(mg_ii.axis_world_coords("time", wcs=mg_ii.extra_coords)[0][0].isot)
-
-print(mg_ii[0].global_coords["time"].isot)
 
 ###############################################################################
 # Working with IRIS Slit-Jaw Image files
 #
 # We will now open the slit-jaw image file we downloaded at the start.
+
 sji_2832 = read_files(sji_filename)
 
 print(sji_2832)
@@ -262,9 +258,7 @@ plt.show()
 # the points we give it. To start we will need the coordinate frame of the
 # SJI observation to use for transforms and plotting later on.
 
-
-sji_frame = wcs_to_celestial_frame(sji_2832.wcs)
-
+sji_frame = wcs_to_celestial_frame(sji_2832[0].wcs)
 bbox = [
     SkyCoord(-750 * u.arcsec, 90 * u.arcsec, frame=sji_frame),
     SkyCoord(-750 * u.arcsec, 95 * u.arcsec, frame=sji_frame),
@@ -288,10 +282,9 @@ print(sji_cut.global_coords["time"])
 ###############################################################################
 # Lets us now find the SJI observation where the time is closest to 06:00 on 2014-09-19.
 
-(time_sji,) = sji_2832.axis_world_coords("time", wcs=sji_2832.extra_coords)
-time_target = Time("2014-09-19T06:00:00.0")
-time_index = np.abs(time_sji - time_target).argmin()
-time_stamp = time_sji[time_index].isot
+time_target = Time("2014-09-19T06:00:00")
+time_index = np.abs(sji_2832.time - time_target).argmin()
+time_stamp = sji_2832.time[time_index].isot
 print(time_index, time_stamp)
 
 ###############################################################################
@@ -336,17 +329,14 @@ plt.show()
 # so we are just going to pretend it's at AIA for this example.
 # This will allow us to transform from IRIS to SDO/AIA.
 
-sji_corrected_wcs = deepcopy(sji_2832.wcs)
-sji_corrected_wcs.wcs.dateobs = sji_2832[45].global_coords["time"].isot
+sji_corrected_wcs = deepcopy(sji_2832[0].wcs)
+sji_corrected_wcs.wcs.dateobs = sji_2832.time[45].isot
 sji_corrected_wcs.wcs.aux.hgln_obs = aia_map.observer_coordinate.lon.to_value(u.deg)
 sji_corrected_wcs.wcs.aux.hglt_obs = aia_map.observer_coordinate.lat.to_value(u.deg)
 sji_corrected_wcs.wcs.aux.rsun_ref = aia_map.observer_coordinate.rsun.to_value(u.m)
 
 # We have to re-create the coordinate frame.
 sji_frame_corrected = wcs_to_celestial_frame(sji_corrected_wcs)
-
-# Remove time to avoid doing this call in all cells below
-sji_corrected_wcs_drop = sji_corrected_wcs.dropaxis(-1)
 
 ###############################################################################
 # Using the draw_quadrangle method, drawing WCS regions becomes much simpler
@@ -362,7 +352,7 @@ aia_sub.draw_quadrangle(
     edgecolor="green",
     linestyle="--",
     linewidth=2,
-    transform=ax.get_transform(sji_corrected_wcs_drop),
+    transform=ax.get_transform(sji_corrected_wcs),
 )
 
 plt.show()
@@ -375,16 +365,16 @@ plt.show()
 #
 # We will rotate the AIA data, using the inverse rotation of the IRIS frame
 
-aia_rot = aia_sub.rotate(rmatrix=np.matrix(sji_corrected_wcs.wcs.pc[:-1, :-1]).I)
+aia_rot = aia_sub.rotate(rmatrix=np.matrix(sji_corrected_wcs.wcs.pc).I)
 
 # Crop the AIA FOV to match IRIS.
-bl = aia_rot.wcs.world_to_pixel(sji_corrected_wcs_drop.pixel_to_world(*(0, 0) * u.pix))
+bl = aia_rot.wcs.world_to_pixel(sji_corrected_wcs.pixel_to_world(*(0, 0) * u.pix))
 tr = aia_rot.wcs.world_to_pixel(
-    sji_corrected_wcs_drop.pixel_to_world(*(sji_cut.data.shape[0], sji_cut.data.shape[1]) * u.pix)
+    sji_corrected_wcs.pixel_to_world(*(sji_cut.data.shape[0], sji_cut.data.shape[1]) * u.pix)
 )
 
 fig = plt.figure()
-ax1 = fig.add_subplot(1, 2, 1, projection=sji_corrected_wcs_drop)
+ax1 = fig.add_subplot(1, 2, 1, projection=sji_corrected_wcs)
 aia_rotate_crop = aia_rot.submap(bl * u.pix, top_right=tr * u.pix)
 aia_rotate_crop.plot(axes=ax1, autoalign=True)
 

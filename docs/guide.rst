@@ -45,7 +45,7 @@ Let us recover the header of the raster file and show the description of the obs
 
 .. code-block:: python
 
-    >>> raster = read_files(sample_data.RASTER, uncertainty=False)  # doctest: +REMOTE_DATA
+    >>> raster = read_files(sample_data.RASTER)  # doctest: +REMOTE_DATA
 
 .. note::
     This, by default will load the data into memory.
@@ -55,13 +55,15 @@ Let us recover the header of the raster file and show the description of the obs
 .. code-block:: python
 
     >>> raster  # doctest: +REMOTE_DATA
-    <ndcube.ndcollection.NDCollection object at ...>
-    NDCollection
-    ------------
+    <irispy.spectrograph.IRISCollection object at ...>
+    <BLANKLINE>
+    IRISCollection
+    --------------
     Cube keys: ('C II 1336', 'Si IV 1394', 'Mg II k 2796')
     Number of Cubes: 3
     Aligned dimensions: [<Quantity 5. pix> <Quantity 16. pix> <Quantity 548. pix>]
-    ...
+    Aligned physical types: [('meta.obs.sequence',), ...]
+    <BLANKLINE>
 
 We get some basic information about the raster file from this, what spectral windows were observed
 The size of the cube, the wavelength keys as well.
@@ -81,17 +83,20 @@ Let us check the header of this collection, this is stored as a ``meta`` attribu
 .. code-block:: python
 
     >>> raster["C II 1336"][0].meta  # doctest: +REMOTE_DATA
-    <sunraster.instr.iris.IRISSGMeta object at ...>
+    <irispy.io.spectrograph.IRISSGMeta object at ...>
+    <BLANKLINE>
     IRISMeta
     --------
-    Observatory:                IRIS
-    Instrument:         SPEC
-    Detector:           FUV1
-    Spectral Window:    C II 1336
-    Spectral Range:             [1331.70275015 1358.28579039] Angstrom
-    Date:                       2021-10-01T06:09:25.090
-    OBS ID:                     3683602040
-    OBS Description:    Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
+    Observatory:     IRIS
+    Instrument:      SPEC
+    Detector:        FUV1
+    Spectral Window: C II 1336
+    Spectral Range:  [1331.70275015 1358.28579039] Angstrom
+    Spectral Band:   FUV
+    Dimensions:      [16, 548, 513]
+    Date:            2021-10-01T06:09:25.090
+    OBS ID:          3683602040
+    OBS Description: Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
     <BLANKLINE>
 
 Note this is not on the main object but each individual element, in this case the spectral window.
@@ -105,25 +110,21 @@ We use the following command to read and load the data from a SJI IRIS Level 2 f
 
 .. code-block:: python
 
-    >>> iris_sji = read_files(sample_data.SJI_1330, uncertainty=False)  # doctest: +REMOTE_DATA
+    >>> iris_sji = read_files(sample_data.SJI_1330)  # doctest: +REMOTE_DATA
     >>> iris_sji  # doctest: +REMOTE_DATA
-    <irispy.sji.IRISMapCube object at ...>
+    <irispy.sji.IRISMapCubeSequence object at ...>
     <BLANKLINE>
-    IRISMapCube
-    -----------
-    Observatory:                 IRIS
-    Instrument:                  SJI
-    Bandpass:                    1330.0
-    Obs. Start:                  2021-10-01T06:09:24.920
-    Obs. End:                    2021-10-01T06:11:44.461
-    Instance Start:              2021-10-01T06:09:25.020
-    Instance End:                2021-10-01T06:11:37.580
-    Roll:                        0.000464606 deg
-    Total Frames in Obs.:        20
-    IRIS Obs. id:                3683602040
-    IRIS Obs. Description:       Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
-    Axis Types:                  [('time', 'time', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat')]
-    Cube dimensions:             [ 20. 548. 555.] pix
+    IRISMapCubeSequence
+    -------------------
+    Observatory:     IRIS
+    Instrument:      SJI
+    OBS ID:          3683602040
+    OBS Description: Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
+    OBS period:      2021-10-01T06:09:24.920 -- 2021-10-01T06:11:44.461
+    Sequence period: 2021-10-01T06:09:25.020 -- 2021-10-01T06:11:37.580
+    Sequence Shape:  (<Quantity 20. pix>, <Quantity 548. pix>, <Quantity 555. pix>)
+    Axis Types:      [('meta.obs.sequence',), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat')]
+    Roll:            0.000464606 deg
     <BLANKLINE>
 
 Metadata
@@ -152,10 +153,12 @@ The exposure times:
 .. code-block:: python
 
     >>> iris_sji.exposure_time   # doctest: +REMOTE_DATA
+    <ndcube.extra_coords.extra_coords.ExtraCoords object at ...>
+    ExtraCoords(exposure time (0) None: QuantityTableCoordinate ['exposure time'] [None]:
     <Quantity [0.50031197, 0.50025398, 0.50023699, 0.50024003, 0.50023901,
                0.50028503, 0.50024903, 0.500269  , 0.50026202, 0.500247  ,
                0.50029403, 0.50021601, 0.50028402, 0.50023901, 0.50024903,
-               0.50025803, 0.500283  , 0.50029802, 0.50029498, 0.50027299] s>
+               0.50025803, 0.500283  , 0.50029802, 0.50029498, 0.50027299] s>)
 
 In most cases, the exposure times are fixed for all scans in a raster.
 However, when automatic exposure compensation (AEC) is switched on and there is a very energetic event (e.g. a

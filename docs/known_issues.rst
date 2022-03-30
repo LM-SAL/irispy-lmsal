@@ -4,13 +4,13 @@
 Known Issues
 ************
 
-This page documents commonly known issues, issues here is defined broadly and refers to oddities or specifics of how ``irispy-lmsal`` or the Python ecosystem works that could anyone catch out.
+This page documents commonly known issues, issues here is defined broadly and refers to oddities or specifics of how ``irispy-lmsal`` or the Python ecosystem works that could catch anyone out.
 
 Per-exposure WCS metadata
 =========================
 
 The IRIS FITS files contain the per-exposure WCS metadata (reference coordinate and PCij matrix) in an extension, while the primary header has only values averaged over the observation
-For example, in for the SJI file, ``CRVAL`` in the primary header is (1.93840, 1.96290), but the reference coordinate
+For example, OBS 4204700138 SJI file, ``CRVAL`` in the primary header is (1.93840, 1.96290), but the reference coordinate
 is actually (-3.56638378,  1.69258388), which is retrieved from the appropriate index in the ``XCENIX``/``YCENIX`` arrays in the extension.
 
 This was (and partially still is) a problem for the ``irispy-lmsal`` package, which assumed that the reference coordinate is the same for all exposures.
@@ -26,7 +26,7 @@ This is not allowed by the WCS standard, so we set its value to 1e-10 arcsec in 
 However, the PCij matrix used is derived from the SJI, with square pixels, so the PCij matrix is a pure rotation.
 This means that one gets the correct answer only if one does the matrix multiplication in the wrong order: first by PCij and then by CDELTs.
 
-We would around this by modify the PCij matrix to have the correct skew.
+We work around this by modifying the PC_ij matrix to have the correct skew.
 Since the X CDELT is 1e-10 arcsec, the inverse is thankfully not infinity.
 Using equation 187 in `Calabretta & Greisen 2002
 <https://www.aanda.org/articles/aa/abs/2002/45/aah3860/aah3860.html>__`, we correct for this.

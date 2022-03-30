@@ -29,7 +29,7 @@ def fitsinfo(filename):
             print(f"{hdr[f'TWMIN{i+1}']:.2f} - {hdr[f'TWMAX{i+1}']:.2f} AA" + modifer)
 
 
-def read_files(filename):
+def read_files(filename, uncertainty=False, memmap=False):
     """
     A wrapper function to read a raster or SJI IRIS Level 2 data file.
 
@@ -43,6 +43,14 @@ def read_files(filename):
         Filename(s) to load.
         If given a string, will load that file.
         If given a list of strings, it will check they are all raster files and load them.
+    uncertainty : `bool`, optional
+        If `True` (not the default), will compute the uncertainty for the data (slower and
+        uses more memory). If `memmap=True`, the uncertainty is never computed.
+    memmap : `bool`, optional
+        If `True` (not the default), will not load arrays into memory, and will only read from
+        the file into memory when needed. This option is faster and uses a
+        lot less memory. However, because FITS scaling is not done on-the-fly,
+        the data units will be unscaled, not the usual data numbers (DN).
 
     Returns
     -------
@@ -53,10 +61,11 @@ def read_files(filename):
 
     if isinstance(filename, str):
         if tarfile.is_tarfile(filename):
-            parent = Path(filename.replace(".tar.gz", "")).mkdir(parents=True, exist_ok=True)
+            path = Path(filename.replace(".tar.gz", ""))
+            path.mkdir(parents=True, exist_ok=True)
             with tarfile.open(filename, "r") as tar:
-                tar.extractall(parent)
-                filename = [parent / file for file in tar.getnames()]
+                tar.extractall(path)
+                filename = [path / file for file in tar.getnames()]
         else:
             filename = [filename]
 
@@ -66,8 +75,10 @@ def read_files(filename):
         raise ValueError("You cannot mix raster and SJI files.")
 
     if intrume == "SJI":
-        return read_sji_lvl2(filename[0])
+        if len(filename) > 1:
+            raise ValueError("You cannot load more than one SJI file at a time.")
+        return read_sji_lvl2(filename[0], memmap=memmap, uncertainty=uncertainty)
     elif intrume == "SPEC":
-        return read_spectrograph_lvl2(filename)
+        return read_spectrograph_lvl2(filename, memmap=memmap, uncertainty=uncertainty)
     else:
         raise ValueError(f"Unsupported instrument: {intrume}")
