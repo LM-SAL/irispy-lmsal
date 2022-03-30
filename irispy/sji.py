@@ -1,7 +1,11 @@
 import textwrap
+from collections import defaultdict
 
+import astropy.units as u
 import matplotlib.pyplot as plt
+import numpy as np
 from astropy.time import Time
+from ndcube.extra_coords import ExtraCoords
 
 from sunraster import SpectrogramCube, SpectrogramSequence
 
@@ -17,14 +21,16 @@ def _get_times(iris_map_cube):
     if hasattr(iris_map_cube, "global_coords") and "time" in iris_map_cube.global_coords:
         instance_start = iris_map_cube.global_coords["time"].min().isot
         instance_end = iris_map_cube.global_coords["time"].max().isot
-    elif hasattr(iris_map_cube, "extra_coords") and isinstance(
-        iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0], Time
-    ):
-        instance_start = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].min().isot
-        instance_end = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].max().isot
     elif hasattr(iris_map_cube, "time") and iris_map_cube.time:
         instance_start = iris_map_cube.time.min().isot
         instance_end = iris_map_cube.time.max().isot
+    elif (
+        hasattr(iris_map_cube, "extra_coords")
+        and hasattr(iris_map_cube, "axis_world_coords")
+        and isinstance(iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0], Time)
+    ):
+        instance_start = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].min().isot
+        instance_end = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].max().isot
     return instance_start, instance_end
 
 
@@ -161,6 +167,23 @@ class IRISMapCube(SpectrogramCube):
             self.dust_masked = True
 
 
+def _create_extra_coords(cube):
+    extra_coords = ExtraCoords()
+    # = [("time", 0, times)]
+    coords = defaultdict(list)
+    for data in cube.data:
+        for name, value in data.global_coords.items():
+            coords[name].append(value)
+    for k, v in coords.items():
+        if k == "time":
+            v = Time(v)
+        else:
+            v = u.Quantity(v)
+        extra_coords.add(k, 0, v)
+    # extra_coords.add([name, value for name, value in coords.items()])
+    return extra_coords
+
+
 class IRISMapCubeSequence(SpectrogramSequence):
     """
     Class for holding, slicing and plotting IRIS SJI data.
@@ -172,7 +195,6 @@ class IRISMapCubeSequence(SpectrogramSequence):
     ----------
     data_list: `list`
         List of `IRISMapCube` objects from the same OBS ID.
-        Each cube must contain the same 'detector type' in its meta attribute.
     meta: `dict` or header object, optional
         Metadata associated with the sequence.
     common_axis: `int`, optional
@@ -184,6 +206,8 @@ class IRISMapCubeSequence(SpectrogramSequence):
     def __init__(self, data_list, meta=None, common_axis=0, times=None):
         super().__init__(data_list, meta=meta, common_axis=common_axis)
         self.time = times
+        self._extra_coords = _create_extra_coords(self)
+        self._data = np.stack(list(data.data for data in data_list))
 
     def __repr__(self):
         return f"{object.__repr__(self)}\n{str(self)}"
@@ -233,3 +257,27 @@ class IRISMapCubeSequence(SpectrogramSequence):
     @time.setter
     def time(self, times):
         self._time = times
+
+    @property
+    def exposure_time(self):
+        return self._extra_coords["exposure time"]
+
+    @property
+    def extra_coords(self):
+        return self._extra_coords
+
+    @property
+    def data_as_array(self):
+        return self._data
+
+    def plot(self, *args, **kwargs):
+        cmap = kwargs.get("cmap")
+        if not cmap:
+            try:
+                cmap = plt.get_cmap(name="irissji{}".format(int(self.meta["TWAVE1"])))
+            except Exception:
+                cmap = "viridis"
+        kwargs["cmap"] = cmap
+        ax = super().plot(self, *args, **kwargs)
+        _set_axis_colors(ax)
+        return ax

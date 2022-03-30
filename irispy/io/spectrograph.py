@@ -10,14 +10,13 @@ from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.time import Time, TimeDelta
 from astropy.wcs import WCS
-from ndcube import NDCollection
 from sunpy.coordinates import Helioprojective
 
 from sunraster.meta import Meta, SlitSpectrographMetaABC
 
-from irispy.spectrograph import IRISSpectrogramCube, IRISSpectrogramCubeSequence
+from irispy.spectrograph import IRISCollection, IRISSpectrogramCube, IRISSpectrogramCubeSequence
 from irispy.utils import calculate_uncertainty
-from irispy.utils.constants import DN_UNIT, READOUT_NOISE, SPECTRAL_BAND
+from irispy.utils.constants import DN_UNIT, READOUT_NOISE, SLIT_WIDTH, SPECTRAL_BAND
 
 __all__ = ["read_spectrograph_lvl2"]
 
@@ -40,6 +39,14 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
     spectral_windows: iterable of `str` or `str`
         Spectral windows to extract from files. Default=None, implies, extract all
         spectral windows.
+    uncertainty : `bool`, optional
+        If `True` (not the default), will compute the uncertainty for the data (slower and
+        uses more memory). If `memmap=True`, the uncertainty is never computed.
+    memmap : `bool`, optional
+        If `True` (not the default), will not load arrays into memory, and will only read from
+        the file into memory when needed. This option is faster and uses a
+        lot less memory. However, because FITS scaling is not done on-the-fly,
+        the data units will be unscaled, not the usual data numbers (DN).
 
     Returns
     -------
@@ -105,14 +112,13 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                     window_name,
                     data_shape=hdulist[window_fits_indices[i]].data.shape,
                 )
+                exposure_times = exposure_times_nuv
+                DN_unit = DN_UNIT["NUV"]
+                readout_noise = READOUT_NOISE["NUV"]
                 if "FUV" in meta.detector:
                     exposure_times = exposure_times_fuv
                     DN_unit = DN_UNIT["FUV"]
                     readout_noise = READOUT_NOISE["FUV"]
-                else:
-                    exposure_times = exposure_times_nuv
-                    DN_unit = DN_UNIT["NUV"]
-                    readout_noise = READOUT_NOISE["NUV"]
                 meta.add("exposure time", exposure_times, None, 0)
                 meta.add("exposure FOV center", fov_center, None, 0)
                 meta.add("observer radial velocity", obs_vrix, None, 0)
@@ -121,12 +127,12 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                 # In this case, set CDELT to a small number.
                 header = copy(hdulist[window_fits_indices[i]].header)
                 # Account for a slit offset (POFFYNUV (45) or POFFYFUV (34))
-                # I set it to NUV as that seems to be the most correct.
-                header["CRVAL3"] -= hdulist[-2].data[:, 45].mean() * 0.16
+                idx = 45
+                if meta.spectral_band == "FUV":
+                    idx = 34
+                header["CRVAL3"] -= hdulist[-2].data[:, idx].mean() * (SLIT_WIDTH.value / 2)
                 if header["CDELT3"] == 0:
                     header["CDELT3"] = 1e-10
-                # Update the rotation matrix only if there is no rotation
-                if np.round(hdulist[0].header["SAT_ROT"]) == 0:
                     ang1, ang2, ang3, ang4 = _pc_matrix(
                         header["CDELT3"] / header["CDELT2"],
                         hdulist[-2].data[:, 20].mean(),
@@ -167,7 +173,7 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
         (window_name, IRISSpectrogramCubeSequence(data_dict[window_name], common_axis=0))
         for window_name in spectral_windows_req
     ]
-    return NDCollection(window_data_pairs, aligned_axes=(0, 1, 2))
+    return IRISCollection(window_data_pairs, aligned_axes=(0, 1, 2))
 
 
 class IRISSGMeta(Meta, metaclass=SlitSpectrographMetaABC):

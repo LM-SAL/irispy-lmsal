@@ -95,7 +95,7 @@ def read_sji_lvl2(filename, uncertainty=False, memmap=False):
                 ("pzty", "custom: PZTY", pzty),
                 ("obs_vrix", "custom: OBS_VRIX", obs_vrix),
                 ("ophaseix", "custom: OPHASEIX", ophaseix),
-                ("exposure time", "custom: PZTX", exposure_time),
+                ("exposure time", "obs.exposure", exposure_time),
                 ("slit x position", "custom: SLTPX1IX", slit_pos_x * u.pix),
                 ("slit y position", "custom: SLTPX2IX", slit_pos_y * u.pix),
             ]
