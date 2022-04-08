@@ -27,19 +27,7 @@ def IRISMapCube_2832():
 
 
 AXIS = [
-    (
-        "time",
-        "time",
-        "custom:CUSTOM",
-        "custom:CUSTOM",
-        "custom:CUSTOM",
-        "custom:CUSTOM",
-        "custom:CUSTOM",
-        "custom:CUSTOM",
-        "custom:CUSTOM",
-        "custom:CUSTOM",
-        "custom:CUSTOM",
-    ),
+    ("meta.obs.sequence",),
     ("custom:pos.helioprojective.lon", "custom:pos.helioprojective.lat"),
     ("custom:pos.helioprojective.lon", "custom:pos.helioprojective.lat"),
 ]
