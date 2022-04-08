@@ -58,19 +58,13 @@ def wobble_movie(
         A list of the movies created.
     """
     header = fits.getheader(filelist[0])
-    exptime = header["EXPTIME"]
+    header["EXPTIME"]
     numframes = header["NAXIS3"]
-    duration = (parse_time(header["ENDOBS"]) - parse_time(header["STARTOBS"])).to(u.s)
+    (parse_time(header["ENDOBS"]) - parse_time(header["STARTOBS"])).to(u.s)
     if ffmpeg_path:
         import matplotlib as mpl
 
         mpl.rcParams["animation.ffmpeg_path"] = ffmpeg_path
-
-    # Check that the OBS is reasonable for checking wobble
-    if duration < 7200 * u.s:
-        raise ValueError("Try to use something with at least 2 hour duration")
-    if exptime < 2:
-        raise ValueError("Try to use something with exposure time longer than 2 seconds")
 
     filenames = []
     for file in filelist:
