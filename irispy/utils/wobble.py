@@ -15,13 +15,12 @@ from irispy.utils import image_clipping
 
 __all__ = ["wobble_movie"]
 
-WOBBLE_CADENCE = 180
-
 
 def wobble_movie(
     filelist: list,
     outdir: Union[str, Path] = "./",
     trim: bool = False,
+    wobble_cadence: Optional[float] = 180,
     ffmpeg_path: Optional[Union[str, Path]] = None,
     **kwargs,
 ) -> None:
@@ -46,6 +45,8 @@ def wobble_movie(
         Defaults to the current working directory.
     trim : `bool`, optional
         Movie is trimmed to include only area that has data in all frames, by default False
+    wobble_cadence : `float`, optional
+        The cadence of the wobble movie in seconds. Defaults to 180 seconds.
     ffmpeg_path : Union[str,Path], optional
         Path to FFMPEG executable, by default `None`.
         In theory you will not need to do this but matplotlib might not be able to find the ffmpeg exe.
@@ -73,7 +74,7 @@ def wobble_movie(
 
         # Calculate index to downsample in time to accentuate the wobble
         cadence = header["CDELT3"]
-        cadence_sample = np.floor(WOBBLE_CADENCE / cadence) if np.floor(WOBBLE_CADENCE / cadence) > 1 else 1
+        cadence_sample = np.floor(wobble_cadence / cadence) if np.floor(wobble_cadence / cadence) > 1 else 1
 
         # Trim down to only that part of the movie that contains data in all frames
         if trim:
