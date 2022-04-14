@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from astropy.coordinates import SpectralCoord
 from astropy.visualization import time_support
 
-from irispy.io import read_sji_lvl2, read_spectrograph_lvl2
+from irispy.io import read_files
 from irispy.utils import image_clipping
 from irispy.utils.utils import _download_data
 
@@ -43,8 +43,8 @@ sji_filename = "iris_l2_20130902_163935_4000255147_SJI_1400_t000.fits.gz"
 # directly without the scaling to Float32, the data values are no longer in DN,
 # but in scaled integer units that start at −2$^{16}$/2.
 
-raster = read_spectrograph_lvl2(raster_filename, memmap=True, uncertainty=False)
-sji_1400 = read_sji_lvl2(sji_filename, memmap=True, uncertainty=False)
+raster = read_files(raster_filename, memmap=True, uncertainty=False)
+sji_1400 = read_files(sji_filename, memmap=True, uncertainty=False)
 print(raster)
 
 ###############################################################################
@@ -73,7 +73,7 @@ plt.show()
 #
 # Let us now load the 1400 slit-jaw and plot it for context
 
-vmin, vmax = image_clipping(sji_1400.data[0])
+vmin, vmax = image_clipping(sji_1400[0].data)
 sji_1400.plot(vmin=vmin, vmax=vmax)
 
 plt.show()
@@ -98,15 +98,14 @@ plt.show()
 # taken at a different cadence, so you will need to load the corresponding
 # time array for the 1400 slit-jaw
 
-times_sji = sji_1400.axis_world_coords("time", wcs=sji_1400.extra_coords)[0][:50]
+times_sji = sji_1400.time[:50]
 
 ###############################################################################
 # Now we can plot both spectral lines and slit-jaw for a pixel close
 # to the slit at the same y position (index 220)
-
 plt.plot(mg_ii_times, mg_ii.data[:200, 220, 103])
 plt.plot(c_ii_times, c_ii.data[:200, 220, 90])
-plt.plot(times_sji, sji_1400.data[:50, 190, 220], "y-")
+plt.plot(times_sji, sji_1400.data_as_array[:50, 190, 220], "y-")
 
 plt.show()
 
