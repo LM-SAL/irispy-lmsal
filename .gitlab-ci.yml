@@ -35,12 +35,12 @@ py38-online:
     - pip install --upgrade codecov
     - codecov
 
-py37-devdeps:
+py38-devdeps:
   allow_failure: true
   stage: Extra
-  image: python:3.7
+  image: python:3.8
   script:
-    - tox -e py37-devdeps
+    - tox -e py38-devdeps
 
 build_docs:
   stage: Extra

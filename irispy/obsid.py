@@ -16,7 +16,7 @@ class ObsID(dict):
 
     Parameters
     ----------
-    obsid: `int`
+    obsid : `int`
         IRIS OBS ID to query. Needs to be a valid OBS ID, with 10 digits.
 
     Notes
@@ -26,7 +26,8 @@ class ObsID(dict):
 
     Examples
     --------
-    Quickly show OBS ID parameters:
+    Quickly show OBS ID parameters
+
     >>> from irispy import obsid
     >>> obsid.ObsID(3675508564)
     IRIS OBS ID 3675508564
@@ -42,6 +43,7 @@ class ObsID(dict):
     Linelist:                                       Flare linelist 1
 
     The data can be accessed as in a dictionary:
+
     >>> data = obsid.ObsID(3675508564)
     >>> data['exptime']
     <Quantity 8. s>
@@ -75,7 +77,7 @@ class ObsID(dict):
         ).format(**self)
 
     @staticmethod
-    def __exptime_to_quant(exptime):
+    def _exptime_to_quant(exptime):
         """
         Converts an 'exptime' string (used in IRIS tables and OBS_DESC) to a
         Quantity instance in seconds.
@@ -153,9 +155,9 @@ class ObsID(dict):
             if desc.iloc[0] in field_keys:
                 attr_name = field_keys[desc.iloc[0]]
                 if attr_name == "exptime":
-                    opt = (self.__exptime_to_quant(a) for a in list(desc.values))
+                    opt = (self._exptime_to_quant(a) for a in list(desc.values))
                     opt = dict(zip(opt, table["OBS ID"]))
-                    attr_value = self.__exptime_to_quant(desc.loc[index])
+                    attr_value = self._exptime_to_quant(desc.loc[index])
                 else:
                     opt = dict(zip(desc, table["OBS ID"]))
                     attr_value = desc.loc[index].strip()
