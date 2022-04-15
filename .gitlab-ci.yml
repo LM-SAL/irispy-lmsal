@@ -8,8 +8,8 @@ before_script:
 stages:
   - Basic
   - Test
-  - Extra
   - Deploy
+  - Extra
 
 codestyle:
   stage: Basic
