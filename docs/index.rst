@@ -52,6 +52,7 @@ If you would rather not register to use GitLab, you can email ``freij@baeri.org`
       installation
       guide
       generated/gallery/index
+      known_issues
       history
 
     ---
