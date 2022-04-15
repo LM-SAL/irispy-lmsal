@@ -22,7 +22,7 @@ from astropy.io import fits
 from scipy.constants import c
 from scipy.interpolate import interp1d
 
-from irispy.io import read_spectrograph_lvl2
+from irispy.io import read_files
 from irispy.utils import image_clipping
 from irispy.utils.utils import _download_data
 
@@ -48,7 +48,7 @@ raster_filename = "iris_l2_20140708_114109_3824262996_raster_t000_r00000.fits"
 # directly without the scaling to Float32, the data values are no longer in DN,
 # but in scaled integer units that start at −2$^{16}$/2.
 
-raster = read_spectrograph_lvl2(raster_filename, memmap=True, uncertainty=False)
+raster = read_files(raster_filename, memmap=True, uncertainty=False)
 print(raster)
 
 ###############################################################################

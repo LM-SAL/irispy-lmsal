@@ -18,7 +18,7 @@ files = download_sample_data()
 file_dict = {}
 for f in files:
     name = Path(f).name
-    _key = _SAMPLE_FILES.get(name, None)
+    _key = _SAMPLE_FILES.get(name)
     if _key:
         setattr(sys.modules[__name__], _key, str(f))
         file_dict.update({_key: f})

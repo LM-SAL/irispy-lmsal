@@ -1,6 +1,6 @@
 """
-IRISPy
-======
+irispy-lmsal
+============
 """
 
 from .sji import *  # NOQA
