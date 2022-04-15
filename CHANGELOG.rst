@@ -1,3 +1,14 @@
+0.2.0 (2022-04-14)
+==================
+
+Breaking Changes
+----------------
+
+- Due to a bug in how older versions of ``irispy-lmsal`` handled the WCS of IRIS files, the readers have been changed.
+  This has meant that some of the older API has changed in ways that are not recoverable.
+  If your old code has broken, please do get in touch, I want to ensure the old API still works as much as humanly possible.
+  Future plans are to restore the older API but that will take some time.
+
 0.1.1 (2022-02-17)
 ==================
 
