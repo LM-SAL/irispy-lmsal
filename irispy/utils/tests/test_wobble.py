@@ -1,5 +1,4 @@
 import os
-from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -38,19 +37,3 @@ def test_wobble_movie(fake_long_obs, tmp_path):
     assert movies != []
     movies = wobble_movie(fake_long_obs, outdir=tmp_path, trim=True)
     assert movies != []
-
-
-def test_wobble_movie_errors(filelist):
-    # Short data run
-    with pytest.raises(ValueError, match="Try to use something with at least 2 hour duration"):
-        wobble_movie(filelist)
-    # exposure time too short
-    fake_header = {
-        "EXPTIME": 1,
-        "NAXIS3": 10,
-        "STARTOBS": "2017-05-02T05:25:51.000",
-        "ENDOBS": "2017-05-02T07:26:51.000",
-    }
-    with patch("irispy.utils.wobble.fits.getheader", return_value=fake_header):
-        with pytest.raises(ValueError, match="Try to use something with exposure time longer than 2 seconds"):
-            wobble_movie(filelist)
