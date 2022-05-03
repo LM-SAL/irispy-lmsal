@@ -16,13 +16,8 @@ codestyle:
   script:
     - tox -e codestyle
 
-py310:
-  stage: Basic
-  script:
-    - tox -e py310
-
 py39:
-  stage: Test
+  stage: Basic
   image: python:3.9
   script:
     - tox -e py39
