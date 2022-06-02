@@ -1,13 +1,11 @@
 import numpy as np
 import numpy.testing as np_test
 import pytest
+from astropy import units as u
+from sunpy.time import parse_time
 
 from irispy import utils
 
-DETECTOR_TYPE_KEY = "detector type"
-
-
-# Arrays for the calcuate_dust_mask method.
 data_dust = np.array(
     [
         [[-1, 2, -3, 4], [2, -200, 5, 3], [0, 1, 2, -300]],
@@ -29,9 +27,9 @@ dust_mask_expected = np.array(
 @pytest.mark.parametrize(
     "test_input, expected_output",
     [
-        ({DETECTOR_TYPE_KEY: "FUV1"}, "FUV"),
-        ({DETECTOR_TYPE_KEY: "NUV"}, "NUV"),
-        ({DETECTOR_TYPE_KEY: "SJI"}, "SJI"),
+        ({"detector type": "FUV1"}, "FUV"),
+        ({"detector type": "NUV"}, "NUV"),
+        ({"detector type": "SJI"}, "SJI"),
     ],
 )
 def test_get_detector_type(test_input, expected_output):
@@ -41,3 +39,21 @@ def test_get_detector_type(test_input, expected_output):
 @pytest.mark.parametrize("input_array, expected_array", [(data_dust, dust_mask_expected)])
 def test_calculate_dust_mask(input_array, expected_array):
     np_test.assert_array_equal(utils.calculate_dust_mask(input_array), expected_array)
+
+
+@pytest.mark.remote_data
+def test_get_iris_response_version_preflight():
+    start_obs = parse_time("2013-07-20T17:10:23", scale="utc")
+    obs_wavelength = np.linspace(1400.5, 1404.9915000926703, num=692, endpoint=True)
+    utils.get_interpolated_effective_area(
+        start_obs, response_version=2, detector_type="FUV", obs_wavelength=obs_wavelength * u.Angstrom
+    )
+
+
+@pytest.mark.remote_data
+def test_get_iris_response_version():
+    start_obs = parse_time("2013-07-20T17:10:23", scale="utc")
+    obs_wavelength = np.linspace(1400.5, 1404.9915000926703, num=692, endpoint=True)
+    utils.get_interpolated_effective_area(
+        start_obs, response_version=6, detector_type="FUV", obs_wavelength=obs_wavelength * u.Angstrom
+    )
