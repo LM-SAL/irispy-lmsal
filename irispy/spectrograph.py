@@ -109,7 +109,7 @@ class IRISSpectrogramCube(SpectrogramCube):
                 """
         )
 
-    def convert_to(self, new_unit_type, time_obs=None, response_version=4):
+    def convert_to(self, new_unit_type, time_obs=None, response_version=6):
         """
         Converts data, unit and uncertainty attributes to new unit type.
 
@@ -121,19 +121,17 @@ class IRISSpectrogramCube(SpectrogramCube):
         Parameters
         ----------
         new_unit_type: `str`
-           Unit type to convert data to. Three values are accepted:
-           "DN": Relevant IRIS data number based on detector type.
-           "photons": photon counts
-           "radiance": Perorms radiometric calibration conversion.
+            Unit type to convert data to. Three values are accepted:
+            "DN": Relevant IRIS data number based on detector type.
+            "photons": photon counts
+            "radiance": Perorms radiometric calibration conversion.
         time_obs: an `astropy.time.Time` object, as a kwarg, valid for version > 2, optional
-           Observation times of the datapoints.
-           Must be in the format of, e.g.,
-           time_obs=Time('2013-09-03', format='utime'),
-           which yields 1094169600.0 seconds in value.
-           The argument time_obs is ignored for versions 1 and 2.
+            Observation times of the datapoints.
+            Must be in the format of, e.g.,
+            ``time_obs=Time('2013-09-03')``,
+            The argument time_obs is ignored for versions 1 and 2.
         response_version: `int`, optional
-            Version number of effective area file to be used. Cannot be set
-            simultaneously with response_file or pre_launch kwarg. Default=4.
+            Version number of effective area file to be used, by default = 6.
 
         Returns
         -------
@@ -155,8 +153,6 @@ class IRISSpectrogramCube(SpectrogramCube):
             lat_wcs_index = lat_wcs_index[0]
             solid_angle = self.wcs.wcs.cdelt[lat_wcs_index] * self.wcs.wcs.cunit[lat_wcs_index] * utils.SLIT_WIDTH
             # Get wavelength for each pixel.
-            # TODO: spectral_data_index UNUSED
-            spectral_data_index = (-1) * (np.arange(len(self.dimensions)) + 1)[spectral_wcs_index]  # NOQA
             obs_wavelength = self.axis_world_coords(2)
 
         if new_unit_type == "DN" or new_unit_type == "photons":
