@@ -139,10 +139,7 @@ def get_interpolated_effective_area(time_obs, response_version, detector_type, o
     ----------
     time_obs : an `astropy.time.Time` object, as a kwarg, valid for version > 2
         Observation times of the datapoints.
-        Must be in the format of, e.g.,
-        ``time_obs=parse_time('2013-09-03', format='utime')``,
-        which yields 1094169600.0 seconds in value.
-        The argument time_obs is ignored for versions 1 and 2.
+        This argument is ignored for versions 1 and 2.
     response_version : `int`
         Version number of effective area file to be used. Cannot be set
         simultaneously with response_file or pre_launch kwarg. Default=4.
@@ -181,7 +178,7 @@ def get_interpolated_effective_area(time_obs, response_version, detector_type, o
 
 def calculate_dust_mask(data_array):
     """
-    Calculate a mask with the dust positions in a given arrayself.
+    Calculate a mask with the dust positions in a given array.
 
     Parameters
     ----------

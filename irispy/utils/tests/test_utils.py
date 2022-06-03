@@ -41,18 +41,9 @@ def test_calculate_dust_mask(input_array, expected_array):
     np_test.assert_array_equal(utils.calculate_dust_mask(input_array), expected_array)
 
 
-@pytest.mark.remote_data
-def test_get_iris_response_version_preflight():
-    start_obs = parse_time("2013-07-20T17:10:23", scale="utc")
-    obs_wavelength = np.linspace(1400.5, 1404.9915000926703, num=692, endpoint=True)
-    utils.get_interpolated_effective_area(
-        start_obs, response_version=2, detector_type="FUV", obs_wavelength=obs_wavelength * u.Angstrom
-    )
-
-
-@pytest.mark.remote_data
 def test_get_iris_response_version():
-    start_obs = parse_time("2013-07-20T17:10:23", scale="utc")
+    # For now just checks the code runs
+    start_obs = parse_time("2013-07-20T17:10:23")
     obs_wavelength = np.linspace(1400.5, 1404.9915000926703, num=692, endpoint=True)
     utils.get_interpolated_effective_area(
         start_obs, response_version=6, detector_type="FUV", obs_wavelength=obs_wavelength * u.Angstrom

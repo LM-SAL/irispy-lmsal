@@ -1,6 +1,7 @@
 """
 This module provides general utility functions for IRIS Responses.
 """
+import os
 import datetime
 
 import astropy.units as u
@@ -10,10 +11,9 @@ import scipy.io
 from astropy.time import Time
 from astropy.units.quantity import Quantity
 from sunpy.time import parse_time
-from sunpy.util.config import get_and_create_download_dir
-from sunpy.util.net import download_file
 
-IRIS_RESPONSE_REMOTE_PATH = "https://sohowww.nascom.nasa.gov/solarsoft/iris/response/"
+from irispy.data import rootdir
+
 RESPONSE_VERSION_FILENAMES = {
     "1": "iris_sra_20130211.geny",
     "2": "iris_sra_20130715.geny",
@@ -29,7 +29,6 @@ __all__ = ["fit_iris_xput", "get_iris_response"]
 def get_iris_response(
     time_obs=None,
     response_version=6,
-    force_download=False,
 ):
     """
     Returns IRIS response structure.
@@ -72,18 +71,8 @@ def get_iris_response(
         version: `int`
         version_date: `astropy.time.Time`
     """
-    try:
-        response_filename = RESPONSE_VERSION_FILENAMES[str(response_version)]
-    except KeyError:
-        raise KeyError("Version number not recognized.")
-    try:
-        path = download_file(
-            IRIS_RESPONSE_REMOTE_PATH + response_filename,
-            get_and_create_download_dir(),
-            overwrite=force_download,
-        )
-    except Exception as e:
-        raise e
+    response_filename = RESPONSE_VERSION_FILENAMES[str(response_version)]
+    path = os.path.join(rootdir, response_filename)
     raw_response_data = scipy.io.readsav(path)
     iris_response = {name: raw_response_data["p0"][name][0] for name in raw_response_data["p0"].dtype.names}
     # Convert some properties to more convenient types.
@@ -326,9 +315,10 @@ def fit_iris_xput(time_obs, time_cal_coeffs, cal_coeffs):
     ----------
     time_obs: `list`
         A list of observation times as `astropy.time.Time` objects.
-    time_cal_coeffs: a numpy array of floats (with exactly two columns)
+    time_cal_coeffs: `astropy.time.Time` with
         Start and end times of intervals of constant ``cal_coeffs[i]``.
         These should be in "utime" format.
+        a numpy array of floats (with exactly two columns)
     cal_coeffs: a numpy array of floats (with at least two columns)
         Coefficients of best-fit function.
 
@@ -347,8 +337,7 @@ def fit_iris_xput(time_obs, time_cal_coeffs, cal_coeffs):
     # Convert the time_cal_coeffs given in the .geny file into a ``astropy.time.Time``
     # object called t_cal_coeffs, so that the time differences will be in days...
     t_cal_coeffs_flat = time_cal_coeffs.flatten()
-    t_cal_coeffs = parse_time(t_cal_coeffs_flat, format="utime")
-    t_cal_coeffs = t_cal_coeffs.reshape(size_time_cal_coeffs)
+    t_cal_coeffs = t_cal_coeffs_flat.reshape(size_time_cal_coeffs)
     # Exponent for transition between exp.decay intervals.
     transition_exp = 1.5
     # For loop for carrying out the least-squares fit and computation of fit output.
@@ -364,9 +353,11 @@ def fit_iris_xput(time_obs, time_cal_coeffs, cal_coeffs):
         t_diff = np.array([x.to(u.year).value for x in t_diff])
         idx = np.where(t_diff < 0)[0]
         if idx.size == 0:
-            idx = 0
+            idx = 1
         else:
             idx = idx[0]
+            if idx == 0:
+                idx = 1
         # If the t_obs is between the calibration time intervals of a
         # calibration file (idx % !=0) then the aux_coeffs are given by an
         # exponential (coefficient and exponential value).
