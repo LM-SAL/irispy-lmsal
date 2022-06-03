@@ -328,6 +328,7 @@ def fit_iris_xput(time_obs, time_cal_coeffs, cal_coeffs):
         A list of observation times as `astropy.time.Time` objects.
     time_cal_coeffs: a numpy array of floats (with exactly two columns)
         Start and end times of intervals of constant ``cal_coeffs[i]``.
+        These should be in "utime" format.
     cal_coeffs: a numpy array of floats (with at least two columns)
         Coefficients of best-fit function.
 
@@ -336,7 +337,7 @@ def fit_iris_xput(time_obs, time_cal_coeffs, cal_coeffs):
     `numpy.array`
         Yields the fit used to compute the effective area using the input times ``time_obs``.
     """
-    time_obs = parse_time(time_obs).utime
+    time_obs = Time(parse_time(time_obs).utime, format="utime")
     size_time_cal_coeffs = time_cal_coeffs.shape
     size_cal_coeffs = cal_coeffs.shape
     if size_time_cal_coeffs[1] != 2 or size_cal_coeffs[1] < 2:
@@ -346,7 +347,7 @@ def fit_iris_xput(time_obs, time_cal_coeffs, cal_coeffs):
     # Convert the time_cal_coeffs given in the .geny file into a ``astropy.time.Time``
     # object called t_cal_coeffs, so that the time differences will be in days...
     t_cal_coeffs_flat = time_cal_coeffs.flatten()
-    t_cal_coeffs = parse_time(t_cal_coeffs_flat).utime
+    t_cal_coeffs = parse_time(t_cal_coeffs_flat, format="utime")
     t_cal_coeffs = t_cal_coeffs.reshape(size_time_cal_coeffs)
     # Exponent for transition between exp.decay intervals.
     transition_exp = 1.5
@@ -357,16 +358,15 @@ def fit_iris_xput(time_obs, time_cal_coeffs, cal_coeffs):
         fit_out = np.zeros(len(list(time_obs)), dtype=np.float64)
         # Looking for the closest time in the calibration time intervals.
         # Differences are given in years before passing to the next stage.
-        t_diff = t - t_cal_coeffs
+        t_diff = Time(t, format="utime") - t_cal_coeffs
         t_diff = t_diff.flatten()
-        # To Convert to an array, quantities need to be dimensionless, hence dividing out the unit.
-        t_diff = np.array([parse_time(x, format="utime").byear for x in t_diff])
+        # To convert to an array, quantities need to be dimensionless, hence dividing out the unit.
+        t_diff = np.array([x.to(u.year).value for x in t_diff])
         idx = np.where(t_diff < 0)[0]
         if idx.size == 0:
-            idx = 1
+            idx = 0
         else:
             idx = idx[0]
-        # breakpoint()
         # If the t_obs is between the calibration time intervals of a
         # calibration file (idx % !=0) then the aux_coeffs are given by an
         # exponential (coefficient and exponential value).
