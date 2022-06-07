@@ -52,10 +52,10 @@ class IRISMapCube(SpectrogramCube):
 
     Examples
     --------
-    >>> from irispy.io import read_sji_lvl2  # doctest: +REMOTE_DATA
-    >>> from irispy.data import sample  # doctest: +REMOTE_DATA
-    >>> sji = read_iris_sji_level2_fits(sample.SJI_CUBE_1400)  # doctest: +REMOTE_DATA
-    >>> sji  # doctest: +REMOTE_DATA
+    >>> from irispy.io import read_sji_lvl2  # doctest: +SKIP
+    >>> from irispy.data import sample  # doctest: +SKIP
+    >>> sji = read_iris_sji_level2_fits(sample.SJI_CUBE_1400)  # doctest: +SKIP
+    >>> sji  # doctest: +SKIP
     """
 
     def __init__(
