@@ -1,3 +1,28 @@
+0.1.3 (2022-05-22)
+==================
+
+Features
+--------
+
+- Added V5 ans V6 support for  ``get_iris_response``. It also does not download the files anymore.
+
+Breaking Changes
+----------------
+
+- API of ``get_iris_response`` has changed:
+  ``pre_launch`` has gone, use ``response_version=2`` instead.
+  ``response_file`` keyword has been removed, it will use files provided by the package instead.
+  ``force_download`` was removed as the function now does not download any files.
+
+0.1.2 (2022-05-02)
+==================
+
+Features
+--------
+
+- Tweaked ``irispy.utils.wobble_movie`` to remove limits on the metadata.
+- Pin ``sunraster`` version due to Python version incompatibilities.
+
 0.1.1 (2022-02-17)
 ==================
 
