@@ -29,7 +29,7 @@ def fitsinfo(filename):
             print(f"{hdr[f'TWMIN{i+1}']:.2f} - {hdr[f'TWMAX{i+1}']:.2f} AA" + modifer)
 
 
-def read_files(filename, uncertainty=False, memmap=False):
+def read_files(filename, spectral_windows=None, uncertainty=False, memmap=False):
     """
     A wrapper function to read a raster or SJI IRIS Level 2 data file.
 
@@ -43,6 +43,9 @@ def read_files(filename, uncertainty=False, memmap=False):
         Filename(s) to load.
         If given a string, will load that file.
         If given a list of strings, it will check they are all raster files and load them.
+    spectral_windows: iterable of `str` or `str`
+        Spectral windows to extract from files. Default=None, implies, extract all
+        spectral windows.
     uncertainty : `bool`, optional
         If `True` (not the default), will compute the uncertainty for the data (slower and
         uses more memory). If `memmap=True`, the uncertainty is never computed.
@@ -79,6 +82,8 @@ def read_files(filename, uncertainty=False, memmap=False):
             raise ValueError("You cannot load more than one SJI file at a time.")
         return read_sji_lvl2(filename[0], memmap=memmap, uncertainty=uncertainty)
     elif intrume == "SPEC":
-        return read_spectrograph_lvl2(filename, memmap=memmap, uncertainty=uncertainty)
+        return read_spectrograph_lvl2(
+            filename, spectral_windows=spectral_windows, memmap=memmap, uncertainty=uncertainty
+        )
     else:
         raise ValueError(f"Unsupported instrument: {intrume}")
