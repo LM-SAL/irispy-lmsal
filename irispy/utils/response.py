@@ -66,7 +66,7 @@ def get_iris_response(
         dn2phot_sg : `tuple` of length 2
         area_sji : `astropy.units.Quantity`
         name_sji : `str`
-        dn2phot_sji :  `tuple` of length 4
+        dn2phot_sji : `tuple` of length 4
         comment : `str`
         version : `int`
         version_date : `astropy.time.Time`
