@@ -59,17 +59,17 @@ def get_iris_response(
     `dict`
         Various parameters regarding IRIS response or effective area structure.
         Includes the following keys:
-        date_obs: `astropy.time.Time`
-        lambda: `astropy.units.Quantity`
-        area_sg: `astropy.units.Quantity`
-        name_sg: `str`
-        dn2phot_sg: `tuple` of length 2
-        area_sji: `astropy.units.Quantity`
-        name_sji: `str`
-        dn2phot_sji:  `tuple` of length 4
-        comment: `str`
-        version: `int`
-        version_date: `astropy.time.Time`
+        date_obs : `astropy.time.Time`
+        lambda : `astropy.units.Quantity`
+        area_sg : `astropy.units.Quantity`
+        name_sg : `str`
+        dn2phot_sg : `tuple` of length 2
+        area_sji : `astropy.units.Quantity`
+        name_sji : `str`
+        dn2phot_sji :  `tuple` of length 4
+        comment : `str`
+        version : `int`
+        version_date : `astropy.time.Time`
     """
     response_filename = RESPONSE_VERSION_FILENAMES[str(response_version)]
     path = os.path.join(rootdir, response_filename)
@@ -80,48 +80,25 @@ def get_iris_response(
     iris_response["AREA_SG"] = Quantity(iris_response["AREA_SG"], unit=u.cm**2)
     iris_response["AREA_SJI"] = Quantity(iris_response["AREA_SJI"], unit=u.cm**2)
     iris_response["GEOM_AREA"] = Quantity(iris_response["GEOM_AREA"], unit=u.cm**2)
-    iris_response["VERSION"] = iris_response["VERSION"]
+    iris_response["VERSION"] = int(iris_response["VERSION"])
     # Convert some properties not found in version below version 3 to
     # more convenient types.
-    if int(iris_response["VERSION"]) > 2:
+    if iris_response["VERSION"] > 2:
         # If DATE_OBS has a value, convert to `astropy.time.Time`, else set to None.
         try:
             iris_response["DATE_OBS"] = parse_time(iris_response["DATE_OBS"], format="utime")
         except Exception:
             iris_response["DATE_OBS"] = None
         time_obs = np.array([time_obs.value])
-        # Convert C_F_TIME to array of time objects while conserving shape.
-        c_f_time = np.empty(iris_response["C_F_TIME"].shape, dtype=object)
-        for i, row in enumerate(iris_response["C_F_TIME"]):
-            for j, t in enumerate(row):
-                c_f_time[i][j] = parse_time(t, format="utime")
-        iris_response["C_F_TIME"] = c_f_time
-        # Convert C_F_LAMBDA to Quantity.
+        iris_response["C_F_TIME"] = Time(iris_response["C_F_TIME"], format="utime")
         iris_response["C_F_LAMBDA"] = Quantity(iris_response["C_F_LAMBDA"], unit="nm")
-        # Convert C_N_TIME to array of time objects while
-        # conserving shape.
-        c_n_time = np.empty(iris_response["C_N_TIME"].shape, dtype=object)
-        for i, row in enumerate(iris_response["C_N_TIME"]):
-            for j, t in enumerate(row):
-                c_n_time[i][j] = parse_time(t, format="utime")
-        iris_response["C_N_TIME"] = c_n_time
-        # Convert C_N_LAMBDA to Quantity.
+        iris_response["C_N_TIME"] = Time(iris_response["C_N_TIME"], format="utime")
         iris_response["C_N_LAMBDA"] = Quantity(iris_response["C_N_LAMBDA"], unit="nm")
-        # Convert C_S_TIME to array of time objects while
-        # conserving shape.
-        c_s_time = np.empty(iris_response["C_S_TIME"].shape, dtype=object)
-        for i, row in enumerate(iris_response["C_S_TIME"]):
-            for j, column in enumerate(row):
-                for k, t in enumerate(column):
-                    c_s_time[i][j][k] = parse_time(t, format="utime")
-        iris_response["C_S_TIME"] = c_s_time
-        # Convert DATE in ELEMENTS array to array of time objects.
-        for i, t in enumerate(iris_response["ELEMENTS"]["DATE"]):
-            iris_response["ELEMENTS"]["DATE"][i] = parse_time(t, format="iso")
-            # Convert VERSION_DATE to time object.
-            iris_response["VERSION_DATE"] = parse_time(iris_response["VERSION_DATE"])
-    if int(iris_response["VERSION"]) < 2:
-        # Change DATE tag in data with version < 2 to VERSION_DATE to
+        iris_response["C_S_TIME"] = Time(iris_response["C_S_TIME"], format="utime")
+        iris_response["ELEMENTS"]["DATE"] = parse_time(iris_response["ELEMENTS"]["DATE"].astype(str).tolist())
+        iris_response["VERSION_DATE"] = parse_time(iris_response["VERSION_DATE"])
+    if iris_response["VERSION"] <= 2:
+        # Change DATE tag in data with version <= 2 to VERSION_DATE to
         # be consistent with more recent versions.
         iris_response["VERSION_DATE"] = Time(
             datetime.datetime(
@@ -131,14 +108,14 @@ def get_iris_response(
             )
         )
         del iris_response["DATE"]
-    if int(iris_response["VERSION"]) > 2 and time_obs is not None:
+    if iris_response["VERSION"] > 2 and time_obs is not None:
         try:
             n_time_obs = len(time_obs)
         except Exception:
             n_time_obs = 1
         iris_response["AREA_SG"] = np.zeros(iris_response["AREA_SG"].shape)
         iris_response["AREA_SJI"] = np.zeros(iris_response["AREA_SJI"].shape)
-        # 1. FUV SG effective areas
+        # FUV SG effective areas
         lambran_fuv = np.array([[133.1, 135.9], [138.8, 140.8]])
         # Rough SG spectral ranges.  Setting effective area to 0 outside of these.
         shp_fuv = iris_response["COEFFS_FUV"].shape
@@ -182,7 +159,7 @@ def get_iris_response(
                 iris_response["LAMBDA"].value <= lambran_nuv[1],
             )
         )
-        if int(iris_response["VERSION"]) <= 3:
+        if iris_response["VERSION"] <= 3:
             for k in range(n_time_obs):
                 interpol_nuv = scipy.interpolate.interp1d(
                     iris_response["C_N_LAMBDA"][:],
@@ -200,10 +177,9 @@ def get_iris_response(
                     axis=0,
                 )
                 iris_response["AREA_SG"][1, w_nuv] = interpol_nuv(iris_response["LAMBDA"][w_nuv])
-        # 3. SJI effective areas
-        if int(iris_response["VERSION"]) <= 3:  # Meaning for version 3 only
-            shp_sji = iris_response["COEFFS_SJI"].shape
-            for j in range(shp_sji[0]):
+        # SJI effective areas
+        if 2 < iris_response["VERSION"] < 4:  # Version 3 only
+            for j in range(iris_response["COEFFS_SJI"].shape[0]):
                 # Calculate pre-launch area from the individual elements
                 prelaunch_area = iris_response["GEOM_AREA"]
                 for k in range(len(iris_response["INDEX_EL_SJI"][j, :])):
@@ -215,10 +191,10 @@ def get_iris_response(
                     iris_response["C_S_TIME"][j, :, :],
                     iris_response["COEFFS_SJI"][j, :, :],
                 )
-                # Time dependetn profiles
+                # Time dependent profiles
                 for k in range(n_time_obs):
                     iris_response["AREA_SJI"][j, :] = prelaunch_area * iris_fit_sji[k]
-        else:  # For version 4 and above
+        else:  # Version 4 and above
             for nuv in range(2):
                 # Calculate baseline SJI area curves
                 area_sji = iris_response["GEOM_AREA"]
@@ -277,7 +253,7 @@ def get_iris_response(
                             sca1n = np.clip(sca1n, a_min=0, a_max=None)
                             iris_response["AREA_SJI"][m] = area_sji[m] * sca1n
                 else:
-                    # NUV: essentially same calculation as r.version=3
+                    # NUV: essentially same calculation as version = 3
                     for n in range(n_time_obs):
                         iris_response["AREA_SJI"] = [
                             Quantity(x, unit=u.cm**2) for x in iris_response["AREA_SJI"]
@@ -330,23 +306,20 @@ def fit_iris_xput(time_obs, time_cal_coeffs, cal_coeffs):
         Yields the fit used to compute the effective area using the input times ``time_obs``.
     """
     time_obs = Time(parse_time(time_obs).utime, format="utime")
-    size_time_cal_coeffs = time_cal_coeffs.shape
-    size_cal_coeffs = cal_coeffs.shape
-    if size_time_cal_coeffs[1] != 2 or size_cal_coeffs[1] < 2:
+    if time_cal_coeffs.shape[1] != 2 or cal_coeffs.shape[1] < 2:
         # Raise ValueError as time coefficient have the wrong format.
         raise ValueError("Incorrect number of elements either in time_cal_coeffs or in cal_coeffs.")
     # Some time transformations.
     # Convert the time_cal_coeffs given in the .geny file into a ``astropy.time.Time``
     # object called t_cal_coeffs, so that the time differences will be in days...
-    t_cal_coeffs_flat = time_cal_coeffs.flatten()
-    t_cal_coeffs = t_cal_coeffs_flat.reshape(size_time_cal_coeffs)
+    t_cal_coeffs = time_cal_coeffs.flatten().reshape(time_cal_coeffs.shape)
     # Exponent for transition between exp.decay intervals.
     transition_exp = 1.5
     # For loop for carrying out the least-squares fit and computation of fit output.
     fit_out = np.zeros(len(time_obs))
     for i, t in enumerate(time_obs):
-        aux_cal_coeffs = np.zeros(2 * size_time_cal_coeffs[0])
-        fit_out = np.zeros(len(list(time_obs)), dtype=np.float64)
+        aux_cal_coeffs = np.zeros(2 * time_cal_coeffs.shape[0])
+        fit_out = np.zeros(len(list(time_obs)))
         # Looking for the closest time in the calibration time intervals.
         # Differences are given in years before passing to the next stage.
         t_diff = Time(t, format="utime") - t_cal_coeffs
