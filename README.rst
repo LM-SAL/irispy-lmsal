@@ -1,11 +1,11 @@
-``irispy-lmsal``
+**irispy-lmsal**
 ****************
 
 .. image:: http://iris.lmsal.com/images/iris_full.jpg
   :width: 400
   :alt: Image of the IRIS spacecraft
 
-``irispy-lmsal`` is a library that provides the tools to read in and analyze data from Interface Region
+**irispy-lmsal** is a library that provides the tools to read in and analyze data from Interface Region
 Imaging Spectrograph (IRIS).
 
 IRIS is a NASA-funded Small Explorer which uses a high-frame-rate ultraviolet imaging spectrometer to make observations of the Sun.

@@ -9,7 +9,6 @@ from sunraster import SpectrogramCube, SpectrogramSequence
 from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
 
 from irispy import utils
-from irispy.visualization import _set_axis_colors
 
 __all__ = ["IRISCollection", "IRISSpectrogramCube", "IRISSpectrogramCubeSequence"]
 
@@ -132,7 +131,7 @@ class IRISSpectrogramCube(SpectrogramCube):
         if len(self.dimensions) == 1:
             kwargs.pop("cmap")
         ax = super().plot(*args, **kwargs)
-        _set_axis_colors(ax)
+        # _set_axis_colors(ax)
         return ax
 
     def convert_to(self, new_unit_type, time_obs=None, response_version=4):

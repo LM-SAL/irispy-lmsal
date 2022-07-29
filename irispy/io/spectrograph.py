@@ -27,8 +27,7 @@ def _pc_matrix(lam, angle_1, angle_2):
 
 def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, memmap=False):
     """
-    Reads IRIS level 2 spectrograph FITS from an OBS into an
-    `.IRISSpectrograph` instance.
+    Reads an level 2 spectrograph FITS.
 
     Parameters
     ----------

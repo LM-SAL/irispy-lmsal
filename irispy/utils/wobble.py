@@ -1,14 +1,12 @@
 from typing import Union, Optional
 from pathlib import Path
 
-import astropy.units as u
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.io import fits
 from astropy.visualization import AsinhStretch, ImageNormalize
 from astropy.wcs import WCS
-from sunpy.time import parse_time
 from sunpy.visualization.colormaps.color_tables import iris_sji_color_table
 
 from irispy.utils import image_clipping
@@ -27,7 +25,7 @@ def wobble_movie(
     """
     Creates a wobble movie from a list of files.
 
-    This is designed to be used on IRIS Level 2 SJI data.
+    This is designed to be used on level 2 SJI data.
 
     2832 is considered the best wavelength to use for wobble movies.
 
@@ -59,17 +57,15 @@ def wobble_movie(
         A list of the movies created.
     """
     header = fits.getheader(filelist[0])
-    header["EXPTIME"]
     numframes = header["NAXIS3"]
-    (parse_time(header["ENDOBS"]) - parse_time(header["STARTOBS"])).to(u.s)
     if ffmpeg_path:
         import matplotlib as mpl
 
         mpl.rcParams["animation.ffmpeg_path"] = ffmpeg_path
 
     filenames = []
-    for file in filelist:
-        data, header = fits.getdata(file, header=True)
+    for afile in filelist:
+        data, header = fits.getdata(afile, header=True)
         wcs = WCS(header)
 
         # Calculate index to downsample in time to accentuate the wobble

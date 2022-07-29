@@ -18,11 +18,14 @@ def _set_axis_colors(ax):
     if len(ax.coords._as_table()) == 2:
         lon, lat = ax.coords
     elif len(ax.coords._as_table()) == 3:
-        wave, lat, lon = ax.coords
+        lon, lat, _ = ax.coords
+    elif len(ax.coords._as_table()) == 4:
+        lon, lat, _, wave = ax.coords
         wave.set_format_unit(u.nm)
         wave.set_major_formatter("x.x")
     else:
         raise ValueError(f"Too many axes: {len(ax.coords._as_table())}")
+    ax.coords.grid()
     lon.set_ticklabel_position("all")
     lat.set_ticklabel_position("all")
     lon.set_axislabel(ax.get_xlabel(), color="black")
