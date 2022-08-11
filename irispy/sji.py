@@ -6,6 +6,7 @@ from sunpy import log
 from sunraster import SpectrogramCube
 
 from irispy.utils import calculate_dust_mask
+from irispy.visualization import _set_axis_colors
 
 __all__ = ["SJICube"]
 
@@ -120,8 +121,7 @@ class SJICube(SpectrogramCube):
         kwargs["cmap"] = cmap
         ax = super().plot(*args, **kwargs)
         if not bypass_formatting:
-            # _set_axis_colors(ax)
-            pass
+            _set_axis_colors(ax)
         return ax
 
     def apply_dust_mask(self, undo=False):

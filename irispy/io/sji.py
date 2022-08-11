@@ -42,9 +42,7 @@ def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
         crval_table=crval_table * u.arcsec,
     )
     base_time = Time(hdulist[0].header["STARTOBS"], format="isot", scale="utc")
-    times = [
-        Timedelta(time, unit="seconds").seconds for time in hdulist[1].data[:, hdulist[1].header["TIME"]]
-    ] * u.s
+    times = [Timedelta(time, unit="seconds").seconds for time in hdulist[1].data[:, hdulist[1].header["TIME"]]] * u.s
     temporal = m.Tabular1D(
         np.arange(hdulist[1].data.shape[0]) * u.pix,
         lookup_table=times,

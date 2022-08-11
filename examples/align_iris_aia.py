@@ -82,7 +82,6 @@ ax = sji_cut.plot(bypass_formatting=True)
 ax.set_xlabel("Helioprojective Longitude (Solar-X) [arcsec]")
 ax.set_ylabel("Helioprojective Latitude (Solar-Y) [arcsec]")
 ax.set_title(f"IRIS SJI {sji_2832.meta['TWAVE1']}")
-
 ax.coords.grid(color="orange", linestyle="-")
 
 lon = ax.coords[0]
@@ -131,9 +130,11 @@ plt.show()
 #
 # Lets us now find the SJI observation where the time is closest to 06:00 on 2014-09-19.
 
-time_target = Time("2014-09-19T06:00:00")
-time_index = np.abs(sji_2832.time - time_target).argmin()
-time_stamp = sji_2832.time[time_index].isot
+
+(time_sji,) = sji_2832.axis_world_coords("time", wcs=sji_2832.extra_coords)
+time_target = Time("2014-09-19T06:00:00.0")
+time_index = np.abs(time_sji - time_target).argmin()
+time_stamp = time_sji[time_index].isot
 print(time_index, time_stamp)
 
 ###############################################################################
