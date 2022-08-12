@@ -122,6 +122,7 @@ class SJICube(SpectrogramCube):
         ax = super().plot(*args, **kwargs)
         if not bypass_formatting:
             _set_axis_colors(ax)
+        ax.axes.grid()
         return ax
 
     def apply_dust_mask(self, undo=False):

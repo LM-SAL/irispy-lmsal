@@ -82,7 +82,7 @@ ax = sji_cut.plot(bypass_formatting=True)
 ax.set_xlabel("Helioprojective Longitude (Solar-X) [arcsec]")
 ax.set_ylabel("Helioprojective Latitude (Solar-Y) [arcsec]")
 ax.set_title(f"IRIS SJI {sji_2832.meta['TWAVE1']}")
-ax.coords.grid(color="orange", linestyle="-")
+ax.coords.grid(color="orange", linestyle="solid", grid_type="contours")
 
 lon = ax.coords[0]
 lat = ax.coords[1]

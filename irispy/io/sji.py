@@ -7,7 +7,6 @@ from astropy.io import fits
 from astropy.modeling import models as m
 from astropy.time import Time
 from dkist.wcs.models import CoupledCompoundModel, VaryingCelestialTransform
-from pandas import Timedelta
 from sunpy.coordinates.frames import Helioprojective
 
 from irispy.sji import SJICube
@@ -42,7 +41,10 @@ def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
         crval_table=crval_table * u.arcsec,
     )
     base_time = Time(hdulist[0].header["STARTOBS"], format="isot", scale="utc")
-    times = [Timedelta(time, unit="seconds").seconds for time in hdulist[1].data[:, hdulist[1].header["TIME"]]] * u.s
+    times = hdulist[1].data[:, hdulist[1].header["TIME"]] * u.s
+    # We need to account for a non-zero time delta.
+    base_time += times[0]
+    times -= times[0]
     temporal = m.Tabular1D(
         np.arange(hdulist[1].data.shape[0]) * u.pix,
         lookup_table=times,
