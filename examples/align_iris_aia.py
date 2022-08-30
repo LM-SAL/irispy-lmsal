@@ -12,6 +12,7 @@ You can get IRIS data with co-aligned SDO data (and more) from https://iris.lmsa
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+import pooch
 import sunpy.map
 from aiapy.calibrate import update_pointing
 from astropy.coordinates import SkyCoord
@@ -22,20 +23,18 @@ from sunpy.net import attrs as a
 
 from irispy.io import read_files
 from irispy.obsid import ObsID
-from irispy.utils.utils import _download_data
 
 ###############################################################################
 # We start with getting the data.
 # This is done by downloading the data from the IRIS archive.
 #
-# In this case, we will use requests as to keep this example self contained
+# In this case, we will use ``pooch`` as to keep this example self contained
 # but using your browser will also work.
 
-url = [
+sji_filename = pooch.retrieve(
     "http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2014/09/19/20140919_051712_3860608353/iris_l2_20140919_051712_3860608353_SJI_2832_t000.fits.gz",
-]
-_download_data(url)
-sji_filename = "iris_l2_20140919_051712_3860608353_SJI_2832_t000.fits.gz"
+    known_hash=None,
+)
 
 ###############################################################################
 # We will now open the slit-jaw imager (SJI) file we just downloaded.
@@ -59,7 +58,6 @@ ObsID(sji_2832.meta["OBSID"])
 # ``bypass_formatting=True`` to the ``plot`` method.
 
 sji_2832.plot()
-
 plt.show()
 
 ###############################################################################
@@ -67,6 +65,19 @@ plt.show()
 
 sji_cut = sji_2832[45]
 print(sji_cut)
+
+###############################################################################
+# We need to create a coordinate frame for the IRIS data.
+# While this is stored in the WCS, getting a coordinate frame is a little more involved.
+# We will use this to do a cutout later on but for now we will plot it.
+
+sji_frame = Helioprojective(observer="earth", obstime=sji_cut.global_coords["Time (UTC)"])
+bbox = [
+    SkyCoord(-700 * u.arcsec, 0 * u.arcsec, frame=sji_frame),
+    SkyCoord(-700 * u.arcsec, 50 * u.arcsec, frame=sji_frame),
+    SkyCoord(-800 * u.arcsec, 0 * u.arcsec, frame=sji_frame),
+    SkyCoord(-800 * u.arcsec, 50 * u.arcsec, frame=sji_frame),
+]
 
 ###############################################################################
 # This dataset has a peculiarity: the observation has a 45 degree roll.
@@ -82,7 +93,7 @@ ax = sji_cut.plot(bypass_formatting=True)
 ax.set_xlabel("Helioprojective Longitude (Solar-X) [arcsec]")
 ax.set_ylabel("Helioprojective Latitude (Solar-Y) [arcsec]")
 ax.set_title(f"IRIS SJI {sji_2832.meta['TWAVE1']}")
-ax.coords.grid(color="orange", linestyle="solid", grid_type="contours")
+ax.grid(color="orange", linestyle="solid")
 
 lon = ax.coords[0]
 lat = ax.coords[1]
@@ -93,6 +104,9 @@ lon.set_axislabel(ax.get_xlabel(), color="black")
 lon.set_ticklabel("black")
 lat.set_axislabel(ax.get_ylabel(), color="red")
 lat.set_ticklabel("red")
+
+# Plot each corner of the box
+[ax.plot_coord(coord, "o") for coord in bbox]
 
 plt.show()
 
@@ -106,19 +120,8 @@ plt.show()
 # ``crop`` will return you the smallest bounding box which contains those 4 points
 # which we can see when we overlay the points we give it.
 
-# We need to create a coordinate frame for the IRIS data.
-# While this is stored in the WCS, getting a coordinate frame is a little more involved.
-sji_frame = Helioprojective(observer="earth", obstime=sji_cut.global_coords["Time (UTC)"])
-bbox = [
-    SkyCoord(-750 * u.arcsec, 90 * u.arcsec, frame=sji_frame),
-    SkyCoord(-750 * u.arcsec, 95 * u.arcsec, frame=sji_frame),
-    SkyCoord(-700 * u.arcsec, 90 * u.arcsec, frame=sji_frame),
-    SkyCoord(-700 * u.arcsec, 95 * u.arcsec, frame=sji_frame),
-]
 sji_crop = sji_cut.crop(*bbox)
 ax = sji_crop.plot(vmin=0, vmax=5000)
-# Plot each corner of the box
-[ax.plot_coord(coord, "o") for coord in bbox]
 plt.xlabel("Solar X")
 plt.ylabel("Solar Y")
 

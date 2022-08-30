@@ -14,6 +14,7 @@ This means that any precise wavelength calibration will need to correct for thos
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+import pooch
 from astropy.coordinates import SpectralCoord
 from astropy.io import fits
 from scipy.constants import c
@@ -21,22 +22,20 @@ from scipy.interpolate import interp1d
 
 from irispy.io import read_files
 from irispy.utils import image_clipping
-from irispy.utils.utils import _download_data
 
 ###############################################################################
 # We start with getting the data. This is done by downloading the data from the IRIS archive.
 #
-# In this case, we will use requests as to keep this example self contained
+# In this case, we will use ``pooch`` as to keep this example self contained
 # but using your browser will also work.
 #
 # Using the url: http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2014/07/08/
 # we are after `iris_l2_20140708_114109_3824262996_raster.tar.gz` which is ~730 MB in size.
 
-urls = [
-    "http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2014/07/08/20140708_114109_3824262996/iris_l2_20140708_114109_3824262996_raster.tar.gz"
-]
-_download_data(urls)
-raster_filename = "iris_l2_20140708_114109_3824262996_raster_t000_r00000.fits"
+raster_filename = pooch.retrieve(
+    "http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2014/07/08/20140708_114109_3824262996/iris_l2_20140708_114109_3824262996_raster.tar.gz",
+    known_hash=None,
+)
 
 ###############################################################################
 # Now to open the file using **irispy-lmsal**.

@@ -12,25 +12,23 @@ You can get IRIS data with co-aligned SDO data (and more) from https://iris.lmsa
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+import pooch
 from astropy.coordinates import SkyCoord, SpectralCoord
 from sunpy.coordinates.frames import Helioprojective
 
 from irispy.io import read_files
-from irispy.utils.utils import _download_data
 
 ###############################################################################
 # We start with getting the data.
 # This is done by downloading the data from the IRIS archive.
 #
-# In this case, we will use requests as to keep this example self contained
+# In this case, we will use ``pooch`` as to keep this example self contained
 # but using your browser will also work.
 
-
-url = [
+raster_filename = pooch.retrieve(
     "http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2018/01/02/20180102_153155_3610108077/iris_l2_20180102_153155_3610108077_raster.tar.gz",
-]
-_download_data(url)
-raster_filename = "iris_l2_20180102_153155_3610108077_raster_t000_r00000.fits"
+    known_hash=None,
+)
 
 ###############################################################################
 # We will now open the raster file we just downloaded.

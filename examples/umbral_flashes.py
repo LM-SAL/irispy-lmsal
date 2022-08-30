@@ -11,31 +11,32 @@ images to study an example of dynamical phenomena called umbral flashes.
 import astropy.units as u
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import pooch
 from astropy.coordinates import SpectralCoord
 from astropy.visualization import time_support
 
 from irispy.io import read_files
 from irispy.utils import image_clipping
-from irispy.utils.utils import _download_data
 
 time_support()
 
 ###############################################################################
 # We start with getting the data. This is done by downloading the data from the IRIS archive.
 #
-# In this case, we will use requests as to keep this example self contained
+# In this case, we will use ``pooch`` as to keep this example self contained
 # but using your browser will also work.
 #
 # Using the url: http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2013/09/02/20130902_163935_4000255147/
 # we are after the 1400 slit-jaw file and the raster file (~900 MB).
 
-urls = [
-    "http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2013/09/02/20130902_163935_4000255147/iris_l2_20130902_163935_4000255147_SJI_1400_t000.fits.gz",
+raster_filename = pooch.retrieve(
     "http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2013/09/02/20130902_163935_4000255147/iris_l2_20130902_163935_4000255147_raster.tar.gz",
-]
-_download_data(urls)
-raster_filename = "iris_l2_20130902_163935_4000255147_raster_t000_r00000.fits"
-sji_filename = "iris_l2_20130902_163935_4000255147_SJI_1400_t000.fits.gz"
+    known_hash=None,
+)
+sji_filename = pooch.retrieve(
+    "http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2013/09/02/20130902_163935_4000255147/iris_l2_20130902_163935_4000255147_SJI_1400_t000.fits.gz",
+    known_hash=None,
+)
 
 ###############################################################################
 # Now to open the files using **irispy-lmsal**.

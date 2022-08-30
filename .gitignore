@@ -220,5 +220,3 @@ irispy/_version.py
 .history
 *.orig
 .tmp
-*.gz
-*.fits
