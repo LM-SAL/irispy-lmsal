@@ -9,6 +9,7 @@ You can get IRIS data with co-aligned SDO data (and more) from https://iris.lmsa
 """
 # sphinx_gallery_thumbnail_number = 5
 
+from cmath import log
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,6 +24,7 @@ from sunpy.net import attrs as a
 
 from irispy.io import read_files
 from irispy.obsid import ObsID
+
 
 ###############################################################################
 # We start with getting the data.
@@ -71,12 +73,12 @@ print(sji_cut)
 # While this is stored in the WCS, getting a coordinate frame is a little more involved.
 # We will use this to do a cutout later on but for now we will plot it.
 
-sji_frame = Helioprojective(observer="earth", obstime=sji_cut.global_coords["Time (UTC)"])
+sji_frame = Helioprojective(observer="earth", obstime="2014-09-19T05:17:31.110")
 bbox = [
-    SkyCoord(-700 * u.arcsec, 0 * u.arcsec, frame=sji_frame),
-    SkyCoord(-700 * u.arcsec, 50 * u.arcsec, frame=sji_frame),
-    SkyCoord(-800 * u.arcsec, 0 * u.arcsec, frame=sji_frame),
-    SkyCoord(-800 * u.arcsec, 50 * u.arcsec, frame=sji_frame),
+    SkyCoord(-750 * u.arcsec, 90 * u.arcsec, frame=sji_frame),
+    SkyCoord(-750 * u.arcsec, 95 * u.arcsec, frame=sji_frame),
+    SkyCoord(-700 * u.arcsec, 90 * u.arcsec, frame=sji_frame),
+    SkyCoord(-700 * u.arcsec, 95 * u.arcsec, frame=sji_frame),
 ]
 
 ###############################################################################
@@ -93,7 +95,7 @@ ax = sji_cut.plot(bypass_formatting=True)
 ax.set_xlabel("Helioprojective Longitude (Solar-X) [arcsec]")
 ax.set_ylabel("Helioprojective Latitude (Solar-Y) [arcsec]")
 ax.set_title(f"IRIS SJI {sji_2832.meta['TWAVE1']}")
-ax.grid(color="orange", linestyle="solid")
+ax.coords.grid(color="orange", linestyle="solid")
 
 lon = ax.coords[0]
 lat = ax.coords[1]
@@ -106,10 +108,14 @@ lat.set_axislabel(ax.get_ylabel(), color="red")
 lat.set_ticklabel("red")
 
 # Plot each corner of the box
+from sunpy import log
+log.setLevel("DEBUG")
 [ax.plot_coord(coord, "o") for coord in bbox]
 
 plt.show()
 
+
+breakpoint()
 ###############################################################################
 # For example, let us cut out the top sunspot.
 # We need to specify the corners for the cut (note the coordinate order is
