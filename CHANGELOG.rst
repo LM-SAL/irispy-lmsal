@@ -1,10 +1,20 @@
+0.1.4 (2022-09-26)
+==================
+
+Features
+--------
+
+- Added a timestamp to each frame of the wobble movie.
+  You will need to set the ``timestamp`` keyword to be `True`.
+- Added a ``wobble_cadence`` keyword to override the default wobble cadence of 180 seconds.
+
 0.1.3 (2022-05-22)
 ==================
 
 Features
 --------
 
-- Added V5 ans V6 support for  ``get_iris_response``. It also does not download the files anymore.
+- Added V5 and V6 support for ``get_iris_response``. It also does not download the files anymore.
 
 Breaking Changes
 ----------------

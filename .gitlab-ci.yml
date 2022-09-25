@@ -7,8 +7,8 @@ before_script:
 
 stages:
   - Basic
-  - Test
   - Deploy
+  - Test
   - Extra
 
 codestyle:
