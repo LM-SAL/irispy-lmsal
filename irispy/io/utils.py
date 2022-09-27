@@ -8,7 +8,7 @@ __all__ = ["fitsinfo", "read_files"]
 
 def fitsinfo(filename):
     """
-    Prints information about the extension of a raster or SJI IRIS Level 2 data
+    Prints information about the extension of a raster or SJI level 2 data
     file.
 
     Parameters
@@ -31,7 +31,7 @@ def fitsinfo(filename):
 
 def read_files(filename, spectral_windows=None, uncertainty=False, memmap=False):
     """
-    A wrapper function to read a raster or SJI IRIS Level 2 data file.
+    A wrapper function to read a raster or SJI level 2 data file.
 
     You can provide one SJI image or a one raster image or a list of raster images.
 

@@ -1,10 +1,8 @@
-.. _known_issues:
-
 ************
 Known Issues
 ************
 
-This page documents commonly known issues, issues here is defined broadly and refers to oddities or specifics of how ``irispy-lmsal`` or the Python ecosystem works that could catch anyone out.
+This page documents commonly known issues, issues here is defined broadly and refers to oddities or specifics of how **irispy-lmsal** or the Python ecosystem works that could catch anyone out.
 
 Per-exposure WCS metadata
 =========================
@@ -13,7 +11,7 @@ The IRIS FITS files contain the per-exposure WCS metadata (reference coordinate 
 For example, OBS 4204700138 SJI file, ``CRVAL`` in the primary header is (1.93840, 1.96290), but the reference coordinate
 is actually (-3.56638378,  1.69258388), which is retrieved from the appropriate index in the ``XCENIX``/``YCENIX`` arrays in the extension.
 
-This was (and partially still is) a problem for the ``irispy-lmsal`` package, which assumed that the reference coordinate is the same for all exposures.
+This was (and partially still is) a problem for the **irispy-lmsal** package, which assumed that the reference coordinate is the same for all exposures.
 This has been taken care of by the SJI reader but not fully by the SP reader.
 
 In future, the goal is to create a gWCS to take account of this.

@@ -1,21 +1,10 @@
-0.2.0 (2022-04-14)
-==================
-
-Breaking Changes
-----------------
-
-- Due to a bug in how older versions of ``irispy-lmsal`` handled the WCS of IRIS files, the readers have been changed.
-  This has meant that some of the older API has changed in ways that are not recoverable.
-  If your old code has broken, please do get in touch, I want to ensure the old API still works as much as humanly possible.
-  Future plans are to restore the older API but that will take some time.
-
 0.1.3 (2022-05-22)
 ==================
 
 Features
 --------
 
-- Added V5 ans V6 support for  ``get_iris_response``. It also does not download the files anymore.
+- Added V5 and V6 support for  ``get_iris_response``.
 
 Breaking Changes
 ----------------
@@ -32,7 +21,7 @@ Features
 --------
 
 - Tweaked ``irispy.utils.wobble_movie`` to remove limits on the metadata.
-- Pin ``sunraster`` version due to Python version incompatibilities.
+- Pin **sunraster** version due to Python version incompatibilities.
 
 0.1.1 (2022-02-17)
 ==================
@@ -45,7 +34,7 @@ Features
 0.1.0 (2022-01-14)
 ==================
 
-First formal release of ``irispy-lmsal``.
+First formal release of **irispy-lmsal**.
 
 Please note there are parts of this library that are still under going development and will be updated as time
 goes on.

@@ -1,21 +1,77 @@
-from copy import copy
-
+import astropy.modeling.models as m
 import astropy.units as u
+import gwcs
+import gwcs.coordinate_frames as cf
 import numpy as np
 from astropy.io import fits
-from astropy.time import Time, TimeDelta
-from astropy.wcs import WCS
+from astropy.modeling import models as m
+from astropy.time import Time
+from dkist.wcs.models import CoupledCompoundModel, VaryingCelestialTransform
+from sunpy.coordinates.frames import Helioprojective
 
-from irispy.sji import IRISMapCube, IRISMapCubeSequence
+from irispy.sji import SJICube
 from irispy.utils import calculate_uncertainty
 from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, BAD_PIXEL_VALUE_UNSCALED, DN_UNIT, READOUT_NOISE
 
 __all__ = ["read_sji_lvl2"]
 
 
+def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
+    """
+    Creates the GWCS object for the SJI file.
+
+    Parameters
+    ----------
+    hdulist : `astropy.io.fits.HDUList`
+        The HDU list of the SJI file.
+
+    Returns
+    -------
+    `gwcs.WCS`
+        GWCS object for the SJI file.
+    """
+    pc_table = hdulist[1].data[:, 14:18].reshape(-1, 2, 2)
+    crval_table = hdulist[1].data[:, 10:12].reshape(-1, 2)
+    crpix = [hdulist[0].header["CRPIX1"], hdulist[0].header["CRPIX2"]]
+    cdelt = [hdulist[0].header["CDELT1"], hdulist[0].header["CDELT2"]]
+    celestial = VaryingCelestialTransform(
+        crpix=crpix * u.pixel,
+        cdelt=cdelt * u.arcsec / u.pixel,
+        pc_table=pc_table * u.arcsec,
+        crval_table=crval_table * u.arcsec,
+    )
+    base_time = Time(hdulist[0].header["STARTOBS"], format="isot", scale="utc")
+    times = hdulist[1].data[:, hdulist[1].header["TIME"]] * u.s
+    # We need to account for a non-zero time delta.
+    base_time += times[0]
+    times -= times[0]
+    temporal = m.Tabular1D(
+        np.arange(hdulist[1].data.shape[0]) * u.pix,
+        lookup_table=times,
+        fill_value=np.nan,
+        bounds_error=False,
+        method="linear",
+    )
+    forward_transform = CoupledCompoundModel("&", left=celestial, right=temporal)
+    celestial_frame = cf.CelestialFrame(
+        axes_order=(0, 1),
+        unit=(u.arcsec, u.arcsec),
+        reference_frame=Helioprojective(observer="earth", obstime=base_time),
+        axis_physical_types=["custom:pos.helioprojective.lon", "custom:pos.helioprojective.lat"],
+        axes_names=("Longitude", "Latitude"),
+    )
+    temporal_frame = cf.TemporalFrame(Time(base_time), unit=(u.s,), axes_order=(2,), axes_names=("Time (UTC)",))
+    output_frame = cf.CompositeFrame([celestial_frame, temporal_frame])
+    input_frame = cf.CoordinateFrame(
+        axes_order=(0, 1, 2), naxes=3, axes_type=["PIXEL", "PIXEL", "PIXEL"], unit=(u.pix, u.pix, u.pix)
+    )
+    gwcs_sji = gwcs.WCS(forward_transform, input_frame=input_frame, output_frame=output_frame)
+    return gwcs_sji
+
+
 def read_sji_lvl2(filename, uncertainty=False, memmap=False):
     """
-    Read level 2 SJI FITS into an IRISMapCube instance.
+    Reads a level 2 SJI FITS.
 
     Parameters
     ----------
@@ -23,7 +79,7 @@ def read_sji_lvl2(filename, uncertainty=False, memmap=False):
         Filename to read.
     uncertainty : `bool`, optional
         If `True` (not the default), will compute the uncertainty for the data (slower and
-        uses more memory). If `memmap=True`, the uncertainty is never computed.
+        uses more memory). If ``memmap=True``, the uncertainty is never computed.
     memmap : `bool`, optional
         If `True` (not the default), will not load arrays into memory, and will only read from
         the file into memory when needed. This option is faster and uses a
@@ -32,99 +88,47 @@ def read_sji_lvl2(filename, uncertainty=False, memmap=False):
 
     Returns
     -------
-    `irispy.sji.IRISMapCubeSequence`
+    `irispy.sji.SJICube`
+        The data cube, using a gWCS.
     """
-    list_of_cubes = []
     with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
         hdulist.verify("silentfix")
-        startobs = hdulist[0].header.get("STARTOBS")
-        startobs = Time(startobs) if startobs else None
-        endobs = hdulist[0].header.get("ENDOBS")
-        endobs = Time(endobs) if endobs else None
-        meta = {
-            "TWAVE1": hdulist[0].header.get("TWAVE1"),
-            "TELESCOP": hdulist[0].header.get("TELESCOP"),
-            "INSTRUME": hdulist[0].header.get("INSTRUME"),
-            "DATA_LEV": hdulist[0].header.get("DATA_LEV"),
-            "OBSID": hdulist[0].header.get("OBSID"),
-            "STARTOBS": startobs,
-            "ENDOBS": endobs,
-            "SAT_ROT": hdulist[0].header["SAT_ROT"] * u.deg,
-            "NBFRAMES": hdulist[0].data.shape[0],
-            "OBS_DESC": hdulist[0].header.get("OBS_DESC"),
-            "FOVX": hdulist[0].header["FOVX"] * u.arcsec,
-            "FOVY": hdulist[0].header["FOVY"] * u.arcsec,
-            "XCEN": hdulist[0].header["XCEN"] * u.arcsec,
-            "YCEN": hdulist[0].header["YCEN"] * u.arcsec,
-        }
-        times = Time(hdulist[0].header["STARTOBS"]) + TimeDelta(
-            hdulist[1].data[:, hdulist[1].header["TIME"]], format="sec"
+        extra_coords = [
+            ("exposure time", 0, hdulist[1].data[:, hdulist[1].header["EXPTIMES"]] * u.s),
+            ("obs_vrix", 0, hdulist[1].data[:, hdulist[1].header["OBS_VRIX"]] * u.m / u.s),
+            ("ophaseix", 0, hdulist[1].data[:, hdulist[1].header["OPHASEIX"]] * u.arcsec),
+            ("pztx", 0, hdulist[1].data[:, hdulist[1].header["PZTX"]] * u.arcsec),
+            ("pzty", 0, hdulist[1].data[:, hdulist[1].header["PZTY"]] * u.arcsec),
+            ("slit x position", 0, hdulist[1].data[:, hdulist[1].header["SLTPX1IX"]] * u.arcsec),
+            ("slit y position", 0, hdulist[1].data[:, hdulist[1].header["SLTPX2IX"]] * u.arcsec),
+            ("xcenix", 0, hdulist[1].data[:, hdulist[1].header["XCENIX"]] * u.arcsec),
+            ("ycenix", 0, hdulist[1].data[:, hdulist[1].header["YCENIX"]] * u.arcsec),
+        ]
+        data = hdulist[0].data
+        data_nan_masked = hdulist[0].data
+        out_uncertainty = None
+        if memmap:
+            data_nan_masked[data == BAD_PIXEL_VALUE_UNSCALED] = 0
+            mask = None
+            scaled = False
+            unit = DN_UNIT["SJI_UNSCALED"]
+        elif not memmap:
+            data_nan_masked[data == BAD_PIXEL_VALUE_SCALED] = np.nan
+            mask = data_nan_masked == BAD_PIXEL_VALUE_SCALED
+            scaled = True
+            unit = DN_UNIT["SJI"]
+            if uncertainty:
+                out_uncertainty = calculate_uncertainty(data, READOUT_NOISE["SJI"], DN_UNIT["SJI"])
+        else:
+            raise ValueError(f"memmap={memmap} is not supported.")
+        map_cube = SJICube(
+            data_nan_masked,
+            _create_gwcs(hdulist),
+            uncertainty=out_uncertainty,
+            unit=unit,
+            meta=hdulist[0].header,
+            mask=mask,
+            scaled=scaled,
         )
-        # The IRIS FITS files contain the per-exposure WCS metadata
-        # (reference coordinate and PCij matrix) in an extension, while the primary
-        # header has only values averaged over the observation
-        for i in range(hdulist[0].header["NAXIS3"]):
-            data = hdulist[0].data[i]
-            data_nan_masked = hdulist[0].data[i]
-            out_uncertainty = None
-            if memmap:
-                data_nan_masked[data == BAD_PIXEL_VALUE_UNSCALED] = 0
-                mask = None
-                scaled = False
-                unit = DN_UNIT["SJI_UNSCALED"]
-                out_uncertainty = None
-            elif not memmap:
-                data_nan_masked[data == BAD_PIXEL_VALUE_SCALED] = np.nan
-                mask = data_nan_masked == BAD_PIXEL_VALUE_SCALED
-                scaled = True
-                unit = DN_UNIT["SJI"]
-                if uncertainty:
-                    out_uncertainty = calculate_uncertainty(data, READOUT_NOISE["SJI"], DN_UNIT["SJI"])
-            else:
-                raise ValueError(f"memmap={memmap} is not supported.")
-            pztx = hdulist[1].data[i, hdulist[1].header["PZTX"]] * u.arcsec
-            pzty = hdulist[1].data[i, hdulist[1].header["PZTY"]] * u.arcsec
-            exposure_time = hdulist[1].data[i, hdulist[1].header["EXPTIMES"]] * u.s
-            obs_vrix = hdulist[1].data[i, hdulist[1].header["OBS_VRIX"]] * u.m / u.s
-            ophaseix = hdulist[1].data[i, hdulist[1].header["OPHASEIX"]] * u.arcsec
-            slit_pos_x = hdulist[1].data[i, hdulist[1].header["SLTPX1IX"]] * u.arcsec
-            slit_pos_y = hdulist[1].data[i, hdulist[1].header["SLTPX2IX"]] * u.arcsec
-            global_coords = [
-                ("time", "time", times[i]),
-                ("pztx", "custom: PZTX", pztx),
-                ("pzty", "custom: PZTY", pzty),
-                ("obs_vrix", "custom: OBS_VRIX", obs_vrix),
-                ("ophaseix", "custom: OPHASEIX", ophaseix),
-                ("exposure time", "obs.exposure", exposure_time),
-                ("slit x position", "custom: SLTPX1IX", slit_pos_x * u.pix),
-                ("slit y position", "custom: SLTPX2IX", slit_pos_y * u.pix),
-            ]
-            header = copy(hdulist[0].header)
-            header.pop("NAXIS3")
-            header.pop("PC3_1")
-            header.pop("PC3_2")
-            header.pop("CTYPE3")
-            header.pop("CUNIT3")
-            header.pop("CRVAL3")
-            header.pop("CRPIX3")
-            header.pop("CDELT3")
-            header["NAXIS"] = 2
-            header["CRVAL1"] = hdulist[1].data[i, hdulist[1].header["XCENIX"]]
-            header["CRVAL2"] = hdulist[1].data[i, hdulist[1].header["YCENIX"]]
-            header["PC1_1"] = hdulist[1].data[0, hdulist[1].header["PC1_1IX"]]
-            header["PC1_2"] = hdulist[1].data[0, hdulist[1].header["PC1_2IX"]]
-            header["PC2_1"] = hdulist[1].data[0, hdulist[1].header["PC2_1IX"]]
-            header["PC2_2"] = hdulist[1].data[0, hdulist[1].header["PC2_2IX"]]
-            wcs = WCS(header)
-            map_cube = IRISMapCube(
-                data_nan_masked,
-                wcs,
-                uncertainty=out_uncertainty,
-                unit=unit,
-                meta=meta,
-                mask=mask,
-                scaled=scaled,
-            )
-            [map_cube.global_coords.add(*global_coord) for global_coord in global_coords]
-            list_of_cubes.append(map_cube)
-    return IRISMapCubeSequence(list_of_cubes, meta=meta, common_axis=None, times=times)
+        [map_cube.extra_coords.add(*extra_coord) for extra_coord in extra_coords]
+    return map_cube
