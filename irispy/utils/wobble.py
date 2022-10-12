@@ -1,11 +1,13 @@
+import re
 from typing import Union, Optional
 from pathlib import Path
 
-import astropy.units as u
 import matplotlib.animation as animation
+import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.io import fits
+from astropy.time import TimeDelta
 from astropy.visualization import AsinhStretch, ImageNormalize
 from astropy.wcs import WCS
 from sunpy.time import parse_time
@@ -20,16 +22,13 @@ def wobble_movie(
     filelist: list,
     outdir: Union[str, Path] = "./",
     trim: bool = False,
-    wobble_cadence: Optional[float] = 180,
+    timestamp: bool = False,
+    wobble_cadence: int = 180,
     ffmpeg_path: Optional[Union[str, Path]] = None,
     **kwargs,
 ) -> None:
     """
     Creates a wobble movie from a list of files.
-
-    This is designed to be used on IRIS Level 2 SJI data.
-
-    2832 is considered the best wavelength to use for wobble movies.
 
     ..note:
 
@@ -45,8 +44,12 @@ def wobble_movie(
         Defaults to the current working directory.
     trim : `bool`, optional
         Movie is trimmed to include only area that has data in all frames, by default False
-    wobble_cadence : `float`, optional
-        The cadence of the wobble movie in seconds. Defaults to 180 seconds.
+    timestamp : `bool`, optional
+        If `True`, will add a timestamp to the wobble movie.
+        Optional, defaults to `False`.
+    wobble_cadence : `int`, optional
+        Sets the cadence of the wobble movie in seconds.
+        Optional, defaults to 180 seconds.
     ffmpeg_path : Union[str,Path], optional
         Path to FFMPEG executable, by default `None`.
         In theory you will not need to do this but matplotlib might not be able to find the ffmpeg exe.
@@ -57,11 +60,16 @@ def wobble_movie(
     -------
     `list`
         A list of the movies created.
+
+    Notes
+    -----
+    This is designed to be used on IRIS Level 2 SJI data.
+
+    2832 is considered the best wavelength to use for wobble movies.
+
+    Timestamps take the main header cadence and add that to the "DATEOBS".
+    They do not use the information in the AUX array.
     """
-    header = fits.getheader(filelist[0])
-    header["EXPTIME"]
-    numframes = header["NAXIS3"]
-    (parse_time(header["ENDOBS"]) - parse_time(header["STARTOBS"])).to(u.s)
     if ffmpeg_path:
         import matplotlib as mpl
 
@@ -71,11 +79,17 @@ def wobble_movie(
     for file in filelist:
         data, header = fits.getdata(file, header=True)
         wcs = WCS(header)
-
+        numframes = header["NAXIS3"]
+        date = header["DATE_OBS"].split(".")[0]
         # Calculate index to downsample in time to accentuate the wobble
         cadence = header["CDELT3"]
         cadence_sample = np.floor(wobble_cadence / cadence) if np.floor(wobble_cadence / cadence) > 1 else 1
-
+        if timestamp:
+            timestamps = [
+                parse_time(header["STARTOBS"]) + TimeDelta(cadence, format="sec") * i for i in range(numframes)
+            ]
+        else:
+            timestamps = [parse_time(header["STARTOBS"])]
         # Trim down to only that part of the movie that contains data in all frames
         if trim:
             # TODO: improve this, it trims a bit but not fully
@@ -99,16 +113,30 @@ def wobble_movie(
         )
         ax.set_xlabel("Solar X")
         ax.set_ylabel("Solar Y")
+        if timestamp:
+            title = ax.text(
+                0.5,
+                0.95,
+                str(timestamps[0]),
+                color="w",
+                transform=ax.transAxes,
+                ha="center",
+                path_effects=[PathEffects.withStroke(linewidth=3, foreground="black")],
+            )
+        else:
+            title = ax.text(0.5, 0.95, "")
 
         def update(i):
             image.set_array(data[i])
-            return [image]
+            if timestamp:
+                title.set_text(str(timestamps[i]))
+            return image, title
 
         anim = animation.FuncAnimation(
-            fig, func=update, frames=range(0, numframes, int(cadence_sample)), blit=True, **kwargs
+            fig, func=update, frames=range(0, numframes, int(cadence_sample)), blit=True, repeat=False, **kwargs
         )
-        date = header["DATE_OBS"].split(".")[0]
-        filename = Path(outdir) / Path(f"{header['TDESC1']}_{date}_wobble.mp4")
+        clean_filename = re.sub(r"[^\w\-_\. ]", "_", f"{header['TDESC1']}_{date}_wobble.mp4")
+        filename = Path(outdir) / Path(clean_filename)
         writervideo = animation.FFMpegWriter(fps=12)
         anim.save(filename, writer=writervideo)
         filenames.append(filename)
