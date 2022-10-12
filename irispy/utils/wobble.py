@@ -107,7 +107,7 @@ def wobble_movie(
         anim = animation.FuncAnimation(
             fig, func=update, frames=range(0, numframes, int(cadence_sample)), blit=True, **kwargs
         )
-        date = header["DATE_OBS"].split(".")[0]
+        date = header["DATE_OBS"].split(".")[0].replace(':', '')
         filename = Path(outdir) / Path(f"{header['TDESC1']}_{date}_wobble.mp4")
         writervideo = animation.FFMpegWriter(fps=12)
         anim.save(filename, writer=writervideo)
