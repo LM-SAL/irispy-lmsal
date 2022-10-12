@@ -1,3 +1,4 @@
+import re
 from typing import Union, Optional
 from pathlib import Path
 
@@ -134,7 +135,8 @@ def wobble_movie(
         anim = animation.FuncAnimation(
             fig, func=update, frames=range(0, numframes, int(cadence_sample)), blit=True, repeat=False, **kwargs
         )
-        filename = Path(outdir) / Path(f"{header['TDESC1']}_{date}_wobble.mp4")
+        clean_filename = re.sub(r"[^\w\-_\. ]", "_", f"{header['TDESC1']}_{date}_wobble.mp4")
+        filename = Path(outdir) / Path(clean_filename)
         writervideo = animation.FFMpegWriter(fps=12)
         anim.save(filename, writer=writervideo)
         filenames.append(filename)
