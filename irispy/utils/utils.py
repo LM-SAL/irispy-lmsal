@@ -1,14 +1,10 @@
 """
 This module provides general utility functions.
 """
-import shutil
 import numbers
-import tarfile
-from pathlib import Path
 
 import astropy.units as u
 import numpy as np
-import requests
 from astropy.modeling.models import custom_model
 from scipy import interpolate, ndimage
 
@@ -22,23 +18,6 @@ __all__ = [
     "image_clipping",
     "calculate_uncertainty",
 ]
-
-
-def _download_data(urls: list):
-    """
-    This only should be called in the irispy-lmsal example gallery.
-
-    THIS IS NOT A USER FACING FUNCTION TO DOWNLOAD DATA.
-    """
-    for url in urls:
-        filename = url.split("/")[-1]
-        if not Path(filename).exists():
-            with requests.get(url, stream=True) as r:
-                with open(filename, "wb") as f:
-                    shutil.copyfileobj(r.raw, f)
-        if ".tar.gz" in filename:
-            with tarfile.open(filename, "r") as tar:
-                tar.extractall(Path(filename).parent)
 
 
 def image_clipping(image, cutoff=1.5e-3, gamma=1.0):
@@ -183,7 +162,7 @@ def calculate_dust_mask(data_array):
     Parameters
     ----------
     data_array : `numpy.ndarray`
-        This array contains some dust poisition that will be calculated. The array
+        This array contains some dust position that will be calculated. The array
         must have scaled values.
 
     Returns
@@ -192,7 +171,7 @@ def calculate_dust_mask(data_array):
         This array has the same shape than data_array and contains the dust positions
         when the value is True.
     """
-    # Creating a mask with the same shape than the inputed data array.
+    # Creating a mask with the same shape than the inputted data array.
     mask = np.zeros_like(data_array, dtype=bool)
     # Set the pixel value to True is the pixel is recognized as a dust pixel.
     mask[(data_array < 0.5) & (data_array > -200)] = True
@@ -211,7 +190,7 @@ def calculate_uncertainty(data: np.array, readout_noise: u.Quantity, unit: u.Qua
     data : np.array
         The data array.
     readout_noise : u.Quantity
-        The readout noise, needs to be a unit that is convertable to photon.
+        The readout noise, needs to be a unit that is convertible to photon.
     unit : u.Quantity
         The final unit that the value should be converted to.
 
