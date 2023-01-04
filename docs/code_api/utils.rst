@@ -1,6 +1,7 @@
-irispy utils
-************
+**********************
+utils (`irispy.utils`)
+**********************
 
-The utils module provides tools to work on irispy objects.
+The `irispy.utils` module provides functions useful for development of ``irispy-lmsal``.
 
 .. automodapi:: irispy.utils

@@ -7,7 +7,7 @@ requires = [
 build-backend = 'setuptools.build_meta'
 
 [tool.black]
-line-length = 115
+line-length = 120
 include = '\.pyi?$'
 exclude = '''
 (
@@ -32,7 +32,7 @@ exclude = '''
     package = "irispy-lmsal"
     filename = "CHANGELOG.rst"
     directory = "changelog/"
-    issue_format = "`#{issue} <https://gitlab.com/LMSAL_HUB/iris_hub/irispy-lmsal/-/merge_requests/{issue}>`__"
+    issue_format = "`#{issue} <https://github.com/LM-SAL/irispy-lmsal/pull/{issue}>`__"
     title_format = "{version} ({project_date})"
 
     [[tool.towncrier.type]]

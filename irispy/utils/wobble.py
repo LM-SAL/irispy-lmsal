@@ -76,8 +76,8 @@ def wobble_movie(
         mpl.rcParams["animation.ffmpeg_path"] = ffmpeg_path
 
     filenames = []
-    for file in filelist:
-        data, header = fits.getdata(file, header=True)
+    for afile in filelist:
+        data, header = fits.getdata(afile, header=True)
         wcs = WCS(header)
         numframes = header["NAXIS3"]
         date = header["DATE_OBS"].split(".")[0]

@@ -82,19 +82,9 @@ area_sg_load6 = iris_response_load6.area_sg
 area_sji_load6 = iris_response_load6.area_sji
 
 
-@pytest.fixture
-def iris_responsev1():
-    return utils.get_iris_response(time_obs=parse_time("2013-09-03"), response_version=1)
-
-
 def test_get_iris_response_version1(iris_responsev1):
     np_test.assert_almost_equal(iris_responsev1["AREA_SG"].value, area_sg_load1, decimal=6)
     np_test.assert_almost_equal(iris_responsev1["AREA_SJI"].value, area_sji_load1, decimal=6)
-
-
-@pytest.fixture
-def iris_responsev2():
-    return utils.get_iris_response(time_obs=parse_time("2013-09-03"), response_version=2)
 
 
 def test_get_iris_response_version2(iris_responsev2):
@@ -102,29 +92,9 @@ def test_get_iris_response_version2(iris_responsev2):
     np_test.assert_almost_equal(iris_responsev2["AREA_SJI"].value, area_sji_load2, decimal=6)
 
 
-@pytest.fixture
-def iris_responsev3():
-    return utils.get_iris_response(time_obs=parse_time("2013-09-03"), response_version=3)
-
-
 def test_get_iris_response_version3(iris_responsev3):
     np_test.assert_almost_equal(iris_responsev3["AREA_SG"].value, area_sg_load3, decimal=6)
     np_test.assert_almost_equal(iris_responsev3["AREA_SJI"].value, area_sji_load3, decimal=6)
-
-
-@pytest.fixture
-def iris_responsev4():
-    return utils.get_iris_response(time_obs=parse_time("2013-09-03"), response_version=4)
-
-
-@pytest.fixture
-def iris_responsev5():
-    return utils.get_iris_response(time_obs=parse_time("2013-09-03"), response_version=5)
-
-
-@pytest.fixture
-def iris_responsev6():
-    return utils.get_iris_response(time_obs=parse_time("2013-09-03"), response_version=6)
 
 
 def test_get_iris_response_version4(iris_responsev4):

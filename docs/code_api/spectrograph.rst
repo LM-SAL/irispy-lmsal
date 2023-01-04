@@ -1,6 +1,7 @@
-irispy Spectrograph
-*******************
+************************************
+Spectrograph (`irispy.spectrograph`)
+************************************
 
-The spectrograph module provides tools to read and work with level 2 spectrograph data.
+The `irispy.spectrograph` module provides tools to read and work with level 2 spectrograph data.
 
 .. automodapi:: irispy.spectrograph

@@ -1,16 +1,13 @@
 import copy
-import os.path
 
 import astropy.units as u
 import numpy as np
-import pytest
 from astropy.io import fits
 from astropy.time import Time, TimeDelta
 from astropy.wcs import WCS
 
 import irispy.data.test
 from irispy import IRISSpectrogramCube, IRISSpectrogramCubeSequence, utils
-from irispy.data.test import get_test_filepath
 from irispy.io.spectrograph import read_spectrograph_lvl2
 
 testpath = irispy.data.test.rootdir
@@ -199,27 +196,19 @@ meta_seq = {
 sequence_DN = IRISSpectrogramCubeSequence([spectrogram_DN0, spectrogram_DN1], meta_seq)
 sequence_photon = IRISSpectrogramCubeSequence([spectrogram_photon0, spectrogram_photon1], meta_seq)
 sequence_DN_per_s = IRISSpectrogramCubeSequence([spectrogram_DN_per_s0, spectrogram_DN_per_s1], meta_seq)
-sequence_photon_per_s = IRISSpectrogramCubeSequence(
-    [spectrogram_photon_per_s0, spectrogram_photon_per_s1], meta_seq
-)
+sequence_photon_per_s = IRISSpectrogramCubeSequence([spectrogram_photon_per_s0, spectrogram_photon_per_s1], meta_seq)
 sequence_photon_per_s_per_s = IRISSpectrogramCubeSequence(
     [spectrogram_photon_per_s_per_s0, spectrogram_photon_per_s1], meta_seq
 )
 sequence_photon_s = IRISSpectrogramCubeSequence([spectrogram_photon_s0, spectrogram_photon_s1], meta_seq)
 
 
-@pytest.fixture
-def iris_l2_test_raster():
-    return read_spectrograph_lvl2(get_test_filepath("iris_l2_20170502_052551_3893010094_raster_t000_r00000.fits"))
-
-
-def test_fits_data_comparison(iris_l2_test_raster):
+def test_fits_data_comparison(raster_file):
     """
     Make sure the data is the same in pyfits and irispy.
     """
-    with fits.open(
-        os.path.join(testpath, "iris_l2_20170502_052551_3893010094_raster_t000_r00000.fits")
-    ) as hdulist:
+    iris_l2_test_raster = read_spectrograph_lvl2(raster_file)
+    with fits.open(raster_file) as hdulist:
         spectral_window1 = hdulist[0].header["TDESC1"]
         spectral_window2 = hdulist[0].header["TDESC2"]
         spectral_window3 = hdulist[0].header["TDESC3"]

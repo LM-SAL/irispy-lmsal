@@ -6,42 +6,43 @@ Installation
 
 Release version
 ===============
-``irispy-lmsal`` is part of the wider ecosystem of scientific Python packages for solar physics and therefore a working installation is more about installing the scientific Python ecosystem.
-If you do not currently have a working scientific Python distribution this guide will set you up with the Miniconda, which makes it easy to install and manage your scientific Python packages.
 
-To install the Miniconda Python distribution follow the `instructions <https://docs.conda.io/en/latest/miniconda.html>`__.
-Although Miniconda makes it simple to switch between Python versions, we recommend that new users install the latest Python 3.x version of Miniconda.
+``irispy-lmsal`` is part of the wider ecosystem of scientific Python packages for solar physics and therefore a working installation is more about installing the scientific Python ecosystem.
+
+To install the Minifoge Python distribution `download the executable for your Operation System <https://github.com/conda-forge/miniforge#miniforge3>`__.
 
 The reason we choose Miniconda over Anaconda, is mainly due to the size as Anaconda comes with a full install of packages you probably do not need and this way you have more direct control over what has been installed into your Python virtual environment.
-Furthermore, you bypass the need for the conda resolver to sort out your root environment which should make conda faster to use.
 
-Using Miniconda
+Using Miniforge
 ---------------
-To install, launch a system command prompt or the 'Anaconda Prompt' (under Windows).
-First configure conda for to add the `conda-forge channel <https://conda-forge.org/>`__::
 
-    conda config --add channels conda-forge
-    conda config --set channel_priority strict
+To install, launch a system command prompt or the 'Miniforge Prompt' (under Windows).
 
-and now to install ``irispy-lmasl`` within the default conda virtual environment::
+.. note::
+
+    We strongly recommend using a `conda virtual environment. <https://towardsdatascience.com/getting-started-with-python-environments-using-conda-32e9f2779307>`__
+
+Now to install ``irispy-lmasl`` within the default conda virtual environment:
+
+.. code-block:: console
 
     $ conda install irispy-lmsal
 
-This will install ``irispy-lmsal`` and every package it needs to function.
-
-.. note::
-    We strongly recommend using a `Python virtual environment <https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/>`__ or a `conda virtual environment. <https://towardsdatascience.com/getting-started-with-python-environments-using-conda-32e9f2779307>`__
+This will install ``irispy-lmsal``.
 
 Updating
 --------
-You can update to the latest version by running::
+You can update to the latest version by running:
 
-    conda update irispy-lmsal
+.. code-block:: console
+
+    $ conda update irispy-lmsal
 
 .. _dev_install:
 
 Development version
 ===================
+
 This section outlines how to install the development version of ``irispy-lmsal``.
 
 Stable Dependencies Install
@@ -55,58 +56,50 @@ From the command line, type:
 
 .. code-block:: console
 
-    conda create -n irispy-dev pip
+    $ conda create -n irispy-dev pip
 
 This creates the ``irispy-dev`` conda environment with just ``pip``.
 Next, you must activate that environment, i.e., switch into it.
 
 .. code-block:: console
 
-    conda activate irispy-dev
+    $ conda activate irispy-dev
 
 Clone ``irispy-lmsal`` repository
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Now we need to clone the `irispy repository`_ from `GitLab`_ into a directory called ``irispy-git``.
-From the directory in which you want ``irispy-git`` to reside, type:
+
+Now we need to clone the `irispy repository`_ from `GitHub`_ into a directory called ``irispy-git``.
+From the directory in which you want ``irispy-git`` to reside.
+If you want to develop ``irispy-lmsal``, you will want to fork the repository on GitHub and use that URL in the clone step above.
 
 .. code-block:: console
 
-    git clone https://gitlab.com/LMSAL_HUB/iris_hub/irispy-lmsal irispy-git
-
-If you want to develop ``irispy-lmsal``, we suggest forking the repository on GitLab and using that in the clone step above.
+    $ git clone <personal fork URL> irispy-git
+    $ cd irispy-git
+    $ git remote add upstream git@github.com:LM-SAL/irispy-lmsal.git
 
 Install ``irispy-lmsal``
 ^^^^^^^^^^^^^^^^^^^^^^^^
+
 Finally, we can install the development version.
 
 .. code-block:: console
 
-    cd irispy-git
-    pip install -e ".[dev]"
+    $ cd irispy-git
+    $ pip install -e ".[dev]"
 
-You should now be ready to use ``irispy-lmsal``.
-To check it's installed, open an Python/IPython/Jupyter Notebook session from any directory and try:
+You are now e ready to develop ``irispy-lmsal``.
 
-.. code-block:: python
+Notice we install no dependencies or use ``conda`` to install this.
+The reason for this is that it is simply easier to use ``pip`` to setup development packages.
 
-    import irispy
-
-To make sure you have the latest updates, regularly do
+At times you might need to get the updated changes, to do so:
 
 .. code-block:: console
 
-    git pull origin master
+    $ git remote update -p
 
-Development dependencies
-------------------------
-We installed the stable versions of many packages.
-If you want to install development versions of any package you can do the following steps:
+From here, you will need to decide if you need to merge changes or rebase changes when you need to contribute the changes back.
 
-- Git clone the source code of the package into a directory called ``package-name-git``.
-  e.g., ``git clone https://github.com/sunpy/sunraster.git sunraster-git``
-- Change into the directory ``package-name-git``.
-  e.g., ``cd sunraster-git``
-- Install it using ``pip install -e .``.
-
-.. _irispy repository: https://gitlab.com/LMSAL_HUB/iris_hub/irispy-lmsal/
-.. _GitLab: https://gitlab.com/
+.. _irispy repository: https://github.com/LM-SAL/irispy-lmsal
+.. _GitHub: https://github.com/

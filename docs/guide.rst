@@ -1,26 +1,26 @@
-******************************************************
-A quick guide to work with IRIS Level 2 data in Python
-******************************************************
+.. _guide:
 
-This guide is intended to help the solar community to start working with IRIS Level 2 data using Python.
-It is especially oriented to those who have a limited knowledge of Python and want to start using this language to analyze IRIS data.
+*************************
+An ``irispy-lmsal`` guide
+*************************
+
+This guide is intended to help the solar community to start working with level 2 data using Python.
+It is especially oriented to those who have a limited knowledge of Python and want to start using this language to analyze data.
 
 This guide will cover:
 
-- reading IRIS Level 2 files
+- reading level 2 files
 - load the data of any of the spectral windows
-- visualize, inspect, and interact with them
 
 In the future more features will arrive:
 
 - a GUI to interact with the data
-- analysis tools
 - a way to save and load regions of interest
-- reading of L3 IRIS data
-- Dopplergrams
+- analysis tools
 - Density Diagnostics
+- Dopplergrams
 - PSF and filter functions
-
+- reading of L3 data
 
 Currently, ``irispy-lmsal`` does not provide a way to download the data from the `IRIS archive <https://iris.lmsal.com/data.html>`__.
 We recommend you browse the catalogue using your browser.
@@ -31,7 +31,7 @@ This guide uses some "sample data" from the IRIS archive that can be accessed:
 
   >>> import irispy.data.sample as sample_data  # doctest: +REMOTE_DATA
 
-Once the IRIS Level 2 data has downloaded, the next step is to read, extract, and inspect them.
+Once the level 2 data has downloaded, the next step is to read, extract, and inspect them.
 
 .. code-block:: python
 
@@ -68,16 +68,7 @@ Let us recover the header of the raster file and show the description of the obs
 We get some basic information about the raster file from this, what spectral windows were observed
 The size of the cube, the wavelength keys as well.
 
-.. note::
-
-  Notice the raster type here, it is a `ndcube.ndcollection.NDCollection` instance.
-  In order to allow easier use o multidimensional data sets (which are common in astronomy), the SunPy-affiliated package `ndcube <https://docs.sunpy.org/projects/ndcube/en/stable/>`_  was developed.
-  This package combines N-dimensional data with their corresponding word coordinate system (WCS) information
-  allowing the data be sliced, visualized and to undergo WCS transforms to alternative coordinate systems.
-  ``irispy-lmsal`` is built upon this.
-
 If we want to check the header of the raster, we can do the following:
-
 Let us check the header of this collection, this is stored as a ``meta`` attribute:
 
 .. code-block:: python
@@ -100,13 +91,11 @@ Let us check the header of this collection, this is stored as a ``meta`` attribu
     <BLANKLINE>
 
 Note this is not on the main object but each individual element, in this case the spectral window.
-While the SJI files contain just one spectral window per file, the raster files have several spectral windows
-per file.
+While the SJI files contain just one spectral window per file, the raster files have several spectral windows per file.
 
-As the SJI IRIS Level 2 data are simpler than the raster files, since they have only one spectral window per
-file, we will start with this data instead of the raster file above.
+As the SJI level 2 data are simpler than the raster files, since they have only one spectral window per file, we will start with this data instead of the raster file above.
 
-We use the following command to read and load the data from a SJI IRIS Level 2 file:
+We use the following command to read and load the data from a SJI level 2 file:
 
 .. code-block:: python
 
@@ -161,14 +150,11 @@ The exposure times:
                0.50025803, 0.500283  , 0.50029802, 0.50029498, 0.50027299] s>)
 
 In most cases, the exposure times are fixed for all scans in a raster.
-However, when automatic exposure compensation (AEC) is switched on and there is a very energetic event (e.g. a
-flare), IRIS will automatically use a lower exposure time to prevent saturation in the detectors.
+However, when automatic exposure compensation (AEC) is switched on and there is a very energetic event (e.g. a flare), IRIS will automatically use a lower exposure time to prevent saturation in the detectors.
 
-If the exposure time varies, you can get the time-dependent exposure times in seconds from the auxiliary
-metadata, second to last HDU in the file with the keys ``"EXPTIMEF"`` and ``"EXPTIMEN"``.
+If the exposure time varies, you can get the time-dependent exposure times in seconds from the auxiliary metadata, second to last HDU in the file with the keys ``"EXPTIMEF"`` and ``"EXPTIMEN"``.
 
-To get arrays of timestamps, or exposure times or "xcenix", that information will be in the ``extra_coords``
-attribute.
+To get arrays of timestamps, or exposure times or "xcenix", that information will be in the ``extra_coords`` attribute.
 
 .. code-block:: python
 
@@ -202,17 +188,17 @@ attribute.
                254.75, 254.75, 254.75, 254.75, 254.75, 254.75, 254.75, 254.75,
                254.75, 254.75, 254.75, 254.75] arcsec pix>)
 
-Understanding a Level 2 FITS file
+Understanding a level 2 FITS file
 =================================
 
-The structure of the IRIS Level 2 FITS data file is as follows:
+The structure of the level 2 FITS data file is as follows:
 
-The IRIS Level 2 FITS are multi-extension FITS files.
+The level 2 FITS are multi-extension FITS files.
 An extension" refers to a part of the file containing self-consistent information.
 This information may be, in the general case, a header or its corresponding data.
 The first extension is called ``primary`` and its ``extension number`` is 0.
 
-The extensions in an IRIS Level 2 SJI FITS file has the following numbers:
+The extensions in an level 2 SJI FITS file has the following numbers:
 
    - ``0``: header and data corresponding to the spectral images observed by the SJI.
    - ``1``: header and auxiliary 31 values from each exposure taken by the SJI in the spectral band of the file.
@@ -222,7 +208,7 @@ The extensions in an IRIS Level 2 SJI FITS file has the following numbers:
      The values of each field can be access as the key in a dictionary or as an attribute.
      See example in the last code block of this section.
 
-An IRIS Level 2 raster FITS file has the following extensions:
+An level 2 raster FITS file has the following extensions:
 
    -  ``0``: main header with the main information of the observation.
       This header has information about all the spectral windows contained in the file and other relevant and
@@ -236,7 +222,7 @@ An IRIS Level 2 raster FITS file has the following extensions:
       each field can be access as the key in a dictionary or as an attribute.
       See example in the last code block of this section.
 
-The function `astropy.fits.io` shows the information of the extensions contained in the IRIS Level 2 file.
+The function `astropy.fits.io` shows the information of the extensions contained in the level 2 file.
 For a SJI file:
 
 .. code-block:: python
@@ -342,7 +328,7 @@ If we now want to recover the main header of any file:
 
 The same can be done with the data using `astropy.io.fits.getdata`.
 
-As the number of spectral windows in a raster file may vary from an observation to another, a good option to access to the last 2 extensions of the IRIS Level 2 file, is to use a negative index:
+As the number of spectral windows in a raster file may vary from an observation to another, a good option to access to the last 2 extensions of the level 2 file, is to use a negative index:
 
 .. code-block:: python
 
@@ -387,4 +373,4 @@ We can access to the values of the variables stored in the data corresponding to
               '/irisa/data/level1/2021/10/01/H0600/iris20211001_06095140_fuv.fits'],
               dtype='<U66')
 
-`More information on the Level 2 data can be found in ITN 26. <https://iris.lmsal.com/itn26/iris_level2.html>`__
+`More information on the level 2 data can be found in ITN 26. <https://iris.lmsal.com/itn26/iris_level2.html>`__

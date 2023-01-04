@@ -8,7 +8,7 @@ __all__ = ["fitsinfo", "read_files"]
 
 def fitsinfo(filename):
     """
-    Prints information about the extension of a raster or SJI IRIS Level 2 data
+    Prints information about the extension of a raster or SJI level 2 data
     file.
 
     Parameters
@@ -21,17 +21,17 @@ def fitsinfo(filename):
         hdr = hdulist[0].header
         print("Observation description: ", hdr["OBS_DESC"], "\n")
         nwin = hdr["NWIN"]
-        modifer = ""
+        modifier = ""
         for i in range(nwin):
             print(f"Extension No. {i+1} stores data and header of {hdr[f'TDESC{i+1}']}: ", end="")
             if "SJI" not in hdr["TDET{}".format(i + 1)]:
-                modifer = f" ({hdr[f'TDET{i+1}'][0:3]})"
-            print(f"{hdr[f'TWMIN{i+1}']:.2f} - {hdr[f'TWMAX{i+1}']:.2f} AA" + modifer)
+                modifier = f" ({hdr[f'TDET{i+1}'][0:3]})"
+            print(f"{hdr[f'TWMIN{i+1}']:.2f} - {hdr[f'TWMAX{i+1}']:.2f} AA" + modifier)
 
 
 def read_files(filename, spectral_windows=None, uncertainty=False, memmap=False):
     """
-    A wrapper function to read a raster or SJI IRIS Level 2 data file.
+    A wrapper function to read a raster or SJI level 2 data file.
 
     You can provide one SJI image or a one raster image or a list of raster images.
 
