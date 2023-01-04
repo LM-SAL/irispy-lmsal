@@ -15,25 +15,6 @@ from irispy.visualization import SequencePlotter, _set_axis_colors
 __all__ = ["SJICube", "SJICubeSequence"]
 
 
-def _get_times(iris_map_cube):
-    instance_start = None
-    instance_end = None
-    if hasattr(iris_map_cube, "global_coords") and "time" in iris_map_cube.global_coords:
-        instance_start = iris_map_cube.global_coords["time"].min().isot
-        instance_end = iris_map_cube.global_coords["time"].max().isot
-    elif hasattr(iris_map_cube, "time") and iris_map_cube.time:
-        instance_start = iris_map_cube.time.min().isot
-        instance_end = iris_map_cube.time.max().isot
-    elif (
-        hasattr(iris_map_cube, "extra_coords")
-        and hasattr(iris_map_cube, "axis_world_coords")
-        and isinstance(iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0], Time)
-    ):
-        instance_start = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].min().isot
-        instance_end = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].max().isot
-    return instance_start, instance_end
-
-
 class SJICube(SpectrogramCube):
     """
     Class representing SJI Image described by a single WCS.
@@ -100,7 +81,12 @@ class SJICube(SpectrogramCube):
         return f"{object.__repr__(self)}\n{str(self)}"
 
     def __str__(self):
-        instance_start, instance_end = _get_times(self)
+        if self.wcs.world_n_dim == 2:
+            instance_start = self.global_coords["Time (UTC)"]
+            instance_end = None
+        else:
+            instance_start = self.wcs.pixel_to_world(0, 0, 0)[-1]
+            instance_end = self.wcs.pixel_to_world(0, 0, self.data.shape[0] - 1)[-1]
         return textwrap.dedent(
             f"""
             SJICube
@@ -211,7 +197,12 @@ class SJICubeSequence(SpectrogramSequence):
         return f"{object.__repr__(self)}\n{str(self)}"
 
     def __str__(self):
-        instance_start, instance_end = _get_times(self)
+        if self.wcs.world_n_dim == 2:
+            instance_start = self.global_coords["Time (UTC)"]
+            instance_end = None
+        else:
+            instance_start = self.wcs.pixel_to_world(0, 0, 0)[-1]
+            instance_end = self.wcs.pixel_to_world(0, 0, self.data.shape[0] - 1)[-1]
         return textwrap.dedent(
             f"""
             SJICubeSequence
