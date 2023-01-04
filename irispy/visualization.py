@@ -10,25 +10,19 @@ __all__ = ["IRISSequencePlotter", "IRISSequenceAnimator"]
 def _set_axis_colors(ax):
     if isinstance(ax, ArrayAnimatorWCS):
         ax = ax.axes
-    if len(ax.coords._as_table()) == 1:
-        wave = ax.coords[0]
-        wave.set_format_unit(u.nm)
-        wave.set_major_formatter("x.x")
-        return
-    if len(ax.coords._as_table()) == 2:
-        lon, lat = ax.coords
-    elif len(ax.coords._as_table()) == 3:
-        wave, lat, lon = ax.coords
-        wave.set_format_unit(u.nm)
-        wave.set_major_formatter("x.x")
-    else:
-        raise ValueError(f"Too many axes: {len(ax.coords._as_table())}")
-    lon.set_ticklabel_position("all")
-    lat.set_ticklabel_position("all")
-    lon.set_axislabel(ax.get_xlabel(), color="black")
-    lon.set_ticklabel("black")
-    lat.set_axislabel(ax.get_ylabel(), color="red")
-    lat.set_ticklabel("red")
+    for axis in ax.coords:
+        if axis.default_label.lower() in ["wavelength", "wave", "em.wl"]:
+            axis.set_format_unit(u.nm)
+            axis.set_major_formatter("x.x")
+            axis.set_axislabel("em.wl [$\\mathrm{nm}$]")
+        elif axis.default_label.lower() in ["latitude", "lat", "custom:pos.helioprojective.lat"]:
+            axis.set_axislabel(axis.default_label, color="red")
+            axis.set_ticklabel_position("all")
+            axis.set_ticklabel("red")
+        elif axis.default_label.lower() in ["longitude", "lon", "custom:pos.helioprojective.lon"]:
+            axis.set_axislabel(axis.default_label, color="black")
+            axis.set_ticklabel_position("all")
+            axis.set_ticklabel("black")
 
 
 class IRISSequencePlotter(MatplotlibSequencePlotter):

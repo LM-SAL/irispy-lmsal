@@ -35,7 +35,7 @@ class ObsID(dict):
     Description:            Large dense 96-step raster 31.35x120 96s
     SJI filters:                                    C II   Mg II w s
     SJI field of view:                                       120x120
-    Exposure time:                                               8.0 s
+    Exposure time:                                             8.0 s
     Binning:                               Spatial x 1, Spectral x 1
     FUV binning:                         FUV spectrally rebinned x 4
     SJI cadence:                                 SJI cadence default

@@ -15,7 +15,7 @@ __all__ = ["read_sji_lvl2"]
 
 def read_sji_lvl2(filename, uncertainty=False, memmap=False):
     """
-    Read level 2 SJI FITS into an IRISMapCube instance.
+    Reads a level 2 SJI FITS.
 
     Parameters
     ----------
@@ -23,7 +23,7 @@ def read_sji_lvl2(filename, uncertainty=False, memmap=False):
         Filename to read.
     uncertainty : `bool`, optional
         If `True` (not the default), will compute the uncertainty for the data (slower and
-        uses more memory). If `memmap=True`, the uncertainty is never computed.
+        uses more memory). If ``memmap=True``, the uncertainty is never computed.
     memmap : `bool`, optional
         If `True` (not the default), will not load arrays into memory, and will only read from
         the file into memory when needed. This option is faster and uses a

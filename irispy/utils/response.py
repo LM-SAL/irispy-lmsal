@@ -255,9 +255,7 @@ def get_iris_response(
                 else:
                     # NUV: essentially same calculation as version = 3
                     for n in range(n_time_obs):
-                        iris_response["AREA_SJI"] = [
-                            Quantity(x, unit=u.cm**2) for x in iris_response["AREA_SJI"]
-                        ]
+                        iris_response["AREA_SJI"] = [Quantity(x, unit=u.cm**2) for x in iris_response["AREA_SJI"]]
                         area_sji = [x for x in area_sji]
                         iris_response["AREA_SJI"][2:4] = area_sji[:]
             for j in range(4):
