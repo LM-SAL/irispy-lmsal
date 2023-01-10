@@ -10,10 +10,10 @@ from astropy.wcs import WCS
 
 from sunraster.extern.meta import Meta
 
-from irispy import IRISMapCube, IRISMapCubeSequence, utils
+from irispy import SJICube, SJICubeSequence, utils
 
 ##############################################################################
-# IRISMapCube Fixtures
+# SJICube Fixtures
 ##############################################################################
 data = np.array(
     [
@@ -120,7 +120,7 @@ meta = Meta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_s
 extra_coords = [("time", 0, times)]
 scaled_T = True
 scaled_F = False
-cube = IRISMapCube(
+cube = SJICube(
     data,
     wcs,
     uncertainty=uncertainty,
@@ -130,7 +130,7 @@ cube = IRISMapCube(
     meta=meta,
 )
 cube.extra_coords.add(*extra_coords[0])
-cube_2D = IRISMapCube(
+cube_2D = SJICube(
     data_2D,
     wcs_2D,
     uncertainty=uncertainty_2D,
@@ -140,7 +140,7 @@ cube_2D = IRISMapCube(
     meta=meta,
 )
 cube_2D.extra_coords.add(*extra_coords[0])
-cube_1D = IRISMapCube(
+cube_1D = SJICube(
     data_1D,
     wcs_1D,
     uncertainty=uncertainty_1D,
@@ -150,7 +150,7 @@ cube_1D = IRISMapCube(
     meta=meta,
 )
 cube_1D.extra_coords.add(*extra_coords[0])
-cube_F = IRISMapCube(
+cube_F = SJICube(
     data,
     wcs,
     uncertainty=uncertainty,
@@ -160,7 +160,7 @@ cube_F = IRISMapCube(
     meta=meta,
 )
 cube_F.extra_coords.add(*extra_coords[0])
-cube_4D = IRISMapCube(
+cube_4D = SJICube(
     data_4D,
     wcs_4D,
     uncertainty=uncertainty_4D,
@@ -215,7 +215,7 @@ exposure_times = 2 * np.ones((2), float) * u.s
 extra_coords = [("time", 0, times)]
 scaled_T = True
 meta = Meta({"exposure time": exposure_times, "OBSID": 1}, axes={"exposure time": 0}, data_shape=data_dust.shape)
-cube_dust = IRISMapCube(
+cube_dust = SJICube(
     data_dust,
     wcs,
     uncertainty=uncertainty,
@@ -227,9 +227,9 @@ cube_dust = IRISMapCube(
 cube_dust.extra_coords.add(*extra_coords[0])
 
 ##############################################################################
-# IRISMapCubeSequence Fixtures
+# SJICubeSequence Fixtures
 ##############################################################################
-cube_seq = IRISMapCube(
+cube_seq = SJICube(
     data,
     wcs,
     uncertainty=uncertainty,
@@ -239,7 +239,7 @@ cube_seq = IRISMapCube(
     scaled=scaled_T,
 )
 cube_seq.extra_coords.add(*extra_coords[0])
-cube_seq_per_s = IRISMapCube(
+cube_seq_per_s = SJICube(
     data / 2,
     wcs,
     uncertainty=uncertainty,
@@ -249,7 +249,7 @@ cube_seq_per_s = IRISMapCube(
     scaled=scaled_T,
 )
 cube_seq_per_s.extra_coords.add(*extra_coords[0])
-cube_seq_per_s_per_s = IRISMapCube(
+cube_seq_per_s_per_s = SJICube(
     data / 2 / 2,
     wcs,
     uncertainty=uncertainty,
@@ -259,7 +259,7 @@ cube_seq_per_s_per_s = IRISMapCube(
     scaled=scaled_T,
 )
 cube_seq_per_s_per_s.extra_coords.add(*extra_coords[0])
-cube_seq_s = IRISMapCube(
+cube_seq_s = SJICube(
     data * 2,
     wcs,
     uncertainty=uncertainty,
@@ -269,7 +269,7 @@ cube_seq_s = IRISMapCube(
     scaled=scaled_T,
 )
 cube_seq_s.extra_coords.add(*extra_coords[0])
-cube_seq_s_s = IRISMapCube(
+cube_seq_s_s = SJICube(
     data * 2 * 2,
     wcs,
     uncertainty=uncertainty,
@@ -279,17 +279,15 @@ cube_seq_s_s = IRISMapCube(
     scaled=scaled_T,
 )
 cube_seq_s_s.extra_coords.add(*extra_coords[0])
-sequence = IRISMapCubeSequence(data_list=[cube_seq, cube_seq], meta=meta, common_axis=0)
-sequence_per_s = IRISMapCubeSequence(data_list=[cube_seq_per_s, cube_seq_per_s], meta=meta, common_axis=0)
-sequence_per_s_per_s = IRISMapCubeSequence(
-    data_list=[cube_seq_per_s_per_s, cube_seq_per_s_per_s], meta=meta, common_axis=0
-)
-sequence_s = IRISMapCubeSequence(data_list=[cube_seq_s, cube_seq_s], meta=meta, common_axis=0)
-sequence_s_s = IRISMapCubeSequence(data_list=[cube_seq_s_s, cube_seq_s_s], meta=meta, common_axis=0)
-seq_dust = IRISMapCubeSequence(data_list=[cube_dust, cube_dust], meta=meta, common_axis=0)
+sequence = SJICubeSequence(data_list=[cube_seq, cube_seq], meta=meta, common_axis=0)
+sequence_per_s = SJICubeSequence(data_list=[cube_seq_per_s, cube_seq_per_s], meta=meta, common_axis=0)
+sequence_per_s_per_s = SJICubeSequence(data_list=[cube_seq_per_s_per_s, cube_seq_per_s_per_s], meta=meta, common_axis=0)
+sequence_s = SJICubeSequence(data_list=[cube_seq_s, cube_seq_s], meta=meta, common_axis=0)
+sequence_s_s = SJICubeSequence(data_list=[cube_seq_s_s, cube_seq_s_s], meta=meta, common_axis=0)
+seq_dust = SJICubeSequence(data_list=[cube_dust, cube_dust], meta=meta, common_axis=0)
 
 ##############################################################################
-# IRISMapCube Tests
+# SJICube Tests
 ##############################################################################
 
 
@@ -301,12 +299,12 @@ seq_dust = IRISMapCubeSequence(data_list=[cube_dust, cube_dust], meta=meta, comm
         (cube_1D, data_1D / exposure_times[0]),
     ],
 )
-def test_IRISMapCube_apply_exposure_time_correction(test_input, expected):
+def test_SJICube_apply_exposure_time_correction(test_input, expected):
     np.testing.assert_array_equal(test_input.apply_exposure_time_correction().data, expected.value)
 
 
 @pytest.mark.parametrize("test_input,expected", [(cube, data * exposure_times[0])])
-def test_IRISMapCube_apply_exposure_time_correction_undo(test_input, expected):
+def test_SJICube_apply_exposure_time_correction_undo(test_input, expected):
     np.testing.assert_array_equal(
         test_input.apply_exposure_time_correction(undo=True, force=True).data,
         expected.value,
@@ -314,7 +312,7 @@ def test_IRISMapCube_apply_exposure_time_correction_undo(test_input, expected):
 
 
 @pytest.mark.parametrize("test_input,expected", [(cube_dust, dust_mask_expected)])
-def test_IRISMapCube_apply_dust_mask(test_input, expected):
+def test_SJICube_apply_dust_mask(test_input, expected):
     test_input.apply_dust_mask()
     np.testing.assert_array_equal(test_input.mask, expected)
     test_input.apply_dust_mask(undo=True)
@@ -322,7 +320,7 @@ def test_IRISMapCube_apply_dust_mask(test_input, expected):
 
 
 ##############################################################################
-# IRISMapCubeSequence Tests
+# SJICubeSequence Tests
 ##############################################################################
 
 
@@ -365,7 +363,7 @@ def test_array_axis_physical_types(test_input, expected):
         # (sequence_per_s, True, False, False, sequence),
     ],
 )
-def test_IRISMapCubeSequence_apply_exposure_time_correction(test_input, undo, copy, force, expected):
+def test_CubeSequence_apply_exposure_time_correction(test_input, undo, copy, force, expected):
     if copy:
         output_sequence = test_input.apply_exposure_time_correction(undo=undo, copy=copy, force=force)
     else:
@@ -376,7 +374,7 @@ def test_IRISMapCubeSequence_apply_exposure_time_correction(test_input, undo, co
 
 
 @pytest.mark.parametrize("test_input,expected", [(seq_dust, dust_mask_expected)])
-def test_IRISMapCubeSequence_apply_dust_mask(test_input, expected):
+def test_CubeSequence_apply_dust_mask(test_input, expected):
     test_input.apply_dust_mask()
     for cube_test in seq_dust.data:
         np.testing.assert_array_equal(cube_test.mask, expected)
