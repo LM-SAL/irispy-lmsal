@@ -8,7 +8,8 @@ from astropy.time import Time
 from ndcube import NDCollection
 from sunpy.coordinates import Helioprojective
 
-from sunraster import SpectrogramCube, SpectrogramSequence
+from sunraster import SpectrogramCube as SpecCube
+from sunraster import SpectrogramSequence as SpecSeq
 from sunraster.meta import Meta, SlitSpectrographMetaABC
 from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
 
@@ -16,15 +17,15 @@ from irispy import utils
 from irispy.utils.constants import SPECTRAL_BAND
 from irispy.visualization import _set_axis_colors
 
-__all__ = ["IRISCollection", "IRISSpectrogramCube", "IRISSpectrogramCubeSequence", "IRISSGMeta"]
+__all__ = ["Collection", "SpectrogramCube", "SpectrogramCubeSequence", "SGMeta"]
 
 
-class IRISCollection(NDCollection):
+class Collection(NDCollection):
     def __str__(self):
         return textwrap.dedent(
             f"""
-            IRISCollection
-            --------------
+            Collection
+            ----------
             Cube keys: {tuple(self.keys())}
             Number of Cubes: {len(self)}
             Aligned dimensions: {self.aligned_dimensions}
@@ -33,9 +34,9 @@ class IRISCollection(NDCollection):
         )
 
 
-class IRISSpectrogramCube(SpectrogramCube):
+class SpectrogramCube(SpecCube):
     """
-    Class representing IRISSpectrogramCube data described by a single WCS.
+    Class representing SpectrogramCube data described by a single WCS.
 
     Parameters
     ----------
@@ -91,7 +92,7 @@ class IRISSpectrogramCube(SpectrogramCube):
 
     def __getitem__(self, item):
         result = super().__getitem__(item)
-        return IRISSpectrogramCube(
+        return SpectrogramCube(
             result.data,
             result.wcs,
             result.uncertainty,
@@ -114,8 +115,8 @@ class IRISSpectrogramCube(SpectrogramCube):
             instance_end = self.axis_world_coords("time", wcs=self.extra_coords)[0].max().isot
         return textwrap.dedent(
             f"""
-            IRISSpectrogramCube
-            -------------------
+            SpectrogramCube
+            ---------------
             OBS ID:             {self.meta.get("OBSID")}
             OBS Description:    {self.meta.get("OBS_DESC")}
             OBS period:         {self.meta.get("STARTOBS")} -- {self.meta.get("ENDOBS")}
@@ -126,7 +127,7 @@ class IRISSpectrogramCube(SpectrogramCube):
             """
         )
 
-    def plot(self, *args, **kwargs):
+    def plot(self, *args, bypass_formatting=False, **kwargs):
         cmap = kwargs.get("cmap")
         if not cmap:
             try:
@@ -137,7 +138,8 @@ class IRISSpectrogramCube(SpectrogramCube):
         if len(self.dimensions) == 1:
             kwargs.pop("cmap")
         ax = super().plot(*args, **kwargs)
-        _set_axis_colors(ax)
+        if not bypass_formatting:
+            _set_axis_colors(ax)
         return ax
 
     def convert_to(self, new_unit_type, time_obs=None, response_version=4):
@@ -166,8 +168,8 @@ class IRISSpectrogramCube(SpectrogramCube):
 
         Returns
         -------
-        `IRISSpectrogramCube`
-            New IRISSpectrogramCube in new units.
+        `SpectrogramCube`
+            New SpectrogramCube in new units.
         """
         detector_type = utils.get_detector_type(self.meta)
         if new_unit_type == "radiance" or self.unit.is_equivalent(utils.RADIANCE_UNIT):
@@ -200,7 +202,7 @@ class IRISSpectrogramCube(SpectrogramCube):
                 new_data = new_data_quantities[0].value
                 new_uncertainty = new_data_quantities[1].value
                 new_unit = new_data_quantities[0].unit
-                self = IRISSpectrogramCube(
+                self = SpectrogramCube(
                     new_data,
                     self.wcs,
                     new_uncertainty,
@@ -245,7 +247,7 @@ class IRISSpectrogramCube(SpectrogramCube):
                 new_unit = new_data_quantities[0].unit
         else:
             raise ValueError("Input unit type not recognized.")
-        new_cube = IRISSpectrogramCube(
+        new_cube = SpectrogramCube(
             new_data,
             self.wcs,
             new_uncertainty,
@@ -257,7 +259,7 @@ class IRISSpectrogramCube(SpectrogramCube):
         return new_cube
 
 
-class IRISSpectrogramCubeSequence(SpectrogramSequence):
+class SpectrogramCubeSequence(SpecSeq):
     """
     Class for holding, slicing and plotting IRIS spectrogram data.
 
@@ -267,7 +269,7 @@ class IRISSpectrogramCubeSequence(SpectrogramSequence):
     Parameters
     ----------
     data_list: `list`
-        List of `IRISSpectrogramCube` objects from the same spectral window and OBS ID.
+        List of `SpectrogramCube` objects from the same spectral window and OBS ID.
     meta: `dict` or header object, optional
         Metadata associated with the sequence.
     common_axis: `int`, optional
@@ -277,7 +279,7 @@ class IRISSpectrogramCubeSequence(SpectrogramSequence):
     def __init__(self, data_list, meta=None, common_axis=0):
         # Check that all spectrograms are from same spectral window and OBS ID.
         if len(np.unique([cube.meta["OBSID"] for cube in data_list])) != 1:
-            raise ValueError("Constituent IRISSpectrogramCube objects must have same value of 'OBSID' in its meta.")
+            raise ValueError("Constituent SpectrogramCube objects must have same value of 'OBSID' in its meta.")
         super().__init__(data_list, meta=meta, common_axis=common_axis)
 
     def __str__(self):
@@ -305,12 +307,12 @@ class IRISSpectrogramCubeSequence(SpectrogramSequence):
         for cube in self.data:
             converted_data_list.append(cube.convert_to(new_unit_type))
         if copy is True:
-            return IRISSpectrogramCubeSequence(converted_data_list, meta=self.meta, common_axis=self._common_axis)
+            return SpectrogramCubeSequence(converted_data_list, meta=self.meta, common_axis=self._common_axis)
         else:
             self.data = converted_data_list
 
 
-class IRISSGMeta(Meta, metaclass=SlitSpectrographMetaABC):
+class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
     def __init__(self, header, spectral_window, **kwargs):
         super().__init__(header, **kwargs)
         spectral_windows = np.array([self["TDESC{0}".format(i)] for i in range(1, self["NWIN"] + 1)])
@@ -332,8 +334,8 @@ class IRISSGMeta(Meta, metaclass=SlitSpectrographMetaABC):
     def __str__(self):
         return textwrap.dedent(
             f"""
-                IRISMeta
-                --------
+                SGMeta
+                ------
                 Observatory:     {self.observatory}
                 Instrument:      {self.instrument}
                 Detector:        {self.detector}

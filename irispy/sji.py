@@ -10,9 +10,9 @@ from ndcube.extra_coords import ExtraCoords
 from sunraster import SpectrogramCube, SpectrogramSequence
 
 from irispy.utils import calculate_dust_mask
-from irispy.visualization import IRISSequencePlotter, _set_axis_colors
+from irispy.visualization import SequencePlotter, _set_axis_colors
 
-__all__ = ["IRISMapCube", "IRISMapCubeSequence"]
+__all__ = ["SJICube", "SJICubeSequence"]
 
 
 def _get_times(iris_map_cube):
@@ -34,7 +34,7 @@ def _get_times(iris_map_cube):
     return instance_start, instance_end
 
 
-class IRISMapCube(SpectrogramCube):
+class SJICube(SpectrogramCube):
     """
     Class representing SJI Image described by a single WCS.
 
@@ -100,20 +100,16 @@ class IRISMapCube(SpectrogramCube):
         return f"{object.__repr__(self)}\n{str(self)}"
 
     def __str__(self):
-        startobs = self.meta.get("STARTOBS")
-        startobs = startobs.isot if startobs else None
-        endobs = self.meta.get("ENDOBS")
-        endobs = endobs.isot if endobs else None
         instance_start, instance_end = _get_times(self)
         return textwrap.dedent(
             f"""
-            IRISMapCube
-            -----------
+            SJICube
+            -------
             Observatory:           {self.meta.get("TELESCOP")}
             Instrument:            {self.meta.get("INSTRUME")}
             Bandpass:              {self.meta.get("TWAVE1")}
-            Obs. Start:            {startobs}
-            Obs. End:              {endobs}
+            Obs. Start:            {self.meta.get("STARTOBS")}
+            Obs. End:              {self.meta.get("ENDOBS")}
             Instance Start:        {instance_start}
             Instance End:          {instance_end}
             Total Frames in Obs.:  {self.meta.get("NBFRAMES")}
@@ -130,7 +126,7 @@ class IRISMapCube(SpectrogramCube):
         sliced_self.scaled = self.scaled
         return sliced_self
 
-    def plot(self, *args, **kwargs):
+    def plot(self, *args, bypass_formatting=False, **kwargs):
         cmap = kwargs.get("cmap")
         if not cmap:
             try:
@@ -139,7 +135,9 @@ class IRISMapCube(SpectrogramCube):
                 cmap = "viridis"
         kwargs["cmap"] = cmap
         ax = super().plot(*args, **kwargs)
-        _set_axis_colors(ax)
+        if not bypass_formatting:
+            _set_axis_colors(ax)
+            ax.axes.grid()
         return ax
 
     def apply_dust_mask(self, undo=False):
@@ -184,7 +182,7 @@ def _create_extra_coords(cube):
     return extra_coords
 
 
-class IRISMapCubeSequence(SpectrogramSequence):
+class SJICubeSequence(SpectrogramSequence):
     """
     Class for holding, slicing and plotting IRIS SJI data.
 
@@ -194,14 +192,14 @@ class IRISMapCubeSequence(SpectrogramSequence):
     Parameters
     ----------
     data_list: `list`
-        List of `IRISMapCube` objects from the same OBS ID.
+        List of `SJICube` objects from the same OBS ID.
     meta: `dict` or header object, optional
         Metadata associated with the sequence.
     common_axis: `int`, optional
         The axis of the NDCubes corresponding to time.
     """
 
-    plotter = IRISSequencePlotter
+    plotter = SequencePlotter
 
     def __init__(self, data_list, meta=None, common_axis=0, times=None):
         super().__init__(data_list, meta=meta, common_axis=common_axis)
@@ -213,20 +211,16 @@ class IRISMapCubeSequence(SpectrogramSequence):
         return f"{object.__repr__(self)}\n{str(self)}"
 
     def __str__(self):
-        startobs = self.meta.get("STARTOBS")
-        startobs = startobs.isot if startobs else None
-        endobs = self.meta.get("ENDOBS")
-        endobs = endobs.isot if endobs else None
         instance_start, instance_end = _get_times(self)
         return textwrap.dedent(
             f"""
-            IRISMapCubeSequence
-            -------------------
+            SJICubeSequence
+            ---------------
             Observatory:     {self.meta.get("TELESCOP")}
             Instrument:      {self.meta.get("INSTRUME")}
             OBS ID:          {self.meta.get("OBSID")}
             OBS Description: {self.meta.get("OBS_DESC")}
-            OBS period:      {startobs} -- {endobs}
+            OBS period:      {self.meta.get("STARTOBS")} -- {self.meta.get("ENDOBS")}
             Sequence period: {instance_start} -- {instance_end}
             Sequence Shape:  {self.dimensions}
             Axis Types:      {self.array_axis_physical_types}
@@ -270,7 +264,7 @@ class IRISMapCubeSequence(SpectrogramSequence):
     def data_as_array(self):
         return self._data
 
-    def plot(self, *args, **kwargs):
+    def plot(self, *args, bypass_formatting=False, **kwargs):
         cmap = kwargs.get("cmap")
         if not cmap:
             try:
@@ -279,5 +273,7 @@ class IRISMapCubeSequence(SpectrogramSequence):
                 cmap = "viridis"
         kwargs["cmap"] = cmap
         ax = super().plot(self, *args, **kwargs)
-        _set_axis_colors(ax)
+        if not bypass_formatting:
+            _set_axis_colors(ax)
+            ax.axes.grid()
         return ax

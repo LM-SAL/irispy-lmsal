@@ -57,7 +57,7 @@ def read_files(filename, spectral_windows=None, uncertainty=False, memmap=False)
 
     Returns
     -------
-    The corresponding `irispy.sji.IRISMapCube` or `irispy.spectrogram.IRISSpectrogramCube`.
+    The corresponding `irispy.sji.SJICube` or `irispy.spectrogram.SpectrogramCube`.
     """
     from irispy.io.sji import read_sji_lvl2
     from irispy.io.spectrograph import read_spectrograph_lvl2

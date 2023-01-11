@@ -14,12 +14,15 @@ is_development = ".dev" in __version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    "hoverxref.extension",
+    "sphinx_copybutton",
+    "sphinx_design",
     "sphinx_automodapi.automodapi",
     "sphinx_automodapi.smart_resolver",
     "sphinx_changelog",
+    "sphinx_gallery.gen_gallery",
     "sphinx.ext.autodoc",
     "sphinx.ext.coverage",
-    "sphinx_gallery.gen_gallery",
     "sphinx.ext.doctest",
     "sphinx.ext.inheritance_diagram",
     "sphinx.ext.intersphinx",
@@ -27,7 +30,6 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
-    "sphinx_panels",
 ]
 
 # Set automodapi to generate files inside the generated directory
@@ -51,6 +53,49 @@ master_doc = "index"
 # The reST default role (used for this markup: `text`) to use for all
 # documents. Set to the "smart" one.
 default_role = "obj"
+
+# -- Options for hoverxref -----------------------------------------------------
+import os
+
+if os.environ.get("READTHEDOCS"):
+    # Building on Read the Docs
+    hoverxref_api_host = "https://readthedocs.org"
+
+    if os.environ.get("PROXIED_API_ENDPOINT"):
+        # Use the proxied API endpoint
+        # - A RTD thing to avoid a CSRF block when docs are using a
+        #   custom domain
+        hoverxref_api_host = "/_"
+
+hoverxref_tooltip_maxwidth = 600  # RTD main window is 696px
+hoverxref_auto_ref = True
+hoverxref_mathjax = True
+
+# hoverxref has to be applied to these
+hoverxref_domains = ["py"]
+
+hoverxref_role_types = {
+    # roles with py domain
+    "attr": "tooltip",
+    "class": "tooltip",
+    "const": "tooltip",
+    "data": "tooltip",
+    "exc": "tooltip",
+    "func": "tooltip",
+    "meth": "tooltip",
+    "mod": "tooltip",
+    "obj": "tooltip",
+    # roles with std domain
+    "confval": "tooltip",
+    "hoverxref": "tooltip",
+    "ref": "tooltip",
+    "term": "tooltip",
+}
+
+# -- Options for sphinx-copybutton ---------------------------------------------
+# Python Repl + continuation, Bash, ipython and qtconsole + continuation, jupyter-console + continuation
+copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
+copybutton_prompt_is_regexp = True
 
 # -- Options for intersphinx extension ---------------------------------------
 

@@ -55,10 +55,10 @@ Let us recover the header of the raster file and show the description of the obs
 .. code-block:: python
 
     >>> raster  # doctest: +REMOTE_DATA
-    <irispy.spectrograph.IRISCollection object at ...>
+    <irispy.spectrograph.Collection object at ...>
     <BLANKLINE>
-    IRISCollection
-    --------------
+    Collection
+    ----------
     Cube keys: ('C II 1336', 'Si IV 1394', 'Mg II k 2796')
     Number of Cubes: 3
     Aligned dimensions: [<Quantity 5. pix> <Quantity 16. pix> <Quantity 548. pix>]
@@ -74,10 +74,10 @@ Let us check the header of this collection, this is stored as a ``meta`` attribu
 .. code-block:: python
 
     >>> raster["C II 1336"][0].meta  # doctest: +REMOTE_DATA
-    <irispy.io.spectrograph.IRISSGMeta object at ...>
+    <irispy.io.spectrograph.SGMeta object at ...>
     <BLANKLINE>
-    IRISMeta
-    --------
+    SGMeta
+    ------
     Observatory:     IRIS
     Instrument:      SPEC
     Detector:        FUV1
@@ -101,10 +101,10 @@ We use the following command to read and load the data from a SJI level 2 file:
 
     >>> iris_sji = read_files(sample_data.SJI_1330)  # doctest: +REMOTE_DATA
     >>> iris_sji  # doctest: +REMOTE_DATA
-    <irispy.sji.IRISMapCubeSequence object at ...>
+    <irispy.sji.SJICubeSequence object at ...>
     <BLANKLINE>
-    IRISMapCubeSequence
-    -------------------
+    SJICubeSequence
+    ---------------
     Observatory:     IRIS
     Instrument:      SJI
     OBS ID:          3683602040
