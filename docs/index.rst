@@ -34,28 +34,33 @@ Getting help
 
 If you would like to get into touch with someone who works on ``irispy-lmsal`` **for any reason**, we suggest opening an issue on the `irispy-lmsal GitHub issue tracker <https://github.com/LM-SAL/irispy-lmsal/issues>`__.
 
-.. panels::
+.. grid:: 1 2 2 2
+    :gutter: 3
 
-    Getting started
-    ^^^^^^^^^^^^^^^
-    .. toctree::
-      :maxdepth: 1
+    .. grid-item-card::
+        :class-card: card
 
-      installation
-      guide
-      generated/gallery/index
-      known_issues
+        Getting started
+        ^^^^^^^^^^^^^^^
+        .. toctree::
+          :maxdepth: 1
 
-    ---
+          installation
+          guide
+          generated/gallery/index
+          known_issues
 
-    Other info
-    ^^^^^^^^^^
-    .. toctree::
-      :maxdepth: 1
+    .. grid-item-card::
+        :class-card: card
 
-      contributing
-      code_api/index
-      changelog
+        Other info
+        ^^^^^^^^^^
+        .. toctree::
+          :maxdepth: 1
+
+          contributing
+          code_api/index
+          changelog
 
 .. _Interface Region Imaging Spectrograph: https://iris.lmsal.com/
 .. _instrument paper: https://www.lmsal.com/iris_science/doc?cmd=dcur&proj_num=IS0196&file_type=pdf

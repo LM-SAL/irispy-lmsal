@@ -11,7 +11,7 @@ from astropy.time import Time, TimeDelta
 from astropy.wcs import WCS
 from sunpy.coordinates import Helioprojective
 
-from irispy.spectrograph import IRISCollection, IRISSGMeta, IRISSpectrogramCube, IRISSpectrogramCubeSequence
+from irispy.spectrograph import Collection, SGMeta, SpectrogramCube, SpectrogramCubeSequence
 from irispy.utils import calculate_uncertainty
 from irispy.utils.constants import DN_UNIT, READOUT_NOISE, SLIT_WIDTH
 
@@ -100,7 +100,7 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
             exposure_times_fuv = hdulist[-2].data[:, hdulist[-2].header["EXPTIMEF"]] * u.s
             exposure_times_nuv = hdulist[-2].data[:, hdulist[-2].header["EXPTIMEN"]] * u.s
             for i, window_name in enumerate(spectral_windows_req):
-                meta = IRISSGMeta(
+                meta = SGMeta(
                     hdulist[0].header,
                     window_name,
                     data_shape=hdulist[window_fits_indices[i]].data.shape,
@@ -152,7 +152,7 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                     out_uncertainty = calculate_uncertainty(
                         hdulist[window_fits_indices[i]].data, readout_noise, DN_UNIT
                     )
-                cube = IRISSpectrogramCube(
+                cube = SpectrogramCube(
                     hdulist[window_fits_indices[i]].data,
                     wcs=wcs,
                     uncertainty=out_uncertainty,
@@ -163,7 +163,7 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                 cube.extra_coords.add("time", 0, times, physical_types="time")
                 data_dict[window_name].append(cube)
     window_data_pairs = [
-        (window_name, IRISSpectrogramCubeSequence(data_dict[window_name], common_axis=0))
+        (window_name, SpectrogramCubeSequence(data_dict[window_name], common_axis=0))
         for window_name in spectral_windows_req
     ]
-    return IRISCollection(window_data_pairs, aligned_axes=(0, 1, 2))
+    return Collection(window_data_pairs, aligned_axes=(0, 1, 2))

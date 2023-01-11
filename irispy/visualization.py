@@ -2,9 +2,10 @@ import astropy.units as u
 import matplotlib.pyplot as plt
 import sunpy.visualization.colormaps as cm  # NOQA
 from mpl_animators import ArrayAnimatorWCS
-from ndcube.visualization.mpl_sequence_plotter import MatplotlibSequencePlotter, SequenceAnimator
+from ndcube.visualization.mpl_sequence_plotter import MatplotlibSequencePlotter
+from ndcube.visualization.mpl_sequence_plotter import SequenceAnimator as SeqAnim
 
-__all__ = ["IRISSequencePlotter", "IRISSequenceAnimator"]
+__all__ = ["SequencePlotter", "SequenceAnimator"]
 
 
 def _set_axis_colors(ax):
@@ -25,7 +26,7 @@ def _set_axis_colors(ax):
             axis.set_ticklabel("black")
 
 
-class IRISSequencePlotter(MatplotlibSequencePlotter):
+class SequencePlotter(MatplotlibSequencePlotter):
     def plot(self, sequence_axis_coords=None, sequence_axis_unit=None, **kwargs):
         cmap = kwargs.get("cmap")
         if not cmap:
@@ -34,7 +35,7 @@ class IRISSequencePlotter(MatplotlibSequencePlotter):
             except Exception:
                 cmap = "viridis"
         kwargs["cmap"] = cmap
-        return IRISSequenceAnimator(self, sequence_axis_coords, sequence_axis_unit, **kwargs)
+        return SequenceAnimator(self, sequence_axis_coords, sequence_axis_unit, **kwargs)
 
     def animate(self, sequence_axis_coords=None, sequence_axis_unit=None, **kwargs):
         cmap = kwargs.get("cmap")
@@ -44,10 +45,10 @@ class IRISSequencePlotter(MatplotlibSequencePlotter):
             except Exception:
                 cmap = "viridis"
         kwargs["cmap"] = cmap
-        return IRISSequenceAnimator(self, sequence_axis_coords, sequence_axis_unit, **kwargs)
+        return SequenceAnimator(self, sequence_axis_coords, sequence_axis_unit, **kwargs)
 
 
-class IRISSequenceAnimator(SequenceAnimator):
+class SequenceAnimator(SeqAnim):
     def plot_start_image_2d(self, ax):
         im = super().plot_start_image_2d(ax)
         _set_axis_colors(ax)
