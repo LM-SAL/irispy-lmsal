@@ -8,15 +8,16 @@ from sunpy.util.parfive_helpers import Downloader
 
 _BASE_URLS = (
     "https://github.com/sunpy/data/raw/main/irispy-lmsal/",
+    "https://github.com/sunpy/sample-data/raw/master/irispy-lmsal/",
     "http://data.sunpy.org/irispy-lmsal/",
 )
 _SAMPLE_DATA = {
+    "AIA_1700": "aia_20140919_060030_1700_image_lev1.fits",
+    "RASTER": "iris_l2_20211001_060925_3683602040_raster.tar.gz",
     "SJI_1330": "iris_l2_20211001_060925_3683602040_SJI_1330_t000.fits.gz",
-    "SJI_1400": "iris_l2_20211001_060925_ipy3683602040_SJI_1400_t000.fits.gz",
+    "SJI_1400": "iris_l2_20211001_060925_3683602040_SJI_1400_t000.fits.gz",
     "SJI_2796": "iris_l2_20211001_060925_3683602040_SJI_2796_t000.fits.gz",
     "SJI_2832": "iris_l2_20211001_060925_3683602040_SJI_2832_t000.fits.gz",
-    "RASTER": "iris_l2_20211001_060925_3683602040_raster.tar.gz",
-    "AIA_1700": "aia_20140919_060030_1700_image_lev1.fits",
 }
 _SAMPLE_FILES = {v: k for k, v in _SAMPLE_DATA.items()}  # NOQA
 
@@ -65,7 +66,8 @@ def _handle_final_errors(results):
     for err in results.errors:
         file_name = err.url.split("/")[-1]
         log.debug(f"Failed to download {_SAMPLE_FILES[file_name]} from {err.url}: {err.exception}")
-        log.error(f"Failed to download {_SAMPLE_FILES[file_name]} from all mirrors," "the file will not be available.")
+        log.error(f"Failed to download {_SAMPLE_FILES[file_name]} from all mirrors, the file will not be available.")
+        log.error(err)
 
 
 def download_sample_data(overwrite=False):

@@ -9,7 +9,7 @@ from astropy.time import Time
 from dkist.wcs.models import CoupledCompoundModel, VaryingCelestialTransform
 from sunpy.coordinates.frames import Helioprojective
 
-from irispy.sji import SJICube, SJICubeSequence
+from irispy.sji import SJICube
 from irispy.utils import calculate_uncertainty
 from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, BAD_PIXEL_VALUE_UNSCALED, DN_UNIT, READOUT_NOISE
 
