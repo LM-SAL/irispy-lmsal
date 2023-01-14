@@ -12,7 +12,7 @@ from astropy.time import Time
 from astropy.units.quantity import Quantity
 from sunpy.time import parse_time
 
-from irispy.data import rootdir
+from irispy.data import ROOTDIR
 
 RESPONSE_VERSION_FILENAMES = {
     "1": "iris_sra_20130211.geny",
@@ -72,7 +72,7 @@ def get_iris_response(
         version_date : `astropy.time.Time`
     """
     response_filename = RESPONSE_VERSION_FILENAMES[str(response_version)]
-    path = os.path.join(rootdir, response_filename)
+    path = os.path.join(ROOTDIR, response_filename)
     raw_response_data = scipy.io.readsav(path)
     iris_response = {name: raw_response_data["p0"][name][0] for name in raw_response_data["p0"].dtype.names}
     # Convert some properties to more convenient types.
