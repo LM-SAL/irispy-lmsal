@@ -39,7 +39,7 @@ def read_files(filename, spectral_windows=None, uncertainty=False, memmap=False)
 
     Parameters
     ----------
-    filename : `list of `str`, `str`
+    filename : `list of `str`, `str`, `pathlib.Path`
         Filename(s) to load.
         If given a string, will load that file.
         If given a list of strings, it will check they are all raster files and load them.
@@ -62,7 +62,9 @@ def read_files(filename, spectral_windows=None, uncertainty=False, memmap=False)
     from irispy.io.sji import read_sji_lvl2
     from irispy.io.spectrograph import read_spectrograph_lvl2
 
-    if isinstance(filename, str):
+    if isinstance(filename, Path):
+        filename = str(filename)
+    if isinstance(filename, (str, Path)):
         if tarfile.is_tarfile(filename):
             path = Path(filename.replace(".tar.gz", ""))
             path.mkdir(parents=True, exist_ok=True)
