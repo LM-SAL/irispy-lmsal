@@ -53,9 +53,8 @@ print(sji_2832)
 print(ObsID(sji_2832.meta["OBSID"]))
 
 ###############################################################################
-# Now, we will plot the SJI. By default, **irispy-lmsal** will a coordinate grid,
-# and will color the spatial axes separately.You can disable by passing in
-# ``bypass_formatting=True`` to the ``plot`` method.
+# Now, we will plot the SJI. By default, **irispy-lmsal** will
+# color the spatial axes.
 
 sji_2832.plot()
 plt.show()
@@ -88,8 +87,7 @@ bbox = [
 # `WCSAxes provides us an API we can use. <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__
 
 plt.figure()
-# irispy will format the axes that if you want to avoid, you can disable:
-ax = sji_cut.plot(bypass_formatting=True)
+ax = sji_cut.plot()
 plt.xlabel("Helioprojective Longitude (Solar-X) [arcsec]")
 plt.ylabel("Helioprojective Latitude (Solar-Y) [arcsec]")
 plt.title(f"IRIS SJI {sji_2832.meta['TWAVE1']}", pad=20)

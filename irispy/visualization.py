@@ -3,7 +3,7 @@ import sunpy.visualization.colormaps as cm  # NOQA
 from mpl_animators import ArrayAnimatorWCS
 from ndcube.visualization.mpl_plotter import MatplotlibPlotter
 
-__all__ = ["_set_axis_colors", "SJIPlotter", "SJIArrayAnimatorWCS"]
+__all__ = ["_set_axis_colors", "Plotter", "CustomArrayAnimatorWCS"]
 
 
 def _set_axis_colors(ax):
@@ -28,7 +28,7 @@ def _set_axis_colors(ax):
             axis.set_ticklabel("black")
 
 
-class SJIArrayAnimatorWCS(ArrayAnimatorWCS):
+class CustomArrayAnimatorWCS(ArrayAnimatorWCS):
     def update_plot_2d(self, val, im, slider):
         """
         Update the image plot.
@@ -40,17 +40,16 @@ class SJIArrayAnimatorWCS(ArrayAnimatorWCS):
             im.set_clim(vmin, vmax)
         slider.cval = val
         _set_axis_colors(self.axes)
-        self.axes.grid()
 
 
-class SJIPlotter(MatplotlibPlotter):
+class Plotter(MatplotlibPlotter):
     def plot(self, *args, **kwargs):
         return super().plot(*args, **kwargs)
 
     def _animate_cube(self, wcs, plot_axes=None, axes_coordinates=None, axes_units=None, data_unit=None, **kwargs):
         # Derive inputs for animation object and instantiate.
         data, wcs, plot_axes, coord_params = self._prep_animate_args(wcs, plot_axes, axes_units, data_unit)
-        ax = SJIArrayAnimatorWCS(data, wcs, plot_axes, coord_params=coord_params, **kwargs)
+        ax = CustomArrayAnimatorWCS(data, wcs, plot_axes, coord_params=coord_params, **kwargs)
         # We need to modify the visible axes after the axes object has been created.
         # This call affects only the initial draw
         self._apply_axes_coordinates(ax.axes, axes_coordinates)
