@@ -1,37 +1,42 @@
 repos:
   - repo: https://github.com/myint/docformatter
-    rev: v1.6.0.rc1
+    rev: v1.5.1
     hooks:
       - id: docformatter
         args: [--in-place, --pre-summary-newline, --make-summary-multi]
   - repo: https://github.com/myint/autoflake
-    rev: v2.0.0
+    rev: v2.0.1
     hooks:
       - id: autoflake
         args: ['--in-place', '--remove-all-unused-imports', '--remove-unused-variable']
-        exclude: ".*(.fits|.fts|.fit|.txt|tca.*|extern.*|.rst|.md|__init__.py|docs/conf.py)$"
+        exclude: ".*(.fits|.fts|.fit|.txt|tca.*|extern.*|.rst|.md|docs/conf.py)$"
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: 'v0.0.247'
+    hooks:
+      - id: ruff
+        args: ['--fix']
   -   repo: https://github.com/psf/black
-      rev: 22.12.0
+      rev: 23.1.0
       hooks:
       - id: black
-        exclude: ".*(.fits|.fts|.fit)$"
-  -   repo: https://github.com/timothycrosley/isort
-      rev: 5.11.4
+        exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
+  -   repo: https://github.com/PyCQA/isort
+      rev: 5.12.0
       hooks:
       - id: isort
-        exclude: ".*(.fits|.fts|.fit)$"
+        exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
   -   repo: https://github.com/pre-commit/pre-commit-hooks
       rev: v4.4.0
       hooks:
       - id: check-ast
       - id: check-case-conflict
       - id: trailing-whitespace
-        exclude: ".*(.fits|.fts|.fit)$"
+        exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
       - id: mixed-line-ending
         args: ['--fix=lf']
-        exclude: ".*(.fits|.fts|.fit)$"
+        exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
       - id: end-of-file-fixer
-        exclude: ".*(.fits|.fts|.fit)$"
+        exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
       - id: check-yaml
       - id: debug-statements
   - repo: https://github.com/codespell-project/codespell

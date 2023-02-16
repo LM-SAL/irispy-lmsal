@@ -4,7 +4,6 @@ import gwcs
 import gwcs.coordinate_frames as cf
 import numpy as np
 from astropy.io import fits
-from astropy.modeling import models as m
 from astropy.time import Time
 from dkist.wcs.models import CoupledCompoundModel, VaryingCelestialTransform
 from sunpy.coordinates.frames import Helioprojective

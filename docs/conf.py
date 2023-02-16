@@ -55,7 +55,7 @@ master_doc = "index"
 default_role = "obj"
 
 # -- Options for hoverxref -----------------------------------------------------
-import os
+import os  # NOQA
 
 if os.environ.get("READTHEDOCS"):
     # Building on Read the Docs
@@ -125,7 +125,7 @@ intersphinx_mapping = {
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 try:
-    from sunpy_sphinx_theme.conf import *
+    from sunpy_sphinx_theme.conf import *  # NOQA
 except ImportError:
     html_theme = "default"
 
@@ -145,7 +145,7 @@ sphinx_gallery_conf = {
     "examples_dirs": os.path.join("..", "examples"),
     "within_subsection_order": ExampleTitleSortKey,
     "gallery_dirs": os.path.join("generated", "gallery"),
-    "default_thumb_file": os.path.join(html_static_path[0], "img", "sunpy_icon_128x128.png"),
+    "default_thumb_file": os.path.join(html_static_path[0], "img", "sunpy_icon_128x128.png"),  # NOQA
     "abort_on_example_error": False,
     "plot_gallery": "True",
     "remove_config_comments": True,
