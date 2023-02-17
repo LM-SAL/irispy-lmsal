@@ -1,9 +1,9 @@
 """
-============================
-Aligning IRIS SJI to SDO/AIA
-============================
+=====================================
+Aligning IRIS SJI (rolled) to SDO/AIA
+=====================================
 
-In this example we will show how to align a IRIS dataset to SDO/AIA.
+In this example we will show how to align a rolled IRIS dataset to SDO/AIA.
 
 You can get IRIS data with co-aligned SDO data (and more) from https://iris.lmsal.com/search/
 """
@@ -32,7 +32,7 @@ from irispy.obsid import ObsID
 # but using your browser will also work.
 
 sji_filename = pooch.retrieve(
-    "https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2023/02/11/20230211_083601_3880012095/iris_l2_20230211_083601_3880012095_SJI_2832_t000.fits.gz",
+    "http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2014/09/19/20140919_051712_3860608353/iris_l2_20140919_051712_3860608353_SJI_2832_t000.fits.gz",
     known_hash=None,
 )
 
@@ -62,7 +62,7 @@ plt.show()
 ###############################################################################
 # We also have the option of going directly to an individual scan.
 
-sji_cut = sji_2832[10]
+sji_cut = sji_2832[45]
 print(sji_cut)
 
 ###############################################################################
@@ -70,16 +70,19 @@ print(sji_cut)
 # While this is stored in the WCS, getting a coordinate frame is a little more involved.
 # We will use this to do a cutout later on but for now we will plot it.
 
-sji_frame = Helioprojective(observer="earth", obstime="2023-02-11T08:36:01")
+sji_frame = Helioprojective(observer="earth", obstime="2014-09-19T05:17:31.110")
 bbox = [
-    SkyCoord(-40 * u.arcsec, -1000 * u.arcsec, frame=sji_frame),
-    SkyCoord(-40* u.arcsec, -875 * u.arcsec, frame=sji_frame),
-    SkyCoord(75 * u.arcsec, -1000 * u.arcsec, frame=sji_frame),
-    SkyCoord(75 * u.arcsec, -875 * u.arcsec, frame=sji_frame),
+    SkyCoord(-750 * u.arcsec, 90 * u.arcsec, frame=sji_frame),
+    SkyCoord(-750 * u.arcsec, 95 * u.arcsec, frame=sji_frame),
+    SkyCoord(-700 * u.arcsec, 90 * u.arcsec, frame=sji_frame),
+    SkyCoord(-700 * u.arcsec, 95 * u.arcsec, frame=sji_frame),
 ]
 
 ###############################################################################
-# We will now plot the IRIS SJI data.
+# This dataset has a peculiarity: the observation has a 45 degree roll.
+# The image does not have a 45 degree rotation because plotting shows the data
+# in the way they are written in the file.
+# We will a coordinate grid to make this clear.
 # You can also change the axis labels and ticks if you so desire.
 # `WCSAxes provides us an API we can use. <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__
 
@@ -116,7 +119,7 @@ plt.show()
 # which we can see when we overlay the points we give it.
 
 sji_crop = sji_cut.crop(*bbox)
-sji_crop.plot(vmin=0, vmax=750)
+sji_crop.plot(vmin=0, vmax=5000)
 plt.xlabel("Solar X")
 plt.ylabel("Solar Y")
 
@@ -126,15 +129,17 @@ plt.show()
 # We will want to align the data to the AIA.
 # First we will want to pick a timestamp during the observation.
 #
-# Lets us now find the SJI observation where the time is closest to 08:50 on 2023-02-11.
+# Lets us now find the SJI observation where the time is closest to 06:00 on 2014-09-19.
 
 (time_sji,) = sji_2832.axis_world_coords("time")
-time_target = Time("2023-02-11T08:50:00")
+time_target = Time("2014-09-19T06:00:00.0")
 time_index = np.abs(time_sji - time_target).argmin()
 time_stamp = time_sji[time_index].isot
 print(time_index, time_stamp)
 
 ###############################################################################
+# The fact that it is rolled 45 degrees makes manual alignment tricky
+# and will illustrate the usefulness of working with WCS.
 # We will download an AIA 170 nm image from the VSO.
 # Once we have acquired it, we will need to use **aiapy** to prep this image.
 

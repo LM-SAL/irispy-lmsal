@@ -29,12 +29,10 @@ def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
     `gwcs.WCS`
         GWCS object for the SJI file.
     """
-    pc_table = hdulist[1].data[:, 14:18].reshape(-1, 2, 2)
-    crval_table = hdulist[1].data[:, 10:12].reshape(-1, 2)
+    pc_table = hdulist[1].data[:, hdulist[1].header["PC1_1IX"]:hdulist[1].header["PC2_2IX"]+1].reshape(-1, 2, 2)
+    crval_table = hdulist[1].data[:, hdulist[1].header["XCENIX"]:hdulist[1].header["YCENIX"]+1]
     crpix = [hdulist[0].header["CRPIX1"], hdulist[0].header["CRPIX2"]]
-    # TODO: Track this down.
-    # These are negative due a model bug that I have been unable to track down.
-    cdelt = [-hdulist[0].header["CDELT1"], -hdulist[0].header["CDELT2"]]
+    cdelt = [hdulist[0].header["CDELT1"], hdulist[0].header["CDELT2"]]
     celestial = VaryingCelestialTransform(
         crpix=crpix * u.pixel,
         cdelt=cdelt * u.arcsec / u.pixel,
