@@ -33,7 +33,7 @@ from irispy.obsid import ObsID
 
 sji_filename = pooch.retrieve(
     "https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2023/02/11/20230211_083601_3880012095/iris_l2_20230211_083601_3880012095_SJI_2832_t000.fits.gz",
-    known_hash=None,
+    known_hash="6455b63917b7434e44f5afa6e51601388c148cc7313e05350f5c0d9398c0b15d",
 )
 
 ###############################################################################
