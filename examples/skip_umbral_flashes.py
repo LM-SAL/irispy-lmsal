@@ -108,7 +108,7 @@ plt.show()
 # time array for the 1400 SJI.
 
 # We will take the first 50 to cut down on the size of the data for this example.
-# This also lines up with the amount of data from the raster.
+# This is memory intensive and that an upstream bug needs to be fixed.
 times_sji = sji_1400.time[:50]
 
 ###############################################################################

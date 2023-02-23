@@ -1,3 +1,5 @@
+from copy import copy
+
 import astropy.modeling.models as m
 import astropy.units as u
 import gwcs
@@ -5,7 +7,9 @@ import gwcs.coordinate_frames as cf
 import numpy as np
 from astropy.io import fits
 from astropy.time import Time
+from astropy.wcs import WCS
 from dkist.wcs.models import CoupledCompoundModel, VaryingCelestialTransform
+from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst
 from sunpy.coordinates.frames import Helioprojective
 
 from irispy.sji import SJICube
@@ -29,8 +33,8 @@ def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
     `gwcs.WCS`
         GWCS object for the SJI file.
     """
-    pc_table = hdulist[1].data[:, hdulist[1].header["PC1_1IX"]:hdulist[1].header["PC2_2IX"]+1].reshape(-1, 2, 2)
-    crval_table = hdulist[1].data[:, hdulist[1].header["XCENIX"]:hdulist[1].header["YCENIX"]+1]
+    pc_table = hdulist[1].data[:, hdulist[1].header["PC1_1IX"] : hdulist[1].header["PC2_2IX"] + 1].reshape(-1, 2, 2)
+    crval_table = hdulist[1].data[:, hdulist[1].header["XCENIX"] : hdulist[1].header["YCENIX"] + 1]
     crpix = [hdulist[0].header["CRPIX1"], hdulist[0].header["CRPIX2"]]
     cdelt = [hdulist[0].header["CDELT1"], hdulist[0].header["CDELT2"]]
     celestial = VaryingCelestialTransform(
@@ -66,6 +70,45 @@ def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
     )
     gwcs_sji = gwcs.WCS(forward_transform, input_frame=input_frame, output_frame=output_frame)
     return gwcs_sji
+
+
+def _create_wcs(hdulist):
+    """
+    This is required as occasionally we need a normal WCS instead of a gWCS due
+    to compatibility issues.
+
+    This has been set to have an Earth Observer at the time of the
+    observation.
+    """
+    wcses = []
+    base_time = Time(hdulist[0].header["STARTOBS"], format="isot", scale="utc")
+    times = hdulist[1].data[:, hdulist[1].header["TIME"]] * u.s
+    # We need to account for a non-zero time delta.
+    base_time += times[0]
+    times -= times[0]
+    for i in range(hdulist[0].header["NAXIS3"]):
+        header = copy(hdulist[0].header)
+        header.pop("NAXIS3")
+        header.pop("PC3_1")
+        header.pop("PC3_2")
+        header.pop("CTYPE3")
+        header.pop("CUNIT3")
+        header.pop("CRVAL3")
+        header.pop("CRPIX3")
+        header.pop("CDELT3")
+        header["NAXIS"] = 2
+        header["CRVAL1"] = hdulist[1].data[i, hdulist[1].header["XCENIX"]]
+        header["CRVAL2"] = hdulist[1].data[i, hdulist[1].header["YCENIX"]]
+        header["PC1_1"] = hdulist[1].data[0, hdulist[1].header["PC1_1IX"]]
+        header["PC1_2"] = hdulist[1].data[0, hdulist[1].header["PC1_2IX"]]
+        header["PC2_1"] = hdulist[1].data[0, hdulist[1].header["PC2_1IX"]]
+        header["PC2_2"] = hdulist[1].data[0, hdulist[1].header["PC2_2IX"]]
+        header["DATE_OBS"] = (base_time + times[i]).isot
+        location = get_body_heliographic_stonyhurst("Earth", header["DATE_OBS"])
+        header["HGLN_OBS"] = location.lon.value
+        header["HGLT_OBS"] = location.lat.value
+        wcses.append(WCS(header))
+    return wcses
 
 
 def read_sji_lvl2(filename, uncertainty=False, memmap=False):
@@ -128,6 +171,7 @@ def read_sji_lvl2(filename, uncertainty=False, memmap=False):
             meta=hdulist[0].header,
             mask=mask,
             scaled=scaled,
+            _basic_wcs=_create_wcs(hdulist),
         )
         [map_cube.extra_coords.add(*extra_coord) for extra_coord in extra_coords]
     return map_cube

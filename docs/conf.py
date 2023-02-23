@@ -151,4 +151,5 @@ sphinx_gallery_conf = {
     "remove_config_comments": True,
     "doc_module": ("sunpy"),
     "only_warn_on_example_error": True,
+    "matplotlib_animations": True,
 }

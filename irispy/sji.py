@@ -62,6 +62,11 @@ class SJICube(SpectrogramCube):
     ):
         self.scaled = scaled
         self.dust_masked = False
+        if "_basic_wcs" in kwargs:
+            _basic_wcs = kwargs.pop("_basic_wcs")
+        else:
+            _basic_wcs = None
+        self._basic_wcs = _basic_wcs
         super().__init__(
             data,
             wcs,
@@ -106,6 +111,8 @@ class SJICube(SpectrogramCube):
     def __getitem__(self, item):
         sliced_self = super().__getitem__(item)
         sliced_self.scaled = self.scaled
+        if self._basic_wcs is not None:
+            sliced_self._basic_wcs = self._basic_wcs[item]
         return sliced_self
 
     def plot(self, *args, **kwargs):
@@ -144,3 +151,10 @@ class SJICube(SpectrogramCube):
             # If undo kwarg is NOT set, mask dust pixels.
             self.mask[dust_mask] = True
             self.dust_masked = True
+
+    @property
+    def basic_wcs(self):
+        """
+        Returns a standard WCS instead of gWCS.
+        """
+        return self._basic_wcs
