@@ -106,7 +106,7 @@ class ObsID(dict):
             "Exposure 1s": "exptime",
             "C II   Si IV   Mg II h/k   Mg II w   ": "sjis",
         }
-        versions = [36, 38, 40]
+        versions = [34, 36, 38, 40]
         if len(str(obsid)) != 10:
             raise ValueError("Invalid OBS ID: must have 10 digits.")
         # here choose between tables

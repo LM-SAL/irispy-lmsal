@@ -1,3 +1,4 @@
+import logging
 import textwrap
 
 import astropy.units as u
@@ -15,7 +16,7 @@ from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
 
 from irispy import utils
 from irispy.utils.constants import SPECTRAL_BAND
-from irispy.visualization import _set_axis_colors
+from irispy.visualization import Plotter, _set_axis_colors
 
 __all__ = ["Collection", "SpectrogramCube", "SpectrogramCubeSequence", "SGMeta"]
 
@@ -127,19 +128,19 @@ class SpectrogramCube(SpecCube):
             """
         )
 
-    def plot(self, *args, bypass_formatting=False, **kwargs):
+    def plot(self, *args, **kwargs):
         cmap = kwargs.get("cmap")
         if not cmap:
             try:
-                cmap = plt.get_cmap(name="irissji{}".format(int(self.meta.detector[:3])))
-            except Exception:
+                cmap = plt.get_cmap(name=f"irissji{int(self.meta.detector[:3])}")
+            except Exception as e:
+                logging.debug(e)
                 cmap = "viridis"
         kwargs["cmap"] = cmap
         if len(self.dimensions) == 1:
             kwargs.pop("cmap")
-        ax = super().plot(*args, **kwargs)
-        if not bypass_formatting:
-            _set_axis_colors(ax)
+        ax = Plotter(ndcube=self).plot(*args, **kwargs)
+        _set_axis_colors(ax)
         return ax
 
     def convert_to(self, new_unit_type, time_obs=None, response_version=4):

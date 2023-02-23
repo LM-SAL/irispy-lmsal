@@ -108,7 +108,7 @@ plt.show()
 # time array for the 1400 SJI.
 
 # We will take the first 50 to cut down on the size of the data for this example.
-# This also lines up with the amount of data from the raster.
+# This is memory intensive and that an upstream bug needs to be fixed.
 times_sji = sji_1400.time[:50]
 
 ###############################################################################
@@ -118,7 +118,7 @@ times_sji = sji_1400.time[:50]
 plt.figure()
 plt.plot(mg_ii_times, mg_ii.data[:200, 220, 103], label="Mg II k3")
 plt.plot(c_ii_times, c_ii.data[:200, 220, 90], label="C II")
-(ax,) = plt.plot(times_sji, sji_1400.data_as_array[:50, 190, 220], label="1400 SJI")
+(ax,) = plt.plot(times_sji, sji_1400.data[:50, 190, 220], label="1400 SJI")
 plt.legend()
 plt.ylabel("Counts (Memory Mapped Value)")
 plt.xlabel("Time (UTC)")
