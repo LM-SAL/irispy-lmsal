@@ -1,0 +1,39 @@
+"""
+====================
+A quick and easy SJI
+====================
+
+In this example we will show how to plot a South Pole SJI dataset.
+
+You can get IRIS data with co-aligned SDO data (and more) from https://iris.lmsal.com/search/
+"""
+import matplotlib.pyplot as plt
+import pooch
+
+from irispy.io import read_files
+
+###############################################################################
+# We start with getting the data.
+# This is done by downloading the data from the IRIS archive.
+#
+# In this case, we will use ``pooch`` as to keep this example self contained
+# but using your browser will also work.
+
+sji_filename = pooch.retrieve(
+    "https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2023/02/11/20230211_083601_3880012095/iris_l2_20230211_083601_3880012095_SJI_2832_t000.fits.gz",
+    known_hash="6455b63917b7434e44f5afa6e51601388c148cc7313e05350f5c0d9398c0b15d",
+)
+
+###############################################################################
+# We will now open the slit-jaw imager (SJI) file we just downloaded.
+
+sji_2832 = read_files(sji_filename)
+# Printing will give us an overview of the file.
+print(sji_2832)
+
+###############################################################################
+# We will now plot the IRIS SJI data.
+# You can also change the axis labels and ticks if you so desire.
+# `WCSAxes provides us an API we can use. <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__
+
+ax = sji_2832.plot()

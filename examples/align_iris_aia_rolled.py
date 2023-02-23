@@ -1,13 +1,14 @@
 """
-============================
-Aligning IRIS SJI to SDO/AIA
-============================
+=====================================
+Aligning IRIS SJI (rolled) to SDO/AIA
+=====================================
 
 In this example we will show how to align a rolled IRIS dataset to SDO/AIA.
 
 You can get IRIS data with co-aligned SDO data (and more) from https://iris.lmsal.com/search/
 """
 # sphinx_gallery_thumbnail_number = 5
+
 
 import astropy.units as u
 import matplotlib.pyplot as plt
@@ -17,7 +18,7 @@ import sunpy.map
 from aiapy.calibrate import update_pointing
 from astropy.coordinates import SkyCoord
 from astropy.time import Time, TimeDelta
-from sunpy.coordinates.frames import Helioprojective
+from astropy.wcs.utils import wcs_to_celestial_frame
 from sunpy.net import Fido
 from sunpy.net import attrs as a
 
@@ -33,7 +34,7 @@ from irispy.obsid import ObsID
 
 sji_filename = pooch.retrieve(
     "http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2014/09/19/20140919_051712_3860608353/iris_l2_20140919_051712_3860608353_SJI_2832_t000.fits.gz",
-    known_hash=None,
+    known_hash="02a1cdbe2014e24b04ff782dcfdbaf553c5a03404813888ddea8c50a9d6b2630",
 )
 
 ###############################################################################
@@ -66,11 +67,11 @@ sji_cut = sji_2832[45]
 print(sji_cut)
 
 ###############################################################################
-# We need to create a coordinate frame for the IRIS data.
+# We need to get the coordinate frame for the IRIS data.
 # While this is stored in the WCS, getting a coordinate frame is a little more involved.
 # We will use this to do a cutout later on but for now we will plot it.
 
-sji_frame = Helioprojective(observer="earth", obstime="2014-09-19T05:17:31.110")
+sji_frame = wcs_to_celestial_frame(sji_cut.basic_wcs)
 bbox = [
     SkyCoord(-750 * u.arcsec, 90 * u.arcsec, frame=sji_frame),
     SkyCoord(-750 * u.arcsec, 95 * u.arcsec, frame=sji_frame),
@@ -139,7 +140,7 @@ print(time_index, time_stamp)
 
 ###############################################################################
 # The fact that it is rolled 45 degrees makes manual alignment tricky
-# and will illustrate the power of working with WCS.
+# and will illustrate the usefulness of working with WCS.
 # We will download an AIA 170 nm image from the VSO.
 # Once we have acquired it, we will need to use **aiapy** to prep this image.
 
@@ -182,10 +183,25 @@ aia_sub.draw_quadrangle(
     edgecolor="green",
     linestyle="--",
     linewidth=2,
-    transform=ax.get_transform(sji_frame),
+    # transform=ax.get_transform(sji_frame),
 )
 
 plt.show()
+
+# ###############################################################################
+# # Now let's plot the IRIS field of view on the AIA image using the information
+# # from the WCS coordinates. This IRIS basic WCS has no observer coordinate information
+# # so we are just going to pretend it's at AIA for this example.
+# # This will allow us to transform from IRIS to SDO/AIA.
+
+# sji_corrected_wcs = copy(sji_cut.basic_wcs)
+# sji_corrected_wcs.wcs.dateobs = sji_cut.isot
+# sji_corrected_wcs.wcs.aux.hgln_obs = aia_map.observer_coordinate.lon.to_value(u.deg)
+# sji_corrected_wcs.wcs.aux.hglt_obs = aia_map.observer_coordinate.lat.to_value(u.deg)
+# sji_corrected_wcs.wcs.aux.rsun_ref = aia_map.observer_coordinate.rsun.to_value(u.m)
+
+# # We have to re-create the coordinate frame.
+# sji_frame_corrected = wcs_to_celestial_frame(sji_corrected_wcs)
 
 ###############################################################################
 # We have a green square showing the region of the IRIS observation.
@@ -194,24 +210,25 @@ plt.show()
 # IRIS frame, or vice-versa.
 #
 # We will rotate the AIA data, using `.reproject_to`.
+# As `sunpy` does not support gWCS, we have to use the basic WCS.
 
-aia_rot = aia_sub.reproject_to(sji_2832[time_index].wcs)
+aia_rot = aia_sub.reproject_to(sji_cut.basic_wcs)
 
 # Crop the AIA FOV to match IRIS.
-bl = aia_rot.wcs.world_to_pixel(sji_2832[time_index].wcs.pixel_to_world(*(0, 0) * u.pix))
+bl = aia_rot.wcs.world_to_pixel(sji_cut.basic_wcs.pixel_to_world(*(0, 0) * u.pix))
 tr = aia_rot.wcs.world_to_pixel(
-    sji_2832[time_index].wcs.pixel_to_world(*(sji_cut.data.shape[0], sji_cut.data.shape[1]) * u.pix)
+    sji_cut.basic_wcs.pixel_to_world(*(sji_cut.data.shape[0], sji_cut.data.shape[1]) * u.pix)
 )
 
 ###############################################################################
 # Finally we will plot the results.
 
 fig = plt.figure()
-ax1 = fig.add_subplot(1, 2, 1, projection=sji_frame)
+ax1 = fig.add_subplot(1, 2, 1, projection=sji_cut.basic_wcs)
 aia_rotate_crop = aia_rot.submap(bl * u.pix, top_right=tr * u.pix)
 aia_rotate_crop.plot(axes=ax1, autoalign=True)
 
-ax2 = fig.add_subplot(1, 2, 2, projection=sji_cut)
+ax2 = fig.add_subplot(1, 2, 2, projection=sji_cut.basic_wcs)
 sji_cut.plot(axes=ax2, cmap="irissji2832", vmin=0, vmax=4500)
 ax2.set_title(f"IRIS SJI {sji_2832.meta['TWAVE1']}Å")
 ax2.grid(color="w", ls=":")
