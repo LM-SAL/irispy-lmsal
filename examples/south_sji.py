@@ -36,4 +36,10 @@ print(sji_2832)
 # You can also change the axis labels and ticks if you so desire.
 # `WCSAxes provides us an API we can use. <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__
 
-ax = sji_2832.plot()
+# Note that the .get_animation() is used to animate this example and is not required normally.
+ax = sji_2832.plot().get_animation()
+plt.xlabel("Helioprojective Longitude (Solar-X) [arcsec]")
+plt.ylabel("Helioprojective Latitude (Solar-Y) [arcsec]")
+plt.title(f"IRIS SJI {sji_2832.meta['TWAVE1']}", pad=20)
+
+plt.show()
