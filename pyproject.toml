@@ -9,7 +9,6 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = "irispy-lmsal"
-provides = "irispy"
 dynamic = ["version"]
 description = "Provides tools to read and analyze data from the IRIS solar-observing satellite."
 readme = "README.rst"
@@ -38,8 +37,8 @@ dependencies = [
   'ndcube>=2.1.2',
   'pandas>=1.3.3',
   'scipy>=1.7.0',
-  'sunpy>=5.0.0rc1',
-  'sunraster>=0.5.0rc1',
+  'sunpy>=4.0.0',
+  'sunraster>=0.4.0',
 ]
 
 [project.urls]
@@ -99,12 +98,13 @@ markers = [
 remote_data_strict = "True"
 filterwarnings = [
   "error",
-  # Do not fail on pytest config issues (i.e. missing plugins) but do show them
   "always::pytest.PytestConfigWarning",
-  #
-  # A list of warnings to ignore follows. If you add to this list, you MUST
-  # add a comment or ideally a link to an issue that explains why the warning
-  # is being ignored
+  "ignore:.*deprecated and slated for removal in Python 3.13",
+  "ignore:numpy.ufunc size changed:RuntimeWarning",
+  "ignore:numpy.ndarray size changed:RuntimeWarning",
+  "ignore:.*'unitfix' made the change 'Changed units'.*",
+  "ignore::erfa.core.ErfaWarning",
+  "ignore:invalid value encountered in sqrt",
 ]
 
 [tool.black]
@@ -193,10 +193,10 @@ skip = "*.asdf,*.fits,*.fts,*.header,*.json,*.xsh,*cache*,*egg*,*extern*,.git,.i
 ignore-words-list = "sav,"
 
 [tool.towncrier]
-    package = "muse"
+    package = "irispy-lmsal"
     filename = "CHANGELOG.rst"
     directory = "changelog/"
-    issue_format = "`#{issue} <https://gitlab.com/LMSAL_HUB/muse_hub/muse_py/-/merge_requests/{issue}>`__"
+    issue_format = "`#{issue} <https://github.com/LM-SAL/irispy-lmsal/pull/{issue}>`__"
     title_format = "{version} ({project_date})"
 
     [[tool.towncrier.type]]

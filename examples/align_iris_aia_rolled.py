@@ -148,7 +148,6 @@ search_results = Fido.search(
     a.Wavelength(1700 * u.AA),
 )
 files = Fido.fetch(search_results)
-
 aia_map = sunpy.map.Map(files[0])
 aia_map = update_pointing(aia_map)
 

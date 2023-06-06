@@ -19,11 +19,11 @@ __all__ = ["wobble_movie"]
 
 
 def wobble_movie(
-    filelist: list,
+    files: Union[list, str, Path],
     *,
     outdir: Union[str, Path] = "./",
     trim: bool = False,
-    timestamp: bool = False,
+    timestamp: bool = True,
     wobble_cadence: int = 180,
     ffmpeg_path: Optional[Union[str, Path]] = None,
     **kwargs,
@@ -38,8 +38,9 @@ def wobble_movie(
 
     Parameters
     ----------
-    filelist : `list`
+    files : Union[list, str, Path]
         Files to create a wobble movie from.
+        If a string or Path is passed, it will encapsulated in a list.
     outdir : Union[str,Path], optional
         Location to save the movie(s).
         Defaults to the current working directory.
@@ -47,7 +48,7 @@ def wobble_movie(
         Movie is trimmed to include only area that has data in all frames, by default False
     timestamp : `bool`, optional
         If `True`, will add a timestamp to the wobble movie.
-        Optional, defaults to `False`.
+        Optional, defaults to `True`.
     wobble_cadence : `int`, optional
         Sets the cadence of the wobble movie in seconds.
         Optional, defaults to 180 seconds.
@@ -76,8 +77,10 @@ def wobble_movie(
 
         mpl.rcParams["animation.ffmpeg_path"] = ffmpeg_path
 
+    if isinstance(files, (str, Path)):
+        files = [files]
     filenames = []
-    for afile in filelist:
+    for afile in files:
         data, header = fits.getdata(afile, header=True)
         wcs = WCS(header)
         numframes = header["NAXIS3"]

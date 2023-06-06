@@ -72,5 +72,5 @@ def test_attribute(attr_name, test_input, expected_output):
 
 @pytest.mark.parametrize("test_input", [INVALID_OBSID])
 def test_invalid_obsid(test_input):
-    with pytest.raises(ValueError, match="YOLO"):
+    with pytest.raises(ValueError, match="Invalid OBS ID: must have 10 digits."):
         ObsID(test_input)

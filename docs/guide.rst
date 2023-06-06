@@ -286,9 +286,6 @@ If you would like a bit more information, we have a similar function within `iri
       0  PRIMARY       1 PrimaryHDU     162   (555, 548, 20)   int16 (rescales to float32)
       1                1 ImageHDU        38   (31, 20)   float64
       2                1 TableHDU        33   20R x 5C   [A10, A10, A4, A66, A63]
-    Observation description:  Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
-    <BLANKLINE>
-    Extension No. 1 stores data and header of SJI_1330: 1310.00 - 1350.00 AA
 
 .. code-block:: python
 

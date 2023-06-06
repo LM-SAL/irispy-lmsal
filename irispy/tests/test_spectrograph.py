@@ -144,7 +144,6 @@ spectrogram_photon_per_s1 = SpectrogramCube(
     SOURCE_UNCERTAINTY_PHOTONS_FUV / single_exposure_time,
     u.photon / u.s,
     meta0,
-    extra_coords1,
 )
 spectrogram_DN0.extra_coords.add(*extra_coords0[0])
 spectrogram_DN0.extra_coords.add(*extra_coords0[1])
