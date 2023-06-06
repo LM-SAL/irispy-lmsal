@@ -29,7 +29,7 @@ raster_filename = pooch.retrieve(
 ###############################################################################
 # Note that when ``memmap=True``, the data values are read from the FITS file
 # directly without the scaling to Float32, the data values are no longer in DN,
-# but in scaled integer units that start at −2$^{16}$/2.
+# but in scaled integer units that start at -2$^{16}$/2.
 
 raster = read_files(raster_filename, memmap=True, uncertainty=False)
 # Provide an overview of the data

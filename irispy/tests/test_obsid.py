@@ -63,7 +63,7 @@ TEST_DATA["linelist"] = [
 
 
 @pytest.mark.parametrize(
-    "attr_name, test_input, expected_output",
+    ("attr_name", "test_input", "expected_output"),
     [(name, obs, output[i]) for (name, output) in TEST_DATA.items() for i, obs in enumerate(OBSIDS)],
 )
 def test_attribute(attr_name, test_input, expected_output):
@@ -72,5 +72,5 @@ def test_attribute(attr_name, test_input, expected_output):
 
 @pytest.mark.parametrize("test_input", [INVALID_OBSID])
 def test_invalid_obsid(test_input):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="YOLO"):
         ObsID(test_input)

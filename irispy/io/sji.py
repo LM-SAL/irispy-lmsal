@@ -66,10 +66,12 @@ def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
     temporal_frame = cf.TemporalFrame(Time(base_time), unit=(u.s,), axes_order=(2,), axes_names=("Time (UTC)",))
     output_frame = cf.CompositeFrame([celestial_frame, temporal_frame])
     input_frame = cf.CoordinateFrame(
-        axes_order=(0, 1, 2), naxes=3, axes_type=["PIXEL", "PIXEL", "PIXEL"], unit=(u.pix, u.pix, u.pix)
+        axes_order=(0, 1, 2),
+        naxes=3,
+        axes_type=["PIXEL", "PIXEL", "PIXEL"],
+        unit=(u.pix, u.pix, u.pix),
     )
-    gwcs_sji = gwcs.WCS(forward_transform, input_frame=input_frame, output_frame=output_frame)
-    return gwcs_sji
+    return gwcs.WCS(forward_transform, input_frame=input_frame, output_frame=output_frame)
 
 
 def _create_wcs(hdulist):
@@ -111,7 +113,7 @@ def _create_wcs(hdulist):
     return wcses
 
 
-def read_sji_lvl2(filename, uncertainty=False, memmap=False):
+def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     """
     Reads a level 2 SJI FITS.
 

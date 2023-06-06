@@ -1,8 +1,8 @@
 """
 This module provides general utility functions for IRIS Responses.
 """
-import os
 import datetime
+from pathlib import Path
 
 import astropy.units as u
 import numpy as np
@@ -72,7 +72,7 @@ def get_iris_response(
         version_date : `astropy.time.Time`
     """
     response_filename = RESPONSE_VERSION_FILENAMES[str(response_version)]
-    path = os.path.join(ROOTDIR, response_filename)
+    path = Path(ROOTDIR) / response_filename
     raw_response_data = scipy.io.readsav(path)
     iris_response = {name: raw_response_data["p0"][name][0] for name in raw_response_data["p0"].dtype.names}
     # Convert some properties to more convenient types.
@@ -87,7 +87,7 @@ def get_iris_response(
         # If DATE_OBS has a value, convert to `astropy.time.Time`, else set to None.
         try:
             iris_response["DATE_OBS"] = parse_time(iris_response["DATE_OBS"], format="utime")
-        except Exception:
+        except Exception:  # NOQA: BLE001
             iris_response["DATE_OBS"] = None
         time_obs = np.array([time_obs.value])
         iris_response["C_F_TIME"] = Time(iris_response["C_F_TIME"], format="utime")
@@ -105,13 +105,13 @@ def get_iris_response(
                 int(iris_response["DATE"][0:4]),
                 int(iris_response["DATE"][4:6]),
                 int(iris_response["DATE"][6:8]),
-            )
+            ),
         )
         del iris_response["DATE"]
     if iris_response["VERSION"] > 2 and time_obs is not None:
         try:
             n_time_obs = len(time_obs)
-        except Exception:
+        except Exception:  # NOQA: BLE001
             n_time_obs = 1
         iris_response["AREA_SG"] = np.zeros(iris_response["AREA_SG"].shape)
         iris_response["AREA_SJI"] = np.zeros(iris_response["AREA_SJI"].shape)
@@ -157,7 +157,7 @@ def get_iris_response(
             np.logical_and(
                 iris_response["LAMBDA"].value >= lambran_nuv[0],
                 iris_response["LAMBDA"].value <= lambran_nuv[1],
-            )
+            ),
         )
         if iris_response["VERSION"] <= 3:
             for k in range(n_time_obs):
@@ -212,7 +212,7 @@ def get_iris_response(
                         [
                             wavelength[0].value,
                             (wavelength[n_wavelength - 2].value * 2.0 + wavelength[n_wavelength - 1].value) / 3.0,
-                        ]
+                        ],
                     )  # 2 wavelengths in nm
                     # Calculate baseline SG area for scaling purposes
                     area_sg = iris_response["GEOM_AREA"]
@@ -235,7 +235,7 @@ def get_iris_response(
                         )
                         area_sj2[n, :] = interpol_sji(wavelength)
                     # Calculate the normalized slant function scal, apply to asji
-                    for n in range(n_time_obs):
+                    for _ in range(n_time_obs):
                         # Best-estimate slant, i.e., eff.area @ wavelength / baseline SG @ wavelength
                         interpol_sg2 = scipy.interpolate.interp1d(
                             iris_response["LAMBDA"],
@@ -247,16 +247,18 @@ def get_iris_response(
                         for m in range(2):
                             sca2n = sca2 * np.sum(weight * area_sj2[m, :]) / np.sum(weight * area_sj2[m, :] * sca2)
                             interpol_sca = scipy.interpolate.interp1d(
-                                wavelength, np.squeeze(sca2n), fill_value="extrapolate"
+                                wavelength,
+                                np.squeeze(sca2n),
+                                fill_value="extrapolate",
                             )
                             sca1n = interpol_sca(iris_response["LAMBDA"])
                             sca1n = np.clip(sca1n, a_min=0, a_max=None)
                             iris_response["AREA_SJI"][m] = area_sji[m] * sca1n
                 else:
                     # NUV: essentially same calculation as version = 3
-                    for n in range(n_time_obs):
+                    for _ in range(n_time_obs):
                         iris_response["AREA_SJI"] = [Quantity(x, unit=u.cm**2) for x in iris_response["AREA_SJI"]]
-                        area_sji = [x for x in area_sji]
+                        area_sji = list(area_sji)
                         iris_response["AREA_SJI"][2:4] = area_sji[:]
             for j in range(4):
                 # SJI specific time dependency

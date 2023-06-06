@@ -6,7 +6,6 @@ Umbral flashes analysis
 In this example, we are going to work with spectra and slit-jaw
 images to study an example of dynamical phenomena called umbral flashes.
 """
-# sphinx_gallery_thumbnail_number = 4
 
 import astropy.units as u
 import matplotlib.dates as mdates
@@ -43,7 +42,7 @@ sji_filename = pooch.retrieve(
 
 # Note that when ``memmap=True``, the data values are read from the FITS file
 # directly without the scaling to Float32, the data values are no longer in DN,
-# but in scaled integer units that start at −2$^{16}$/2.
+# but in scaled integer units that start at -2$^{16}$/2.
 raster = read_files(raster_filename, memmap=True, uncertainty=False)
 sji_1400 = read_files(sji_filename, memmap=True, uncertainty=False)
 

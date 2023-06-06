@@ -19,7 +19,7 @@ _SAMPLE_DATA = {
     "SJI_2796": "iris_l2_20211001_060925_3683602040_SJI_2796_t000.fits.gz",
     "SJI_2832": "iris_l2_20211001_060925_3683602040_SJI_2832_t000.fits.gz",
 }
-_SAMPLE_FILES = {v: k for k, v in _SAMPLE_DATA.items()}  # NOQA
+_SAMPLE_FILES = {v: k for k, v in _SAMPLE_DATA.items()}
 
 
 def _download_sample_data(base_url, sample_files, overwrite):
@@ -40,20 +40,16 @@ def _download_sample_data(base_url, sample_files, overwrite):
     `parfive.Results`
         Download results. Will behave like a list of files.
     """
-    dl = Downloader(overwrite=overwrite, progress=True, headers={"Accept-Encoding": "identity"})
-
+    dl = Downloader(overwrite=overwrite, progress=True)
     for url_file_name, fname in sample_files:
         url = urljoin(base_url, url_file_name)
         dl.enqueue_file(url, filename=fname)
-
-    results = dl.download()
-    return results
+    return dl.download()
 
 
 def _retry_sample_data(results, new_url_base):
     # In case we have a broken file on disk, overwrite it.
-    dl = Downloader(overwrite=True, progress=True, headers={"Accept-Encoding": "identity"})
-
+    dl = Downloader(overwrite=True, progress=True)
     for err in results.errors:
         file_name = err.url.split("/")[-1]
         log.debug(f"Failed to download {_SAMPLE_FILES[file_name]} from {err.url}: {err.exception}")
@@ -61,9 +57,7 @@ def _retry_sample_data(results, new_url_base):
         new_url = urljoin(new_url_base, file_name)
         log.debug(f"Attempting redownload of {_SAMPLE_FILES[file_name]} using {new_url}")
         dl.enqueue_file(new_url, filename=err.filepath_partial)
-
     extra_results = dl.download()
-
     # Make a new results object which contains all the successful downloads
     # from the previous results object and this retry, and all the errors from
     # this retry.
@@ -75,8 +69,12 @@ def _retry_sample_data(results, new_url_base):
 def _handle_final_errors(results):
     for err in results.errors:
         file_name = err.url.split("/")[-1]
-        log.debug(f"Failed to download {_SAMPLE_FILES[file_name]} from {err.url}: {err.exception}")
-        log.error(f"Failed to download {_SAMPLE_FILES[file_name]} from all mirrors," "the file will not be available.")
+        log.debug(
+            f"Failed to download {_SAMPLE_FILES[file_name]} from {err.url}: {err.exception}",
+        )
+        log.error(
+            f"Failed to download {_SAMPLE_FILES[file_name]} from all mirrors," "the file will not be available.",
+        )
 
 
 def _get_sampledata_dir():
@@ -91,7 +89,7 @@ def _get_sampledata_dir():
     return sampledata_dir
 
 
-def _get_sample_files(filename_list, no_download=False, force_download=False):
+def _get_sample_files(filename_list, *, no_download=False, force_download=False):
     """
     Returns a list of disk locations corresponding to a list of filenames for
     sample data, downloading the sample data files as necessary.
@@ -119,19 +117,15 @@ def _get_sample_files(filename_list, no_download=False, force_download=False):
         Raised if any of the files cannot be downloaded from any of the mirrors.
     """
     sampledata_dir = _get_sampledata_dir()
-
     fullpaths = [sampledata_dir / fn for fn in filename_list]
-
     if no_download:
         fullpaths = [fp if fp.exists() else None for fp in fullpaths]
     else:
         to_download = zip(filename_list, fullpaths)
         if not force_download:
             to_download = [(fn, fp) for fn, fp in to_download if not fp.exists()]
-
         if to_download:
             results = _download_sample_data(_BASE_URLS[0], to_download, overwrite=force_download)
-
             # Try the other mirrors for any download errors
             if results.errors:
                 for next_url in _BASE_URLS[1:]:
@@ -141,5 +135,4 @@ def _get_sample_files(filename_list, no_download=False, force_download=False):
                 else:
                     _handle_final_errors(results)
                     raise RuntimeError
-
     return fullpaths

@@ -2,7 +2,6 @@ import logging
 import textwrap
 
 import matplotlib.pyplot as plt
-
 from sunraster import SpectrogramCube
 
 from irispy.utils import calculate_dust_mask
@@ -52,6 +51,7 @@ class SJICube(SpectrogramCube):
         self,
         data,
         wcs,
+        *,
         uncertainty=None,
         unit=None,
         meta=None,
@@ -105,7 +105,7 @@ class SJICube(SpectrogramCube):
             Axis Types:            {self.array_axis_physical_types}
             Roll:                  {self.meta.get("SAT_ROT")}
             Cube dimensions:       {self.dimensions}
-            """
+            """,
         )
 
     def __getitem__(self, item):
@@ -120,7 +120,7 @@ class SJICube(SpectrogramCube):
         if not cmap:
             try:
                 cmap = plt.get_cmap(name=f"irissji{int(self.meta['TWAVE1'])}")
-            except Exception as e:
+            except Exception as e:  # NOQA: BLE001
                 logging.debug(e)
                 cmap = "viridis"
         kwargs["cmap"] = cmap
@@ -128,7 +128,7 @@ class SJICube(SpectrogramCube):
         _set_axis_colors(ax)
         return ax
 
-    def apply_dust_mask(self, undo=False):
+    def apply_dust_mask(self, *, undo=False):
         """
         Applies or undoes an update of the mask with the dust particles
         positions.

@@ -1,11 +1,11 @@
-import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from astropy import units as u
 from pkg_resources import resource_filename
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
+dir_path = Path(__file__).parent
 
 __all__ = ["ObsID"]
 
@@ -84,8 +84,7 @@ class ObsID(dict):
         """
         if exptime == "Exposure 1s":
             return 1.0 * u.s
-        else:
-            return float(exptime.split(" x ")[1]) * u.s
+        return float(exptime.split(" x ")[1]) * u.s
 
     def _read_obsid(self, obsid):
         """
@@ -122,8 +121,8 @@ class ObsID(dict):
         except IndexError:
             raise ValueError(
                 "Invalid OBS ID: last two numbers must be between"
-                " {} and {}".format(table1["OBS-ID"].min(), table1["OBS-ID"].max())
-            )
+                " {} and {}".format(table1["OBS-ID"].min(), table1["OBS-ID"].max()),
+            ) from None
 
         data["raster_step"] = meta["Raster step"]
         data["raster_fov"] = meta["Raster FOV"]
@@ -139,7 +138,7 @@ class ObsID(dict):
             [  # find all dividers between fields
                 table2.where(table2["OBS ID"] == 0).dropna(how="all").index,
                 np.array([len(table2)]),
-            ]
+            ],
         )
         # field indices, start from largest and subtract
         for start, end in zip(field_ranges[-2::-1], field_ranges[:0:-1]):

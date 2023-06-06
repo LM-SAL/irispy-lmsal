@@ -1,8 +1,8 @@
-import os
+from pathlib import Path
 
 import irispy
 from irispy.data.sample import download_all
 
 __all__ = ["download_all"]
 
-ROOTDIR = os.path.join(os.path.dirname(irispy.__file__), "data")
+ROOTDIR = Path(irispy.__file__).parent / "data"

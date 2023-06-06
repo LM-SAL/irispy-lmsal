@@ -20,6 +20,7 @@ __all__ = ["wobble_movie"]
 
 def wobble_movie(
     filelist: list,
+    *,
     outdir: Union[str, Path] = "./",
     trim: bool = False,
     timestamp: bool = False,
@@ -127,13 +128,18 @@ def wobble_movie(
             title = ax.text(0.5, 0.95, "")
 
         def update(i):
-            image.set_array(data[i])
+            image.set_array(data[i])  # NOQA: B023
             if timestamp:
-                title.set_text(str(timestamps[i]))
-            return image, title
+                title.set_text(str(timestamps[i]))  # NOQA: B023
+            return image, title  # NOQA: B023
 
         anim = animation.FuncAnimation(
-            fig, func=update, frames=range(0, numframes, int(cadence_sample)), blit=True, repeat=False, **kwargs
+            fig,
+            func=update,
+            frames=range(0, numframes, int(cadence_sample)),
+            blit=True,
+            repeat=False,
+            **kwargs,
         )
         clean_filename = re.sub(r"[^\w\-_\. ]", "_", f"{header['TDESC1']}_{date}_wobble.mp4")
         filename = Path(outdir) / Path(clean_filename)

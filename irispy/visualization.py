@@ -1,5 +1,5 @@
 import astropy.units as u
-import sunpy.visualization.colormaps as cm  # NOQA
+import sunpy.visualization.colormaps as cm  # NOQA: F401
 from mpl_animators import ArrayAnimatorWCS
 from ndcube.visualization.mpl_plotter import MatplotlibPlotter
 

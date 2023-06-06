@@ -6,7 +6,6 @@ import pytest
 from astropy import units as u
 from astropy.time import Time
 from astropy.wcs import WCS
-
 from sunraster.extern.meta import Meta
 
 from irispy import SJICube, utils
@@ -18,7 +17,7 @@ data = np.array(
     [
         [[1, 2, 3, 4], [2, 4, 5, 3], [0, 1, 2, 3]],
         [[2, 4, 5, 1], [10, 5, 2, 2], [10, 3, 3, 0]],
-    ]
+    ],
 )
 data_2D = np.array([[1, 2, 3, 4], [2, 4, 5, 3]])
 data_1D = np.array([1, 2])
@@ -32,7 +31,7 @@ data_4D = np.array(
             [[1, 2, 3, 4], [2, 4, 5, 3], [0, 1, 2, 3]],
             [[2, 4, 5, 1], [10, 5, 2, 2], [10, 3, 3, 0]],
         ],
-    ]
+    ],
 )
 header = {
     "CTYPE1": "HPLN-TAN",
@@ -173,7 +172,7 @@ data_dust = np.array(
     [
         [[-1, 2, -3, 4], [2, -200, 5, 3], [0, 1, 2, -300]],
         [[2, -200, 5, 1], [10, -5, 2, 2], [10, -3, 3, 0]],
-    ]
+    ],
 )
 header = {
     "CTYPE1": "HPLN-TAN",
@@ -206,7 +205,7 @@ dust_mask_expected = np.array(
             [True, True, False, False],
         ],
         [[True, True, True, False], [True, True, True, True], [True, True, True, True]],
-    ]
+    ],
 )
 uncertainty = 1
 times = Time(["2014-12-11T19:39:00.48", "2014-12-11T19:43:07.6"])
@@ -230,7 +229,7 @@ cube_dust.extra_coords.add(*extra_coords[0])
 # SJICube Tests
 ##############################################################################
 @pytest.mark.parametrize(
-    "test_input,expected",
+    ("test_input", "expected"),
     [
         (cube, data / exposure_times[0]),
         (cube_2D, data_2D / exposure_times[0]),
@@ -241,7 +240,7 @@ def test_SJICube_apply_exposure_time_correction(test_input, expected):
     np.testing.assert_array_equal(test_input.apply_exposure_time_correction().data, expected.value)
 
 
-@pytest.mark.parametrize("test_input,expected", [(cube, data * exposure_times[0])])
+@pytest.mark.parametrize(("test_input", "expected"), [(cube, data * exposure_times[0])])
 def test_SJICube_apply_exposure_time_correction_undo(test_input, expected):
     np.testing.assert_array_equal(
         test_input.apply_exposure_time_correction(undo=True, force=True).data,
@@ -249,7 +248,7 @@ def test_SJICube_apply_exposure_time_correction_undo(test_input, expected):
     )
 
 
-@pytest.mark.parametrize("test_input,expected", [(cube_dust, dust_mask_expected)])
+@pytest.mark.parametrize(("test_input", "expected"), [(cube_dust, dust_mask_expected)])
 def test_SJICube_apply_dust_mask(test_input, expected):
     test_input.apply_dust_mask()
     np.testing.assert_array_equal(test_input.mask, expected)

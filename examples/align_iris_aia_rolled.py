@@ -7,7 +7,6 @@ In this example we will show how to align a rolled IRIS dataset to SDO/AIA.
 
 You can get IRIS data with co-aligned SDO data (and more) from https://iris.lmsal.com/search/
 """
-# sphinx_gallery_thumbnail_number = 5
 
 
 import astropy.units as u
@@ -45,7 +44,6 @@ sji_2832 = read_files(sji_filename)
 print(sji_2832)
 # ``.meta`` contains the entire FITS header from the primary HDU.
 # Since it is very long, we won't actually print it here.
-# print(sji_2832.meta)
 
 ###############################################################################
 # Can't remember what is OBSID 3860608353?
@@ -157,9 +155,7 @@ aia_map = update_pointing(aia_map)
 # You don't need to register AIA images unless you need them aligned to other AIA images.
 # otherwise you are degrading the data as the affine transform is not perfect.
 # But it is the last step to get a level 1.5 image.
-# from aiapy.calibrate import register
 #
-# aia_map = register(aia_map)
 
 ###############################################################################
 # Now let's plot the IRIS field of view on the AIA image.
@@ -183,7 +179,6 @@ aia_sub.draw_quadrangle(
     edgecolor="green",
     linestyle="--",
     linewidth=2,
-    # transform=ax.get_transform(sji_frame),
 )
 
 plt.show()
@@ -194,14 +189,8 @@ plt.show()
 # # so we are just going to pretend it's at AIA for this example.
 # # This will allow us to transform from IRIS to SDO/AIA.
 
-# sji_corrected_wcs = copy(sji_cut.basic_wcs)
-# sji_corrected_wcs.wcs.dateobs = sji_cut.isot
-# sji_corrected_wcs.wcs.aux.hgln_obs = aia_map.observer_coordinate.lon.to_value(u.deg)
-# sji_corrected_wcs.wcs.aux.hglt_obs = aia_map.observer_coordinate.lat.to_value(u.deg)
-# sji_corrected_wcs.wcs.aux.rsun_ref = aia_map.observer_coordinate.rsun.to_value(u.m)
 
 # # We have to re-create the coordinate frame.
-# sji_frame_corrected = wcs_to_celestial_frame(sji_corrected_wcs)
 
 ###############################################################################
 # We have a green square showing the region of the IRIS observation.
@@ -217,7 +206,7 @@ aia_rot = aia_sub.reproject_to(sji_cut.basic_wcs)
 # Crop the AIA FOV to match IRIS.
 bl = aia_rot.wcs.world_to_pixel(sji_cut.basic_wcs.pixel_to_world(*(0, 0) * u.pix))
 tr = aia_rot.wcs.world_to_pixel(
-    sji_cut.basic_wcs.pixel_to_world(*(sji_cut.data.shape[0], sji_cut.data.shape[1]) * u.pix)
+    sji_cut.basic_wcs.pixel_to_world(*(sji_cut.data.shape[0], sji_cut.data.shape[1]) * u.pix),
 )
 
 ###############################################################################
