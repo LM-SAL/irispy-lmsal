@@ -102,7 +102,7 @@ filterwarnings = [
   "ignore:.*deprecated and slated for removal in Python 3.13",
   "ignore:numpy.ufunc size changed:RuntimeWarning",
   "ignore:numpy.ndarray size changed:RuntimeWarning",
-  "ignore:.*'unitfix' made the change 'Changed units'.*",
+  "ignore:.*unitfix.*",
   "ignore::erfa.core.ErfaWarning",
   "ignore:invalid value encountered in sqrt",
 ]
