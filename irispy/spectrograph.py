@@ -1,3 +1,4 @@
+import logging
 import textwrap
 
 import astropy.units as u
@@ -7,7 +8,6 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from ndcube import NDCollection
 from sunpy.coordinates import Helioprojective
-
 from sunraster import SpectrogramCube as SpecCube
 from sunraster import SpectrogramSequence as SpecSeq
 from sunraster.meta import Meta, SlitSpectrographMetaABC
@@ -15,7 +15,7 @@ from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
 
 from irispy import utils
 from irispy.utils.constants import SPECTRAL_BAND
-from irispy.visualization import _set_axis_colors
+from irispy.visualization import Plotter, _set_axis_colors
 
 __all__ = ["Collection", "SpectrogramCube", "SpectrogramCubeSequence", "SGMeta"]
 
@@ -30,7 +30,7 @@ class Collection(NDCollection):
             Number of Cubes: {len(self)}
             Aligned dimensions: {self.aligned_dimensions}
             Aligned physical types: {self.aligned_axis_physical_types}
-            """
+            """,
         )
 
 
@@ -77,6 +77,7 @@ class SpectrogramCube(SpecCube):
         uncertainty,
         unit,
         meta,
+        *,
         mask=None,
         copy=False,
     ):
@@ -124,22 +125,22 @@ class SpectrogramCube(SpecCube):
             Data shape:         {self.dimensions}
             Axis Types:         {self.array_axis_physical_types}
             Roll:               {self.meta.get("SAT_ROT")}
-            """
+            """,
         )
 
-    def plot(self, *args, bypass_formatting=False, **kwargs):
+    def plot(self, *args, **kwargs):
         cmap = kwargs.get("cmap")
         if not cmap:
             try:
-                cmap = plt.get_cmap(name="irissji{}".format(int(self.meta.detector[:3])))
-            except Exception:
+                cmap = plt.get_cmap(name=f"irissji{int(self.meta.detector[:3])}")
+            except Exception as e:  # NOQA: BLE001
+                logging.debug(e)
                 cmap = "viridis"
         kwargs["cmap"] = cmap
         if len(self.dimensions) == 1:
             kwargs.pop("cmap")
-        ax = super().plot(*args, **kwargs)
-        if not bypass_formatting:
-            _set_axis_colors(ax)
+        ax = Plotter(ndcube=self).plot(*args, **kwargs)
+        _set_axis_colors(ax)
         return ax
 
     def convert_to(self, new_unit_type, time_obs=None, response_version=4):
@@ -216,7 +217,9 @@ class SpectrogramCube(SpecCube):
             else:
                 new_unit = u.photon
             new_data_arrays, new_unit = utils.convert_between_DN_and_photons(
-                (self.data, self.uncertainty.array), self.unit, new_unit
+                (self.data, self.uncertainty.array),
+                self.unit,
+                new_unit,
             )
             new_data = new_data_arrays[0]
             new_uncertainty = new_data_arrays[1]
@@ -286,7 +289,7 @@ class SpectrogramCubeSequence(SpecSeq):
         # Overload it get the class name in the string
         return super().__str__()
 
-    def convert_to(self, new_unit_type, copy=False):
+    def convert_to(self, new_unit_type, *, copy=False):
         """
         Converts data, uncertainty and unit of each spectrogram in sequence to
         new unit.
@@ -308,26 +311,26 @@ class SpectrogramCubeSequence(SpecSeq):
             converted_data_list.append(cube.convert_to(new_unit_type))
         if copy is True:
             return SpectrogramCubeSequence(converted_data_list, meta=self.meta, common_axis=self._common_axis)
-        else:
-            self.data = converted_data_list
+        self.data = converted_data_list
+        return None
 
 
 class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
     def __init__(self, header, spectral_window, **kwargs):
         super().__init__(header, **kwargs)
-        spectral_windows = np.array([self["TDESC{0}".format(i)] for i in range(1, self["NWIN"] + 1)])
+        spectral_windows = np.array([self[f"TDESC{i}"] for i in range(1, self["NWIN"] + 1)])
         window_mask = np.array([spectral_window in window for window in spectral_windows])
         if window_mask.sum() < 1:
             raise ValueError(
                 "Spectral window not found. "
                 f"Input spectral window: {spectral_window}; "
-                f"Spectral windows in header: {spectral_windows}"
+                f"Spectral windows in header: {spectral_windows}",
             )
-        elif window_mask.sum() > 1:
+        if window_mask.sum() > 1:
             raise ValueError(
                 "Spectral window must be unique. "
                 f"Input spectral window: {spectral_window}; "
-                f"Ambiguous spectral windows in header: {spectral_windows[window_mask]}"
+                f"Ambiguous spectral windows in header: {spectral_windows[window_mask]}",
             )
         self._iwin = np.arange(len(spectral_windows))[window_mask][0] + 1
 
@@ -346,7 +349,7 @@ class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
                 Date:            {self.date_reference}
                 OBS ID:          {self.observing_mode_id}
                 OBS Description: {self.observing_mode_description}
-                """
+                """,
         )
 
     def __repr__(self):
@@ -528,5 +531,4 @@ class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
         """
         if "fuv" in self.detector.lower():
             return self.get("SUMSPTRF")
-        else:
-            return self.get("SUMSPTRN")
+        return self.get("SUMSPTRN")

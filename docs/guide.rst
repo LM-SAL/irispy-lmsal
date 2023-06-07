@@ -74,7 +74,7 @@ Let us check the header of this collection, this is stored as a ``meta`` attribu
 .. code-block:: python
 
     >>> raster["C II 1336"][0].meta  # doctest: +REMOTE_DATA
-    <irispy.io.spectrograph.SGMeta object at ...>
+    <irispy.spectrograph.SGMeta object at ...>
     <BLANKLINE>
     SGMeta
     ------
@@ -101,19 +101,23 @@ We use the following command to read and load the data from a SJI level 2 file:
 
     >>> iris_sji = read_files(sample_data.SJI_1330)  # doctest: +REMOTE_DATA
     >>> iris_sji  # doctest: +REMOTE_DATA
-    <irispy.sji.SJICubeSequence object at ...>
+    <irispy.sji.SJICube object at ...>
     <BLANKLINE>
-    SJICubeSequence
-    ---------------
-    Observatory:     IRIS
-    Instrument:      SJI
-    OBS ID:          3683602040
-    OBS Description: Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
-    OBS period:      2021-10-01T06:09:24.920 -- 2021-10-01T06:11:44.461
-    Sequence period: 2021-10-01T06:09:25.020 -- 2021-10-01T06:11:37.580
-    Sequence Shape:  (<Quantity 20. pix>, <Quantity 548. pix>, <Quantity 555. pix>)
-    Axis Types:      [('meta.obs.sequence',), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat')]
-    Roll:            0.000464606 deg
+    SJICube
+    -------
+    Observatory:           IRIS
+    Instrument:            SJI
+    Bandpass:              1330.0
+    Obs. Start:            2021-10-01T06:09:24.920
+    Obs. End:              2021-10-01T06:11:44.461
+    Instance Start:        2021-10-01T06:09:25.020
+    Instance End:          2021-10-01T06:11:37.580
+    Total Frames in Obs.:  None
+    IRIS Obs. id:          3683602040
+    IRIS Obs. Description: Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
+    Axis Types:            [('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat', 'time', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat')]
+    Roll:                  0.000464606
+    Cube dimensions:       [ 20. 548. 555.] pix
     <BLANKLINE>
 
 Metadata
@@ -133,7 +137,7 @@ When the observation started:
 .. code-block:: python
 
     >>> iris_sji.meta['STARTOBS']   # doctest: +REMOTE_DATA
-    <Time object: scale='utc' format='isot' value=2021-10-01T06:09:24.920>
+    '2021-10-01T06:09:24.920'
 
 It possible it might be in a ``"DATE_OBS"`` instead.
 
@@ -142,12 +146,10 @@ The exposure times:
 .. code-block:: python
 
     >>> iris_sji.exposure_time   # doctest: +REMOTE_DATA
-    <ndcube.extra_coords.extra_coords.ExtraCoords object at ...>
-    ExtraCoords(exposure time (0) None: QuantityTableCoordinate ['exposure time'] [None]:
     <Quantity [0.50031197, 0.50025398, 0.50023699, 0.50024003, 0.50023901,
                0.50028503, 0.50024903, 0.500269  , 0.50026202, 0.500247  ,
                0.50029403, 0.50021601, 0.50028402, 0.50023901, 0.50024903,
-               0.50025803, 0.500283  , 0.50029802, 0.50029498, 0.50027299] s>)
+               0.50025803, 0.500283  , 0.50029802, 0.50029498, 0.50027299] s>
 
 In most cases, the exposure times are fixed for all scans in a raster.
 However, when automatic exposure compensation (AEC) is switched on and there is a very energetic event (e.g. a flare), IRIS will automatically use a lower exposure time to prevent saturation in the detectors.
@@ -160,33 +162,57 @@ To get arrays of timestamps, or exposure times or "xcenix", that information wil
 
     >>> iris_sji.extra_coords  # doctest: +REMOTE_DATA
     <ndcube.extra_coords.extra_coords.ExtraCoords object at ...>
-    ExtraCoords(time (0) None: TimeTableCoordinate ['time'] [None]:
-    ['2021-10-01T06:09:25.020' '2021-10-01T06:09:31.990'
-     '2021-10-01T06:09:38.950' '2021-10-01T06:09:45.920'
-     '2021-10-01T06:09:52.920' '2021-10-01T06:09:59.890'
-     '2021-10-01T06:10:06.860' '2021-10-01T06:10:13.860'
-     '2021-10-01T06:10:20.830' '2021-10-01T06:10:27.800'
-     '2021-10-01T06:10:34.800' '2021-10-01T06:10:41.770'
-     '2021-10-01T06:10:48.740' '2021-10-01T06:10:55.740'
-     '2021-10-01T06:11:02.700' '2021-10-01T06:11:09.670'
-     '2021-10-01T06:11:16.670' '2021-10-01T06:11:23.640'
-     '2021-10-01T06:11:30.610' '2021-10-01T06:11:37.580'],
-    ...
-    exposure time (0) None: QuantityTableCoordinate ['exposure time'] [None]:
+    ExtraCoords(exposure time (0) None: QuantityTableCoordinate ['exposure time'] [None]:
     <Quantity [0.50031197, 0.50025398, 0.50023699, 0.50024003, 0.50023901,
                0.50028503, 0.50024903, 0.500269  , 0.50026202, 0.500247  ,
                0.50029403, 0.50021601, 0.50028402, 0.50023901, 0.50024903,
                0.50025803, 0.500283  , 0.50029802, 0.50029498, 0.50027299] s>,
+                obs_vrix (0) None: QuantityTableCoordinate ['obs_vrix'] [None]:
+    <Quantity [-253.13569641, -242.44810486, -231.77319336, -221.11309814,
+               -210.41799927, -199.78419495, -189.16329956, -178.50950623,
+               -167.91630554, -157.33630371, -146.72239685, -136.17030334,
+               -125.63009644, -115.05719757, -104.5714035 ,  -94.14320374,
+                -83.69550323,  -73.3214035 ,  -62.97399902,  -52.65399933] m / s>,
+                ophaseix (0) None: QuantityTableCoordinate ['ophaseix'] [None]:
+    <Quantity [0.77429509, 0.77548558, 0.77667391, 0.77786386, 0.77905941,
+               0.78024989, 0.78144038, 0.78263599, 0.78382647, 0.78501666,
+               0.78621155, 0.78740203, 0.78859252, 0.78978807, 0.79097688,
+               0.79216683, 0.79336196, 0.79455239, 0.79574287, 0.79693335] arcsec>,
+                pztx (0) None: QuantityTableCoordinate ['pztx'] [None]:
+    <Quantity [-7.97803831e+00, -3.98715830e+00,  3.72256944e-03,
+                3.99460268e+00, -7.97803831e+00, -3.98715830e+00,
+                3.72256944e-03,  3.99460268e+00, -7.97803831e+00,
+               -3.98715830e+00,  3.72256944e-03,  3.99460268e+00,
+               -7.97803831e+00, -3.98715830e+00,  3.72256944e-03,
+                3.99460268e+00, -7.97803831e+00, -3.98715830e+00,
+                3.72256944e-03,  3.99460268e+00] arcsec>,
+                pzty (0) None: QuantityTableCoordinate ['pzty'] [None]:
+    <Quantity [0.6446346 , 0.66160059, 0.67856681, 0.69553316, 0.6446346 ,
+               0.66160059, 0.67856681, 0.69553316, 0.6446346 , 0.66160059,
+               0.67856681, 0.69553316, 0.6446346 , 0.66160059, 0.67856681,
+               0.69553316, 0.6446346 , 0.66160059, 0.67856681, 0.69553316] arcsec>,
                 slit x position (0) None: QuantityTableCoordinate ['slit x position'] [None]:
     <Quantity [258.75      , 270.74543085, 282.74086427, 294.73629541,
                258.75      , 270.74543085, 282.74086427, 294.73629541,
                258.75      , 270.74543085, 282.74086427, 294.73629541,
                258.75      , 270.74543085, 282.74086427, 294.73629541,
-               258.75      , 270.74543085, 282.74086427, 294.73629541] arcsec pix>,
+               258.75      , 270.74543085, 282.74086427, 294.73629541] arcsec>,
                 slit y position (0) None: QuantityTableCoordinate ['slit y position'] [None]:
     <Quantity [254.75, 254.75, 254.75, 254.75, 254.75, 254.75, 254.75, 254.75,
                254.75, 254.75, 254.75, 254.75, 254.75, 254.75, 254.75, 254.75,
-               254.75, 254.75, 254.75, 254.75] arcsec pix>)
+               254.75, 254.75, 254.75, 254.75] arcsec>,
+                xcenix (0) None: QuantityTableCoordinate ['xcenix'] [None]:
+    <Quantity [-321.64163621, -321.64154081, -321.64054553, -321.63951873,
+               -321.5924215 , -321.59850309, -321.60135777, -321.56819773,
+               -321.55565282, -321.55661478, -321.51550993, -321.5241685 ,
+               -321.4984636 , -321.49132346, -321.47172876, -321.48122647,
+               -321.46051587, -321.41851219, -321.42161527, -321.42543197] arcsec>,
+                ycenix (0) None: QuantityTableCoordinate ['ycenix'] [None]:
+    <Quantity [390.41458808, 390.43178122, 390.44696156, 390.46218927,
+               390.40669468, 390.41598631, 390.42799954, 390.43424635,
+               390.38567211, 390.39919174, 390.41787952, 390.43324879,
+               390.40355692, 390.4319302 , 390.43515948, 390.44981385,
+               390.41605352, 390.43774154, 390.45774336, 390.47763699] arcsec>)
 
 Understanding a level 2 FITS file
 =================================
@@ -260,9 +286,6 @@ If you would like a bit more information, we have a similar function within `iri
       0  PRIMARY       1 PrimaryHDU     162   (555, 548, 20)   int16 (rescales to float32)
       1                1 ImageHDU        38   (31, 20)   float64
       2                1 TableHDU        33   20R x 5C   [A10, A10, A4, A66, A63]
-    Observation description:  Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
-    <BLANKLINE>
-    Extension No. 1 stores data and header of SJI_1330: 1310.00 - 1350.00 AA
 
 .. code-block:: python
 

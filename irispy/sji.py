@@ -1,37 +1,13 @@
+import logging
 import textwrap
-from collections import defaultdict
 
-import astropy.units as u
 import matplotlib.pyplot as plt
-import numpy as np
-from astropy.time import Time
-from ndcube.extra_coords import ExtraCoords
-
-from sunraster import SpectrogramCube, SpectrogramSequence
+from sunraster import SpectrogramCube
 
 from irispy.utils import calculate_dust_mask
-from irispy.visualization import SequencePlotter, _set_axis_colors
+from irispy.visualization import Plotter, _set_axis_colors
 
-__all__ = ["SJICube", "SJICubeSequence"]
-
-
-def _get_times(iris_map_cube):
-    instance_start = None
-    instance_end = None
-    if hasattr(iris_map_cube, "global_coords") and "time" in iris_map_cube.global_coords:
-        instance_start = iris_map_cube.global_coords["time"].min().isot
-        instance_end = iris_map_cube.global_coords["time"].max().isot
-    elif hasattr(iris_map_cube, "time") and iris_map_cube.time:
-        instance_start = iris_map_cube.time.min().isot
-        instance_end = iris_map_cube.time.max().isot
-    elif (
-        hasattr(iris_map_cube, "extra_coords")
-        and hasattr(iris_map_cube, "axis_world_coords")
-        and isinstance(iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0], Time)
-    ):
-        instance_start = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].min().isot
-        instance_end = iris_map_cube.axis_world_coords("time", wcs=iris_map_cube.extra_coords)[0].max().isot
-    return instance_start, instance_end
+__all__ = ["SJICube"]
 
 
 class SJICube(SpectrogramCube):
@@ -75,6 +51,7 @@ class SJICube(SpectrogramCube):
         self,
         data,
         wcs,
+        *,
         uncertainty=None,
         unit=None,
         meta=None,
@@ -85,6 +62,11 @@ class SJICube(SpectrogramCube):
     ):
         self.scaled = scaled
         self.dust_masked = False
+        if "_basic_wcs" in kwargs:
+            _basic_wcs = kwargs.pop("_basic_wcs")
+        else:
+            _basic_wcs = None
+        self._basic_wcs = _basic_wcs
         super().__init__(
             data,
             wcs,
@@ -100,7 +82,12 @@ class SJICube(SpectrogramCube):
         return f"{object.__repr__(self)}\n{str(self)}"
 
     def __str__(self):
-        instance_start, instance_end = _get_times(self)
+        if self.wcs.world_n_dim == 2:
+            instance_start = self.global_coords["Time (UTC)"]
+            instance_end = None
+        else:
+            instance_start = self.wcs.pixel_to_world(0, 0, 0)[-1]
+            instance_end = self.wcs.pixel_to_world(0, 0, self.data.shape[0] - 1)[-1]
         return textwrap.dedent(
             f"""
             SJICube
@@ -118,29 +105,30 @@ class SJICube(SpectrogramCube):
             Axis Types:            {self.array_axis_physical_types}
             Roll:                  {self.meta.get("SAT_ROT")}
             Cube dimensions:       {self.dimensions}
-            """
+            """,
         )
 
     def __getitem__(self, item):
         sliced_self = super().__getitem__(item)
         sliced_self.scaled = self.scaled
+        if self._basic_wcs is not None:
+            sliced_self._basic_wcs = self._basic_wcs[item]
         return sliced_self
 
-    def plot(self, *args, bypass_formatting=False, **kwargs):
+    def plot(self, *args, **kwargs):
         cmap = kwargs.get("cmap")
         if not cmap:
             try:
-                cmap = plt.get_cmap(name="irissji{}".format(int(self.meta["TWAVE1"])))
-            except Exception:
+                cmap = plt.get_cmap(name=f"irissji{int(self.meta['TWAVE1'])}")
+            except Exception as e:  # NOQA: BLE001
+                logging.debug(e)
                 cmap = "viridis"
         kwargs["cmap"] = cmap
-        ax = super().plot(*args, **kwargs)
-        if not bypass_formatting:
-            _set_axis_colors(ax)
-            ax.axes.grid()
+        ax = Plotter(ndcube=self).plot(*args, **kwargs)
+        _set_axis_colors(ax)
         return ax
 
-    def apply_dust_mask(self, undo=False):
+    def apply_dust_mask(self, *, undo=False):
         """
         Applies or undoes an update of the mask with the dust particles
         positions.
@@ -164,116 +152,9 @@ class SJICube(SpectrogramCube):
             self.mask[dust_mask] = True
             self.dust_masked = True
 
-
-def _create_extra_coords(cube):
-    extra_coords = ExtraCoords()
-    # = [("time", 0, times)]
-    coords = defaultdict(list)
-    for data in cube.data:
-        for name, value in data.global_coords.items():
-            coords[name].append(value)
-    for k, v in coords.items():
-        if k == "time":
-            v = Time(v)
-        else:
-            v = u.Quantity(v)
-        extra_coords.add(k, 0, v)
-    # extra_coords.add([name, value for name, value in coords.items()])
-    return extra_coords
-
-
-class SJICubeSequence(SpectrogramSequence):
-    """
-    Class for holding, slicing and plotting IRIS SJI data.
-
-    This class contains all the functionality of its super class with
-    some additional functionalities.
-
-    Parameters
-    ----------
-    data_list: `list`
-        List of `SJICube` objects from the same OBS ID.
-    meta: `dict` or header object, optional
-        Metadata associated with the sequence.
-    common_axis: `int`, optional
-        The axis of the NDCubes corresponding to time.
-    """
-
-    plotter = SequencePlotter
-
-    def __init__(self, data_list, meta=None, common_axis=0, times=None):
-        super().__init__(data_list, meta=meta, common_axis=common_axis)
-        self.time = times
-        self._extra_coords = _create_extra_coords(self)
-        self._data = np.stack(list(data.data for data in data_list))
-
-    def __repr__(self):
-        return f"{object.__repr__(self)}\n{str(self)}"
-
-    def __str__(self):
-        instance_start, instance_end = _get_times(self)
-        return textwrap.dedent(
-            f"""
-            SJICubeSequence
-            ---------------
-            Observatory:     {self.meta.get("TELESCOP")}
-            Instrument:      {self.meta.get("INSTRUME")}
-            OBS ID:          {self.meta.get("OBSID")}
-            OBS Description: {self.meta.get("OBS_DESC")}
-            OBS period:      {self.meta.get("STARTOBS")} -- {self.meta.get("ENDOBS")}
-            Sequence period: {instance_start} -- {instance_end}
-            Sequence Shape:  {self.dimensions}
-            Axis Types:      {self.array_axis_physical_types}
-            Roll:            {self.meta.get("SAT_ROT")}
-            """
-        )
-
-    def apply_dust_mask(self, undo=False):
+    @property
+    def basic_wcs(self):
         """
-        Applies or undoes an update of all the masks with the dust particles
-        positions.
-
-        Rewrites all data with/without the dust positions.
-
-        Parameters
-        ----------
-        undo: `bool`, optional
-            If `False` (default), dust particles positions masks will be applied.
-            If `True`, dust particles positions masks will be removed.
+        Returns a standard WCS instead of gWCS.
         """
-        for cube in self.data:
-            cube.apply_dust_mask(undo=undo)
-
-    @property
-    def time(self):
-        return self._time
-
-    @time.setter
-    def time(self, times):
-        self._time = times
-
-    @property
-    def exposure_time(self):
-        return self._extra_coords["exposure time"]
-
-    @property
-    def extra_coords(self):
-        return self._extra_coords
-
-    @property
-    def data_as_array(self):
-        return self._data
-
-    def plot(self, *args, bypass_formatting=False, **kwargs):
-        cmap = kwargs.get("cmap")
-        if not cmap:
-            try:
-                cmap = plt.get_cmap(name="irissji{}".format(int(self.meta["TWAVE1"])))
-            except Exception:
-                cmap = "viridis"
-        kwargs["cmap"] = cmap
-        ax = super().plot(self, *args, **kwargs)
-        if not bypass_formatting:
-            _set_axis_colors(ax)
-            ax.axes.grid()
-        return ax
+        return self._basic_wcs

@@ -22,7 +22,7 @@ EXPOSURE_TIME = np.zeros(3) + single_exposure_time
 
 
 @pytest.mark.parametrize(
-    "data_arrays, old_unit, new_unit, expected_data_arrays, expected_unit",
+    ("data_arrays", "old_unit", "new_unit", "expected_data_arrays", "expected_unit"),
     [
         (
             [SOURCE_DATA_DN, SOURCE_DATA_DN],

@@ -52,7 +52,7 @@ def image_clipping(image, cutoff=1.5e-3, gamma=1.0):
         fak = nbins / (hmax - hmin)
         hist = np.histogram((image - hmin) * fak, range=(0.0, float(nbins)), bins=nbins)
     h = hist[0]
-    bin = hist[1]
+    bins = hist[1]
     nh = np.size(h)
     # Integrate the histogram so that h(i) holds the number of points
     # with equal or lower intensity.
@@ -68,8 +68,8 @@ def image_clipping(image, cutoff=1.5e-3, gamma=1.0):
     # Note that the bottom value is taken off (addition of h[0] to cutoff),
     # there are often very many points in IRIS images that are set to zero, this
     # removes them from calculation... and seems to work.
-    vmin = (np.max(np.where(h <= (cutoff + h[0]), bin[1:] - bin[0], 0)) / fak + hmin) ** gamma
-    vmax = (np.min(np.where(h >= (1.0 - cutoff), bin[1:] - bin[0], nh - 2)) / fak + hmin) ** gamma
+    vmin = (np.max(np.where(h <= (cutoff + h[0]), bins[1:] - bins[0], 0)) / fak + hmin) ** gamma
+    vmax = (np.min(np.where(h >= (1.0 - cutoff), bins[1:] - bins[0], nh - 2)) / fak + hmin) ** gamma
     return vmin, vmax
 
 
@@ -149,10 +149,7 @@ def get_interpolated_effective_area(time_obs, response_version, detector_type, o
         eff_area.to(eff_area_interp_base_unit**2).value,
         s=0,
     )
-    eff_area_interp = interpolate.splev(obs_wavelength.to(eff_area_interp_base_unit).value, tck) * (
-        eff_area_interp_base_unit**2
-    )
-    return eff_area_interp
+    return interpolate.splev(obs_wavelength.to(eff_area_interp_base_unit).value, tck) * eff_area_interp_base_unit**2
 
 
 def calculate_dust_mask(data_array):

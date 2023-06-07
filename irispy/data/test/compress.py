@@ -13,11 +13,11 @@ def compress(files: list) -> None:
             hdu.verify("fix")
             # TODO; why is this here?
             if "CADPL_DV" in hdu.header:
-                print(hdu.header["CADPL_DV"])
+                print(hdu.header["CADPL_DV"])  # NOQA: T201
                 del hdu.header["CADPL_DV"]
             # TODO; why is this here?
             if "CADEX_DV" in hdu.header:
-                print(hdu.header["CADEX_DV"])
+                print(hdu.header["CADEX_DV"])  # NOQA: T201
                 del hdu.header["CADEX_DV"]
             if hdu.data is None:
                 continue

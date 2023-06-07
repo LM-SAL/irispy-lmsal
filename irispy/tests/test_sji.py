@@ -2,7 +2,20 @@ import astropy.units as u
 import numpy as np
 
 AXIS = [
-    ("meta.obs.sequence",),
+    (
+        "custom:pos.helioprojective.lon",
+        "custom:pos.helioprojective.lat",
+        "time",
+        "custom:CUSTOM",
+        "custom:CUSTOM",
+        "custom:CUSTOM",
+        "custom:CUSTOM",
+        "custom:CUSTOM",
+        "custom:CUSTOM",
+        "custom:CUSTOM",
+        "custom:CUSTOM",
+        "custom:CUSTOM",
+    ),
     ("custom:pos.helioprojective.lon", "custom:pos.helioprojective.lat"),
     ("custom:pos.helioprojective.lon", "custom:pos.helioprojective.lat"),
 ]

@@ -1,3 +1,4 @@
+import logging
 import tarfile
 from pathlib import Path
 
@@ -19,17 +20,17 @@ def fitsinfo(filename):
     with fits.open(filename) as hdulist:
         hdulist.info()
         hdr = hdulist[0].header
-        print("Observation description: ", hdr["OBS_DESC"], "\n")
+        logging.info(f"Observation description: {hdr['OBS_DESC']}")
         nwin = hdr["NWIN"]
         modifier = ""
         for i in range(nwin):
-            print(f"Extension No. {i+1} stores data and header of {hdr[f'TDESC{i+1}']}: ", end="")
-            if "SJI" not in hdr["TDET{}".format(i + 1)]:
+            logging.info(f"Extension No. {i+1} stores data and header of {hdr[f'TDESC{i+1}']}: ")
+            if "SJI" not in hdr[f"TDET{i + 1}"]:
                 modifier = f" ({hdr[f'TDET{i+1}'][0:3]})"
-            print(f"{hdr[f'TWMIN{i+1}']:.2f} - {hdr[f'TWMAX{i+1}']:.2f} AA" + modifier)
+            logging.info(f"{hdr[f'TWMIN{i+1}']:.2f} - {hdr[f'TWMAX{i+1}']:.2f} AA" + modifier)
 
 
-def read_files(filename, spectral_windows=None, uncertainty=False, memmap=False):
+def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=False):
     """
     A wrapper function to read a raster or SJI level 2 data file.
 
@@ -39,7 +40,7 @@ def read_files(filename, spectral_windows=None, uncertainty=False, memmap=False)
 
     Parameters
     ----------
-    filename : `list of `str`, `str`
+    filename : `list of `str`, `str`, `pathlib.Path`
         Filename(s) to load.
         If given a string, will load that file.
         If given a list of strings, it will check they are all raster files and load them.
@@ -62,7 +63,9 @@ def read_files(filename, spectral_windows=None, uncertainty=False, memmap=False)
     from irispy.io.sji import read_sji_lvl2
     from irispy.io.spectrograph import read_spectrograph_lvl2
 
-    if isinstance(filename, str):
+    if isinstance(filename, Path):
+        filename = str(filename)
+    if isinstance(filename, (str, Path)):
         if tarfile.is_tarfile(filename):
             path = Path(filename.replace(".tar.gz", ""))
             path.mkdir(parents=True, exist_ok=True)
@@ -71,19 +74,19 @@ def read_files(filename, spectral_windows=None, uncertainty=False, memmap=False)
                 filename = [path / file for file in tar.getnames()]
         else:
             filename = [filename]
-
     intrume = fits.getval(filename[0], "INSTRUME")
     all_instrume = [fits.getval(f, "INSTRUME") for f in filename]
-    if not all([intrume == i for i in all_instrume]):
+    if not all(intrume == i for i in all_instrume):
         raise ValueError("You cannot mix raster and SJI files.")
-
     if intrume == "SJI":
         if len(filename) > 1:
             raise ValueError("You cannot load more than one SJI file at a time.")
         return read_sji_lvl2(filename[0], memmap=memmap, uncertainty=uncertainty)
-    elif intrume == "SPEC":
+    if intrume == "SPEC":
         return read_spectrograph_lvl2(
-            filename, spectral_windows=spectral_windows, memmap=memmap, uncertainty=uncertainty
+            filename,
+            spectral_windows=spectral_windows,
+            memmap=memmap,
+            uncertainty=uncertainty,
         )
-    else:
-        raise ValueError(f"Unsupported instrument: {intrume}")
+    raise ValueError(f"Unsupported instrument: {intrume}")

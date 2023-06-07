@@ -59,7 +59,7 @@ If you would like to get into touch with someone who works on ``irispy-lmsal`` *
           :maxdepth: 1
 
           contributing
-          code_api/index
+          reference/index
           changelog
 
 .. _Interface Region Imaging Spectrograph: https://iris.lmsal.com/
