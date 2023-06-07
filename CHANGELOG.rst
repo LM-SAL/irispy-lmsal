@@ -1,19 +1,22 @@
-0.1.3 (2022-05-22)
+0.2.0 (2023-06-06)
 ==================
 
 Features
 --------
 
-- Added V5 and V6 support for  ``get_iris_response``.
-  It also does not download the files anymore.
+- Add support for V34 files.
 
 Breaking Changes
 ----------------
 
-- API of ``get_iris_response`` has changed:
-  ``pre_launch`` has gone, use ``response_version=2`` instead.
-  ``response_file`` keyword has been removed, it will use files provided by the package instead.
-  ``force_download`` was removed as the function now does not download any files.
+- SJI data is now stored using a gWCS.
+- All keywords have to passed by name into to all functions now.
+- Dropped Python 3.8 support.
+
+Internal Changes
+----------------
+- Templated to remove setup.py and setup.cfg
+- Tweaks to documentation.
 
 0.1.2 (2022-05-02)
 ==================

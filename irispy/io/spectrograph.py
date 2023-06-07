@@ -22,7 +22,7 @@ def _pc_matrix(lam, angle_1, angle_2):
     return angle_1, -1 * lam * angle_2, 1 / lam * angle_2, angle_1
 
 
-def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, memmap=False):
+def read_spectrograph_lvl2(filenames, *, spectral_windows=None, uncertainty=False, memmap=False, revert_v34=False):
     """
     Reads IRIS level 2 spectrograph FITS from an OBS into an
     `.IRISSpectrograph` instance.
@@ -44,6 +44,9 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
         the file into memory when needed. This option is faster and uses a
         lot less memory. However, because FITS scaling is not done on-the-fly,
         the data units will be unscaled, not the usual data numbers (DN).
+    revert_v34 : `bool`, optional.
+        Will undo the data and WCS flipping made to V34 observations.
+        Defaults to `False`.
 
     Returns
     -------
@@ -60,9 +63,10 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
 
     # Collecting the window observations
     with fits.open(filenames[0], memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
+        v34 = True if hdulist[0].header["OBSID"].startswith("34") else False
         hdulist.verify("silentfix")
         windows_in_obs = np.array(
-            [hdulist[0].header["TDESC{0}".format(i)] for i in range(1, hdulist[0].header["NWIN"] + 1)]
+            [hdulist[0].header[f"TDESC{i}"] for i in range(1, hdulist[0].header["NWIN"] + 1)],
         )
         # If spectral_window is not set then get every window.
         # Else take the appropriate windows
@@ -77,17 +81,18 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
             spectral_windows_req = np.asarray(spectral_windows_req, dtype="U")
             window_is_in_obs = np.asarray([window in windows_in_obs for window in spectral_windows_req])
             if not all(window_is_in_obs):
-                missing_windows = window_is_in_obs == False
+                missing_windows = window_is_in_obs is False
                 raise ValueError(f"Spectral windows {spectral_windows[missing_windows]} not in file {filenames[0]}")
             window_fits_indices = np.nonzero(np.in1d(windows_in_obs, spectral_windows))[0] + 1
-        data_dict = dict([(window_name, list()) for window_name in spectral_windows_req])
+        data_dict = {window_name: [] for window_name in spectral_windows_req}
 
     for filename in filenames:
         with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
             hdulist.verify("silentfix")
             # Extract axis-aligned metadata.
             times = Time(hdulist[0].header["STARTOBS"]) + TimeDelta(
-                hdulist[-2].data[:, hdulist[-2].header["TIME"]], format="sec"
+                hdulist[-2].data[:, hdulist[-2].header["TIME"]],
+                format="sec",
             )
             fov_center = SkyCoord(
                 Tx=hdulist[-2].data[:, hdulist[-2].header["XCENIX"]],
@@ -120,9 +125,7 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                 # In this case, set CDELT to a small number.
                 header = copy(hdulist[window_fits_indices[i]].header)
                 # Account for a slit offset (POFFYNUV (45) or POFFYFUV (34))
-                idx = 45
-                if meta.spectral_band == "FUV":
-                    idx = 34
+                idx = 34 if meta.spectral_band == "FUV" else 45
                 header["CRVAL3"] -= hdulist[-2].data[:, idx].mean() * (SLIT_WIDTH.value / 2)
                 if header["CDELT3"] == 0:
                     header["CDELT3"] = 1e-10
@@ -137,11 +140,11 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                     header["PC3_3"] = ang4
                 try:
                     wcs = WCS(header)
-                except Exception as e:
+                except Exception as e:  # NOQA: BLE001
                     logging.warning(
-                        f"WCS failed to load while reading one step of the raster due to {e}"
-                        " The loading will continue but this will be missing in the final cube."
-                        f" Spectral window: {window_name}, step {i} in file: {filename}"
+                        f"WCS failed to load while reading one step of the raster due to {e} "
+                        "The loading will continue but this will be missing in the final cube. "
+                        f"Spectral window: {window_name}, step {i} in file: {filename}",
                     )
                     continue
                 out_uncertainty = None
@@ -150,10 +153,21 @@ def read_spectrograph_lvl2(filenames, spectral_windows=None, uncertainty=False, 
                     data_mask = hdulist[window_fits_indices[i]].data == -200.0
                 if uncertainty:
                     out_uncertainty = calculate_uncertainty(
-                        hdulist[window_fits_indices[i]].data, readout_noise, DN_UNIT
+                        hdulist[window_fits_indices[i]].data,
+                        readout_noise,
+                        DN_UNIT,
                     )
+                if v34 and not revert_v34:
+                    data = np.flip(hdulist[window_fits_indices[i]].data, axis=0)
+                    header["PC2_3"] = -header["PC2_3"]
+                    header["PC3_2"] = -header["PC3_2"]
+                    header["CDELT3"] = np.abs(header["CDELT3"])
+                    header["CRPIX3"] = header["NAXIS3"] - header["CRPIX3"] + 1
+                    wcs = WCS(header)
+                else:
+                    data = hdulist[window_fits_indices[i]].data
                 cube = SpectrogramCube(
-                    hdulist[window_fits_indices[i]].data,
+                    data,
                     wcs=wcs,
                     uncertainty=out_uncertainty,
                     unit=DN_unit,

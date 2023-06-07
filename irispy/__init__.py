@@ -1,10 +1,9 @@
 """
+============
 irispy-lmsal
 ============
 """
 
-from .sji import *  # NOQA
-from .spectrograph import *  # NOQA
-from .version import version as __version__
-
-__all__ = ["__version__"]
+from .sji import *  # NOQA: F403
+from .spectrograph import *  # NOQA: F403
+from .version import version as __version__  # NOQA: F401

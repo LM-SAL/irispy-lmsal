@@ -42,7 +42,7 @@ def convert_between_DN_and_photons(old_data_arrays, old_unit, new_unit):
         Unit of new data arrays with any inverse time component preserved.
     """
     if old_unit == new_unit or old_unit == new_unit / u.s:
-        new_data_arrays = [data for data in old_data_arrays]
+        new_data_arrays = list(old_data_arrays)
         new_unit_time_accounted = old_unit
     else:
         # During calculations, the time component due to exposure
@@ -68,6 +68,7 @@ def convert_or_undo_photons_per_sec_to_radiance(
     detector_type,
     spectral_dispersion_per_pixel,
     solid_angle,
+    *,
     undo=False,
 ):
     """
@@ -113,7 +114,7 @@ def convert_or_undo_photons_per_sec_to_radiance(
                 raise ValueError(
                     "Invalid unit provided.  As kwarg undo=True, "
                     "unit must be equivalent to {}.  Error found for {}th element "
-                    "of data_quantities. Unit: {}".format(RADIANCE_UNIT, i, data.unit)
+                    "of data_quantities. Unit: {}".format(RADIANCE_UNIT, i, data.unit),
                 )
     else:
         for data in data_quantities:
@@ -121,7 +122,7 @@ def convert_or_undo_photons_per_sec_to_radiance(
                 raise ValueError(
                     "Invalid unit provided.  As kwarg undo=False, "
                     "unit must be equivalent to {}.  Error found for {}th element "
-                    "of data_quantities. Unit: {}".format(u.photon / u.s, i, data.unit)
+                    "of data_quantities. Unit: {}".format(u.photon / u.s, i, data.unit),
                 )
     photons_per_sec_to_radiance_factor = calculate_photons_per_sec_to_radiance_factor(
         time_obs,
@@ -134,7 +135,8 @@ def convert_or_undo_photons_per_sec_to_radiance(
     # Change shape of arrays so they are compatible for broadcasting
     # with data and uncertainty arrays.
     photons_per_sec_to_radiance_factor = reshape_1D_wavelength_dimensions_for_broadcast(
-        photons_per_sec_to_radiance_factor, data_quantities[0].ndim
+        photons_per_sec_to_radiance_factor,
+        data_quantities[0].ndim,
     )
     # Perform (or undo) radiometric conversion.
     if undo is True:
@@ -188,7 +190,10 @@ def calculate_photons_per_sec_to_radiance_factor(
     """
     # Get effective area and interpolate to observed wavelength grid.
     eff_area_interp = get_interpolated_effective_area(
-        time_obs, response_version, detector_type, obs_wavelength=wavelength
+        time_obs,
+        response_version,
+        detector_type,
+        obs_wavelength=wavelength,
     )
     # Return radiometric conversed data assuming input data is in units of photons/s.
     return (

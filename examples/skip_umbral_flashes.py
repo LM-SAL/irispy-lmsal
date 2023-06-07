@@ -6,7 +6,6 @@ Umbral flashes analysis
 In this example, we are going to work with spectra and slit-jaw
 images to study an example of dynamical phenomena called umbral flashes.
 """
-# sphinx_gallery_thumbnail_number = 4
 
 import astropy.units as u
 import matplotlib.dates as mdates
@@ -43,7 +42,7 @@ sji_filename = pooch.retrieve(
 
 # Note that when ``memmap=True``, the data values are read from the FITS file
 # directly without the scaling to Float32, the data values are no longer in DN,
-# but in scaled integer units that start at −2$^{16}$/2.
+# but in scaled integer units that start at -2$^{16}$/2.
 raster = read_files(raster_filename, memmap=True, uncertainty=False)
 sji_1400 = read_files(sji_filename, memmap=True, uncertainty=False)
 
@@ -108,7 +107,7 @@ plt.show()
 # time array for the 1400 SJI.
 
 # We will take the first 50 to cut down on the size of the data for this example.
-# This also lines up with the amount of data from the raster.
+# This is memory intensive and that an upstream bug needs to be fixed.
 times_sji = sji_1400.time[:50]
 
 ###############################################################################
@@ -118,7 +117,7 @@ times_sji = sji_1400.time[:50]
 plt.figure()
 plt.plot(mg_ii_times, mg_ii.data[:200, 220, 103], label="Mg II k3")
 plt.plot(c_ii_times, c_ii.data[:200, 220, 90], label="C II")
-(ax,) = plt.plot(times_sji, sji_1400.data_as_array[:50, 190, 220], label="1400 SJI")
+(ax,) = plt.plot(times_sji, sji_1400.data[:50, 190, 220], label="1400 SJI")
 plt.legend()
 plt.ylabel("Counts (Memory Mapped Value)")
 plt.xlabel("Time (UTC)")

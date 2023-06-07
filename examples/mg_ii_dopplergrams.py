@@ -9,7 +9,6 @@ The Dopplergram is obtained by subtracting the intensities at symmetrical veloci
 This very large dense raster took more than three hours to complete the 400 scans (30 s exposures), which means that the spacecraft's orbital velocity changes during the observations.
 This means that any precise wavelength calibration will need to correct for those shifts.
 """
-# sphinx_gallery_thumbnail_number = 5
 import tarfile
 
 import astropy.units as u
@@ -42,7 +41,7 @@ downloaded_tar_iris_file = pooch.retrieve(
 # Now to open the file using ``irispy-lmsal``.
 # Note that when ``memmap=True``, the data values are read from the FITS file
 # directly without the scaling to Float32, the data values are no longer in DN,
-# but in scaled integer units that start at −2$^{16}$/2.
+# but in scaled integer units that start at -2$^{16}$/2.
 
 raster = read_files(downloaded_tar_iris_file, memmap=True, uncertainty=False)
 

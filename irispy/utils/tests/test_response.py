@@ -1,4 +1,4 @@
-import os.path
+from pathlib import Path
 
 import numpy as np
 import numpy.testing as np_test
@@ -10,9 +10,8 @@ from irispy import utils
 from irispy.data.test import rootdir
 
 # Arrays for the fit_iris_xput method
-r = os.path.join(rootdir, "..", "iris_sra_c_20161022.geny")
-raw_response_data = scipy.io.readsav(r, python_dict=True, verbose=False)
-iris_response = dict([(name, raw_response_data["p0"][name][0]) for name in raw_response_data["p0"].dtype.names])
+raw_response_data = scipy.io.readsav(Path(rootdir) / ".." / "iris_sra_c_20161022.geny", python_dict=True, verbose=False)
+iris_response = {name: raw_response_data["p0"][name][0] for name in raw_response_data["p0"].dtype.names}
 time_obs = [parse_time("2013-09-03")]
 time_cal_coeffs0 = parse_time(iris_response.get("C_F_TIME"), format="utime")
 time_cal_coeffs1 = parse_time(iris_response.get("C_N_TIME"), format="utime")
@@ -39,21 +38,21 @@ def test_get_iris_response_greater_than_6():
 
 # Tests for get_iris_response function
 # Version 1
-sav_file_path1 = os.path.join(rootdir, "idl_iris_get_response_20130903_new_version001.sav")
+sav_file_path1 = Path(rootdir) / "idl_iris_get_response_20130903_new_version001.sav"
 test_iris_response1 = scipy.io.readsav(sav_file_path1, python_dict=True, verbose=False)
 iris_response_load1 = test_iris_response1["iris_response"][0]
 area_sg_load1 = iris_response_load1.area_sg
 area_sji_load1 = iris_response_load1.area_sji
 
 # Version 2
-sav_file_path2 = os.path.join(rootdir, "idl_iris_get_response_20130903_new_version002.sav")
+sav_file_path2 = Path(rootdir) / "idl_iris_get_response_20130903_new_version002.sav"
 test_iris_response2 = scipy.io.readsav(sav_file_path2, python_dict=True, verbose=False)
 iris_response_load2 = test_iris_response2["iris_response"][0]
 area_sg_load2 = iris_response_load2.area_sg
 area_sji_load2 = iris_response_load2.area_sji
 
 # Version 3
-sav_file_path3 = os.path.join(rootdir, "idl_iris_get_response_20130903_new_version003.sav")
+sav_file_path3 = Path(rootdir) / "idl_iris_get_response_20130903_new_version003.sav"
 
 test_iris_response3 = scipy.io.readsav(sav_file_path3, python_dict=True, verbose=False)
 iris_response_load3 = test_iris_response3["iris_response"][0]
@@ -61,21 +60,21 @@ area_sg_load3 = iris_response_load3.area_sg
 area_sji_load3 = iris_response_load3.area_sji
 
 # Version 4
-sav_file_path4 = os.path.join(rootdir, "idl_iris_get_response_20130903_new_version004.sav")
+sav_file_path4 = Path(rootdir) / "idl_iris_get_response_20130903_new_version004.sav"
 test_iris_response4 = scipy.io.readsav(sav_file_path4, python_dict=True, verbose=False)
 iris_response_load4 = test_iris_response4["iris_response"][0]
 area_sg_load4 = iris_response_load4.area_sg
 area_sji_load4 = iris_response_load4.area_sji
 
 # Version 5
-sav_file_path5 = os.path.join(rootdir, "idl_iris_get_response_20130903_new_version005.sav")
+sav_file_path5 = Path(rootdir) / "idl_iris_get_response_20130903_new_version005.sav"
 test_iris_response5 = scipy.io.readsav(sav_file_path5, python_dict=True, verbose=False)
 iris_response_load5 = test_iris_response5["iris_response"][0]
 area_sg_load5 = iris_response_load5.area_sg
 area_sji_load5 = iris_response_load5.area_sji
 
 # Version 6
-sav_file_path6 = os.path.join(rootdir, "idl_iris_get_response_20130903_new_version006.sav")
+sav_file_path6 = Path(rootdir) / "idl_iris_get_response_20130903_new_version006.sav"
 test_iris_response6 = scipy.io.readsav(sav_file_path6, python_dict=True, verbose=False)
 iris_response_load6 = test_iris_response6["iris_response"][0]
 area_sg_load6 = iris_response_load6.area_sg
@@ -113,7 +112,7 @@ def test_get_iris_response_version6(iris_responsev6):
 
 
 @pytest.mark.parametrize(
-    "input_arrays, expected_array",
+    ("input_arrays", "expected_array"),
     [
         ([time_obs, time_cal_coeffs0, cal_coeffs0], iris_fit_expected0),
         ([time_obs, time_cal_coeffs0, cal_coeffs1], iris_fit_expected1),
@@ -133,7 +132,7 @@ def test_fit_iris_xput(input_arrays, expected_array):
 
 
 def test_fixed_time():
-    sav_file_path6 = os.path.join(rootdir, "test_response.sav")
+    sav_file_path6 = Path(rootdir) / "test_response.sav"
     response = scipy.io.readsav(sav_file_path6, python_dict=True, verbose=False)
     response = response["test"][0]
     area_sg = response.area_sg

@@ -16,7 +16,7 @@ SOURCE_DATA_DN = np.array(
     [
         [[0.563, 1.132, -1.343], [-0.719, 1.441, 1.566]],
         [[0.563, 1.132, -1.343], [-0.719, 1.441, 1.566]],
-    ]
+    ],
 )
 SOURCE_UNCERTAINTY_DN = np.sqrt(SOURCE_DATA_DN)
 # Arrays relating SOURCE_DATA_DN to photons in NUV and FUV
@@ -24,13 +24,13 @@ SOURCE_DATA_PHOTONS_NUV = np.array(
     [
         [[10.134, 20.376, -24.174], [-12.942, 25.938, 28.188]],
         [[10.134, 20.376, -24.174], [-12.942, 25.938, 28.188]],
-    ]
+    ],
 )
 SOURCE_DATA_PHOTONS_FUV = np.array(
     [
         [[2.252, 4.528, -5.372], [-2.876, 5.764, 6.264]],
         [[2.252, 4.528, -5.372], [-2.876, 5.764, 6.264]],
-    ]
+    ],
 )
 SOURCE_UNCERTAINTY_PHOTONS_NUV = np.sqrt(SOURCE_DATA_PHOTONS_NUV)
 SOURCE_UNCERTAINTY_PHOTONS_FUV = np.sqrt(SOURCE_DATA_PHOTONS_FUV)
@@ -144,7 +144,6 @@ spectrogram_photon_per_s1 = SpectrogramCube(
     SOURCE_UNCERTAINTY_PHOTONS_FUV / single_exposure_time,
     u.photon / u.s,
     meta0,
-    extra_coords1,
 )
 spectrogram_DN0.extra_coords.add(*extra_coords0[0])
 spectrogram_DN0.extra_coords.add(*extra_coords0[1])
@@ -198,7 +197,8 @@ sequence_photon = SpectrogramCubeSequence([spectrogram_photon0, spectrogram_phot
 sequence_DN_per_s = SpectrogramCubeSequence([spectrogram_DN_per_s0, spectrogram_DN_per_s1], meta_seq)
 sequence_photon_per_s = SpectrogramCubeSequence([spectrogram_photon_per_s0, spectrogram_photon_per_s1], meta_seq)
 sequence_photon_per_s_per_s = SpectrogramCubeSequence(
-    [spectrogram_photon_per_s_per_s0, spectrogram_photon_per_s1], meta_seq
+    [spectrogram_photon_per_s_per_s0, spectrogram_photon_per_s1],
+    meta_seq,
 )
 sequence_photon_s = SpectrogramCubeSequence([spectrogram_photon_s0, spectrogram_photon_s1], meta_seq)
 
