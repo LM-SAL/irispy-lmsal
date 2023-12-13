@@ -30,14 +30,15 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Physics",
 ]
 dependencies = [
-  'dkist>=1.0.0b13',
+  'dkist>=1.0.0',
   'ndcube>=2.1.2',
   'pandas>=1.3.3',
   'scipy>=1.7.0',
-  'sunpy>=4.0.0',
+  'sunpy>=5.0.0',
   'sunraster>=0.4.0',
 ]
 
@@ -51,9 +52,11 @@ repository = "https://github.com/LM-SAL/irispy-lmsal"
 [project.optional-dependencies]
 all = ["irispy-lmsal"]
 tests = [
+  "irispy-lmsal[all]",
   'pytest-astropy',
 ]
 docs = [
+  "irispy-lmsal[all]",
   'aiapy',
   'pooch',
   'sphinx',
@@ -65,7 +68,7 @@ docs = [
   'sphinx-hoverxref',
   'sunpy-sphinx-theme',
 ]
-dev = ["irispy-lmsal[all,tests,docs]"]
+dev = ["irispy-lmsal[tests,docs]"]
 
 [tool.setuptools_scm]
 write_to = "irispy/_version.py"
