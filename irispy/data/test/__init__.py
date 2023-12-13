@@ -1,7 +1,6 @@
 """
 IRISPy test data files.
 """
-import glob
 from pathlib import Path
 
 from astropy.utils.data import get_pkg_data_filename
@@ -11,7 +10,7 @@ import irispy
 __all__ = ["rootdir", "file_list", "get_test_filepath"]
 
 rootdir = Path(irispy.__file__).parent / "data" / "test"
-file_list = glob.glob(str(Path(rootdir) / "*.[!p]*"))
+file_list = str(Path(rootdir).glob("/*.[!p]*"))
 
 
 def get_test_filepath(filename, **kwargs):

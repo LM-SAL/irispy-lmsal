@@ -79,7 +79,7 @@ class SJICube(SpectrogramCube):
         )
 
     def __repr__(self):
-        return f"{object.__repr__(self)}\n{str(self)}"
+        return f"{object.__repr__(self)}\n{self!s}"
 
     def __str__(self):
         if self.wcs.world_n_dim == 2:

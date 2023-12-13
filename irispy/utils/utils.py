@@ -174,8 +174,7 @@ def calculate_dust_mask(data_array):
     mask[(data_array < 0.5) & (data_array > -200)] = True
     # Extending the mask to avoid the neighbours pixel influenced by the dust pixels.
     struct = np.array([np.zeros((3, 3)), np.ones((3, 3)), np.zeros((3, 3))], dtype=bool)
-    mask = ndimage.binary_dilation(mask, structure=struct).astype(mask.dtype)
-    return mask
+    return ndimage.binary_dilation(mask, structure=struct).astype(mask.dtype)
 
 
 def calculate_uncertainty(data: np.array, readout_noise: u.Quantity, unit: u.Quantity) -> float:

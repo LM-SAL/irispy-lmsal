@@ -111,7 +111,7 @@ class ObsID(dict):
         # here choose between tables
         version = int(str(obsid)[:2])
         if version not in versions:
-            raise ValueError("Invalid OBS ID: two first digits must one of" " {}".format(versions))
+            raise ValueError("Invalid OBS ID: two first digits must one of" f" {versions}")
         obsid = int(str(obsid)[2:])  # version digits are no longer needed
         table1 = pd.read_csv(resource_filename("irispy", "data/v%i-table10.csv" % version))
         table2 = pd.read_csv(resource_filename("irispy", "data/v%i-table2000.csv" % version))

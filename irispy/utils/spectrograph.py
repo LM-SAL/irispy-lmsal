@@ -113,16 +113,16 @@ def convert_or_undo_photons_per_sec_to_radiance(
             if not data.unit.is_equivalent(RADIANCE_UNIT):
                 raise ValueError(
                     "Invalid unit provided.  As kwarg undo=True, "
-                    "unit must be equivalent to {}.  Error found for {}th element "
-                    "of data_quantities. Unit: {}".format(RADIANCE_UNIT, i, data.unit),
+                    f"unit must be equivalent to {RADIANCE_UNIT}.  Error found for {i}th element "
+                    f"of data_quantities. Unit: {data.unit}",
                 )
     else:
         for data in data_quantities:
             if data.unit != u.photon / u.s:
                 raise ValueError(
                     "Invalid unit provided.  As kwarg undo=False, "
-                    "unit must be equivalent to {}.  Error found for {}th element "
-                    "of data_quantities. Unit: {}".format(u.photon / u.s, i, data.unit),
+                    f"unit must be equivalent to {u.photon / u.s}.  Error found for {i}th element "
+                    f"of data_quantities. Unit: {data.unit}",
                 )
     photons_per_sec_to_radiance_factor = calculate_photons_per_sec_to_radiance_factor(
         time_obs,
@@ -185,7 +185,11 @@ def calculate_photons_per_sec_to_radiance_factor(
     Returns
     -------
     `astropy.units.Quantity`
-        Mutliplicative conversion factor from counts/s to radiance units
+        # The term "multiplicative" refers to the fact that the conversion factor calculated by the
+        # `calculate_photons_per_sec_to_radiance_factor` function is used to multiply the counts per
+        # second (cps) data to obtain the radiance data. In other words, the conversion factor is a
+        # scaling factor that is applied to the cps data to convert it to radiance units.
+        Multiplicative conversion factor from counts/s to radiance units
         for input wavelengths.
     """
     # Get effective area and interpolate to observed wavelength grid.

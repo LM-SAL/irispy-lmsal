@@ -103,7 +103,7 @@ class SpectrogramCube(SpecCube):
         )
 
     def __repr__(self):
-        return f"{object.__repr__(self)}\n{str(self)}"
+        return f"{object.__repr__(self)}\n{self!s}"
 
     def __str__(self):
         instance_start = None
@@ -353,7 +353,7 @@ class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
         )
 
     def __repr__(self):
-        return f"{object.__repr__(self)}\n{str(self)}"
+        return f"{object.__repr__(self)}\n{self!s}"
 
     def _construct_time(self, key):
         val = self.get(key)

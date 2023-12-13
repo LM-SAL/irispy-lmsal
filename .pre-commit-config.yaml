@@ -1,32 +1,32 @@
 repos:
   - repo: https://github.com/myint/docformatter
-    rev: v1.7.2-rc7
+    rev: v1.7.5
     hooks:
       - id: docformatter
         args: [--in-place, --pre-summary-newline, --make-summary-multi]
   - repo: https://github.com/myint/autoflake
-    rev: v2.1.1
+    rev: v2.2.1
     hooks:
       - id: autoflake
         args: ['--in-place', '--remove-all-unused-imports', '--remove-unused-variable']
         exclude: ".*(.fits|.fts|.fit|.txt|tca.*|extern.*|.rst|.md|docs/conf.py)$"
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: 'v0.0.270'
+    rev: 'v0.1.7'
     hooks:
       - id: ruff
-        args: ['--fix']
+        args: ['--fix', '--unsafe-fixes']
   -   repo: https://github.com/psf/black
-      rev: 23.3.0
+      rev: 23.12.0
       hooks:
       - id: black
         exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
   -   repo: https://github.com/PyCQA/isort
-      rev: 5.12.0
+      rev: 5.13.1
       hooks:
       - id: isort
         exclude: ".*(.fits|.fts|.fit|.txt|.csv)$"
   -   repo: https://github.com/pre-commit/pre-commit-hooks
-      rev: v4.4.0
+      rev: v4.5.0
       hooks:
       - id: check-ast
       - id: check-case-conflict
@@ -39,7 +39,7 @@ repos:
       - id: check-yaml
       - id: debug-statements
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.4
+    rev: v2.2.6
     hooks:
       - id: codespell
         additional_dependencies:
