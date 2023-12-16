@@ -62,11 +62,7 @@ class SJICube(SpectrogramCube):
     ):
         self.scaled = scaled
         self.dust_masked = False
-        if "_basic_wcs" in kwargs:
-            _basic_wcs = kwargs.pop("_basic_wcs")
-        else:
-            _basic_wcs = None
-        self._basic_wcs = _basic_wcs
+        self._basic_wcs = kwargs.pop("_basic_wcs") if "_basic_wcs" in kwargs else None
         super().__init__(
             data,
             wcs,

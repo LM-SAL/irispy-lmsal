@@ -2,7 +2,6 @@
 This module provides constants used elsewhere.
 """
 
-
 import astropy.units as u
 
 __all__ = [

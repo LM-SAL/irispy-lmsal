@@ -99,13 +99,9 @@ def get_detector_type(meta):
     Returns
     -------
     `str`
-       Detector type.
+        Detector type.
     """
-    if "FUV" in meta["detector type"]:
-        detector_type = "FUV"
-    else:
-        detector_type = meta["detector type"]
-    return detector_type
+    return "FUV" if "FUV" in meta["detector type"] else meta["detector type"]
 
 
 def get_interpolated_effective_area(time_obs, response_version, detector_type, obs_wavelength):

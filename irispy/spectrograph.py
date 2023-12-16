@@ -297,18 +297,16 @@ class SpectrogramCubeSequence(SpecSeq):
         Parameters
         ----------
         new_unit_type: `str`
-           Unit type to convert data to.  Three values are accepted:
-           "DN": Relevant IRIS data number based on detector type.
-           "photons": photon counts
-           "radiance": Perorms radiometric calibration conversion.
+            Unit type to convert data to.  Three values are accepted:
+            "DN": Relevant IRIS data number based on detector type.
+            "photons": photon counts
+            "radiance": Performs radiometric calibration conversion.
         copy: `bool`
             If True a new instance with the converted data values is return.
             If False, the current instance is overwritten.
             Default=False
         """
-        converted_data_list = []
-        for cube in self.data:
-            converted_data_list.append(cube.convert_to(new_unit_type))
+        converted_data_list = [cube.convert_to(new_unit_type) for cube in self.data]
         if copy is True:
             return SpectrogramCubeSequence(converted_data_list, meta=self.meta, common_axis=self._common_axis)
         self.data = converted_data_list

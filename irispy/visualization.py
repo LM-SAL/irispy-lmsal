@@ -19,13 +19,15 @@ def _set_axis_colors(ax):
             axis.set_major_formatter("x.x")
             axis.set_axislabel("em.wl [$\\mathrm{nm}$]")
         elif axis.default_label.lower() in ["latitude", "lat", "custom:pos.helioprojective.lat"]:
-            axis.set_axislabel(axis.default_label, color="red")
-            axis.set_ticklabel_position("all")
-            axis.set_ticklabel("red")
+            _extracted_from__set_axis_colors_14(axis, "red")
         elif axis.default_label.lower() in ["longitude", "lon", "custom:pos.helioprojective.lon"]:
-            axis.set_axislabel(axis.default_label, color="black")
-            axis.set_ticklabel_position("all")
-            axis.set_ticklabel("black")
+            _extracted_from__set_axis_colors_14(axis, "black")
+
+
+def _extracted_from__set_axis_colors_14(axis, color):
+    axis.set_axislabel(axis.default_label, color=color)
+    axis.set_ticklabel_position("all")
+    axis.set_ticklabel(color)
 
 
 class CustomArrayAnimatorWCS(ArrayAnimatorWCS):
@@ -55,10 +57,7 @@ class Plotter(MatplotlibPlotter):
         self._apply_axes_coordinates(ax.axes, axes_coordinates)
         # This changes the parameters for future iterations
         for hidden in self._not_visible_coords(ax.axes, axes_coordinates):
-            if hidden in ax.coord_params:
-                param = ax.coord_params[hidden]
-            else:
-                param = {}
+            param = ax.coord_params[hidden] if hidden in ax.coord_params else {}
             param["ticks"] = False
             ax.coord_params[hidden] = param
         return ax

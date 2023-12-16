@@ -41,7 +41,7 @@ def convert_between_DN_and_photons(old_data_arrays, old_unit, new_unit):
     `astropy.unit.Unit`
         Unit of new data arrays with any inverse time component preserved.
     """
-    if old_unit == new_unit or old_unit == new_unit / u.s:
+    if old_unit in [new_unit, new_unit / u.s]:
         new_data_arrays = list(old_data_arrays)
         new_unit_time_accounted = old_unit
     else:
@@ -138,16 +138,11 @@ def convert_or_undo_photons_per_sec_to_radiance(
         photons_per_sec_to_radiance_factor,
         data_quantities[0].ndim,
     )
-    # Perform (or undo) radiometric conversion.
-    if undo is True:
-        new_data_quantities = [
-            (data / photons_per_sec_to_radiance_factor).to(u.photon / u.s) for data in data_quantities
-        ]
-    else:
-        new_data_quantities = [
-            (data * photons_per_sec_to_radiance_factor).to(RADIANCE_UNIT) for data in data_quantities
-        ]
-    return new_data_quantities
+    return (
+        [(data / photons_per_sec_to_radiance_factor).to(u.photon / u.s) for data in data_quantities]
+        if undo is True
+        else [(data * photons_per_sec_to_radiance_factor).to(RADIANCE_UNIT) for data in data_quantities]
+    )
 
 
 def calculate_photons_per_sec_to_radiance_factor(
