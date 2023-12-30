@@ -39,13 +39,13 @@ jobs:
       coverage: codecov
       posargs: -n auto
       libraries: |
-        apt:
+        choco:
           - ffmpeg
         brew:
           - ffmpeg
       envs: |
         - windows: py310
-        - macos: py39-oldestdeps
+        - macos: py39
 
   docs:
     needs: [core]
