@@ -28,14 +28,14 @@ def compress(files: list) -> None:
                 continue
             if hdu.data.ndim == 2:
                 factor = (0.1, 1)
-            if hdu.data.ndim == 3:
+            elif hdu.data.ndim == 3:
                 factor = (0.1, 0.1, 0.1)
             hdu.data = zoom(hdu.data, factor, order=0)
-            if hdu.data.ndim == 3:
-                hdu.header["NAXIS1"] = hdu.data.shape[2]
-                hdu.header["NAXIS2"] = hdu.data.shape[1]
-                hdu.header["NAXIS3"] = hdu.data.shape[0]
             if hdu.data.ndim == 2:
                 hdu.header["NAXIS1"] = hdu.data.shape[1]
                 hdu.header["NAXIS2"] = hdu.data.shape[0]
+            elif hdu.data.ndim == 3:
+                hdu.header["NAXIS1"] = hdu.data.shape[2]
+                hdu.header["NAXIS2"] = hdu.data.shape[1]
+                hdu.header["NAXIS3"] = hdu.data.shape[0]
         hdus.writeto(f"{file.split('.fits')[0]}_test.fits", overwrite=True)
