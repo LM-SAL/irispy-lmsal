@@ -63,7 +63,7 @@ def read_spectrograph_lvl2(filenames, *, spectral_windows=None, uncertainty=Fals
 
     # Collecting the window observations
     with fits.open(filenames[0], memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
-        v34 = True if hdulist[0].header["OBSID"].startswith("34") else False
+        v34 = bool(hdulist[0].header["OBSID"].startswith("34"))
         hdulist.verify("silentfix")
         windows_in_obs = np.array(
             [hdulist[0].header[f"TDESC{i}"] for i in range(1, hdulist[0].header["NWIN"] + 1)],

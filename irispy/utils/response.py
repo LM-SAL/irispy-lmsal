@@ -102,7 +102,7 @@ def get_iris_response(
         # be consistent with more recent versions.
         iris_response["VERSION_DATE"] = Time(
             datetime.datetime(
-                int(iris_response["DATE"][0:4]),
+                int(iris_response["DATE"][:4]),
                 int(iris_response["DATE"][4:6]),
                 int(iris_response["DATE"][6:8]),
             ),

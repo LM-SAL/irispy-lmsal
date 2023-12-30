@@ -40,7 +40,7 @@ def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
     celestial = VaryingCelestialTransform(
         crpix=crpix * u.pixel,
         cdelt=cdelt * u.arcsec / u.pixel,
-        pc_table=pc_table * u.arcsec,
+        pc_table=pc_table * u.pixel,
         crval_table=crval_table * u.arcsec,
     )
     base_time = Time(hdulist[0].header["STARTOBS"], format="isot", scale="utc")
@@ -156,15 +156,13 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             mask = None
             scaled = False
             unit = DN_UNIT["SJI_UNSCALED"]
-        elif not memmap:
+        else:
             data_nan_masked[data == BAD_PIXEL_VALUE_SCALED] = np.nan
             mask = data_nan_masked == BAD_PIXEL_VALUE_SCALED
             scaled = True
             unit = DN_UNIT["SJI"]
             if uncertainty:
                 out_uncertainty = calculate_uncertainty(data, READOUT_NOISE["SJI"], DN_UNIT["SJI"])
-        else:
-            raise ValueError(f"memmap={memmap} is not supported.")
         map_cube = SJICube(
             data_nan_masked,
             _create_gwcs(hdulist),

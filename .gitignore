@@ -205,8 +205,9 @@ $RECYCLE.BIN/
 .hypothesis
 .pytest_cache
 docs/_build
-docs/generated
 docs/api/
+docs/generated
+docs/sg_execution_times.rst
 docs/whatsnew/latest_changelog.txt
 irispy/_version.py
 

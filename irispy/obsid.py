@@ -90,9 +90,8 @@ class ObsID(dict):
         """
         Reads different fields from OBS ID number.
         """
-        data = {}
         options = {}
-        data["obsid"] = obsid
+        data = {"obsid": obsid}
         field_keys = {
             "Large linelist": "linelist",
             "Default compression": "compression",
@@ -111,7 +110,7 @@ class ObsID(dict):
         # here choose between tables
         version = int(str(obsid)[:2])
         if version not in versions:
-            raise ValueError("Invalid OBS ID: two first digits must one of" " {}".format(versions))
+            raise ValueError("Invalid OBS ID: two first digits must one of" f" {versions}")
         obsid = int(str(obsid)[2:])  # version digits are no longer needed
         table1 = pd.read_csv(resource_filename("irispy", "data/v%i-table10.csv" % version))
         table2 = pd.read_csv(resource_filename("irispy", "data/v%i-table2000.csv" % version))
@@ -120,8 +119,7 @@ class ObsID(dict):
             meta = table1.where(table1["OBS-ID"] == id_raster).dropna().iloc[0]
         except IndexError:
             raise ValueError(
-                "Invalid OBS ID: last two numbers must be between"
-                " {} and {}".format(table1["OBS-ID"].min(), table1["OBS-ID"].max()),
+                f'Invalid OBS ID: last two numbers must be between {table1["OBS-ID"].min()} and {table1["OBS-ID"].max()}',
             ) from None
 
         data["raster_step"] = meta["Raster step"]
@@ -129,11 +127,7 @@ class ObsID(dict):
         data["spec_cadence"] = meta["Spectral cadence"]
         data["sji_fov"] = meta["SJI FOV"]
         data["raster_desc"] = meta["Description"]
-        data["raster_fulldesc"] = "{} {} {}".format(
-            data["raster_desc"],
-            data["raster_fov"],
-            data["spec_cadence"],
-        )
+        data["raster_fulldesc"] = f'{data["raster_desc"]} {data["raster_fov"]} {data["spec_cadence"]}'
         field_ranges = np.concatenate(
             [  # find all dividers between fields
                 table2.where(table2["OBS ID"] == 0).dropna(how="all").index,

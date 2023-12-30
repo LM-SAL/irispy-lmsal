@@ -41,7 +41,7 @@ def convert_between_DN_and_photons(old_data_arrays, old_unit, new_unit):
     `astropy.unit.Unit`
         Unit of new data arrays with any inverse time component preserved.
     """
-    if old_unit == new_unit or old_unit == new_unit / u.s:
+    if old_unit in [new_unit, new_unit / u.s]:
         new_data_arrays = list(old_data_arrays)
         new_unit_time_accounted = old_unit
     else:
@@ -113,16 +113,16 @@ def convert_or_undo_photons_per_sec_to_radiance(
             if not data.unit.is_equivalent(RADIANCE_UNIT):
                 raise ValueError(
                     "Invalid unit provided.  As kwarg undo=True, "
-                    "unit must be equivalent to {}.  Error found for {}th element "
-                    "of data_quantities. Unit: {}".format(RADIANCE_UNIT, i, data.unit),
+                    f"unit must be equivalent to {RADIANCE_UNIT}.  Error found for {i}th element "
+                    f"of data_quantities. Unit: {data.unit}",
                 )
     else:
         for data in data_quantities:
             if data.unit != u.photon / u.s:
                 raise ValueError(
                     "Invalid unit provided.  As kwarg undo=False, "
-                    "unit must be equivalent to {}.  Error found for {}th element "
-                    "of data_quantities. Unit: {}".format(u.photon / u.s, i, data.unit),
+                    f"unit must be equivalent to {u.photon / u.s}.  Error found for {i}th element "
+                    f"of data_quantities. Unit: {data.unit}",
                 )
     photons_per_sec_to_radiance_factor = calculate_photons_per_sec_to_radiance_factor(
         time_obs,
@@ -138,16 +138,11 @@ def convert_or_undo_photons_per_sec_to_radiance(
         photons_per_sec_to_radiance_factor,
         data_quantities[0].ndim,
     )
-    # Perform (or undo) radiometric conversion.
-    if undo is True:
-        new_data_quantities = [
-            (data / photons_per_sec_to_radiance_factor).to(u.photon / u.s) for data in data_quantities
-        ]
-    else:
-        new_data_quantities = [
-            (data * photons_per_sec_to_radiance_factor).to(RADIANCE_UNIT) for data in data_quantities
-        ]
-    return new_data_quantities
+    return (
+        [(data / photons_per_sec_to_radiance_factor).to(u.photon / u.s) for data in data_quantities]
+        if undo is True
+        else [(data * photons_per_sec_to_radiance_factor).to(RADIANCE_UNIT) for data in data_quantities]
+    )
 
 
 def calculate_photons_per_sec_to_radiance_factor(
@@ -185,7 +180,11 @@ def calculate_photons_per_sec_to_radiance_factor(
     Returns
     -------
     `astropy.units.Quantity`
-        Mutliplicative conversion factor from counts/s to radiance units
+        # The term "multiplicative" refers to the fact that the conversion factor calculated by the
+        # `calculate_photons_per_sec_to_radiance_factor` function is used to multiply the counts per
+        # second (cps) data to obtain the radiance data. In other words, the conversion factor is a
+        # scaling factor that is applied to the cps data to convert it to radiance units.
+        Multiplicative conversion factor from counts/s to radiance units
         for input wavelengths.
     """
     # Get effective area and interpolate to observed wavelength grid.

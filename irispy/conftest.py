@@ -1,6 +1,13 @@
+import os
+
+import numpy as np
 import pytest
+from astropy.io import fits
+from sunpy.time import parse_time
 
 from irispy.data.test import get_test_filepath
+from irispy.io.sji import read_sji_lvl2
+from irispy.utils import get_iris_response
 
 
 @pytest.fixture()
@@ -37,76 +44,46 @@ def SJICube_1330():
 
 @pytest.fixture()
 def SJICube_1400():
-    from irispy.io.sji import read_sji_lvl2
-
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_1400_t000_test.fits"))
 
 
 @pytest.fixture()
 def SJICube_2796():
-    from irispy.io.sji import read_sji_lvl2
-
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_2796_t000_test.fits"))
 
 
 @pytest.fixture()
 def SJICube_2832():
-    from irispy.io.sji import read_sji_lvl2
-
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_2832_t000_test.fits"))
 
 
 @pytest.fixture()
-def iris_responsev1():
-    from sunpy.time import parse_time
-
-    from irispy.utils import get_iris_response
-
+def iris_response_v1():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=1)
 
 
 @pytest.fixture()
-def iris_responsev2():
-    from sunpy.time import parse_time
-
-    from irispy.utils import get_iris_response
-
+def iris_response_v2():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=2)
 
 
 @pytest.fixture()
-def iris_responsev3():
-    from sunpy.time import parse_time
-
-    from irispy.utils import get_iris_response
-
+def iris_response_v3():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=3)
 
 
 @pytest.fixture()
-def iris_responsev4():
-    from sunpy.time import parse_time
-
-    from irispy.utils import get_iris_response
-
+def iris_response_v4():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=4)
 
 
 @pytest.fixture()
-def iris_responsev5():
-    from sunpy.time import parse_time
-
-    from irispy.utils import get_iris_response
-
+def iris_response_v5():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=5)
 
 
 @pytest.fixture()
-def iris_responsev6():
-    from sunpy.time import parse_time
-
-    from irispy.utils import get_iris_response
-
+def iris_response_v6():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=6)
 
 
@@ -122,11 +99,6 @@ def filelist():
 
 @pytest.fixture(scope="session")
 def fake_long_obs(tmp_path_factory):
-    import os
-
-    import numpy as np
-    from astropy.io import fits
-
     header = fits.getheader(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_2832_t000_test.fits"))
     header["STARTOBS"] = "2017-05-02T05:25:51.000"
     header["ENDOBS"] = "2017-05-02T08:25:51.000"
