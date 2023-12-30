@@ -26,8 +26,10 @@ def fitsinfo(filename):
         for i in range(nwin):
             logging.info(f"Extension No. {i+1} stores data and header of {hdr[f'TDESC{i+1}']}: ")
             if "SJI" not in hdr[f"TDET{i + 1}"]:
-                modifier = f" ({hdr[f'TDET{i+1}'][0:3]})"
-            logging.info(f"{hdr[f'TWMIN{i+1}']:.2f} - {hdr[f'TWMAX{i+1}']:.2f} AA" + modifier)
+                modifier = f" ({hdr[f'TDET{i + 1}'][:3]})"
+            logging.info(
+                f"{hdr[f'TWMIN{i + 1}']:.2f} - {hdr[f'TWMAX{i + 1}']:.2f} AA{modifier}",
+            )
 
 
 def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=False):
@@ -76,7 +78,7 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
             filename = [filename]
     intrume = fits.getval(filename[0], "INSTRUME")
     all_instrume = [fits.getval(f, "INSTRUME") for f in filename]
-    if not all(intrume == i for i in all_instrume):
+    if any(intrume != i for i in all_instrume):
         raise ValueError("You cannot mix raster and SJI files.")
     if intrume == "SJI":
         if len(filename) > 1:

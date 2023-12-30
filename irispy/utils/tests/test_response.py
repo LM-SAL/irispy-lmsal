@@ -81,34 +81,34 @@ area_sg_load6 = iris_response_load6.area_sg
 area_sji_load6 = iris_response_load6.area_sji
 
 
-def test_get_iris_response_version1(iris_responsev1):
-    np_test.assert_almost_equal(iris_responsev1["AREA_SG"].value, area_sg_load1, decimal=6)
-    np_test.assert_almost_equal(iris_responsev1["AREA_SJI"].value, area_sji_load1, decimal=6)
+def test_get_iris_response_version1(iris_response_v1):
+    np_test.assert_almost_equal(iris_response_v1["AREA_SG"].value, area_sg_load1, decimal=6)
+    np_test.assert_almost_equal(iris_response_v1["AREA_SJI"].value, area_sji_load1, decimal=6)
 
 
-def test_get_iris_response_version2(iris_responsev2):
-    np_test.assert_almost_equal(iris_responsev2["AREA_SG"].value, area_sg_load2, decimal=6)
-    np_test.assert_almost_equal(iris_responsev2["AREA_SJI"].value, area_sji_load2, decimal=6)
+def test_get_iris_response_version2(iris_response_v2):
+    np_test.assert_almost_equal(iris_response_v2["AREA_SG"].value, area_sg_load2, decimal=6)
+    np_test.assert_almost_equal(iris_response_v2["AREA_SJI"].value, area_sji_load2, decimal=6)
 
 
-def test_get_iris_response_version3(iris_responsev3):
-    np_test.assert_almost_equal(iris_responsev3["AREA_SG"].value, area_sg_load3, decimal=6)
-    np_test.assert_almost_equal(iris_responsev3["AREA_SJI"].value, area_sji_load3, decimal=6)
+def test_get_iris_response_version3(iris_response_v3):
+    np_test.assert_almost_equal(iris_response_v3["AREA_SG"].value, area_sg_load3, decimal=6)
+    np_test.assert_almost_equal(iris_response_v3["AREA_SJI"].value, area_sji_load3, decimal=6)
 
 
-def test_get_iris_response_version4(iris_responsev4):
-    np_test.assert_almost_equal(iris_responsev4["AREA_SG"].value, area_sg_load4, decimal=3)
-    np_test.assert_almost_equal(iris_responsev4["AREA_SJI"].value, area_sji_load4, decimal=3)
+def test_get_iris_response_version4(iris_response_v4):
+    np_test.assert_almost_equal(iris_response_v4["AREA_SG"].value, area_sg_load4, decimal=3)
+    np_test.assert_almost_equal(iris_response_v4["AREA_SJI"].value, area_sji_load4, decimal=3)
 
 
-def test_get_iris_response_version5(iris_responsev5):
-    np_test.assert_almost_equal(iris_responsev5["AREA_SG"].value, area_sg_load5, decimal=3)
-    np_test.assert_almost_equal(iris_responsev5["AREA_SJI"].value, area_sji_load5, decimal=3)
+def test_get_iris_response_version5(iris_response_v5):
+    np_test.assert_almost_equal(iris_response_v5["AREA_SG"].value, area_sg_load5, decimal=3)
+    np_test.assert_almost_equal(iris_response_v5["AREA_SJI"].value, area_sji_load5, decimal=3)
 
 
-def test_get_iris_response_version6(iris_responsev6):
-    np_test.assert_almost_equal(iris_responsev6["AREA_SG"].value, area_sg_load6, decimal=3)
-    np_test.assert_almost_equal(iris_responsev6["AREA_SJI"].value, area_sji_load6, decimal=3)
+def test_get_iris_response_version6(iris_response_v6):
+    np_test.assert_almost_equal(iris_response_v6["AREA_SG"].value, area_sg_load6, decimal=3)
+    np_test.assert_almost_equal(iris_response_v6["AREA_SJI"].value, area_sji_load6, decimal=3)
 
 
 @pytest.mark.parametrize(

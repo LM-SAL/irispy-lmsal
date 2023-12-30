@@ -62,11 +62,7 @@ class SJICube(SpectrogramCube):
     ):
         self.scaled = scaled
         self.dust_masked = False
-        if "_basic_wcs" in kwargs:
-            _basic_wcs = kwargs.pop("_basic_wcs")
-        else:
-            _basic_wcs = None
-        self._basic_wcs = _basic_wcs
+        self._basic_wcs = kwargs.pop("_basic_wcs") if "_basic_wcs" in kwargs else None
         super().__init__(
             data,
             wcs,
@@ -79,7 +75,7 @@ class SJICube(SpectrogramCube):
         )
 
     def __repr__(self):
-        return f"{object.__repr__(self)}\n{str(self)}"
+        return f"{object.__repr__(self)}\n{self!s}"
 
     def __str__(self):
         if self.wcs.world_n_dim == 2:

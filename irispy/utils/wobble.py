@@ -80,8 +80,8 @@ def wobble_movie(
     if isinstance(files, (str, Path)):
         files = [files]
     filenames = []
-    for afile in files:
-        data, header = fits.getdata(afile, header=True)
+    for a_file in files:
+        data, header = fits.getdata(a_file, header=True)
         wcs = WCS(header)
         numframes = header["NAXIS3"]
         date = header["DATE_OBS"].split(".")[0]
