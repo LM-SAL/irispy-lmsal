@@ -187,7 +187,7 @@ class SpectrogramCube(SpecCube):
             # Get wavelength for each pixel.
             obs_wavelength = self.axis_world_coords(2)
 
-        if new_unit_type == "DN" or new_unit_type == "photons":
+        if new_unit_type in ["DN", "photons"]:
             if self.unit.is_equivalent(utils.RADIANCE_UNIT):
                 # Convert from radiance to counts/s
                 new_data_quantities = utils.convert_or_undo_photons_per_sec_to_radiance(
@@ -212,10 +212,7 @@ class SpectrogramCube(SpecCube):
                     mask=self.mask,
                 )
                 self._extra_coords = self.extra_coords
-            if new_unit_type == "DN":
-                new_unit = utils.DN_UNIT[detector_type]
-            else:
-                new_unit = u.photon
+            new_unit = utils.DN_UNIT[detector_type] if new_unit_type == "DN" else u.photon
             new_data_arrays, new_unit = utils.convert_between_DN_and_photons(
                 (self.data, self.uncertainty.array),
                 self.unit,
