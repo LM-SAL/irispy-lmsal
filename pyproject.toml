@@ -27,7 +27,6 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -73,123 +72,15 @@ dev = ["irispy-lmsal[tests,docs]"]
 [tool.setuptools_scm]
 write_to = "irispy/_version.py"
 
-[tool.setuptools.exclude-package-data]
-muse = ["irispy._dev"]
+[tool.setuptools]
+include-package-data = true
+platforms = ["any"]
+provides = ["irispy"]
+license-files = ["LICENSE.rst"]
 
-[tool.pytest.ini_options]
-testpaths = [
-  "irispy",
-  "docs"
-]
-norecursedirs = [
-  ".tox",
-  "build",
-  '''docs[\/]_build''',
-  '''docs[\/]generated''',
-  "*.egg-info",
-  "examples",
-  '''irispy[/\]_dev''',
-  ".jupyter",
-  ".history",
-]
-doctest_plus = "enabled"
-doctest_optionflags = "NORMALIZE_WHITESPACE FLOAT_CMP ELLIPSIS"
-addopts = "--doctest-rst --doctest-ignore-import-errors -p no:unraisableexception -p no:threadexception"
-markers = [
-  "remote_data: marks this test function as needing remote data.",
-]
-remote_data_strict = "True"
-filterwarnings = [
-  "error",
-  "always::pytest.PytestConfigWarning",
-  "ignore:.*deprecated and slated for removal in Python 3.13",
-  "ignore:numpy.ufunc size changed:RuntimeWarning",
-  "ignore:numpy.ndarray size changed:RuntimeWarning",
-  "ignore:.*unitfix.*",
-  "ignore::erfa.core.ErfaWarning",
-  "ignore:invalid value encountered in sqrt",
-]
-
-[tool.black]
-line-length = 120
-target-version = ['py39']
-
-[tool.isort]
-profile = "black"
-line_length = 120
-length_sort = "False"
-length_sort_sections = "stdlib"
-
-[tool.ruff]
-# Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-target-version = "py39"
-line-length = 120
-exclude=[
-    ".git,",
-    "__pycache__",
-    "build",
-    "tools/**",
-]
-select = [
-       "E",
-       "F",
-       "W",
-       "UP",
-       "PT",
-       "RET",
-       "TID",
-       "PLE",
-       "NPY",
-       "RUF",
-       "PGH",
-       "PTH",
-       "BLE",
-       "FBT",
-       "B",
-       "A",
-       "COM",
-       "C4",
-       "T20",
-       "RSE",
-       "ERA",
-]
-fixable = [
-       "E",
-       "F",
-       "W",
-       "UP",
-       "PT",
-       "RET",
-       "TID",
-       "PLE",
-       "NPY",
-       "RUF",
-       "PGH",
-       "PTH",
-       "BLE",
-       "FBT",
-       "B",
-       "A",
-       "COM",
-       "C4",
-       "T20",
-       "RSE",
-       "ERA",
-]
-extend-ignore = [
-    "E501",  # Line too long
-    # TODO: Fix in future
-    "E741",  # Ambiguous variable name
-]
-
-[tool.ruff.per-file-ignores]
-"examples/*.py" = [
-    "T201", # We need print in our examples
-]
-
-[tool.ruff.pydocstyle]
-convention = "numpy"
+[tool.setuptools.packages.find]
+exclude = ["irispy._dev"]
+namespaces = false
 
 [tool.codespell]
 skip = "*.asdf,*.fits,*.fts,*.header,*.json,*.xsh,*cache*,*egg*,*extern*,.git,.idea,.tox,_build,*truncated,*.svg,.asv_env,.history"

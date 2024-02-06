@@ -22,7 +22,14 @@ def _pc_matrix(lam, angle_1, angle_2):
     return angle_1, -1 * lam * angle_2, 1 / lam * angle_2, angle_1
 
 
-def read_spectrograph_lvl2(filenames, *, spectral_windows=None, uncertainty=False, memmap=False, revert_v34=False):
+def read_spectrograph_lvl2(
+    filenames,
+    *,
+    spectral_windows=None,
+    uncertainty=False,
+    memmap=False,
+    revert_v34=False,
+):
     """
     Reads IRIS level 2 spectrograph FITS from an OBS into an
     `.IRISSpectrograph` instance.
@@ -74,15 +81,13 @@ def read_spectrograph_lvl2(filenames, *, spectral_windows=None, uncertainty=Fals
             spectral_windows_req = windows_in_obs
             window_fits_indices = range(1, len(hdulist) - 2)
         else:
-            if isinstance(spectral_windows, str):
-                spectral_windows_req = [spectral_windows]
-            else:
-                spectral_windows_req = spectral_windows
+            spectral_windows_req = [spectral_windows] if isinstance(spectral_windows, str) else spectral_windows
             spectral_windows_req = np.asarray(spectral_windows_req, dtype="U")
             window_is_in_obs = np.asarray([window in windows_in_obs for window in spectral_windows_req])
             if not all(window_is_in_obs):
                 missing_windows = window_is_in_obs is False
-                raise ValueError(f"Spectral windows {spectral_windows[missing_windows]} not in file {filenames[0]}")
+                msg = f"Spectral windows {spectral_windows[missing_windows]} not in file {filenames[0]}"
+                raise ValueError(msg)
             window_fits_indices = np.nonzero(np.in1d(windows_in_obs, spectral_windows))[0] + 1
         data_dict = {window_name: [] for window_name in spectral_windows_req}
 
@@ -141,11 +146,12 @@ def read_spectrograph_lvl2(filenames, *, spectral_windows=None, uncertainty=Fals
                 try:
                     wcs = WCS(header)
                 except Exception as e:  # NOQA: BLE001
-                    logging.warning(
-                        f"WCS failed to load while reading one step of the raster due to {e} "
+                    msg = (
+                        f"WCS failed to load while reading one step of the raster due to {e}"
                         "The loading will continue but this will be missing in the final cube. "
-                        f"Spectral window: {window_name}, step {i} in file: {filename}",
+                        f"Spectral window: {window_name}, step {i} in file: {filename}"
                     )
+                    logging.warning(msg)
                     continue
                 out_uncertainty = None
                 data_mask = None

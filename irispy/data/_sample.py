@@ -62,7 +62,7 @@ def _retry_sample_data(results, new_url_base):
     # from the previous results object and this retry, and all the errors from
     # this retry.
     new_results = results + extra_results
-    new_results._errors = extra_results._errors
+    new_results._errors = extra_results._errors  # NOQA: SLF001
     return new_results
 
 
@@ -121,7 +121,7 @@ def _get_sample_files(filename_list, *, no_download=False, force_download=False)
     if no_download:
         fullpaths = [fp if fp.exists() else None for fp in fullpaths]
     else:
-        to_download = zip(filename_list, fullpaths)
+        to_download = zip(filename_list, fullpaths, strict=False)
         if not force_download:
             to_download = [(fn, fp) for fn, fp in to_download if not fp.exists()]
         if to_download:

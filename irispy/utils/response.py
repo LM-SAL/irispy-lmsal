@@ -1,6 +1,7 @@
 """
 This module provides general utility functions for IRIS Responses.
 """
+
 import datetime
 from pathlib import Path
 
@@ -105,6 +106,7 @@ def get_iris_response(
                 int(iris_response["DATE"][:4]),
                 int(iris_response["DATE"][4:6]),
                 int(iris_response["DATE"][6:8]),
+                tzinfo=datetime.timezone.utc,
             ),
         )
         del iris_response["DATE"]
@@ -308,7 +310,8 @@ def fit_iris_xput(time_obs, time_cal_coeffs, cal_coeffs):
     time_obs = Time(parse_time(time_obs).utime, format="utime")
     if time_cal_coeffs.shape[1] != 2 or cal_coeffs.shape[1] < 2:
         # Raise ValueError as time coefficient have the wrong format.
-        raise ValueError("Incorrect number of elements either in time_cal_coeffs or in cal_coeffs.")
+        msg = "Incorrect number of elements either in time_cal_coeffs or in cal_coeffs."
+        raise ValueError(msg)
     # Some time transformations.
     # Convert the time_cal_coeffs given in the .geny file into a ``astropy.time.Time``
     # object called t_cal_coeffs, so that the time differences will be in days...

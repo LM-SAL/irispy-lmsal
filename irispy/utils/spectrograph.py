@@ -2,7 +2,6 @@
 This module provides general utility functions called by code in spectrograph.
 """
 
-
 import astropy.units as u
 import numpy as np
 from astropy import constants
@@ -111,18 +110,24 @@ def convert_or_undo_photons_per_sec_to_radiance(
     if undo is True:
         for i, data in enumerate(data_quantities):
             if not data.unit.is_equivalent(RADIANCE_UNIT):
-                raise ValueError(
+                msg = (
                     "Invalid unit provided.  As kwarg undo=True, "
                     f"unit must be equivalent to {RADIANCE_UNIT}.  Error found for {i}th element "
-                    f"of data_quantities. Unit: {data.unit}",
+                    f"of data_quantities. Unit: {data.unit}"
+                )
+                raise ValueError(
+                    msg,
                 )
     else:
         for data in data_quantities:
             if data.unit != u.photon / u.s:
-                raise ValueError(
+                msg = (
                     "Invalid unit provided.  As kwarg undo=False, "
                     f"unit must be equivalent to {u.photon / u.s}.  Error found for {i}th element "
-                    f"of data_quantities. Unit: {data.unit}",
+                    f"of data_quantities. Unit: {data.unit}"
+                )
+                raise ValueError(
+                    msg,
                 )
     photons_per_sec_to_radiance_factor = calculate_photons_per_sec_to_radiance_factor(
         time_obs,
@@ -214,5 +219,6 @@ def reshape_1D_wavelength_dimensions_for_broadcast(wavelength, n_data_dim):
     elif n_data_dim == 3:
         wavelength = wavelength[np.newaxis, np.newaxis, :]
     else:
-        raise ValueError("IRISSpectrogram dimensions must be 2 or 3.")
+        msg = "IRISSpectrogram dimensions must be 2 or 3."
+        raise ValueError(msg)
     return wavelength
