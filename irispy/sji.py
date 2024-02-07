@@ -108,7 +108,7 @@ class SJICube(SpectrogramCube):
         sliced_self = super().__getitem__(item)
         sliced_self.scaled = self.scaled
         if self._basic_wcs is not None:
-            sliced_self._basic_wcs = self._basic_wcs[item]
+            sliced_self._basic_wcs = self._basic_wcs[item]  # NOQA: SLF001
         return sliced_self
 
     def plot(self, *args, **kwargs):

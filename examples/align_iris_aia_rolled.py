@@ -8,7 +8,6 @@ In this example we will show how to align a rolled IRIS dataset to SDO/AIA.
 You can get IRIS data with co-aligned SDO data (and more) from https://iris.lmsal.com/search/
 """
 
-
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np

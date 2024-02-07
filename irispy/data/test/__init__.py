@@ -1,6 +1,7 @@
 """
 IRISPy test data files.
 """
+
 from pathlib import Path
 
 from astropy.utils.data import get_pkg_data_filename
@@ -29,12 +30,10 @@ def get_test_filepath(filename, **kwargs):
 
     See Also
     --------
-
     astropy.utils.data.get_pkg_data_filename : Get package data filename
 
     Notes
     -----
-
     This is a wrapper around `astropy.utils.data.get_pkg_data_filename` which
     sets the ``package`` kwarg to be 'irispy.data.test`.
     """

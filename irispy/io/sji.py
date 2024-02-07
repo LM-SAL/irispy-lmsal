@@ -60,7 +60,10 @@ def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
         axes_order=(0, 1),
         unit=(u.arcsec, u.arcsec),
         reference_frame=Helioprojective(observer="earth", obstime=base_time),
-        axis_physical_types=["custom:pos.helioprojective.lon", "custom:pos.helioprojective.lat"],
+        axis_physical_types=[
+            "custom:pos.helioprojective.lon",
+            "custom:pos.helioprojective.lat",
+        ],
         axes_names=("Longitude", "Latitude"),
     )
     temporal_frame = cf.TemporalFrame(Time(base_time), unit=(u.s,), axes_order=(2,), axes_names=("Time (UTC)",))
@@ -138,13 +141,33 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
         hdulist.verify("silentfix")
         extra_coords = [
-            ("exposure time", 0, hdulist[1].data[:, hdulist[1].header["EXPTIMES"]] * u.s),
-            ("obs_vrix", 0, hdulist[1].data[:, hdulist[1].header["OBS_VRIX"]] * u.m / u.s),
-            ("ophaseix", 0, hdulist[1].data[:, hdulist[1].header["OPHASEIX"]] * u.arcsec),
+            (
+                "exposure time",
+                0,
+                hdulist[1].data[:, hdulist[1].header["EXPTIMES"]] * u.s,
+            ),
+            (
+                "obs_vrix",
+                0,
+                hdulist[1].data[:, hdulist[1].header["OBS_VRIX"]] * u.m / u.s,
+            ),
+            (
+                "ophaseix",
+                0,
+                hdulist[1].data[:, hdulist[1].header["OPHASEIX"]] * u.arcsec,
+            ),
             ("pztx", 0, hdulist[1].data[:, hdulist[1].header["PZTX"]] * u.arcsec),
             ("pzty", 0, hdulist[1].data[:, hdulist[1].header["PZTY"]] * u.arcsec),
-            ("slit x position", 0, hdulist[1].data[:, hdulist[1].header["SLTPX1IX"]] * u.arcsec),
-            ("slit y position", 0, hdulist[1].data[:, hdulist[1].header["SLTPX2IX"]] * u.arcsec),
+            (
+                "slit x position",
+                0,
+                hdulist[1].data[:, hdulist[1].header["SLTPX1IX"]] * u.arcsec,
+            ),
+            (
+                "slit y position",
+                0,
+                hdulist[1].data[:, hdulist[1].header["SLTPX2IX"]] * u.arcsec,
+            ),
             ("xcenix", 0, hdulist[1].data[:, hdulist[1].header["XCENIX"]] * u.arcsec),
             ("ycenix", 0, hdulist[1].data[:, hdulist[1].header["YCENIX"]] * u.arcsec),
         ]

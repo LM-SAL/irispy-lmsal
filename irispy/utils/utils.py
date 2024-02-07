@@ -1,6 +1,7 @@
 """
 This module provides general utility functions.
 """
+
 import numbers
 
 import astropy.units as u
@@ -134,7 +135,8 @@ def get_interpolated_effective_area(time_obs, response_version, detector_type, o
     elif detector_type == "NUV":
         detector_type_index = 1
     else:
-        raise ValueError("Detector type not recognized.")
+        msg = "Detector type not recognized."
+        raise ValueError(msg)
     eff_area = iris_response["AREA_SG"][detector_type_index, :]
     response_wavelength = iris_response["LAMBDA"]
     # Interpolate the effective areas to cover the wavelengths
