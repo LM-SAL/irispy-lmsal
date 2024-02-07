@@ -1,6 +1,7 @@
 """
 Tests that use fake data (fd) instead of the test files.
 """
+
 import numpy as np
 import pytest
 from astropy import units as u
@@ -212,7 +213,11 @@ times = Time(["2014-12-11T19:39:00.48", "2014-12-11T19:43:07.6"])
 exposure_times = 2 * np.ones((2), float) * u.s
 extra_coords = [("time", 0, times)]
 scaled_T = True
-meta = Meta({"exposure time": exposure_times, "OBSID": 1}, axes={"exposure time": 0}, data_shape=data_dust.shape)
+meta = Meta(
+    {"exposure time": exposure_times, "OBSID": 1},
+    axes={"exposure time": 0},
+    data_shape=data_dust.shape,
+)
 cube_dust = SJICube(
     data_dust,
     wcs,

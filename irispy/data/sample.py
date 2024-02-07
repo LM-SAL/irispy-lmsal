@@ -24,6 +24,7 @@ Sample shortnames
    * - Sample shortname
      - Name of downloaded file
 """
+
 from ._sample import _SAMPLE_DATA, _get_sample_files
 
 # Add a table row to the module docstring for each sample file
@@ -32,7 +33,12 @@ for _keyname, _filename in sorted(_SAMPLE_DATA.items()):
 
 
 # file_dict and file_list are not normal variables; see __getattr__() below
-__all__ = [*sorted(_SAMPLE_DATA.keys()), "download_all", "file_dict", "file_list"]  # NOQA: F822, PLE0604
+__all__ = [  # NOQA: PLE0604, F822
+    "download_all",
+    "file_dict",
+    "file_list",
+    *sorted(_SAMPLE_DATA.keys()),
+]
 
 
 # See PEP 562 (https://peps.python.org/pep-0562/) for module-level __dir__()
@@ -45,10 +51,19 @@ def __getattr__(name):
     if name in _SAMPLE_DATA:
         return _get_sample_files([_SAMPLE_DATA[name]])[0]
     if name == "file_dict":
-        return dict(sorted(zip(_SAMPLE_DATA.keys(), _get_sample_files(_SAMPLE_DATA.values(), no_download=True))))
+        return dict(
+            sorted(
+                zip(
+                    _SAMPLE_DATA.keys(),
+                    _get_sample_files(_SAMPLE_DATA.values(), no_download=True),
+                    strict=False,
+                )
+            )
+        )
     if name == "file_list":
         return [v for v in __getattr__("file_dict").values() if v]
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+    msg = f"module '{__name__}' has no attribute '{name}'"
+    raise AttributeError(msg)
 
 
 def download_all(*, force_download=False):

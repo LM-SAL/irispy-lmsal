@@ -246,7 +246,8 @@ class SpectrogramCube(SpecCube):
                 new_uncertainty = new_data_quantities[1].value
                 new_unit = new_data_quantities[0].unit
         else:
-            raise ValueError("Input unit type not recognized.")
+            msg = "Input unit type not recognized."
+            raise ValueError(msg)
         new_cube = SpectrogramCube(
             new_data,
             self.wcs,
@@ -255,7 +256,7 @@ class SpectrogramCube(SpecCube):
             self.meta,
             mask=self.mask,
         )
-        new_cube._extra_coords = self.extra_coords
+        new_cube._extra_coords = self.extra_coords  # NOQA: SLF001
         return new_cube
 
 
@@ -279,7 +280,8 @@ class SpectrogramCubeSequence(SpecSeq):
     def __init__(self, data_list, meta=None, common_axis=0):
         # Check that all spectrograms are from same spectral window and OBS ID.
         if len(np.unique([cube.meta["OBSID"] for cube in data_list])) != 1:
-            raise ValueError("Constituent SpectrogramCube objects must have same value of 'OBSID' in its meta.")
+            msg = "Constituent SpectrogramCube objects must have same value of 'OBSID' in its meta."
+            raise ValueError(msg)
         super().__init__(data_list, meta=meta, common_axis=common_axis)
 
     def __str__(self):
@@ -316,16 +318,22 @@ class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
         spectral_windows = np.array([self[f"TDESC{i}"] for i in range(1, self["NWIN"] + 1)])
         window_mask = np.array([spectral_window in window for window in spectral_windows])
         if window_mask.sum() < 1:
-            raise ValueError(
+            msg = (
                 "Spectral window not found. "
                 f"Input spectral window: {spectral_window}; "
-                f"Spectral windows in header: {spectral_windows}",
+                f"Spectral windows in header: {spectral_windows}"
+            )
+            raise ValueError(
+                msg,
             )
         if window_mask.sum() > 1:
-            raise ValueError(
+            msg = (
                 "Spectral window must be unique. "
                 f"Input spectral window: {spectral_window}; "
-                f"Ambiguous spectral windows in header: {spectral_windows[window_mask]}",
+                f"Ambiguous spectral windows in header: {spectral_windows[window_mask]}"
+            )
+            raise ValueError(
+                msg,
             )
         self._iwin = np.arange(len(spectral_windows))[window_mask][0] + 1
 

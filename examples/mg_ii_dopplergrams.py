@@ -9,6 +9,7 @@ The Dopplergram is obtained by subtracting the intensities at symmetrical veloci
 This very large dense raster took more than three hours to complete the 400 scans (30 s exposures), which means that the spacecraft's orbital velocity changes during the observations.
 This means that any precise wavelength calibration will need to correct for those shifts.
 """
+
 import tarfile
 
 import astropy.units as u

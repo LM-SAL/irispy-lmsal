@@ -7,6 +7,7 @@ In this example we will show how to plot a South Pole SJI dataset.
 
 You can get IRIS data with co-aligned SDO data (and more) from https://iris.lmsal.com/search/
 """
+
 import matplotlib.pyplot as plt
 import pooch
 

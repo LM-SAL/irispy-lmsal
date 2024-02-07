@@ -1,21 +1,20 @@
 """
 Configuration file for the Sphinx documentation builder.
 """
-import os
+
 import datetime
+import os
 from pathlib import Path
 
 from sphinx_gallery.sorting import ExampleTitleSortKey
-from sunpy_sphinx_theme.conf import *  # NOQA: F403
+from sunpy_sphinx_theme import PNG_ICON
 
 from irispy import __version__
 
 # -- Project information -----------------------------------------------------
 project = "irispy-lmsal"
 author = "IRIS Instrument Team"
-copyright = f"{datetime.datetime.now().year}, {author}"  # NOQA: A001
-
-# The full version, including alpha/beta/rc tags
+copyright = f"{datetime.datetime.now(datetime.timezone.utc).year}, {author}"  # NOQA: A001
 release = __version__
 is_development = ".dev" in __version__
 
@@ -38,27 +37,15 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
 ]
-
-# Set automodapi to generate files inside the generated directory
 automodapi_toctreedirnm = "generated/api"
-# List of patterns, relative to source directory, that match files and
-# directories to ignore when looking for source files.
-# This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
-# The suffix(es) of source filenames.
-# You can specify multiple suffix as a list of string:
 source_suffix = ".rst"
-# The master toctree document.
 master_doc = "index"
-# The reST default role (used for this markup: `text`) to use for all
-# documents. Set to the "smart" one.
 default_role = "obj"
 
 # -- Options for hoverxref -----------------------------------------------------
 if os.environ.get("READTHEDOCS"):
-    # Building on Read the Docs
     hoverxref_api_host = "https://readthedocs.org"
-
     if os.environ.get("PROXIED_API_ENDPOINT"):
         # Use the proxied API endpoint
         # - A RTD thing to avoid a CSRF block when docs are using a
@@ -68,10 +55,8 @@ if os.environ.get("READTHEDOCS"):
 hoverxref_tooltip_maxwidth = 600  # RTD main window is 696px
 hoverxref_auto_ref = True
 hoverxref_mathjax = True
-
 # hoverxref has to be applied to these
 hoverxref_domains = ["py"]
-
 hoverxref_role_types = {
     # roles with py domain
     "attr": "tooltip",
@@ -131,7 +116,6 @@ intersphinx_mapping = {
 }
 
 # -- Options for HTML output -------------------------------------------------
-# Render inheritance diagrams in SVG
 graphviz_output_format = "svg"
 sphinx_gallery_conf = {
     "backreferences_dir": Path("generated") / "modules",
@@ -139,7 +123,7 @@ sphinx_gallery_conf = {
     "examples_dirs": Path("..") / "examples",
     "within_subsection_order": ExampleTitleSortKey,
     "gallery_dirs": Path("generated") / "gallery",
-    "default_thumb_file": Path(html_static_path[0]) / "img" / "sunpy_icon_128x128.png",  # NOQA: F405
+    "default_thumb_file": PNG_ICON,
     "abort_on_example_error": False,
     "plot_gallery": "True",
     "remove_config_comments": True,

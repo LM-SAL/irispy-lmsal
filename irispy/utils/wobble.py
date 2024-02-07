@@ -1,8 +1,6 @@
 import re
-from typing import Union, Optional
 from pathlib import Path
 
-import matplotlib.animation as animation
 import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,6 +8,7 @@ from astropy.io import fits
 from astropy.time import TimeDelta
 from astropy.visualization import AsinhStretch, ImageNormalize
 from astropy.wcs import WCS
+from matplotlib import animation
 from sunpy.time import parse_time
 from sunpy.visualization.colormaps.color_tables import iris_sji_color_table
 
@@ -19,13 +18,13 @@ __all__ = ["wobble_movie"]
 
 
 def wobble_movie(
-    files: Union[list, str, Path],
+    files: list | str | Path,
     *,
-    outdir: Union[str, Path] = "./",
+    outdir: str | Path = "./",
     trim: bool = False,
     timestamp: bool = True,
     wobble_cadence: int = 180,
-    ffmpeg_path: Optional[Union[str, Path]] = None,
+    ffmpeg_path: str | Path | None = None,
     **kwargs,
 ) -> None:
     """
@@ -77,7 +76,7 @@ def wobble_movie(
 
         mpl.rcParams["animation.ffmpeg_path"] = ffmpeg_path
 
-    if isinstance(files, (str, Path)):
+    if isinstance(files, str | Path):
         files = [files]
     filenames = []
     for a_file in files:

@@ -5,6 +5,7 @@ Working with IRIS spectrograph files
 
 In this example, we will showcase how to use ``irispy-lmsal`` to open, crop and plot IRIS spectrograph data.
 """
+
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np

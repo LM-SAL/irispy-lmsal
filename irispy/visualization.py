@@ -18,9 +18,17 @@ def _set_axis_colors(ax):
             axis.set_format_unit(u.nm)
             axis.set_major_formatter("x.x")
             axis.set_axislabel("em.wl [$\\mathrm{nm}$]")
-        elif axis.default_label.lower() in ["latitude", "lat", "custom:pos.helioprojective.lat"]:
+        elif axis.default_label.lower() in [
+            "latitude",
+            "lat",
+            "custom:pos.helioprojective.lat",
+        ]:
             _extracted_from__set_axis_colors_14(axis, "red")
-        elif axis.default_label.lower() in ["longitude", "lon", "custom:pos.helioprojective.lon"]:
+        elif axis.default_label.lower() in [
+            "longitude",
+            "lon",
+            "custom:pos.helioprojective.lon",
+        ]:
             _extracted_from__set_axis_colors_14(axis, "black")
 
 
@@ -48,7 +56,15 @@ class Plotter(MatplotlibPlotter):
     def plot(self, *args, **kwargs):
         return super().plot(*args, **kwargs)
 
-    def _animate_cube(self, wcs, plot_axes=None, axes_coordinates=None, axes_units=None, data_unit=None, **kwargs):
+    def _animate_cube(
+        self,
+        wcs,
+        plot_axes=None,
+        axes_coordinates=None,
+        axes_units=None,
+        data_unit=None,
+        **kwargs,
+    ):
         # Derive inputs for animation object and instantiate.
         data, wcs, plot_axes, coord_params = self._prep_animate_args(wcs, plot_axes, axes_units, data_unit)
         ax = CustomArrayAnimatorWCS(data, wcs, plot_axes, coord_params=coord_params, **kwargs)
@@ -57,7 +73,7 @@ class Plotter(MatplotlibPlotter):
         self._apply_axes_coordinates(ax.axes, axes_coordinates)
         # This changes the parameters for future iterations
         for hidden in self._not_visible_coords(ax.axes, axes_coordinates):
-            param = ax.coord_params[hidden] if hidden in ax.coord_params else {}
+            param = ax.coord_params.get(hidden, {})
             param["ticks"] = False
             ax.coord_params[hidden] = param
         return ax

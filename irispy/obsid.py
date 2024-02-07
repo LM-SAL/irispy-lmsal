@@ -45,13 +45,13 @@ class ObsID(dict):
     The data can be accessed as in a dictionary:
 
     >>> data = obsid.ObsID(3675508564)
-    >>> data['exptime']
+    >>> data["exptime"]
     <Quantity 8. s>
-    >>> data['linelist']
+    >>> data["linelist"]
     'Flare linelist 1'
-    >>> data['raster_fov']
+    >>> data["raster_fov"]
     '31.35x120'
-    >>> data['raster_step']
+    >>> data["raster_step"]
     0.33
     """
 
@@ -106,11 +106,13 @@ class ObsID(dict):
         }
         versions = [34, 36, 38, 40]
         if len(str(obsid)) != 10:
-            raise ValueError("Invalid OBS ID: must have 10 digits.")
+            msg = "Invalid OBS ID: must have 10 digits."
+            raise ValueError(msg)
         # here choose between tables
         version = int(str(obsid)[:2])
         if version not in versions:
-            raise ValueError("Invalid OBS ID: two first digits must one of" f" {versions}")
+            msg = "Invalid OBS ID: two first digits must one of" f" {versions}"
+            raise ValueError(msg)
         obsid = int(str(obsid)[2:])  # version digits are no longer needed
         table1 = pd.read_csv(resource_filename("irispy", "data/v%i-table10.csv" % version))
         table2 = pd.read_csv(resource_filename("irispy", "data/v%i-table2000.csv" % version))
@@ -118,8 +120,9 @@ class ObsID(dict):
         try:
             meta = table1.where(table1["OBS-ID"] == id_raster).dropna().iloc[0]
         except IndexError:
+            msg = f'Invalid OBS ID: last two numbers must be between {table1["OBS-ID"].min()} and {table1["OBS-ID"].max()}'
             raise ValueError(
-                f'Invalid OBS ID: last two numbers must be between {table1["OBS-ID"].min()} and {table1["OBS-ID"].max()}',
+                msg,
             ) from None
 
         data["raster_step"] = meta["Raster step"]
@@ -135,7 +138,7 @@ class ObsID(dict):
             ],
         )
         # field indices, start from largest and subtract
-        for start, end in zip(field_ranges[-2::-1], field_ranges[:0:-1]):
+        for start, end in zip(field_ranges[-2::-1], field_ranges[:0:-1], strict=False):
             table = table2.iloc[start:end]
             for i in np.arange(start, end)[::-1]:
                 index = i
@@ -149,10 +152,10 @@ class ObsID(dict):
                 attr_name = field_keys[desc.iloc[0]]
                 if attr_name == "exptime":
                     opt = (self._exptime_to_quant(a) for a in list(desc.values))
-                    opt = dict(zip(opt, table["OBS ID"]))
+                    opt = dict(zip(opt, table["OBS ID"], strict=False))
                     attr_value = self._exptime_to_quant(desc.loc[index])
                 else:
-                    opt = dict(zip(desc, table["OBS ID"]))
+                    opt = dict(zip(desc, table["OBS ID"], strict=False))
                     attr_value = desc.loc[index].strip()
                 data[attr_name] = attr_value
                 options[attr_name] = opt
