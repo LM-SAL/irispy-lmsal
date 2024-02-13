@@ -279,8 +279,8 @@ If you would like a bit more information, we have a similar function within `iri
 
 .. code-block:: python
 
-    >>> from irispy.io import fitsinfo  # doctest: +REMOTE_DATA
-    >>> fitsinfo(sample_data.SJI_1330)  # doctest: +REMOTE_DATA
+    >>> from irispy.io import fits_info  # doctest: +REMOTE_DATA
+    >>> fits_info(sample_data.SJI_1330)  # doctest: +REMOTE_DATA
     Filename: ...iris_l2_20211001_060925_3683602040_SJI_1330_t000.fits.gz
     No.    Name      Ver    Type      Cards   Dimensions   Format
       0  PRIMARY       1 PrimaryHDU     162   (555, 548, 20)   int16 (rescales to float32)
@@ -289,7 +289,7 @@ If you would like a bit more information, we have a similar function within `iri
 
 .. code-block:: python
 
-    >>> fitsinfo("iris_l2_20211001_060925_3683602040_raster_t000_r00000.fits") # doctest: +SKIP
+    >>> fits_info("iris_l2_20211001_060925_3683602040_raster_t000_r00000.fits") # doctest: +SKIP
     Filename: iris_l2_20211001_060925_3683602040_raster_t000_r00000.fits
     No.    Name      Ver    Type      Cards   Dimensions   Format
       0  PRIMARY       1 PrimaryHDU     215   ()

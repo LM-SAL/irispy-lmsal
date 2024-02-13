@@ -1,21 +1,123 @@
-import logging
 import tarfile
 from copy import copy
 from pathlib import Path
 
+import astropy.modeling.models as m
 import astropy.units as u
+import gwcs
+import gwcs.coordinate_frames as cf
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.time import Time, TimeDelta
 from astropy.wcs import WCS
+from dkist.wcs.models import CoupledCompoundModel, VaryingCelestialTransform
+from sunpy import log
 from sunpy.coordinates import Helioprojective
+from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst
 
 from irispy.spectrograph import Collection, SGMeta, SpectrogramCube, SpectrogramCubeSequence
-from irispy.utils import calculate_uncertainty
+from irispy.utils import calculate_uncertainty, tar_extract_all
 from irispy.utils.constants import DN_UNIT, READOUT_NOISE, SLIT_WIDTH
 
 __all__ = ["read_spectrograph_lvl2"]
+
+
+def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
+    """
+    Creates the GWCS object for the SJI file.
+
+    Parameters
+    ----------
+    hdulist : `astropy.io.fits.HDUList`
+        The HDU list of the SJI file.
+
+    Returns
+    -------
+    `gwcs.WCS`
+        GWCS object for the SJI file.
+    """
+    pc_table = hdulist[1].data[:, hdulist[1].header["PC1_1IX"] : hdulist[1].header["PC2_2IX"] + 1].reshape(-1, 2, 2)
+    crval_table = hdulist[1].data[:, hdulist[1].header["XCENIX"] : hdulist[1].header["YCENIX"] + 1]
+    crpix = [hdulist[0].header["CRPIX1"], hdulist[0].header["CRPIX2"]]
+    cdelt = [hdulist[0].header["CDELT1"], hdulist[0].header["CDELT2"]]
+    celestial = VaryingCelestialTransform(
+        crpix=crpix * u.pixel,
+        cdelt=cdelt * u.arcsec / u.pixel,
+        pc_table=pc_table * u.pixel,
+        crval_table=crval_table * u.arcsec,
+    )
+    base_time = Time(hdulist[0].header["STARTOBS"], format="isot", scale="utc")
+    times = hdulist[1].data[:, hdulist[1].header["TIME"]] * u.s
+    # We need to account for a non-zero time delta.
+    base_time += times[0]
+    times -= times[0]
+    temporal = m.Tabular1D(
+        np.arange(hdulist[1].data.shape[0]) * u.pix,
+        lookup_table=times,
+        fill_value=np.nan,
+        bounds_error=False,
+        method="linear",
+    )
+    forward_transform = CoupledCompoundModel("&", left=celestial, right=temporal)
+    celestial_frame = cf.CelestialFrame(
+        axes_order=(0, 1),
+        unit=(u.arcsec, u.arcsec),
+        reference_frame=Helioprojective(observer="earth", obstime=base_time),
+        axis_physical_types=[
+            "custom:pos.helioprojective.lon",
+            "custom:pos.helioprojective.lat",
+        ],
+        axes_names=("Longitude", "Latitude"),
+    )
+    temporal_frame = cf.TemporalFrame(Time(base_time), unit=(u.s,), axes_order=(2,), axes_names=("Time (UTC)",))
+    output_frame = cf.CompositeFrame([celestial_frame, temporal_frame])
+    input_frame = cf.CoordinateFrame(
+        axes_order=(0, 1, 2),
+        naxes=3,
+        axes_type=["PIXEL", "PIXEL", "PIXEL"],
+        unit=(u.pix, u.pix, u.pix),
+    )
+    return gwcs.WCS(forward_transform, input_frame=input_frame, output_frame=output_frame)
+
+
+def _create_wcs(hdulist):
+    """
+    This is required as occasionally we need a normal WCS instead of a gWCS due
+    to compatibility issues.
+
+    This has been set to have an Earth Observer at the time of the
+    observation.
+    """
+    wcses = []
+    base_time = Time(hdulist[0].header["STARTOBS"], format="isot", scale="utc")
+    times = hdulist[1].data[:, hdulist[1].header["TIME"]] * u.s
+    # We need to account for a non-zero time delta.
+    base_time += times[0]
+    times -= times[0]
+    for i in range(hdulist[0].header["NAXIS3"]):
+        header = copy(hdulist[0].header)
+        header.pop("NAXIS3")
+        header.pop("PC3_1")
+        header.pop("PC3_2")
+        header.pop("CTYPE3")
+        header.pop("CUNIT3")
+        header.pop("CRVAL3")
+        header.pop("CRPIX3")
+        header.pop("CDELT3")
+        header["NAXIS"] = 2
+        header["CRVAL1"] = hdulist[1].data[i, hdulist[1].header["XCENIX"]]
+        header["CRVAL2"] = hdulist[1].data[i, hdulist[1].header["YCENIX"]]
+        header["PC1_1"] = hdulist[1].data[0, hdulist[1].header["PC1_1IX"]]
+        header["PC1_2"] = hdulist[1].data[0, hdulist[1].header["PC1_2IX"]]
+        header["PC2_1"] = hdulist[1].data[0, hdulist[1].header["PC2_1IX"]]
+        header["PC2_2"] = hdulist[1].data[0, hdulist[1].header["PC2_2IX"]]
+        header["DATE_OBS"] = (base_time + times[i]).isot
+        location = get_body_heliographic_stonyhurst("Earth", header["DATE_OBS"])
+        header["HGLN_OBS"] = location.lon.value
+        header["HGLT_OBS"] = location.lat.value
+        wcses.append(WCS(header))
+    return wcses
 
 
 def _pc_matrix(lam, angle_1, angle_2):
@@ -34,12 +136,16 @@ def read_spectrograph_lvl2(
     Reads IRIS level 2 spectrograph FITS from an OBS into an
     `.IRISSpectrograph` instance.
 
+    .. warning::
+
+        This function does not handle tar files.
+        Either extract them manually or use `irispy.io.read_files`.
+
     Parameters
     ----------
     filenames: `list` of `str` or `str`
         Filename of filenames to be read. They must all be associated with the same
         OBS number.
-        If you provide a tar file, it will be extracted at the same location.
     spectral_windows: iterable of `str` or `str`
         Spectral windows to extract from files. Default=None, implies, extract all
         spectral windows.
@@ -59,16 +165,6 @@ def read_spectrograph_lvl2(
     -------
     `ndcube.NDCollection`
     """
-    if isinstance(filenames, str):
-        if tarfile.is_tarfile(filenames):
-            parent = Path(filenames.replace(".tar.gz", "")).mkdir(parents=True, exist_ok=True)
-            with tarfile.open(filenames, "r") as tar:
-                tar.extractall(parent)
-                filenames = [parent / file for file in tar.getnames()]
-        else:
-            filenames = [filenames]
-
-    # Collecting the window observations
     with fits.open(filenames[0], memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
         v34 = bool(hdulist[0].header["OBSID"].startswith("34"))
         hdulist.verify("silentfix")
@@ -151,7 +247,7 @@ def read_spectrograph_lvl2(
                         "The loading will continue but this will be missing in the final cube. "
                         f"Spectral window: {window_name}, step {i} in file: {filename}"
                     )
-                    logging.warning(msg)
+                    log.warning(msg)
                     continue
                 out_uncertainty = None
                 data_mask = None

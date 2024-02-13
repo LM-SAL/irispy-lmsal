@@ -1,4 +1,3 @@
-import logging
 import textwrap
 
 import astropy.units as u
@@ -7,6 +6,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from ndcube import NDCollection
+from sunpy import log
 from sunpy.coordinates import Helioprojective
 from sunraster import SpectrogramCube as SpecCube
 from sunraster import SpectrogramSequence as SpecSeq
@@ -134,7 +134,7 @@ class SpectrogramCube(SpecCube):
             try:
                 cmap = plt.get_cmap(name=f"irissji{int(self.meta.detector[:3])}")
             except Exception as e:  # NOQA: BLE001
-                logging.debug(e)
+                log.debug(e)
                 cmap = "viridis"
         kwargs["cmap"] = cmap
         if len(self.dimensions) == 1:
