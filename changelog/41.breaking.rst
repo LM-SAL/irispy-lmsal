@@ -1,0 +1,1 @@
+``read_files`` now returns a dictionary with keys "raster" and "sji" where the values are a list of loaded IRIS classes.

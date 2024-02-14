@@ -118,7 +118,7 @@ def _create_wcs(hdulist):
 
 def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     """
-    Reads a level 2 SJI FITS.
+    Reads one level 2 SJI FITS.
 
     Parameters
     ----------

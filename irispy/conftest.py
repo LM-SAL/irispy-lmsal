@@ -1,4 +1,6 @@
 import os
+import tarfile
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -10,84 +12,84 @@ from irispy.io.sji import read_sji_lvl2
 from irispy.utils import get_iris_response
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def raster_file():
     return get_test_filepath("iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits")
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sji_1330_file():
     return get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_1330_t000_test.fits")
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sji_1400_file():
     return get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_1400_t000_test.fits")
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sji_2796_file():
     return get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_2796_t000_test.fits")
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sji_2832_file():
     return get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_2832_t000_test.fits")
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def SJICube_1330():
     from irispy.io.sji import read_sji_lvl2
 
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_1330_t000_test.fits"))
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def SJICube_1400():
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_1400_t000_test.fits"))
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def SJICube_2796():
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_2796_t000_test.fits"))
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def SJICube_2832():
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_2832_t000_test.fits"))
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def iris_response_v1():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=1)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def iris_response_v2():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=2)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def iris_response_v3():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=3)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def iris_response_v4():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=4)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def iris_response_v5():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=5)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def iris_response_v6():
     return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=6)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def filelist():
     return [
         get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_1330_t000_test.fits"),
@@ -110,3 +112,13 @@ def fake_long_obs(tmp_path_factory):
     fits_file = os.fspath(temp_dir.joinpath("iris_l2_20210905_001833_3620258102_SJI_2832_t000_test.fits"))
     hdu.writeto(fits_file)
     return [fits_file]
+
+
+@pytest.fixture(scope="session")
+def fake_tar(tmp_path_factory, filelist):
+    temp_dir = tmp_path_factory.mktemp("IRIS")
+    tar_file = os.fspath(temp_dir.joinpath("iris_l2_20210905_001833_3620258102_SJI_2832_t000_test.tar"))
+    with tarfile.open(tar_file, "w") as tar:
+        for file in filelist:
+            tar.add(file, arcname=Path(file).name)
+    return Path(tar_file)
