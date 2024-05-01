@@ -196,7 +196,7 @@ plt.show()
 # and for this we need to rotate one of them. We can either rotate SDO/AIA to the
 # IRIS frame, or vice-versa.
 #
-# We will rotate the AIA data, using `.reproject_to`.
+# We will rotate the AIA data, using `sunpy.map.Map.reproject_to`.
 # As `sunpy` does not support gWCS, we have to use the basic WCS.
 
 aia_rot = aia_sub.reproject_to(sji_cut.basic_wcs)

@@ -1,5 +1,5 @@
-*********
-Tutorials
-*********
+********
+Examples
+********
 
-This gallery contains tutorials of how to use ``irispy-lmsal``.
+This gallery contains examples of how to use ``irispy-lmsal``.

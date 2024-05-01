@@ -110,12 +110,14 @@ intersphinx_mapping = {
         "https://docs.sunpy.org/projects/sunkit-instruments/en/stable/",
         None,
     ),
-    "zeep": ("https://docs.python-zeep.org/en/stable/", None),
     "asdf": ("https://asdf.readthedocs.io/en/stable/", None),
     "sunpy": ("https://docs.sunpy.org/en/stable/", None),
+    "sunraster": ("https://docs.sunpy.org/projects/sunraster/en/stable/", None),
+    "zeep": ("https://docs.python-zeep.org/en/stable/", None),
 }
 
 # -- Options for HTML output -------------------------------------------------
+html_theme = "sunpy"
 graphviz_output_format = "svg"
 sphinx_gallery_conf = {
     "backreferences_dir": Path("generated") / "modules",
