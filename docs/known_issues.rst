@@ -28,8 +28,7 @@ This means that one gets the correct answer only if one does the matrix multipli
 
 We work around this by modifying the PC_ij matrix to have the correct skew.
 Since the X CDELT is 1e-10 arcsec, the inverse is thankfully not infinity.
-Using equation 187 in `Calabretta & Greisen 2002
-<https://www.aanda.org/articles/aa/abs/2002/45/aah3860/aah3860.html>__`, we correct for this.
+Using equation 187 in `Calabretta & Greisen 2002 <https://www.aanda.org/articles/aa/abs/2002/45/aah3860/aah3860.html>__`, we correct for this.
 
 Note that since these pixels are extremely rectangular, an aspect ratio of ~3e-10, the cross terms in the
 PCij matrix are quite small: -3.4e-12 and -3.8e7.
