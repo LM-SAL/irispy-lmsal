@@ -10,4 +10,5 @@ API Reference
    irispy
    sji
    spectrograph
+   io
    utils
