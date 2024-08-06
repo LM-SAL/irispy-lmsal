@@ -21,7 +21,7 @@ __all__ = ["Collection", "SpectrogramCube", "SpectrogramCubeSequence", "SGMeta"]
 
 
 class Collection(NDCollection):
-    def __str__(self):
+    def __str__(self) -> str:
         return textwrap.dedent(
             f"""
             Collection
@@ -80,7 +80,7 @@ class SpectrogramCube(SpecCube):
         *,
         mask=None,
         copy=False,
-    ):
+    ) -> None:
         super().__init__(
             data,
             wcs,
@@ -102,10 +102,10 @@ class SpectrogramCube(SpecCube):
             mask=result.mask,
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{object.__repr__(self)}\n{self!s}"
 
-    def __str__(self):
+    def __str__(self) -> str:
         instance_start = None
         instance_end = None
         if self.global_coords and "time" in self.global_coords:
@@ -277,14 +277,14 @@ class SpectrogramCubeSequence(SpecSeq):
         The axis of the NDCubes corresponding to time.
     """
 
-    def __init__(self, data_list, meta=None, common_axis=0):
+    def __init__(self, data_list, meta=None, common_axis=0) -> None:
         # Check that all spectrograms are from same spectral window and OBS ID.
         if len(np.unique([cube.meta["OBSID"] for cube in data_list])) != 1:
             msg = "Constituent SpectrogramCube objects must have same value of 'OBSID' in its meta."
             raise ValueError(msg)
         super().__init__(data_list, meta=meta, common_axis=common_axis)
 
-    def __str__(self):
+    def __str__(self) -> str:
         # Overload it get the class name in the string
         return super().__str__()
 
@@ -313,7 +313,7 @@ class SpectrogramCubeSequence(SpecSeq):
 
 
 class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
-    def __init__(self, header, spectral_window, **kwargs):
+    def __init__(self, header, spectral_window, **kwargs) -> None:
         super().__init__(header, **kwargs)
         spectral_windows = np.array([self[f"TDESC{i}"] for i in range(1, self["NWIN"] + 1)])
         window_mask = np.array([spectral_window in window for window in spectral_windows])
@@ -337,7 +337,7 @@ class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
             )
         self._iwin = np.arange(len(spectral_windows))[window_mask][0] + 1
 
-    def __str__(self):
+    def __str__(self) -> str:
         return textwrap.dedent(
             f"""
                 SGMeta
@@ -355,7 +355,7 @@ class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
                 """,
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{object.__repr__(self)}\n{self!s}"
 
     def _construct_time(self, key):

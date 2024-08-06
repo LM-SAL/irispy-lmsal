@@ -55,13 +55,13 @@ class ObsID(dict):
     0.33
     """
 
-    def __init__(self, obsid):
+    def __init__(self, obsid) -> None:
         self.obsid = obsid
         data, options = self._read_obsid(obsid)
         super().__init__(data)
         self.options = options
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             "IRIS OBS ID {obsid}\n"
             "----------------------\n"
