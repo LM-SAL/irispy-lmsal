@@ -103,6 +103,8 @@ def fake_long_obs(tmp_path_factory):
     header["STARTOBS"] = "2017-05-02T05:25:51.000"
     header["ENDOBS"] = "2017-05-02T08:25:51.000"
     header["NAXIS3"] = 100
+    if header["CUNIT3"] == "seconds":
+        header["CUNIT3"] = "s"
     rng = np.random.default_rng(12345)
     data = rng.random((header["NAXIS3"], header["NAXIS2"], header["NAXIS1"]))
     temp_dir = tmp_path_factory.mktemp("IRIS")
