@@ -88,7 +88,7 @@ def read_spectrograph_lvl2(
                 missing_windows = window_is_in_obs is False
                 msg = f"Spectral windows {spectral_windows[missing_windows]} not in file {filenames[0]}"
                 raise ValueError(msg)
-            window_fits_indices = np.nonzero(np.in1d(windows_in_obs, spectral_windows))[0] + 1
+            window_fits_indices = np.nonzero(np.isin(windows_in_obs, spectral_windows))[0] + 1
         data_dict = {window_name: [] for window_name in spectral_windows_req}
 
     for filename in filenames:

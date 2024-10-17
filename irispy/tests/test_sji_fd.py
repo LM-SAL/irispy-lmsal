@@ -48,7 +48,7 @@ header = {
     "CRVAL2": 0,
     "NAXIS2": 3,
     "CTYPE3": "Time    ",
-    "CUNIT3": "seconds",
+    "CUNIT3": "s",
     "CDELT3": 0.3,
     "CRPIX3": 0,
     "CRVAL3": 0,
@@ -72,7 +72,7 @@ header_2D = {
 wcs_2D = WCS(header=header_2D, naxis=2)
 header_4D = {
     "CTYPE1": "Time    ",
-    "CUNIT1": "seconds",
+    "CUNIT1": "s",
     "CDELT1": 0.4,
     "CRPIX1": 0,
     "CRVAL1": 0,
@@ -84,7 +84,7 @@ header_4D = {
     "CRVAL2": 0,
     "NAXIS2": 3,
     "CTYPE3": "Wavelength",
-    "CUNIT3": "seconds",
+    "CUNIT3": "s",
     "CDELT3": 0.4,
     "CRPIX3": 0,
     "CRVAL3": 0,
@@ -99,7 +99,7 @@ header_4D = {
 wcs_4D = WCS(header=header_4D, naxis=4)
 header_1D = {
     "CTYPE1": "Time    ",
-    "CUNIT1": "seconds",
+    "CUNIT1": "s",
     "CDELT1": 0.4,
     "CRPIX1": 0,
     "CRVAL1": 0,
@@ -109,10 +109,11 @@ wcs_1D = WCS(header=header_1D, naxis=1)
 unit = utils.DN_UNIT["SJI"]
 mask_cube = data >= 0
 mask_4D = data_4D >= 0
-uncertainty = np.sqrt(data)
-uncertainty_2D = np.sqrt(data_2D)
-uncertainty_1D = np.sqrt(data_1D)
-uncertainty_4D = np.sqrt(data_4D)
+with np.errstate(divide="ignore", invalid="ignore"):
+    uncertainty = np.sqrt(data)
+    uncertainty_2D = np.sqrt(data_2D)
+    uncertainty_1D = np.sqrt(data_1D)
+    uncertainty_4D = np.sqrt(data_4D)
 times = Time(["2014-12-11T19:39:00.48", "2014-12-11T19:43:07.6"])
 exposure_times = 2 * np.ones((2), float) * u.s
 meta = Meta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_shape=data.shape)
@@ -189,7 +190,7 @@ header = {
     "CRVAL2": 0,
     "NAXIS2": 3,
     "CTYPE3": "Time    ",
-    "CUNIT3": "seconds",
+    "CUNIT3": "s",
     "CDELT3": 0.3,
     "CRPIX3": 0,
     "CRVAL3": 0,

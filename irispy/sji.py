@@ -59,7 +59,7 @@ class SJICube(SpectrogramCube):
         copy=False,
         scaled=None,
         **kwargs,
-    ):
+    ) -> None:
         self.scaled = scaled
         self.dust_masked = False
         self._basic_wcs = kwargs.pop("_basic_wcs") if "_basic_wcs" in kwargs else None
@@ -74,10 +74,10 @@ class SJICube(SpectrogramCube):
             **kwargs,
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{object.__repr__(self)}\n{self!s}"
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.wcs.world_n_dim == 2:
             instance_start = self.global_coords["Time (UTC)"]
             instance_end = None
