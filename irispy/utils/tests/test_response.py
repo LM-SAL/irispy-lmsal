@@ -92,7 +92,6 @@ def test_get_iris_response_version2(iris_response_v2):
 
 
 def test_get_iris_response_version3(iris_response_v3):
-    breakpoint()
     np_test.assert_almost_equal(iris_response_v3["AREA_SG"].value, area_sg_load3, decimal=6)
     np_test.assert_almost_equal(iris_response_v3["AREA_SJI"].value, area_sji_load3, decimal=6)
 
