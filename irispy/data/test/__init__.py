@@ -8,7 +8,7 @@ from astropy.utils.data import get_pkg_data_filename
 
 import irispy
 
-__all__ = ["rootdir", "file_list", "get_test_filepath"]
+__all__ = ["file_list", "get_test_filepath", "rootdir"]
 
 rootdir = Path(irispy.__file__).parent / "data" / "test"
 file_list = str(Path(rootdir).glob("/*.[!p]*"))

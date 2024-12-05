@@ -12,12 +12,12 @@ from scipy import interpolate, ndimage
 from irispy.utils.response import get_iris_response
 
 __all__ = [
+    "calculate_dust_mask",
+    "calculate_uncertainty",
+    "gaussian1d_on_linear_bg",
     "get_detector_type",
     "get_interpolated_effective_area",
-    "calculate_dust_mask",
-    "gaussian1d_on_linear_bg",
     "image_clipping",
-    "calculate_uncertainty",
 ]
 
 

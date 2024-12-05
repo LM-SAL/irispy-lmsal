@@ -17,7 +17,7 @@ from irispy import utils
 from irispy.utils.constants import SPECTRAL_BAND
 from irispy.visualization import Plotter, _set_axis_colors
 
-__all__ = ["Collection", "SpectrogramCube", "SpectrogramCubeSequence", "SGMeta"]
+__all__ = ["Collection", "SGMeta", "SpectrogramCube", "SpectrogramCubeSequence"]
 
 
 class Collection(NDCollection):
