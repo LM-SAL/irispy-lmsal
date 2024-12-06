@@ -5,12 +5,12 @@ This module provides constants used elsewhere.
 import astropy.units as u
 
 __all__ = [
-    "DN_UNIT",
-    "READOUT_NOISE",
-    "RADIANCE_UNIT",
-    "SLIT_WIDTH",
     "BAD_PIXEL_VALUE_SCALED",
     "BAD_PIXEL_VALUE_UNSCALED",
+    "DN_UNIT",
+    "RADIANCE_UNIT",
+    "READOUT_NOISE",
+    "SLIT_WIDTH",
 ]
 
 # The following value is only appropriate for byte scaled images

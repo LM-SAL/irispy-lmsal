@@ -10,9 +10,9 @@ from irispy.utils.constants import RADIANCE_UNIT
 from irispy.utils.utils import get_interpolated_effective_area
 
 __all__ = [
+    "calculate_photons_per_sec_to_radiance_factor",
     "convert_between_DN_and_photons",
     "convert_or_undo_photons_per_sec_to_radiance",
-    "calculate_photons_per_sec_to_radiance_factor",
     "reshape_1D_wavelength_dimensions_for_broadcast",
 ]
 

@@ -3,7 +3,7 @@ import sunpy.visualization.colormaps as cm  # NOQA: F401
 from mpl_animators import ArrayAnimatorWCS
 from ndcube.visualization.mpl_plotter import MatplotlibPlotter
 
-__all__ = ["_set_axis_colors", "Plotter", "CustomArrayAnimatorWCS"]
+__all__ = ["CustomArrayAnimatorWCS", "Plotter", "_set_axis_colors"]
 
 
 def _set_axis_colors(ax):

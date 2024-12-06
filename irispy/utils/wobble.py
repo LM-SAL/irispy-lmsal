@@ -86,7 +86,7 @@ def wobble_movie(
         date = header["DATE_OBS"].split(".")[0]
         # Calculate index to downsample in time to accentuate the wobble
         cadence = header["CDELT3"]
-        cadence_sample = np.floor(wobble_cadence / cadence) if np.floor(wobble_cadence / cadence) > 1 else 1
+        cadence_sample = max(1, np.floor(wobble_cadence / cadence))
         if timestamp:
             timestamps = [
                 parse_time(header["STARTOBS"]) + TimeDelta(cadence, format="sec") * i for i in range(numframes)
