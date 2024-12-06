@@ -100,7 +100,7 @@ class SJICube(SpectrogramCube):
             IRIS Obs. Description: {self.meta.get("OBS_DESC")}
             Axis Types:            {self.array_axis_physical_types}
             Roll:                  {self.meta.get("SAT_ROT")}
-            Cube dimensions:       {self.dimensions}
+            Cube dimensions:       {self.shape}
             """,
         )
 

@@ -122,7 +122,7 @@ class SpectrogramCube(SpecCube):
             OBS Description:    {self.meta.get("OBS_DESC")}
             OBS period:         {self.meta.get("STARTOBS")} -- {self.meta.get("ENDOBS")}
             Spectrogram period: {instance_start} -- {instance_end}
-            Data shape:         {self.dimensions}
+            Data shape:         {self.shape}
             Axis Types:         {self.array_axis_physical_types}
             Roll:               {self.meta.get("SAT_ROT")}
             """,
@@ -137,7 +137,7 @@ class SpectrogramCube(SpecCube):
                 logging.debug(e)
                 cmap = "viridis"
         kwargs["cmap"] = cmap
-        if len(self.dimensions) == 1:
+        if len(self.shape) == 1:
             kwargs.pop("cmap")
         ax = Plotter(ndcube=self).plot(*args, **kwargs)
         _set_axis_colors(ax)
@@ -348,7 +348,7 @@ class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
                 Spectral Window: {self.spectral_window}
                 Spectral Range:  {self.spectral_range}
                 Spectral Band:   {self.spectral_band}
-                Dimensions:      {self.dimensions}
+                Dimensions:      {self.shape}
                 Date:            {self.date_reference}
                 OBS ID:          {self.observing_mode_id}
                 OBS Description: {self.observing_mode_description}

@@ -10,7 +10,7 @@ import irispy.data.test
 from irispy import SpectrogramCube, SpectrogramCubeSequence, utils
 from irispy.io.spectrograph import read_spectrograph_lvl2
 
-testpath = irispy.data.test.rootdir
+testpath = irispy.data.test.ROOTDIR
 # Arrays of DN
 SOURCE_DATA_DN = np.array(
     [
