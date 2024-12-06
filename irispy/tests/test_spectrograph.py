@@ -10,7 +10,7 @@ import irispy.data.test
 from irispy import SpectrogramCube, SpectrogramCubeSequence, utils
 from irispy.io.spectrograph import read_spectrograph_lvl2
 
-testpath = irispy.data.test.rootdir
+testpath = irispy.data.test.ROOTDIR
 # Arrays of DN
 SOURCE_DATA_DN = np.array(
     [
@@ -18,7 +18,8 @@ SOURCE_DATA_DN = np.array(
         [[0.563, 1.132, -1.343], [-0.719, 1.441, 1.566]],
     ],
 )
-SOURCE_UNCERTAINTY_DN = np.sqrt(SOURCE_DATA_DN)
+with np.errstate(divide="ignore", invalid="ignore"):
+    SOURCE_UNCERTAINTY_DN = np.sqrt(SOURCE_DATA_DN)
 # Arrays relating SOURCE_DATA_DN to photons in NUV and FUV
 SOURCE_DATA_PHOTONS_NUV = np.array(
     [
@@ -32,8 +33,9 @@ SOURCE_DATA_PHOTONS_FUV = np.array(
         [[2.252, 4.528, -5.372], [-2.876, 5.764, 6.264]],
     ],
 )
-SOURCE_UNCERTAINTY_PHOTONS_NUV = np.sqrt(SOURCE_DATA_PHOTONS_NUV)
-SOURCE_UNCERTAINTY_PHOTONS_FUV = np.sqrt(SOURCE_DATA_PHOTONS_FUV)
+with np.errstate(divide="ignore", invalid="ignore"):
+    SOURCE_UNCERTAINTY_PHOTONS_NUV = np.sqrt(SOURCE_DATA_PHOTONS_NUV)
+    SOURCE_UNCERTAINTY_PHOTONS_FUV = np.sqrt(SOURCE_DATA_PHOTONS_FUV)
 time_dim_len = SOURCE_DATA_DN.shape[0]
 single_exposure_time = 2.0
 EXPOSURE_TIME = u.Quantity(np.zeros(time_dim_len) + single_exposure_time, unit=u.s)

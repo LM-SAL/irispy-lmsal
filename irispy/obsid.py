@@ -1,9 +1,9 @@
+import importlib.resources
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from astropy import units as u
-from pkg_resources import resource_filename
 
 dir_path = Path(__file__).parent
 
@@ -52,16 +52,16 @@ class ObsID(dict):
     >>> data["raster_fov"]
     '31.35x120'
     >>> data["raster_step"]
-    0.33
+    np.float64(0.33)
     """
 
-    def __init__(self, obsid):
+    def __init__(self, obsid) -> None:
         self.obsid = obsid
         data, options = self._read_obsid(obsid)
         super().__init__(data)
         self.options = options
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             "IRIS OBS ID {obsid}\n"
             "----------------------\n"
@@ -114,8 +114,12 @@ class ObsID(dict):
             msg = "Invalid OBS ID: two first digits must one of" f" {versions}"
             raise ValueError(msg)
         obsid = int(str(obsid)[2:])  # version digits are no longer needed
-        table1 = pd.read_csv(resource_filename("irispy", "data/v%i-table10.csv" % version))
-        table2 = pd.read_csv(resource_filename("irispy", "data/v%i-table2000.csv" % version))
+        with importlib.resources.as_file(importlib.resources.files("irispy") / f"data/v{version}-table10.csv") as path:
+            table1 = pd.read_csv(path)
+        with importlib.resources.as_file(
+            importlib.resources.files("irispy") / f"data/v{version}-table2000.csv"
+        ) as path:
+            table2 = pd.read_csv(path)
         id_raster = int(str(obsid)[-2:])
         try:
             meta = table1.where(table1["OBS-ID"] == id_raster).dropna().iloc[0]

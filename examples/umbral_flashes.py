@@ -64,8 +64,6 @@ vmin, vmax = image_clipping(mg_ii.data[..., 103])
 mg_crop.plot(vmin=vmin, vmax=vmax)
 plt.xlabel("Solar Y")
 
-plt.show()
-
 ###############################################################################
 # The middle section between 60"-75" is on the umbra of a sunspot, even though
 # it is not obvious from this image. One can see very clearly the umbral oscillations,
@@ -76,16 +74,13 @@ plt.show()
 vmin, vmax = image_clipping(sji_1400[0].data)
 sji_1400[0].plot(vmin=vmin, vmax=vmax)
 
-plt.show()
-
 ###############################################################################
 # The slit pixel 220 is a location on the sunspot's umbra.
 # Let us plot the k3 intensity (spectral pixel 103 of ``mg_ii``) and the
 # core of the brightest C II line (spectral pixel 90 of ``c_ii``) vs
 # time in minutes (showing first ~10 minutes only)
-
-mg_ii_times = mg_ii.axis_world_coords("time", wcs=mg_ii.extra_coords)[0][:200]
-c_ii_times = c_ii.axis_world_coords("time", wcs=c_ii.extra_coords)[0][:200]
+mg_ii_times = mg_ii.time[:200]
+c_ii_times = c_ii.time[:200]
 
 plt.figure()
 plt.plot(mg_ii_times, mg_ii.data[:200, 220, 103], label="Mg II k3")
@@ -98,8 +93,6 @@ ax.axes.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.axes.xaxis.get_
 for label in ax.axes.get_xticklabels(which="major"):
     label.set(rotation=30, horizontalalignment="right")
 
-plt.show()
-
 ###############################################################################
 # Imagine now you wanted to compare these oscillations with
 # the intensity from the SJI. The SJI images are typically
@@ -107,7 +100,6 @@ plt.show()
 # time array for the 1400 SJI.
 
 # We will take the first 50 to cut down on the size of the data for this example.
-# This is memory intensive and that an upstream bug needs to be fixed.
 times_sji = sji_1400.time[:50]
 
 ###############################################################################
@@ -126,8 +118,8 @@ ax.axes.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.axes.xaxis.get_
 for label in ax.axes.get_xticklabels(which="major"):
     label.set(rotation=30, horizontalalignment="right")
 
-plt.show()
-
 ###############################################################################
 # You are now ready to explore all the correlations, anti-correlations,
 # and phase differences.
+
+plt.show()
