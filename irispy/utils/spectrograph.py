@@ -2,8 +2,9 @@
 This module provides general utility functions called by code in spectrograph.
 """
 
-import astropy.units as u
 import numpy as np
+
+import astropy.units as u
 from astropy import constants
 
 from irispy.utils.constants import RADIANCE_UNIT

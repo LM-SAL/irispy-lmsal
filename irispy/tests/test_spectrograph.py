@@ -1,7 +1,8 @@
 import copy
 
-import astropy.units as u
 import numpy as np
+
+import astropy.units as u
 from astropy.io import fits
 from astropy.time import Time, TimeDelta
 from astropy.wcs import WCS

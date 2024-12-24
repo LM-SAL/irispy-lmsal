@@ -4,6 +4,7 @@ import numpy as np
 import numpy.testing as np_test
 import pytest
 import scipy.io
+
 from sunpy.time import parse_time
 
 from irispy import utils
