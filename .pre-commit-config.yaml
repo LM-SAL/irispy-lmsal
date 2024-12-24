@@ -4,7 +4,7 @@ repos:
     hooks:
       - id: docformatter
         args: ["--in-place", "--pre-summary-newline", "--make-summary-multi"]
-  - repo: https://github.com/myint/autoflake
+  - repo: https://github.com/PyCQA/autoflake
     rev: v2.3.1
     hooks:
       - id: autoflake
@@ -15,8 +15,8 @@ repos:
             "--remove-unused-variable",
           ]
         exclude: ".*(.fits|.fts|.fit|.txt|tca.*|extern.*|.rst|.md|docs/conf.py)$"
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.8.2"
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.8.4"
     hooks:
       - id: ruff
         args: ["--fix", "--unsafe-fixes"]
