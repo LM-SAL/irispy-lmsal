@@ -2,6 +2,7 @@ import logging
 import textwrap
 
 import matplotlib.pyplot as plt
+
 from sunraster import SpectrogramCube
 
 from irispy.utils import calculate_dust_mask
@@ -108,7 +109,7 @@ class SJICube(SpectrogramCube):
         sliced_self = super().__getitem__(item)
         sliced_self.scaled = self.scaled
         if self._basic_wcs is not None:
-            sliced_self._basic_wcs = self._basic_wcs[item]  # NOQA: SLF001
+            sliced_self._basic_wcs = self._basic_wcs[item]
         return sliced_self
 
     def plot(self, *args, **kwargs):

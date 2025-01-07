@@ -1,11 +1,13 @@
 import logging
 import textwrap
 
-import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+
+import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
+
 from ndcube import NDCollection
 from sunpy.coordinates import Helioprojective
 from sunraster import SpectrogramCube as SpecCube
@@ -256,7 +258,7 @@ class SpectrogramCube(SpecCube):
             self.meta,
             mask=self.mask,
         )
-        new_cube._extra_coords = self.extra_coords  # NOQA: SLF001
+        new_cube._extra_coords = self.extra_coords
         return new_cube
 
 

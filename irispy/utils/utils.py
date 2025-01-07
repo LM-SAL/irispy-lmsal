@@ -4,10 +4,11 @@ This module provides general utility functions.
 
 import numbers
 
-import astropy.units as u
 import numpy as np
-from astropy.modeling.models import custom_model
 from scipy import interpolate, ndimage
+
+import astropy.units as u
+from astropy.modeling.models import custom_model
 
 from irispy.utils.response import get_iris_response
 

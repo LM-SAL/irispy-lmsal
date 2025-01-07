@@ -1,7 +1,8 @@
-import astropy.units as u
 import numpy as np
 import numpy.testing as np_test
 import pytest
+
+import astropy.units as u
 
 from irispy.utils.constants import DN_UNIT
 from irispy.utils.spectrograph import convert_between_DN_and_photons

@@ -6,11 +6,13 @@ Working with IRIS spectrograph files
 In this example, we will showcase how to use ``irispy-lmsal`` to open, crop and plot IRIS spectrograph data.
 """
 
-import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
 import pooch
+
+import astropy.units as u
 from astropy.coordinates import SkyCoord, SpectralCoord
+
 from sunpy.coordinates.frames import Helioprojective
 
 from irispy.io import read_files

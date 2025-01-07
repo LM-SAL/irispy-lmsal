@@ -62,7 +62,7 @@ def _retry_sample_data(results, new_url_base):
     # from the previous results object and this retry, and all the errors from
     # this retry.
     new_results = results + extra_results
-    new_results._errors = extra_results._errors  # NOQA: SLF001
+    new_results._errors = extra_results._errors
     return new_results
 
 

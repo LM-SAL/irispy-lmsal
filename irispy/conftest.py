@@ -2,7 +2,9 @@ import os
 
 import numpy as np
 import pytest
+
 from astropy.io import fits
+
 from sunpy.time import parse_time
 
 from irispy.data.test import get_test_filepath

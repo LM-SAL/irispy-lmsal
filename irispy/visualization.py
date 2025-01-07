@@ -1,6 +1,8 @@
-import astropy.units as u
-import sunpy.visualization.colormaps as cm  # NOQA: F401
 from mpl_animators import ArrayAnimatorWCS
+
+import astropy.units as u
+
+import sunpy.visualization.colormaps as cm  # NOQA: F401
 from ndcube.visualization.mpl_plotter import MatplotlibPlotter
 
 __all__ = ["CustomArrayAnimatorWCS", "Plotter", "_set_axis_colors"]

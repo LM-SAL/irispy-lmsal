@@ -12,14 +12,15 @@ This means that any precise wavelength calibration will need to correct for thos
 
 import tarfile
 
-import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
 import pooch
-from astropy.coordinates import SpectralCoord
-from astropy.io import fits
 from scipy.constants import c
 from scipy.interpolate import interp1d
+
+import astropy.units as u
+from astropy.coordinates import SpectralCoord
+from astropy.io import fits
 
 from irispy.io import read_files
 from irispy.utils import image_clipping

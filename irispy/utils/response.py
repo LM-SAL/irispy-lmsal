@@ -5,12 +5,14 @@ This module provides general utility functions for IRIS Responses.
 import datetime
 from pathlib import Path
 
-import astropy.units as u
 import numpy as np
 import scipy
 import scipy.io
+
+import astropy.units as u
 from astropy.time import Time
 from astropy.units.quantity import Quantity
+
 from sunpy.time import parse_time
 
 from irispy.data import ROOTDIR
