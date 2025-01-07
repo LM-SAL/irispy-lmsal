@@ -4,11 +4,13 @@ from pathlib import Path
 import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import animation
+
 from astropy.io import fits
 from astropy.time import TimeDelta
 from astropy.visualization import AsinhStretch, ImageNormalize
 from astropy.wcs import WCS
-from matplotlib import animation
+
 from sunpy.time import parse_time
 from sunpy.visualization.colormaps.color_tables import iris_sji_color_table
 

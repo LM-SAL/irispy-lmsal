@@ -4,9 +4,11 @@ Tests that use fake data (fd) instead of the test files.
 
 import numpy as np
 import pytest
+
 from astropy import units as u
 from astropy.time import Time
 from astropy.wcs import WCS
+
 from sunraster.extern.meta import Meta
 
 from irispy import SJICube, utils

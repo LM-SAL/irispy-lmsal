@@ -4,8 +4,9 @@ Short script I used to create the test FITS files in this folder.
 
 
 def compress(files: list) -> None:
-    from astropy.io import fits
     from scipy.ndimage import zoom
+
+    from astropy.io import fits
 
     for file in files:
         hdus = fits.open(file)

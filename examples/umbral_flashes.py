@@ -7,10 +7,11 @@ In this example, we are going to work with spectra and slit-jaw
 images to study an example of dynamical phenomena called umbral flashes.
 """
 
-import astropy.units as u
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pooch
+
+import astropy.units as u
 from astropy.coordinates import SpectralCoord
 from astropy.visualization import time_support
 
