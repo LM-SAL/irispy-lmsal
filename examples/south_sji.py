@@ -22,7 +22,7 @@ from irispy.io import read_files
 
 sji_filename = pooch.retrieve(
     "https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2023/02/11/20230211_083601_3880012095/iris_l2_20230211_083601_3880012095_SJI_2832_t000.fits.gz",
-    known_hash="a4b4f108ed67aded876bb167f24f093e8401d836f7deb66c97a36da8dd226064",
+    known_hash="282595a2c0a5400ef98d1df0172618483dc74b5b56ff16a0f388723363c6f0f1",
 )
 
 ###############################################################################
