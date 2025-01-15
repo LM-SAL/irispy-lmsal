@@ -72,7 +72,7 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Tru
             path = Path(filename.replace(".tar.gz", ""))
             path.mkdir(parents=True, exist_ok=True)
             with tarfile.open(filename, "r") as tar:
-                tar.extractall(path)
+                tar.extractall(path, filter="data")
                 filename = [path / file for file in tar.getnames()]
         else:
             filename = [filename]

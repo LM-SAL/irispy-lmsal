@@ -65,7 +65,7 @@ def read_spectrograph_lvl2(
         if tarfile.is_tarfile(filenames):
             parent = Path(filenames.replace(".tar.gz", "")).mkdir(parents=True, exist_ok=True)
             with tarfile.open(filenames, "r") as tar:
-                tar.extractall(parent)
+                tar.extractall(parent, filter="data")
                 filenames = [parent / file for file in tar.getnames()]
         else:
             filenames = [filenames]
