@@ -11,7 +11,6 @@ You can get IRIS data with co-aligned SDO data (and more) from https://iris.lmsa
 import matplotlib.pyplot as plt
 import numpy as np
 import pooch
-from aiapy.calibrate import update_pointing
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -19,6 +18,8 @@ from astropy.time import Time, TimeDelta
 from astropy.wcs.utils import wcs_to_celestial_frame
 
 import sunpy.map
+from aiapy.calibrate import update_pointing
+from aiapy.calibrate.util import get_pointing_table
 from sunpy.net import Fido
 from sunpy.net import attrs as a
 
@@ -150,7 +151,10 @@ search_results = Fido.search(
 )
 files = Fido.fetch(search_results)
 aia_map = sunpy.map.Map(files[0])
-aia_map = update_pointing(aia_map)
+pointing_table = get_pointing_table(
+    source="LMSAL", time_range=(Time(time_stamp) - TimeDelta(1 * u.minute), Time(time_stamp) + TimeDelta(1 * u.minute))
+)
+aia_map = update_pointing(aia_map, pointing_table=pointing_table)
 
 # You don't need to register AIA images unless you need them aligned to other AIA images.
 # otherwise you are degrading the data as the affine transform is not perfect.

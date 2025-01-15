@@ -24,7 +24,7 @@ def fitsinfo(filename):
         logging.info(msg)
         modifier = ""
         for i in range(hdr["NWIN"]):
-            msg = f"Extension No. {i+1} stores data and header of {hdr[f'TDESC{i+1}']}: "
+            msg = f"Extension No. {i + 1} stores data and header of {hdr[f'TDESC{i + 1}']}: "
             logging.info(msg)
             if "SJI" not in hdr[f"TDET{i + 1}"]:
                 modifier = f" ({hdr[f'TDET{i + 1}'][:3]})"
@@ -72,7 +72,7 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Tru
             path = Path(filename.replace(".tar.gz", ""))
             path.mkdir(parents=True, exist_ok=True)
             with tarfile.open(filename, "r") as tar:
-                tar.extractall(path)
+                tar.extractall(path, filter="data")
                 filename = [path / file for file in tar.getnames()]
         else:
             filename = [filename]

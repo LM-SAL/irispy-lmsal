@@ -59,9 +59,9 @@ Let us recover the header of the raster file and show the description of the obs
     <BLANKLINE>
     Collection
     ----------
-    Cube keys: ('C II 1336', 'Si IV 1394', 'Mg II k 2796')
+    Cube keys: (np.str_('C II 1336'), np.str_('Si IV 1394'), np.str_('Mg II k 2796'))
     Number of Cubes: 3
-    Aligned dimensions: [<Quantity 5. pix> <Quantity 16. pix> <Quantity 548. pix>]
+    Aligned dimensions: [5 16 548]
     Aligned physical types: [('meta.obs.sequence',), ...]
     <BLANKLINE>
 
@@ -84,7 +84,7 @@ Let us check the header of this collection, this is stored as a ``meta`` attribu
     Spectral Window: C II 1336
     Spectral Range:  [1331.70275015 1358.28579039] Angstrom
     Spectral Band:   FUV
-    Dimensions:      [16, 548, 513]
+    Dimensions:      [ 16 548 513]
     Date:            2021-10-01T06:09:25.090
     OBS ID:          3683602040
     OBS Description: Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
@@ -117,7 +117,7 @@ We use the following command to read and load the data from a SJI level 2 file:
     IRIS Obs. Description: Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
     Axis Types:            [('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat', 'time', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat')]
     Roll:                  0.000464606
-    Cube dimensions:       [ 20. 548. 555.] pix
+    Cube dimensions:       (20, 548, 555)
     <BLANKLINE>
 
 Metadata

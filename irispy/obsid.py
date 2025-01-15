@@ -112,7 +112,7 @@ class ObsID(dict):
         # here choose between tables
         version = int(str(obsid)[:2])
         if version not in versions:
-            msg = "Invalid OBS ID: two first digits must one of" f" {versions}"
+            msg = f"Invalid OBS ID: two first digits must one of {versions}"
             raise ValueError(msg)
         obsid = int(str(obsid)[2:])  # version digits are no longer needed
         with importlib.resources.as_file(importlib.resources.files("irispy") / f"data/v{version}-table10.csv") as path:
@@ -125,7 +125,7 @@ class ObsID(dict):
         try:
             meta = table1.where(table1["OBS-ID"] == id_raster).dropna().iloc[0]
         except IndexError:
-            msg = f'Invalid OBS ID: last two numbers must be between {table1["OBS-ID"].min()} and {table1["OBS-ID"].max()}'
+            msg = f"Invalid OBS ID: last two numbers must be between {table1['OBS-ID'].min()} and {table1['OBS-ID'].max()}"
             raise ValueError(
                 msg,
             ) from None
@@ -135,7 +135,7 @@ class ObsID(dict):
         data["spec_cadence"] = meta["Spectral cadence"]
         data["sji_fov"] = meta["SJI FOV"]
         data["raster_desc"] = meta["Description"]
-        data["raster_fulldesc"] = f'{data["raster_desc"]} {data["raster_fov"]} {data["spec_cadence"]}'
+        data["raster_fulldesc"] = f"{data['raster_desc']} {data['raster_fov']} {data['spec_cadence']}"
         field_ranges = np.concatenate(
             [  # find all dividers between fields
                 table2.where(table2["OBS ID"] == 0).dropna(how="all").index,
