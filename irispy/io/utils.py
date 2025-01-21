@@ -32,7 +32,7 @@ def fitsinfo(filename):
             logging.info(msg)
 
 
-def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=True):
+def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=False):
     """
     A wrapper function to read a raster or SJI level 2 data file.
 
@@ -53,7 +53,7 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Tru
         If `True` (not the default), will compute the uncertainty for the data (slower and
         uses more memory). If `memmap=True`, the uncertainty is never computed.
     memmap : `bool`, optional
-        If `True` (the default), will not load arrays into memory, and will only read from
+        If `True` (not the default), will not load arrays into memory, and will only read from
         the file into memory when needed. This option is faster and uses a
         lot less memory. However, because FITS scaling is not done on-the-fly,
         the data units will be unscaled, not the usual data numbers (DN).

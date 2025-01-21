@@ -5,13 +5,12 @@ import astropy.units as u
 import sunpy.visualization.colormaps as cm  # NOQA: F401
 from ndcube.visualization.mpl_plotter import MatplotlibPlotter
 
-__all__ = ["CustomArrayAnimatorWCS", "Plotter", "_set_axis_colors"]
+__all__ = ["CustomArrayAnimatorWCS", "Plotter", "set_axis_properties"]
 
 
-def _set_axis_colors(ax):
+def set_axis_properties(ax):
     """
-    Private method to set the axis colors and labels for IRIS SJI and Raster
-    data.
+    Set the axis colors and labels for IRIS SJI and Raster data.
     """
     if isinstance(ax, ArrayAnimatorWCS):
         ax = ax.axes
@@ -19,25 +18,38 @@ def _set_axis_colors(ax):
         if axis.default_label.lower() in ["wavelength", "wave", "em.wl"]:
             axis.set_format_unit(u.nm)
             axis.set_major_formatter("x.x")
-            axis.set_axislabel("em.wl [$\\mathrm{nm}$]")
+            axis.set_axislabel("Wavelength [$\\mathrm{nm}$]")
         elif axis.default_label.lower() in [
             "latitude",
             "lat",
             "custom:pos.helioprojective.lat",
         ]:
-            _extracted_from__set_axis_colors_14(axis, "red")
+            _set_axis_properties(axis, "red")
+            axis.set_axislabel_position("l")
         elif axis.default_label.lower() in [
             "longitude",
             "lon",
             "custom:pos.helioprojective.lon",
         ]:
-            _extracted_from__set_axis_colors_14(axis, "black")
+            _set_axis_properties(axis, "black")
+            axis.set_axislabel_position("b")
 
 
-def _extracted_from__set_axis_colors_14(axis, color):
-    axis.set_axislabel(axis.default_label, color=color)
+def _set_axis_properties(axis, color):
+    """
+    Set the axis colors and labels for IRIS SJI and Raster data.
+
+    Parameters
+    ----------
+    axis : `~astropy.visualization.wcsaxes.core.WCSAxes`
+        The axis to set the colors and labels for.
+    color : str
+        The color to use for the axis label.
+    """
     axis.set_ticklabel_position("all")
-    axis.set_ticklabel(color)
+    axis.set_ticks_position("all")
+    axis.set_ticklabel(color, fontsize=8)
+    axis.set_axislabel(axis.default_label, color=color, fontsize=8)
 
 
 class CustomArrayAnimatorWCS(ArrayAnimatorWCS):
@@ -51,7 +63,7 @@ class CustomArrayAnimatorWCS(ArrayAnimatorWCS):
             vmin, vmax = self._get_2d_plot_limits()
             im.set_clim(vmin, vmax)
         slider.cval = val
-        _set_axis_colors(self.axes)
+        set_axis_properties(self.axes)
 
 
 class Plotter(MatplotlibPlotter):
@@ -62,20 +74,10 @@ class Plotter(MatplotlibPlotter):
         self,
         wcs,
         plot_axes=None,
-        axes_coordinates=None,
+        axes_coordinates=None,  # Unused but passed in via ModestImage.set
         axes_units=None,
         data_unit=None,
         **kwargs,
     ):
-        # Derive inputs for animation object and instantiate.
         data, wcs, plot_axes, coord_params = self._prep_animate_args(wcs, plot_axes, axes_units, data_unit)
-        ax = CustomArrayAnimatorWCS(data, wcs, plot_axes, coord_params=coord_params, **kwargs)
-        # We need to modify the visible axes after the axes object has been created.
-        # This call affects only the initial draw
-        self._apply_axes_coordinates(ax.axes, axes_coordinates)
-        # This changes the parameters for future iterations
-        for hidden in self._not_visible_coords(ax.axes, axes_coordinates):
-            param = ax.coord_params.get(hidden, {})
-            param["ticks"] = False
-            ax.coord_params[hidden] = param
-        return ax
+        return CustomArrayAnimatorWCS(data, wcs, plot_axes, coord_params=coord_params, **kwargs)
