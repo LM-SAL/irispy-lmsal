@@ -21,6 +21,8 @@ The complexity of IRIS leads to a variety of different data products with differ
 Therefore a powerful, yet flexible suite of data analysis tools is required to enable users to efficiently, reliably and effectively pursue their science goals.
 This is the aim of irispy-lmsal.
 
+`The data is publicly available and provides access to co-aligned SDO/AIA data and more. <https://iris.lmsal.com/search/>`__
+
 What is ``irispy-lmsal``?
 =========================
 
