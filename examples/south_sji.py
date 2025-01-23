@@ -1,11 +1,9 @@
 """
-====================
-A quick and easy SJI
-====================
+===========
+A quick SJI
+===========
 
 In this example we will show how to plot a South Pole SJI dataset.
-
-You can get IRIS data with co-aligned SDO data (and more) from https://iris.lmsal.com/search/
 """
 
 import matplotlib.pyplot as plt
@@ -17,7 +15,7 @@ from irispy.io import read_files
 # We start with getting the data.
 # This is done by downloading the data from the IRIS archive.
 #
-# In this case, we will use ``pooch`` as to keep this example self contained
+# In this case, we will use ``pooch`` so to keep this example self-contained
 # but using your browser will also work.
 
 sji_filename = pooch.retrieve(
@@ -28,19 +26,18 @@ sji_filename = pooch.retrieve(
 ###############################################################################
 # We will now open the slit-jaw imager (SJI) file we just downloaded.
 
-sji_2832 = read_files(sji_filename)
-# Printing will give us an overview of the file.
+sji_2832 = read_files(sji_filename, memmap=False)
+# Printing will give us an overview of the SJI dataset.
 print(sji_2832)
 
 ###############################################################################
 # We will now plot the IRIS SJI data.
+#
 # You can also change the axis labels and ticks if you so desire.
 # `WCSAxes provides us an API we can use. <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__
 
 # Note that the .get_animation() is used to animate this example and is not required normally.
 ax = sji_2832.plot().get_animation()
-plt.xlabel("Helioprojective Longitude (Solar-X) [arcsec]")
-plt.ylabel("Helioprojective Latitude (Solar-Y) [arcsec]")
-plt.title(f"IRIS SJI {sji_2832.meta['TWAVE1']}", pad=20)
+plt.title(f"IRIS SJI {sji_2832.meta['TWAVE1']}", pad=25)
 
 plt.show()
