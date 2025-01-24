@@ -36,7 +36,7 @@ raster_filename = pooch.retrieve(
 # directly without the scaling to Float32, the data values are no longer in DN,
 # but in scaled integer units that start at -2$^{16}$/2.
 
-raster = read_files(raster_filename, memmap=True)
+raster = read_files(raster_filename, memmap=False)
 
 ###############################################################################
 # Let us now explore what was returned.
@@ -64,10 +64,19 @@ print(mg_ii)
 ###############################################################################
 # Now we have more information about the data, including the OBS ID and description.
 #
-# Let's plot it:
+# Let's plot it
 
 fig = plt.figure()
 mg_ii.plot(fig=fig)
+
+###############################################################################
+# If we want to "raster" over wavelength, we can do the following
+
+fig = plt.figure()
+# This will also "transpose" the data but this is only for visualization purposes
+# We have to set the vmin and vmax or in this case, clip_interval, as by default
+# "plot" works out the vmin,vmax from the first slice which in this case is 0.
+mg_ii.plot(fig=fig, plot_axes=["x", "y", None], clip_interval=(1, 99.9) * u.percent)
 
 ###############################################################################
 # This object is sliceable, so we can do things like this:
@@ -77,7 +86,7 @@ print(mg_ii[120, 200])
 fig = plt.figure()
 ax = fig.add_subplot(111, projection=mg_ii[120, 200].wcs)
 # This is just the data values along the wavelength axis of the Mg II k window at pixel (120, 200)
-mg_ii[120, 200].plot()
+mg_ii[120, 200].plot(axes=ax)
 
 ###############################################################################
 # Note that the values are unscaled due to the ``memmap=True`` setting.
@@ -87,9 +96,8 @@ mg_ii[120, 200].plot()
 
 (mg_wave,) = mg_ii.axis_world_coords("wl")
 
-fig = plt.figure()
 fig, ax = plt.subplots()
-plt.plot(mg_wave.to("AA"), mg_ii.data[120, 200])
+ax.plot(mg_wave.to("AA"), mg_ii.data[120, 200])
 
 ###############################################################################
 # When we use the underlying data directly, we lose all the metadata and WCS information.
@@ -113,15 +121,18 @@ print(mg_index)
 
 ###############################################################################
 # Now we will plot spectroheliogram for Mg II k core wavelength.
-# We can use the ``crop`` method to get this information, this will
+# We can use the ``crop`` metkhod to get this information, this will
 # require a `~.SpectralCoord` object from `astropy.coordinates`.
 
 # None, means that the axis is not cropped
 # Note that this has to be in axis order
 lower_corner = [SpectralCoord(280, unit=u.nm), None]
 upper_corner = [SpectralCoord(280, unit=u.nm), None]
+mg_spec_crop = mg_ii.crop(lower_corner, upper_corner)
 
-mg_crop = mg_ii.crop(lower_corner, upper_corner).plot()
+fig = plt.figure()
+ax = fig.add_subplot(111, projection=mg_spec_crop.wcs)
+mg_spec_crop.plot(axes=ax)
 
 ###############################################################################
 # Imagine there's a really cool feature at (-338", 275"), how can you plot
@@ -129,12 +140,13 @@ mg_crop = mg_ii.crop(lower_corner, upper_corner).plot()
 
 lower_corner = [None, SkyCoord(-338 * u.arcsec, 275 * u.arcsec, frame=Helioprojective)]
 upper_corner = [None, SkyCoord(-338 * u.arcsec, 275 * u.arcsec, frame=Helioprojective)]
-
 mg_ii_cut = mg_ii.crop(lower_corner, upper_corner)
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection=mg_ii_cut.wcs)
-mg_ii.crop(lower_corner, upper_corner).plot(axes=ax)
+mg_ii_cut.plot(axes=ax)
+
+plt.show()
 
 ###############################################################################
 #  Now, you may also be interested in knowing the time that was this observation taken.

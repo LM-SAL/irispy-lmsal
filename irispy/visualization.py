@@ -8,6 +8,23 @@ from ndcube.visualization.mpl_plotter import MatplotlibPlotter
 __all__ = ["CustomArrayAnimatorWCS", "Plotter", "set_axis_properties"]
 
 
+LAT_LABELS = [
+    "custom:pos.helioprojective.lat",
+    "hplt-tan",
+    "hplt",
+    "lat",
+    "latitude",
+]
+LON_LABELS = [
+    "custom:pos.helioprojective.lon",
+    "hpln-tan",
+    "hpln",
+    "lon",
+    "longitude",
+]
+WAVELENGTH_LABELS = ["wavelength", "wave", "em.wl"]
+
+
 def set_axis_properties(ax):
     """
     Set the axis colors and labels for IRIS SJI and Raster data.
@@ -15,24 +32,17 @@ def set_axis_properties(ax):
     if isinstance(ax, ArrayAnimatorWCS):
         ax = ax.axes
     for axis in ax.coords:
-        if axis.default_label.lower() in ["wavelength", "wave", "em.wl"]:
+        if axis.default_label.lower() in WAVELENGTH_LABELS:
             axis.set_format_unit(u.nm)
             axis.set_major_formatter("x.x")
             axis.set_axislabel("Wavelength [$\\mathrm{nm}$]")
-        elif axis.default_label.lower() in [
-            "latitude",
-            "lat",
-            "custom:pos.helioprojective.lat",
-        ]:
+        elif axis.default_label.lower() in LAT_LABELS:
             _set_axis_properties(axis, "red")
-            axis.set_axislabel_position("l")
-        elif axis.default_label.lower() in [
-            "longitude",
-            "lon",
-            "custom:pos.helioprojective.lon",
-        ]:
+        elif axis.default_label.lower() in LON_LABELS:
             _set_axis_properties(axis, "black")
-            axis.set_axislabel_position("b")
+        else:
+            msg = f"Unknown axis label: {axis.default_label}"
+            raise ValueError(msg)
 
 
 def _set_axis_properties(axis, color):
@@ -46,8 +56,6 @@ def _set_axis_properties(axis, color):
     color : str
         The color to use for the axis label.
     """
-    axis.set_ticklabel_position("all")
-    axis.set_ticks_position("all")
     axis.set_ticklabel(color, fontsize=8)
     axis.set_axislabel(axis.default_label, color=color, fontsize=8)
 
@@ -74,7 +82,7 @@ class Plotter(MatplotlibPlotter):
         self,
         wcs,
         plot_axes=None,
-        axes_coordinates=None,  # Unused but passed in via ModestImage.set
+        axes_coordinates=None,  # NOQA: ARG002 - Unused but passed in via ModestImage.set
         axes_units=None,
         data_unit=None,
         **kwargs,
