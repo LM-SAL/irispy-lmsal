@@ -59,6 +59,7 @@ docs = [
   "irispy-lmsal[all]",
   'aiapy',
   'pooch',
+  'dask[distributed]',
   'sphinx',
   'sphinx-automodapi',
   'sphinx-changelog',

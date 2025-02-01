@@ -41,8 +41,7 @@ def set_axis_properties(ax):
         elif axis.default_label.lower() in LON_LABELS:
             _set_axis_properties(axis, "black")
         else:
-            msg = f"Unknown axis label: {axis.default_label}"
-            raise ValueError(msg)
+            pass
 
 
 def _set_axis_properties(axis, color):

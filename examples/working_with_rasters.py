@@ -121,7 +121,7 @@ print(mg_index)
 
 ###############################################################################
 # Now we will plot spectroheliogram for Mg II k core wavelength.
-# We can use the ``crop`` metkhod to get this information, this will
+# We can use the ``crop`` method to get this information, this will
 # require a `~.SpectralCoord` object from `astropy.coordinates`.
 
 # None, means that the axis is not cropped

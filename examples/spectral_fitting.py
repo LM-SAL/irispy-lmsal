@@ -3,18 +3,25 @@
 Spectral fitting
 ================
 
-In this example, we are going to fit spectral lines from IRIS data with Gaussians.
-We use this to work out the moments.
+In this example, we are going to fit spectral lines from IRIS, using the raster data with a single Gaussian.
+Then use the fitted values to calculate the Gaussian moments.
 """
+
+import shutil
+import warnings
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pooch
+from dask.distributed import Client
+from distributed import Client
 
 import astropy.units as u
-from astropy.coordinates import SkyCoord
+from astropy import constants
+from astropy.coordinates import SkyCoord, SpectralCoord
 from astropy.modeling import models as m
-from astropy.modeling.fitting import TRFLSQFitter, parallel_fit_dask
+from astropy.modeling.fitting import LevMarLSQFitter, parallel_fit_dask
 from astropy.visualization import time_support
 
 from sunpy.coordinates.frames import Helioprojective
@@ -65,31 +72,32 @@ ax = fig.add_subplot(111, projection=si_iv_crop.wcs)
 si_iv_crop.plot(axes=ax)
 
 ###############################################################################
+# Let us just check the full field of view at the line core.
+
+si_iv_core = 140.277 * u.nm
+
+lower_corner = [SpectralCoord(si_iv_core), None]
+upper_corner = [SpectralCoord(si_iv_core), None]
+
+si_iv_spec_crop = si_iv_1403.crop(lower_corner, upper_corner)
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection=si_iv_spec_crop.wcs)
+ax = si_iv_spec_crop.plot(axes=ax, vmin=0, vmax=100)
+
+###############################################################################
 # We will want to make two rebinned cubes from the full raster,
 # one summed along the wavelength dimension and one of the spectra averaged over all spatial pixels.
 
 wl_sum = si_iv_1403.rebin((1, 1, si_iv_1403.data.shape[-1]), operation=np.sum)[0]
-print(wl_sum)
-
 spatial_mean = si_iv_1403.rebin((*si_iv_1403.data.shape[:-1], 1))[0, 0, :]
-print(spatial_mean)
-
-# ###############################################################################
-# So this is what the spatial mean looks like.
-
-fig = plt.figure()
-ax = fig.add_subplot(111, projection=spatial_mean.wcs)
-ax = spatial_mean.plot(axes=ax)
 
 # ###############################################################################
 # Now we can create a model for this spectra.
 
-si_iv_core = 140.28 * u.nm
-
 initial_model = m.Const1D(amplitude=2 * si_iv_1403.unit) + m.Gaussian1D(
     amplitude=8 * si_iv_1403.unit, mean=si_iv_core, stddev=0.005 * u.nm
 )
-print(initial_model)
 
 # ###############################################################################
 # To improve our initial conditions we now fit the initial model to the spatially averaged spectra.
@@ -98,16 +106,15 @@ print(initial_model)
 # correlated with. So in this case we get the wavelength dimension which only
 # returns a single `SpectralCoord` object corresponding to the first array dimension of the cube.
 
-fitter = TRFLSQFitter(calc_uncertainties=True)
+fitter = LevMarLSQFitter(calc_uncertainties=True)
 average_fit = fitter(
     initial_model,
     spatial_mean.axis_world_coords("em.wl")[0].to(u.nm),
     spatial_mean.data * spatial_mean.unit,
 )
-print(average_fit)
 
 # ###############################################################################
-# Now we can add to our previous plot, the initial model and the model fit to the average spectra.
+# Now we check, the initial model and the model fitted to the average spectra.
 
 fig = plt.figure()
 ax = spatial_mean.plot(label="Spatial average")
@@ -117,7 +124,11 @@ plt.legend()
 
 # ###############################################################################
 # Now we have our model to fit to all of the spectra, for all slit steps.
-#
+# However, before we get to that, we will shrink the cube we fit.
+
+si_iv_1403_small = si_iv_1403.crop()
+
+# ###############################################################################
 # The function `.parallel_fit_dask` will map a model to each element of a cube along
 # one (or more) "fitting axes", in this case our fitting axis is our wavelength
 # axis (array axis -1). So we want to fit each slice of the data array along the 3rd axis.
@@ -134,57 +145,102 @@ plt.legend()
 #
 # What is returned from `.parallel_fit_dask` is a model with array parameters with
 # the shape of the non-fitting axes of the data.
+#
 
-# We can therefore fit the cube as follows:
-spice_model_fit = parallel_fit_dask(
-    data=si_iv_1403[0],
-    data_unit=si_iv_1403.unit,
-    model=average_fit,
-    fitter=TRFLSQFitter(),
-    fitting_axes=1,
-    # Filter out non-finite values otherwise the fitting will fail
-    fitter_kwargs={"filter_non_finite": True},
-)
+# First we will start a local dask client to improve the fitting performance
+client = Client()
 
-# # ###############################################################################
-# # Given that we are going to want to visualise the output of a few fits, I am going to define a plotting function which will display the shift in the peak locations of the two Gaussians. We shall talk more about this later.
+# Next we will want to setup error reporting
+# Since it is using multiprocess/dask, logs are returned instead of errors
+diag_path = Path("./diag")
+shutil.rmtree(diag_path, ignore_errors=True)
 
+# LevMarLSQFitter does not like negative values, so we need to filter the data
+# You can also set a mask but for now, we will just handle the data.
+filtered_data = np.where(si_iv_1403.data < 0, 0, si_iv_1403.data)
 
-def plot_spice_fit(spice_model_fit):
-    g1_peak_shift = spice_model_fit.mean_1.quantity.to(u.km / u.s, equivalencies=u.doppler_optical(NIV_wave))
-    g2_peak_shift = spice_model_fit.mean_2.quantity.to(u.km / u.s, equivalencies=u.doppler_optical(NeVIII_wave))
-
-    fig, axs = plt.subplots(ncols=3, subplot_kw={"projection": wl_sum}, figsize=(11, 4))
-    fig.suptitle(f"SPICE - {hdu.header['EXTNAME']} - {hdu.header['DATE-AVG']}")
-
-    wl_sum.plot(axes=axs[0])
-    fig.colorbar(axs[0].get_images()[0], ax=axs[0], extend="both", label=f"{wl_sum.unit:latex}", shrink=0.8)
-    axs[0].set_title("Data (summed over wavelength)", pad=40)
-
-    g1_max = np.percentile(np.abs(g1_peak_shift.value), 99)
-    mean_1 = axs[1].imshow(g1_peak_shift.value, cmap="coolwarm", vmin=-g1_max, vmax=g1_max)
-    fig.colorbar(
-        mean_1, ax=axs[1], extend="both", label=f"Velocity from Doppler shift [{g1_peak_shift.unit:latex}]", shrink=0.8
+# We can therefore fit the cube as follows
+with warnings.catch_warnings():
+    # There are several WCS warnings we just want to ignore
+    warnings.simplefilter("ignore")
+    iris_model_fit = parallel_fit_dask(
+        data=filtered_data,
+        data_unit=si_iv_1403.unit,
+        fitting_axes=2,
+        world=si_iv_1403.wcs,
+        model=average_fit,
+        fitter=LevMarLSQFitter(),
+        # Filter out non-finite values otherwise the fitting will fail
+        fitter_kwargs={"filter_non_finite": True},
+        diagnostics="error",
+        diagnostics_path=diag_path,
+        scheduler=client,
     )
-    axs[1].set_title(f"N IV ({NIV_wave:latex})", pad=40)
 
-    g2_max = np.percentile(np.abs(g2_peak_shift.value), 98)
-    mean_2 = axs[2].imshow(g2_peak_shift.value, cmap="coolwarm", vmin=-g2_max, vmax=g2_max)
-    fig.colorbar(
-        mean_2, ax=axs[2], extend="both", label=f"Velocity from Doppler shift [{g2_peak_shift.unit:latex}]", shrink=0.8
+# ###############################################################################
+# Let us see if we have any errors
+
+diag_folders = list(diag_path.glob("*"))
+errors = []
+for diag in diag_folders:
+    if (path := (diag / "error.log")).exists():
+        content = open(path).read()
+        errors.append(content)
+
+print(f"{len(errors)} errors occurred")
+if errors:
+    print("First error is:")
+    print(errors[0])
+
+# ###############################################################################
+# Given that we are going to want to visualize the output, a simple plotting
+# function below has been created for this purpose. Note that it is not a complete
+# standalone function, it requires a few variables defined outside.
+
+
+def plot_gaussian_fit(model_fit):
+    fig, axs = plt.subplots(nrows=1, ncols=3, subplot_kw={"projection": si_iv_spec_crop}, figsize=(16, 6))
+
+    net_flux = (
+        np.sqrt(2 * np.pi)
+        * (model_fit.amplitude_0 + model_fit.amplitude_1)
+        * model_fit.stddev_1.quantity
+        / np.mean(si_iv_1403.axis_world_coords("wl")[0][1:] - si_iv_1403.axis_world_coords("wl")[0][:-1])
     )
-    axs[2].set_title(f"Ne VIII ({NeVIII_wave:latex})", pad=40)
+    amp_max = np.nanpercentile(np.abs(net_flux.value), 99)
+    amp = axs[0].imshow(net_flux.value, vmin=0, vmax=amp_max, origin="lower")
+    cbar = fig.colorbar(amp, ax=axs[0], shrink=0.3)
+    cbar.set_label(label=f"Intensity [{net_flux.unit.to_string()}]", fontsize=8)
+    cbar.ax.tick_params(labelsize=8)
+    axs[0].set_title("Gaussian Net Flux")
+
+    core_shift = ((model_fit.mean_1.quantity.to(u.nm)) - si_iv_core) / si_iv_core * (constants.c.to(u.km / u.s))
+    shift_max = np.nanpercentile(np.abs(core_shift.value), 95)
+    shift = axs[1].imshow(core_shift.value, cmap="coolwarm", vmin=-shift_max, vmax=shift_max)
+    cbar = fig.colorbar(shift, ax=axs[1], extend="both", shrink=0.3)
+    cbar.set_label(label=f"Doppler shift [{core_shift.unit.to_string()}]", fontsize=8)
+    cbar.ax.tick_params(labelsize=8)
+    axs[1].set_title("Velocity from Gaussian shift")
+
+    sigma = (model_fit.stddev_1.quantity.to(u.nm)) / si_iv_core * (constants.c.to(u.km / u.s))
+    line_max = np.nanpercentile(np.abs(sigma.value), 95)
+    line = axs[2].imshow(sigma.value, vmax=line_max)
+    cbar = fig.colorbar(line, ax=axs[2], shrink=0.3)
+    cbar.set_label(label=f"Line Width [{sigma.unit.to_string()}]", fontsize=8)
+    cbar.ax.tick_params(labelsize=8)
+    axs[2].set_title("Gaussian Sigma")
 
     for ax in axs:
-        ax.coords[0].set_ticklabel(exclude_overlapping=True)
-        ax.coords[0].set_axislabel("Helioprojective Longitude")
-        ax.coords[1].set_axislabel("Helioprojective Latitude")
-        ax.coords[2].set_ticklabel(exclude_overlapping=True)
-
+        ax.coords[0].set_ticklabel(exclude_overlapping=True, fontsize=8)
+        ax.coords[0].set_axislabel("Helioprojective Longitude", fontsize=8)
+        ax.coords[1].set_ticklabel(exclude_overlapping=True, fontsize=8)
+        ax.coords[1].set_axislabel("Helioprojective Latitude", fontsize=8)
     fig.tight_layout()
 
 
-plot_spice_fit(spice_model_fit)
+# ###############################################################################
+# Let us see the output!
 
+plot_gaussian_fit(iris_model_fit)
 
 plt.show()

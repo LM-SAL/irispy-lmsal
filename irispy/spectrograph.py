@@ -9,10 +9,11 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
 from ndcube import NDCollection
+from ndcube.meta import NDMeta
 from sunpy.coordinates import Helioprojective
 from sunraster import SpectrogramCube as SpecCube
 from sunraster import SpectrogramSequence as SpecSeq
-from sunraster.meta import Meta, SlitSpectrographMetaABC
+from sunraster.meta import SlitSpectrographMetaABC
 from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
 
 from irispy import utils
@@ -314,7 +315,7 @@ class SpectrogramCubeSequence(SpecSeq):
         return None
 
 
-class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
+class SGMeta(NDMeta, metaclass=SlitSpectrographMetaABC):
     def __init__(self, header, spectral_window, **kwargs) -> None:
         super().__init__(header, **kwargs)
         spectral_windows = np.array([self[f"TDESC{i}"] for i in range(1, self["NWIN"] + 1)])
