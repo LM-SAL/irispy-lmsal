@@ -129,3 +129,11 @@ ignore-words-list = "sav,"
       directory = "trivial"
       name = "Internal Changes"
       showcontent = true
+
+[tool.codeflash]
+# All paths are relative to this pyproject.toml's directory.
+module-root = "irispy"
+tests-root = "irispy"
+test-framework = "pytest"
+ignore-paths = []
+formatter-cmds = ["ruff check --exit-zero --fix $file", "ruff format $file"]
