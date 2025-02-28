@@ -65,7 +65,7 @@ lint.extend-ignore = [
     "N806", # in function should be lowercase
     "S101", # Use of `assert` detected
 ]
-"irispy/io/__init__.py" = [
+"**/io/**" = [
     "A005", # Module `io` shadows a Python standard-library module
 ]
 

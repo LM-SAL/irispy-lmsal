@@ -105,7 +105,8 @@ search_results = Fido.search(
 files = Fido.fetch(search_results)
 aia_map = sunpy.map.Map(files[0])
 pointing_table = get_pointing_table(
-    source="LMSAL", time_range=(Time(time_stamp) - TimeDelta(1 * u.minute), Time(time_stamp) + TimeDelta(1 * u.minute))
+    source="JSOC",
+    time_range=(Time(time_stamp) - TimeDelta(5 * 60 * u.minute), Time(time_stamp) + TimeDelta(1 * u.minute)),
 )
 aia_map = update_pointing(aia_map, pointing_table=pointing_table)
 # You don't need to register AIA images unless you need them aligned to other AIA images.
