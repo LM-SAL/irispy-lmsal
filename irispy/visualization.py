@@ -40,8 +40,6 @@ def set_axis_properties(ax):
             _set_axis_properties(axis, "red")
         elif axis.default_label.lower() in LON_LABELS:
             _set_axis_properties(axis, "black")
-        else:
-            pass
 
 
 def _set_axis_properties(axis, color):

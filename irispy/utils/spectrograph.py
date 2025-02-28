@@ -12,13 +12,13 @@ from irispy.utils.utils import get_interpolated_effective_area
 
 __all__ = [
     "calculate_photons_per_sec_to_radiance_factor",
-    "convert_between_DN_and_photons",
+    "convert_between_dn_and_photons",
     "convert_or_undo_photons_per_sec_to_radiance",
-    "reshape_1D_wavelength_dimensions_for_broadcast",
+    "reshape_1d_wavelength_dimensions_for_broadcast",
 ]
 
 
-def convert_between_DN_and_photons(old_data_arrays, old_unit, new_unit):
+def convert_between_dn_and_photons(old_data_arrays, old_unit, new_unit):
     """
     Converts arrays from IRIS DN to photons or vice versa.
 
@@ -140,7 +140,7 @@ def convert_or_undo_photons_per_sec_to_radiance(
     )
     # Change shape of arrays so they are compatible for broadcasting
     # with data and uncertainty arrays.
-    photons_per_sec_to_radiance_factor = reshape_1D_wavelength_dimensions_for_broadcast(
+    photons_per_sec_to_radiance_factor = reshape_1d_wavelength_dimensions_for_broadcast(
         photons_per_sec_to_radiance_factor,
         data_quantities[0].ndim,
     )
@@ -212,7 +212,7 @@ def calculate_photons_per_sec_to_radiance_factor(
     )
 
 
-def reshape_1D_wavelength_dimensions_for_broadcast(wavelength, n_data_dim):
+def reshape_1d_wavelength_dimensions_for_broadcast(wavelength, n_data_dim):
     if n_data_dim == 1:
         pass
     elif n_data_dim == 2:
