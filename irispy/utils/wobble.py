@@ -1,10 +1,9 @@
 import re
 from pathlib import Path
 
-import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import animation
+from matplotlib import animation, patheffects
 
 from astropy.io import fits
 from astropy.time import TimeDelta
@@ -126,7 +125,7 @@ def wobble_movie(
                 color="w",
                 transform=ax.transAxes,
                 ha="center",
-                path_effects=[PathEffects.withStroke(linewidth=3, foreground="black")],
+                path_effects=[patheffects.withStroke(linewidth=3, foreground="black")],
             )
         else:
             title = ax.text(0.5, 0.95, "")

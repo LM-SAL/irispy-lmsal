@@ -118,11 +118,11 @@ def read_spectrograph_lvl2(
                     data_shape=hdulist[window_fits_indices[i]].data.shape,
                 )
                 exposure_times = exposure_times_nuv
-                DN_unit = DN_UNIT["NUV"]
+                dn_unit = DN_UNIT["NUV"]
                 readout_noise = READOUT_NOISE["NUV"]
                 if "FUV" in meta.detector:
                     exposure_times = exposure_times_fuv
-                    DN_unit = DN_UNIT["FUV"]
+                    dn_unit = DN_UNIT["FUV"]
                     readout_noise = READOUT_NOISE["FUV"]
                 meta.add("exposure time", exposure_times, None, 0)
                 meta.add("exposure FOV center", fov_center, None, 0)
@@ -163,7 +163,7 @@ def read_spectrograph_lvl2(
                     out_uncertainty = calculate_uncertainty(
                         hdulist[window_fits_indices[i]].data,
                         readout_noise,
-                        DN_UNIT,
+                        dn_unit,
                     )
                 if v34 and not revert_v34:
                     data = np.flip(hdulist[window_fits_indices[i]].data, axis=0)
@@ -178,7 +178,7 @@ def read_spectrograph_lvl2(
                     data,
                     wcs=wcs,
                     uncertainty=out_uncertainty,
-                    unit=DN_unit,
+                    unit=dn_unit,
                     meta=meta,
                     mask=data_mask,
                 )

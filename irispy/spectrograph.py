@@ -9,10 +9,11 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
 from ndcube import NDCollection
+from ndcube.meta import NDMeta
 from sunpy.coordinates import Helioprojective
 from sunraster import SpectrogramCube as SpecCube
 from sunraster import SpectrogramSequence as SpecSeq
-from sunraster.meta import Meta, SlitSpectrographMetaABC
+from sunraster.meta import SlitSpectrographMetaABC
 from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
 
 from irispy import utils
@@ -205,7 +206,7 @@ class SpectrogramCube(SpecCube):
                 new_data = new_data_quantities[0].value
                 new_uncertainty = new_data_quantities[1].value
                 new_unit = new_data_quantities[0].unit
-                self = SpectrogramCube(
+                self = SpectrogramCube(  # NOQA: PLW0642 Reassigned `self` variable in instance method
                     new_data,
                     self.wcs,
                     new_uncertainty,
@@ -215,7 +216,7 @@ class SpectrogramCube(SpecCube):
                 )
                 self._extra_coords = self.extra_coords
             new_unit = utils.DN_UNIT[detector_type] if new_unit_type == "DN" else u.photon
-            new_data_arrays, new_unit = utils.convert_between_DN_and_photons(
+            new_data_arrays, new_unit = utils.convert_between_dn_and_photons(
                 (self.data, self.uncertainty.array),
                 self.unit,
                 new_unit,
@@ -314,7 +315,7 @@ class SpectrogramCubeSequence(SpecSeq):
         return None
 
 
-class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
+class SGMeta(NDMeta, metaclass=SlitSpectrographMetaABC):
     def __init__(self, header, spectral_window, **kwargs) -> None:
         super().__init__(header, **kwargs)
         spectral_windows = np.array([self[f"TDESC{i}"] for i in range(1, self["NWIN"] + 1)])
@@ -430,7 +431,7 @@ class SGMeta(Meta, metaclass=SlitSpectrographMetaABC):
         return self._construct_time("ENDOBS")
 
     @property
-    def observation_includes_SAA(self):
+    def observation_includes_saa(self):
         """
         Whether IRIS passed through SAA during observations.
         """

@@ -38,24 +38,24 @@ def sji_2832_file():
 
 
 @pytest.fixture
-def SJICube_1330():
+def sjicube_1330():
     from irispy.io.sji import read_sji_lvl2
 
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_1330_t000_test.fits"))
 
 
 @pytest.fixture
-def SJICube_1400():
+def sjicube_1400():
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_1400_t000_test.fits"))
 
 
 @pytest.fixture
-def SJICube_2796():
+def sjicube_2796():
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_2796_t000_test.fits"))
 
 
 @pytest.fixture
-def SJICube_2832():
+def sjicube_2832():
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_2832_t000_test.fits"))
 
 
