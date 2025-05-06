@@ -206,7 +206,7 @@ class SpectrogramCube(SpecCube):
                 new_data = new_data_quantities[0].value
                 new_uncertainty = new_data_quantities[1].value
                 new_unit = new_data_quantities[0].unit
-                self = SpectrogramCube(
+                self = SpectrogramCube(  # NOQA: PLW0642 Reassigned `self` variable in instance method
                     new_data,
                     self.wcs,
                     new_uncertainty,
@@ -216,7 +216,7 @@ class SpectrogramCube(SpecCube):
                 )
                 self._extra_coords = self.extra_coords
             new_unit = utils.DN_UNIT[detector_type] if new_unit_type == "DN" else u.photon
-            new_data_arrays, new_unit = utils.convert_between_DN_and_photons(
+            new_data_arrays, new_unit = utils.convert_between_dn_and_photons(
                 (self.data, self.uncertainty.array),
                 self.unit,
                 new_unit,
@@ -431,7 +431,7 @@ class SGMeta(NDMeta, metaclass=SlitSpectrographMetaABC):
         return self._construct_time("ENDOBS")
 
     @property
-    def observation_includes_SAA(self):
+    def observation_includes_saa(self):
         """
         Whether IRIS passed through SAA during observations.
         """
