@@ -29,7 +29,7 @@ jobs:
         apt:
           - ffmpeg
       envs: |
-        - linux: py312
+        - linux: py313
 
   test:
     needs: [core]
@@ -44,8 +44,8 @@ jobs:
         brew:
           - ffmpeg
       envs: |
-        - windows: py311
-        - macos: py310
+        - windows: py312
+        - macos: py311
 
   docs:
     needs: [core]
@@ -73,7 +73,7 @@ jobs:
         apt:
           - ffmpeg
       envs: |
-        - linux: py311-online
+        - linux: py313-online
 
   cron:
     needs: [core]
@@ -86,7 +86,7 @@ jobs:
         apt:
           - ffmpeg
       envs: |
-        - linux: py312-devdeps
+        - linux: py313-devdeps
 
   publish:
     # Build wheels when pushing to any branch except main

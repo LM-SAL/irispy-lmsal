@@ -17,7 +17,7 @@ license = {file = "LICENSE.txt"}
 keywords = ["solar physics", "solar", "science", "NASA", "iris", "spectra", "lmsal"]
 authors = [
   {email = "nabil.freij@gmail.com"},
-  {name = "Nabil Freij"}
+  {name = "Nabil Freij"},
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
