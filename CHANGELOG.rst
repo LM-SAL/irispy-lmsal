@@ -1,3 +1,26 @@
+0.2.2 (2025-05-07)
+==================
+
+Documentation
+-------------
+
+- Rewrote existing examples to be more consistent.
+- Added an example for single Gaussian fitting using new functionally from astropy 7.0
+
+Internal Changes
+----------------
+
+- Rewrite of unit tests.
+- Fixed warning from DKIST modelling.
+
+0.2.1 (2024-06-09)
+==================
+
+Internal Changes
+----------------
+
+- Add COC, add more links to docs and IO section
+
 0.2.0 (2023-12-25)
 ==================
 
@@ -15,6 +38,7 @@ Breaking Changes
 
 Internal Changes
 ----------------
+
 - Templated to remove setup.py and setup.cfg
 - Tweaks to documentation.
 
