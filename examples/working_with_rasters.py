@@ -92,7 +92,7 @@ mg_ii[120, 200].plot(axes=ax)
 # Note that the values are unscaled due to the ``memmap=True`` setting.
 #
 # We can also plot using the data directly. We can read the wavelengths of the
-# Mg window by calling ``axis_world_coords`` for "wl" (wavelength), and redo the plot.
+# Mg window by calling `ndcube.NDCube.axis_world_coords` for "wl" (wavelength), and redo the plot.
 
 (mg_wave,) = mg_ii.axis_world_coords("wl")
 
