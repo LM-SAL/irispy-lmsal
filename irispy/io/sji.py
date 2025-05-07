@@ -37,10 +37,10 @@ def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
     """
     pc_table = hdulist[1].data[:, hdulist[1].header["PC1_1IX"] : hdulist[1].header["PC2_2IX"] + 1].reshape(-1, 2, 2)
     crval_table = hdulist[1].data[:, hdulist[1].header["XCENIX"] : hdulist[1].header["YCENIX"] + 1]
-    crpix = [hdulist[0].header["CRPIX1"], hdulist[0].header["CRPIX2"]]
+    crpix_table = [hdulist[0].header["CRPIX1"], hdulist[0].header["CRPIX2"]]
     cdelt = [hdulist[0].header["CDELT1"], hdulist[0].header["CDELT2"]]
     celestial = VaryingCelestialTransform(
-        crpix=crpix * u.pixel,
+        crpix_table=crpix_table * u.pixel,
         cdelt=cdelt * u.arcsec / u.pixel,
         pc_table=pc_table * u.pixel,
         crval_table=crval_table * u.arcsec,
