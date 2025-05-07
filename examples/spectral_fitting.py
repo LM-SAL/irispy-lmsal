@@ -116,7 +116,7 @@ def setup_initial_model(si_iv_1403, si_iv_core):
 
 ################################################################################
 # To improve our initial conditions we now fit the initial model to the spatially averaged spectra.
-# To do this we use the `.axis_world_coords` method of NDCube which returns all,
+# To do this we use the `ndcube.NDCube.axis_world_coords` method of NDCube which returns all,
 # or a subset of the world coordinates along however many array axes they are
 # correlated with. So in this case we get the wavelength dimension which only
 # returns a single `SpectralCoord` object corresponding to the first array dimension of the cube.
