@@ -1,8 +1,8 @@
-import logging
 import textwrap
 
 import matplotlib.pyplot as plt
 
+from sunpy import log as logger
 from sunraster import SpectrogramCube
 
 from irispy.utils import calculate_dust_mask
@@ -118,7 +118,7 @@ class SJICube(SpectrogramCube):
             try:
                 cmap = plt.get_cmap(name=f"irissji{int(self.meta['TWAVE1'])}")
             except Exception as e:  # NOQA: BLE001
-                logging.debug(e)
+                logger.debug(e)
                 cmap = "viridis"
         kwargs["cmap"] = cmap
         ax = Plotter(ndcube=self).plot(*args, **kwargs)

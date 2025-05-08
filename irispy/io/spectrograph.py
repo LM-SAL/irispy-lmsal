@@ -1,4 +1,3 @@
-import logging
 import tarfile
 from copy import copy
 from pathlib import Path
@@ -11,6 +10,7 @@ from astropy.io import fits
 from astropy.time import Time, TimeDelta
 from astropy.wcs import WCS
 
+from sunpy import log as logger
 from sunpy.coordinates import Helioprojective
 
 from irispy.spectrograph import Collection, SGMeta, SpectrogramCube, SpectrogramCubeSequence
@@ -153,7 +153,7 @@ def read_spectrograph_lvl2(
                         "The loading will continue but this will be missing in the final cube. "
                         f"Spectral window: {window_name}, step {i} in file: {filename}"
                     )
-                    logging.warning(msg)
+                    logger.warning(msg)
                     continue
                 out_uncertainty = None
                 data_mask = None
