@@ -1,3 +1,12 @@
+0.2.4 (2025-05-08)
+==================
+
+Documentation
+-------------
+
+- Simplified the spectral fitting example by making it single threaded.
+
+
 0.2.3 (2025-05-07)
 ==================
 
