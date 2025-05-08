@@ -1,8 +1,9 @@
-import logging
 import tarfile
 from pathlib import Path
 
 from astropy.io import fits
+
+from sunpy import log as logger
 
 __all__ = ["fitsinfo", "read_files"]
 
@@ -21,15 +22,15 @@ def fitsinfo(filename):
         hdulist.info()
         hdr = hdulist[0].header
         msg = f"Observation description: {hdr['OBS_DESC']}"
-        logging.info(msg)
+        logger.info(msg)
         modifier = ""
         for i in range(hdr["NWIN"]):
             msg = f"Extension No. {i + 1} stores data and header of {hdr[f'TDESC{i + 1}']}: "
-            logging.info(msg)
+            logger.info(msg)
             if "SJI" not in hdr[f"TDET{i + 1}"]:
                 modifier = f" ({hdr[f'TDET{i + 1}'][:3]})"
             msg = f"{hdr[f'TWMIN{i + 1}']:.2f} - {hdr[f'TWMAX{i + 1}']:.2f} AA{modifier}"
-            logging.info(msg)
+            logger.info(msg)
 
 
 def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=False):
