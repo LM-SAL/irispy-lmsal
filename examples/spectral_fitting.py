@@ -6,6 +6,7 @@ Spectral fitting
 In this example, we are going to fit spectral lines from IRIS, using the raster data with a single Gaussian.
 Then use the fitted values to calculate the Gaussian moments.
 """
+# sphinx_gallery_thumbnail_number = 3
 
 import warnings
 
@@ -62,7 +63,6 @@ si_iv_1403 = raster["Si IV 1403"][0]
 top_left = [None, SkyCoord(-290 * u.arcsec, 260 * u.arcsec, frame=frames.Helioprojective)]
 bottom_right = [None, SkyCoord(-360 * u.arcsec, 310 * u.arcsec, frame=frames.Helioprojective)]
 si_iv_1403 = si_iv_1403.crop(top_left, bottom_right)
-
 
 ###############################################################################
 # Let us just check the full field of view at the line core.
