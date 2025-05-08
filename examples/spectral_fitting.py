@@ -74,7 +74,9 @@ si_iv_spec_crop = si_iv_1403.crop(lower_corner, upper_corner)
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection=si_iv_spec_crop.wcs)
-ax = si_iv_spec_crop.plot(axes=ax, vmin=0, vmax=100)
+si_iv_spec_crop.plot(axes=ax, vmin=0, vmax=200)
+plt.title("Si IV 1402.77 A")
+plt.colorbar(label="Intensity [DN]", shrink=0.8)
 
 ###############################################################################
 # We will want to make two rebinned cubes from the full raster,
