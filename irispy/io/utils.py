@@ -33,7 +33,7 @@ def fitsinfo(filename):
             logger.info(msg)
 
 
-def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=False):
+def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=False, **kwargs):
     """
     A wrapper function to read a raster or SJI level 2 data file.
 
@@ -58,6 +58,8 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
         the file into memory when needed. This option is faster and uses a
         lot less memory. However, because FITS scaling is not done on-the-fly,
         the data units will be unscaled, not the usual data numbers (DN).
+    kwargs : `dict`, optional
+        Additional keyword arguments to pass to the reader functions.
 
     Returns
     -------
@@ -86,13 +88,14 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
         if len(filename) > 1:
             msg = "You cannot load more than one SJI file at a time."
             raise ValueError(msg)
-        return read_sji_lvl2(filename[0], memmap=memmap, uncertainty=uncertainty)
+        return read_sji_lvl2(filename[0], memmap=memmap, uncertainty=uncertainty, **kwargs)
     if intrume == "SPEC":
         return read_spectrograph_lvl2(
             filename,
             spectral_windows=spectral_windows,
             memmap=memmap,
             uncertainty=uncertainty,
+            **kwargs,
         )
     msg = f"Unsupported instrument: {intrume}"
     raise ValueError(msg)

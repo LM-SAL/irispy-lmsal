@@ -3,7 +3,6 @@ Configuration file for the Sphinx documentation builder.
 """
 
 import datetime
-import os
 from pathlib import Path
 
 from sunpy_sphinx_theme import PNG_ICON
@@ -19,7 +18,6 @@ is_development = ".dev" in __version__
 
 # -- General configuration ---------------------------------------------------
 extensions = [
-    "hoverxref.extension",
     "sphinx_copybutton",
     "sphinx_design",
     "sphinx_automodapi.automodapi",
@@ -41,38 +39,6 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 source_suffix = ".rst"
 master_doc = "index"
 default_role = "obj"
-
-# -- Options for hoverxref -----------------------------------------------------
-if os.environ.get("READTHEDOCS"):
-    hoverxref_api_host = "https://readthedocs.org"
-    if os.environ.get("PROXIED_API_ENDPOINT"):
-        # Use the proxied API endpoint
-        # - A RTD thing to avoid a CSRF block when docs are using a
-        #   custom domain
-        hoverxref_api_host = "/_"
-
-hoverxref_tooltip_maxwidth = 600  # RTD main window is 696px
-hoverxref_auto_ref = True
-hoverxref_mathjax = True
-# hoverxref has to be applied to these
-hoverxref_domains = ["py"]
-hoverxref_role_types = {
-    # roles with py domain
-    "attr": "tooltip",
-    "class": "tooltip",
-    "const": "tooltip",
-    "data": "tooltip",
-    "exc": "tooltip",
-    "func": "tooltip",
-    "meth": "tooltip",
-    "mod": "tooltip",
-    "obj": "tooltip",
-    # roles with std domain
-    "confval": "tooltip",
-    "hoverxref": "tooltip",
-    "ref": "tooltip",
-    "term": "tooltip",
-}
 
 # -- Options for sphinx-copybutton ---------------------------------------------
 # Python Repl + continuation, Bash, ipython and qtconsole + continuation, jupyter-console + continuation
