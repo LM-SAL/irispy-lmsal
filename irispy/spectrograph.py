@@ -18,7 +18,7 @@ from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
 
 from irispy import utils
 from irispy.utils.constants import SPECTRAL_BAND
-from irispy.visualization import Plotter, set_axis_properties
+from irispy.visualization import Plotter, SequencePlotter, set_axis_properties
 
 __all__ = ["Collection", "SGMeta", "SpectrogramCube", "SpectrogramCubeSequence"]
 
@@ -290,6 +290,21 @@ class SpectrogramCubeSequence(SpecSeq):
     def __str__(self) -> str:
         # Overload it get the class name in the string
         return super().__str__()
+
+    def plot(self, *args, **kwargs):
+        cmap = kwargs.get("cmap")
+        if not cmap:
+            try:
+                cmap = plt.get_cmap(name=f"irissji{int(self.meta.detector[:3])}")
+            except Exception as e:  # NOQA: BLE001
+                logger.debug(e)
+                cmap = "viridis"
+        kwargs["cmap"] = cmap
+        if len(self.shape) == 1:
+            kwargs.pop("cmap")
+        ax = SequencePlotter(ndcube=self).plot(*args, **kwargs)
+        set_axis_properties(ax)
+        return ax
 
     def convert_to(self, new_unit_type, *, copy=False):
         """
