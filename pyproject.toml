@@ -66,7 +66,6 @@ docs = [
   'sphinx-copybutton',
   'sphinx-design',
   'sphinx-gallery',
-  'sphinx-hoverxref',
   'sunpy-sphinx-theme',
 ]
 dev = ["irispy-lmsal[tests,docs]"]

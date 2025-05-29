@@ -4,8 +4,9 @@ import astropy.units as u
 
 import sunpy.visualization.colormaps as cm  # NOQA: F401
 from ndcube.visualization.mpl_plotter import MatplotlibPlotter
+from ndcube.visualization.mpl_sequence_plotter import MatplotlibSequencePlotter
 
-__all__ = ["CustomArrayAnimatorWCS", "Plotter", "set_axis_properties"]
+__all__ = ["CustomArrayAnimatorWCS", "Plotter", "SequencePlotter"]
 
 
 LAT_LABELS = [
@@ -72,6 +73,24 @@ class CustomArrayAnimatorWCS(ArrayAnimatorWCS):
 
 
 class Plotter(MatplotlibPlotter):
+    def plot(self, *args, **kwargs):
+        return super().plot(*args, **kwargs)
+
+    def _animate_cube(
+        self,
+        wcs,
+        plot_axes=None,
+        axes_coordinates=None,  # NOQA: ARG002 - Unused but passed in via ModestImage.set
+        axes_units=None,
+        data_unit=None,
+        **kwargs,
+    ):
+        data, wcs, plot_axes, coord_params = self._prep_animate_args(wcs, plot_axes, axes_units, data_unit)
+
+        return CustomArrayAnimatorWCS(data, wcs, plot_axes, coord_params=coord_params, **kwargs)
+
+
+class SequencePlotter(MatplotlibSequencePlotter):
     def plot(self, *args, **kwargs):
         return super().plot(*args, **kwargs)
 
