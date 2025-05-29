@@ -60,29 +60,20 @@ def _set_axis_properties(axis, label, color):
     axis.set_axislabel(label, color=color, fontsize=8)
 
 
-class IRISArrayAnimatorWCS(ArrayAnimatorWCS):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+class Plot2DMixin:
     def update_plot_2d(self, val, im, slider):
-        """
-        Update the image plot.
-        """
         super().update_plot_2d(val, im, slider)
         set_axis_properties(self.axes)
 
 
-class IRISSequenceAnimator(SequenceAnimator):
-    def __init__(self, *args, **kwargs):
-        kwargs.update(slider_labels=["Raster Step", "Scan Number"])
-        super().__init__(*args, **kwargs)
+class IRISArrayAnimatorWCS(Plot2DMixin, ArrayAnimatorWCS):
+    pass
 
-    def update_plot_2d(self, val, im, slider):
-        """
-        Update the image plot.
-        """
-        super().update_plot_2d(val, im, slider)
-        set_axis_properties(self.axes)
+
+class IRISSequenceAnimator(Plot2DMixin, SequenceAnimator):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("slider_labels", ["Raster Step", "Scan Number"])
+        super().__init__(*args, **kwargs)
 
 
 class IRISPlotter(MatplotlibPlotter):
@@ -95,6 +86,8 @@ class IRISPlotter(MatplotlibPlotter):
         data_unit=None,
         **kwargs,
     ):
+        # This is a copy of the super method, but with the replacement
+        # of the ArrayAnimatorWCS with IRISArrayAnimatorWCS.
         data, wcs, plot_axes, coord_params = self._prep_animate_args(wcs, plot_axes, axes_units, data_unit)
         ax = IRISArrayAnimatorWCS(data, wcs, plot_axes, coord_params=coord_params, **kwargs)
         # We need to modify the visible axes after the axes object has been created.
@@ -126,7 +119,7 @@ class IRISSequencePlotter(MatplotlibSequencePlotter):
             to be used as the slider pixel values.
             If None, array indices will be used.
 
-        sequence_axis_units: `astropy.units.Unit` or `str`, optional
+        sequence_axis_unit: `astropy.units.Unit` or `str`, optional
             The unit in which the sequence_axis_coordinates should be displayed.
             If None, the default unit will be used.
         """
