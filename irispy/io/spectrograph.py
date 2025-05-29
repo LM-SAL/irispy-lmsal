@@ -166,6 +166,7 @@ def read_spectrograph_lvl2(
                         dn_unit,
                     )
                 if v34 and not revert_v34:
+                    times = times[::-1]
                     data = np.flip(hdulist[window_fits_indices[i]].data, axis=0)
                     header["PC1_3"] = 0
                     header["PC2_3"] = -header["PC2_3"]

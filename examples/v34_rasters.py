@@ -87,3 +87,8 @@ plt.show()
 ###############################################################################
 # As you can see, the v34 data is flipped in the y-axis and the WCS is
 # adjusted accordingly.
+#
+# The same is true for the times in the raster:
+
+print(f"Flipped time: {mg_ii_k.time[:5]}")
+print(f"Unflipped time: {mg_ii_k_unflipped.time[:5]}")
