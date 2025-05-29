@@ -72,6 +72,8 @@ ax = fig.add_subplot(121, projection=mg_spec_crop.wcs)
 ax.set_title("v34 flipped")
 mg_spec_crop.plot(axes=ax, plot_axes=["x", "y"])
 
+# sphinx_gallery_defer_figures
+
 ###############################################################################
 # Now let us compare the results with the unflipped data.
 
@@ -91,4 +93,5 @@ plt.show()
 # The same is true for the times in the raster:
 
 print(f"Flipped time: {mg_ii_k.time[:5]}")
+print("*" * 50)
 print(f"Unflipped time: {mg_ii_k_unflipped.time[:5]}")
