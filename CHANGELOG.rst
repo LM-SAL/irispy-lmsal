@@ -1,3 +1,16 @@
+0.2.5 (2025-06-02)
+==================
+
+Documentation
+-------------
+
+- Added raster v34 example
+
+Internal Changes
+----------------
+
+- Updated slider names on plots
+
 0.2.4 (2025-05-08)
 ==================
 
@@ -5,7 +18,6 @@ Documentation
 -------------
 
 - Simplified the spectral fitting example by making it single threaded.
-
 
 0.2.3 (2025-05-07)
 ==================
