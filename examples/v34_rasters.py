@@ -13,7 +13,9 @@ import matplotlib.pyplot as plt
 import pooch
 
 import astropy.units as u
-from astropy.coordinates import SpectralCoord
+from astropy.coordinates import SkyCoord, SpectralCoord
+
+from sunpy.coordinates.frames import Helioprojective
 
 from irispy.io import read_files
 
@@ -84,7 +86,6 @@ ax2.set_title("v34 unflipped")
 mg_spec_unflipped_crop.plot(axes=ax2, plot_axes=["x", "y"])
 fig.tight_layout()
 
-plt.show()
 
 ###############################################################################
 # As you can see, the v34 data is flipped in the y-axis and the WCS is
@@ -95,3 +96,20 @@ plt.show()
 print(f"Flipped time: {mg_ii_k.time[:5]}")
 print("*" * 50)
 print(f"Unflipped time: {mg_ii_k_unflipped.time[:5]}")
+
+###############################################################################
+# Finally we will just see that the spectral profiles are unaffected in either case.
+
+lower_corner = [None, SkyCoord(-909 * u.arcsec, 294 * u.arcsec, frame=Helioprojective)]
+mg_ii_k_unflipped_spectra = mg_ii_k_unflipped[0].crop(lower_corner, lower_corner)
+mg_ii_k_spectra = mg_ii_k[0].crop(lower_corner, lower_corner)
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection=mg_ii_k_unflipped_spectra.wcs)
+mg_ii_k_unflipped_spectra.plot(axes=ax, color="red", label="v34 unflipped")
+mg_ii_k_spectra.plot(axes=ax, color="black", label="v34 default", linestyle="--")
+plt.legend()
+
+###############################################################################
+
+plt.show()
