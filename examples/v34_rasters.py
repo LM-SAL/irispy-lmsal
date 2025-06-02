@@ -13,7 +13,9 @@ import matplotlib.pyplot as plt
 import pooch
 
 import astropy.units as u
-from astropy.coordinates import SpectralCoord
+from astropy.coordinates import SkyCoord, SpectralCoord
+
+from sunpy.coordinates.frames import Helioprojective
 
 from irispy.io import read_files
 
@@ -33,10 +35,11 @@ raster_filename = pooch.retrieve(
 
 ###############################################################################
 # We will now open the raster file we just downloaded.
+# By default, irispy-lmsal will read the v34 data, flipping the data so that it
+# is in the same orientation as normal IRIS data and adjust the WCS accordingly.
 
 raster = read_files(raster_filename, memmap=False)
-# We will also undo the v34 handling and read the data as it is in the file.
-# This will be used later to compare the results.
+# We will also undo the v34 handling and read the data as is.
 raster_unflipped = read_files(raster_filename, memmap=False, revert_v34=True)
 
 # Printing will give us an overview of the file.
@@ -50,41 +53,29 @@ mg_ii_k_unflipped = raster_unflipped["Mg II k 2796"]
 print(mg_ii_k)
 
 ###############################################################################
-# So by default, irispy-lmsal will read the v34 data, flipping the data so that it
-# is in the same orientation as normal IRIS data and adjust the WCS accordingly.
-
-fig = plt.figure()
-mg_ii_k.plot(fig=fig, clip_interval=(0.1, 99.9) * u.percent)
-
-###############################################################################
-# To confirm this we will plot spectroheliogram for Mg II k core wavelength.
+# To see the effect of the v34 handling, we will plot a spectroheliogram
+# for the Mg II k core wavelength.
+#
 # We can use the ``crop`` method to get this information, this will
 # require a `~.SpectralCoord` object from `astropy.coordinates`.
 
 # None, means that the axis is not cropped
-# Note that this has to be in axis order
+# Since we want one physical coordinate, we will just use the
+# same spectral coordinate for both axes.
 lower_corner = [SpectralCoord(280, unit=u.nm), None]
-upper_corner = [SpectralCoord(280, unit=u.nm), None]
-mg_spec_crop = mg_ii_k[0].crop(lower_corner, upper_corner)
+
+mg_spec_crop = mg_ii_k[0].crop(lower_corner, lower_corner)
+mg_spec_unflipped_crop = mg_ii_k_unflipped[0].crop(lower_corner, lower_corner)
 
 fig = plt.figure(figsize=(6, 12))
 ax = fig.add_subplot(121, projection=mg_spec_crop.wcs)
 ax.set_title("v34 flipped")
 mg_spec_crop.plot(axes=ax, plot_axes=["x", "y"])
 
-# sphinx_gallery_defer_figures
-
-###############################################################################
-# Now let us compare the results with the unflipped data.
-
-mg_spec_unflipped_crop = mg_ii_k_unflipped[0].crop(lower_corner, upper_corner)
-
 ax2 = fig.add_subplot(122, projection=mg_spec_unflipped_crop.wcs)
 ax2.set_title("v34 unflipped")
 mg_spec_unflipped_crop.plot(axes=ax2, plot_axes=["x", "y"])
 fig.tight_layout()
-
-plt.show()
 
 ###############################################################################
 # As you can see, the v34 data is flipped in the y-axis and the WCS is
@@ -95,3 +86,20 @@ plt.show()
 print(f"Flipped time: {mg_ii_k.time[:5]}")
 print("*" * 50)
 print(f"Unflipped time: {mg_ii_k_unflipped.time[:5]}")
+
+###############################################################################
+# Finally we will just see that the spectral profiles are unaffected in either case.
+
+lower_corner = [None, SkyCoord(-909 * u.arcsec, 294 * u.arcsec, frame=Helioprojective)]
+mg_ii_k_unflipped_spectra = mg_ii_k_unflipped[0].crop(lower_corner, lower_corner)
+mg_ii_k_spectra = mg_ii_k[0].crop(lower_corner, lower_corner)
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection=mg_ii_k_unflipped_spectra.wcs)
+mg_ii_k_unflipped_spectra.plot(axes=ax, color="red", label="v34 unflipped")
+mg_ii_k_spectra.plot(axes=ax, color="black", label="v34 default", linestyle="--")
+plt.legend()
+
+###############################################################################
+
+plt.show()
