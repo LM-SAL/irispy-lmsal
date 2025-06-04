@@ -14,7 +14,7 @@ from dkist.wcs.models import CoupledCompoundModel, VaryingCelestialTransform
 from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst
 from sunpy.coordinates.frames import Helioprojective
 
-from irispy.sji import SJICube
+from irispy.sji import AIACube, SJICube
 from irispy.utils import calculate_uncertainty
 from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, BAD_PIXEL_VALUE_UNSCALED, DN_UNIT, READOUT_NOISE
 
@@ -120,7 +120,7 @@ def _create_wcs(hdulist):
 
 def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     """
-    Reads a level 2 SJI FITS.
+    Reads a level 2 SJI FITS or the IRIS aligned AIA Cubes.
 
     Parameters
     ----------
@@ -142,6 +142,7 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     """
     with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
         hdulist.verify("silentfix")
+        instrume = hdulist[0].header["INSTRUME"]
         extra_coords = [
             (
                 "exposure time",
@@ -182,13 +183,16 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             scaled = False
             unit = DN_UNIT["SJI_UNSCALED"]
         else:
-            data_nan_masked[data == BAD_PIXEL_VALUE_SCALED] = np.nan
+            # This is a workaround for the AIA cubes being in int and not float
+            mask_value = -200 if np.issubdtype(data.dtype, np.integer) else np.nan
+            data_nan_masked[data == BAD_PIXEL_VALUE_SCALED] = mask_value
             mask = data_nan_masked == BAD_PIXEL_VALUE_SCALED
             scaled = True
             unit = DN_UNIT["SJI"]
-            if uncertainty:
+            if uncertainty and instrume == "IRIS":
                 out_uncertainty = calculate_uncertainty(data, READOUT_NOISE["SJI"], DN_UNIT["SJI"])
-        map_cube = SJICube(
+        cube_class = SJICube if instrume == "IRIS" else AIACube
+        map_cube = cube_class(
             data_nan_masked,
             _create_gwcs(hdulist),
             uncertainty=out_uncertainty,
