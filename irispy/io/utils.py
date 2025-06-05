@@ -3,6 +3,7 @@ from pathlib import Path
 
 from astropy.io import fits
 
+from ndcube import NDCollection
 from sunpy import log as logger
 
 __all__ = ["fitsinfo", "read_files"]
@@ -63,14 +64,8 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
 
     Returns
     -------
-    list
-        If this is a mixed collection of file data types
-    `irispy.sji.SJICube`
-        If a singular SJI file was passed in
-    `irispy.spectrogram.SpectrogramCube`
-        If a singular raster file was passed in
     `NDCollection`
-        If a singular set of IRIS AIA aligned files were passed in.
+        With keys being the value of TDESC1, the values being the cube.
     """
     from irispy.io.sji import read_sji_lvl2  # , read_aia_cube
     from irispy.io.spectrograph import read_spectrograph_lvl2
@@ -82,7 +77,7 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
     to_remove = []
     for file in filename:
         if tarfile.is_tarfile(file):
-            path = Path(file.replace(".tar.gz", ""))
+            path = Path(str(file).replace(".tar.gz", ""))
             path.mkdir(parents=True, exist_ok=True)
             with tarfile.open(file, "r") as tar:
                 tar.extractall(path, filter="data")
@@ -91,18 +86,17 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
     filename.extend(to_add)
     for remove in to_remove:
         filename.pop(filename.index(remove))
-    returns = []
+    returns = {}
     for file in filename:
         instrume = fits.getval(file, "INSTRUME")
+        describe = fits.getval(file, "TDESC1")
         logger.debug(f"Processing file: {file} with instrume: {instrume}")
         try:
             if instrume in ["IRIS", "SJI"] or instrume.startswith("AIA"):
-                returns.append(read_sji_lvl2(file, memmap=memmap, uncertainty=uncertainty, **kwargs))
+                returns[f"{describe}"] = read_sji_lvl2(file, memmap=memmap, uncertainty=uncertainty, **kwargs)
             elif instrume == "SPEC":
-                returns.append(
-                    read_spectrograph_lvl2(
-                        file, spectral_windows=spectral_windows, memmap=memmap, uncertainty=uncertainty, **kwargs
-                    )
+                returns[f"{describe}"] = read_spectrograph_lvl2(
+                    file, spectral_windows=spectral_windows, memmap=memmap, uncertainty=uncertainty, **kwargs
                 )
             else:
                 logger.warning(f"INSTRUME: {instrume} was not recognized and not loaded")
@@ -111,4 +105,4 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
                 logger.warning(f"File {file} failed to load with {e}")
                 continue
             raise
-    return returns[0] if len(returns) == 1 else returns
+    return NDCollection(returns) if len(returns) > 1 else next(iter(returns.values()))

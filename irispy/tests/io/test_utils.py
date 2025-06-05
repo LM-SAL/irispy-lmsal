@@ -43,6 +43,6 @@ def test_read_files_sji(sji_1330_file, sji_1400_file, sji_2796_file, sji_2832_fi
     assert read_files([sji_2832_file])
 
 
-def test_read_files_sji_more_than_one(sji_1330_file):
-    returns = read_files([sji_1330_file, sji_1330_file])
+def test_read_files_sji_more_than_one(sji_1330_file, sji_1400_file):
+    returns = read_files([sji_1330_file, sji_1400_file])
     assert len(returns) == 2

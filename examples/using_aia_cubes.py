@@ -46,17 +46,18 @@ sdo_aia_file = pooch.retrieve(
 aia_collection = read_files(sdo_aia_file, memmap=False)
 
 ###############################################################################
-# Let us look at the first returned AIA cube.
+# Let us look at the first collection returned of the AIA cube.
 
-print(aia_collection[0])
+print(aia_collection)
 
 ###############################################################################
-# We will now plot the AIA data in the same manner as the SJU data.
+# We will now plot the AIA data in the same manner as the SJI data.
 #
 # You can also change the axis labels and ticks if you so desire.
 # `WCSAxes provides us an API we can use. <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__
 
 # Note that the .get_animation() is used to animate this example and is not required normally.
-ax = aia_collection[0].plot().get_animation()
+fig = plt.figure()
+aia_collection["304_THIN"].plot(fig=fig).get_animation()
 
 plt.show()

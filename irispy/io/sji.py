@@ -192,9 +192,9 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             mask = data_nan_masked == BAD_PIXEL_VALUE_SCALED
             scaled = True
             unit = DN_UNIT["SJI"]
-            if uncertainty and instrume == "IRIS":
+            if uncertainty and instrume in ["IRIS", "SJI"]:
                 out_uncertainty = calculate_uncertainty(data, READOUT_NOISE["SJI"], DN_UNIT["SJI"])
-        cube_class = SJICube if instrume == "IRIS" else AIACube
+        cube_class = SJICube if instrume in ["IRIS", "SJI"] else AIACube
         map_cube = cube_class(
             data_nan_masked,
             _create_gwcs(hdulist),
