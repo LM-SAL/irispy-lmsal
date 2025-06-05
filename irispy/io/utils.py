@@ -111,6 +111,4 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
                 logger.warning(f"File {file} failed to load with {e}")
                 continue
             raise
-    if len(returns) == 1:
-        return returns[0]
-    return returns
+    return returns[0] if len(returns) == 1 else returns
