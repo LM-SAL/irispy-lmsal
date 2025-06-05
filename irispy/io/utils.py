@@ -110,7 +110,7 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
             if allow_errors:
                 logger.warning(f"File {file} failed to load with {e}")
                 continue
-            raise OSError from e
+            raise
     if len(returns) == 1:
         return returns[0]
     return returns
