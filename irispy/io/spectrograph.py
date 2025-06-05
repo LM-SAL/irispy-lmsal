@@ -61,9 +61,9 @@ def read_spectrograph_lvl2(
     -------
     `ndcube.NDCollection`
     """
-    if isinstance(filenames, str):
+    if isinstance(filenames, str | Path):
         if tarfile.is_tarfile(filenames):
-            parent = Path(filenames.replace(".tar.gz", "")).mkdir(parents=True, exist_ok=True)
+            parent = Path(str(filenames).replace(".tar.gz", "")).mkdir(parents=True, exist_ok=True)
             with tarfile.open(filenames, "r") as tar:
                 tar.extractall(parent, filter="data")
                 filenames = [parent / file for file in tar.getnames()]

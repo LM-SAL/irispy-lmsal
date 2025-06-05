@@ -1,0 +1,1 @@
+Increased minimum version of dkist to 1.11.0.

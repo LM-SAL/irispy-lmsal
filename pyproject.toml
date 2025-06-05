@@ -34,7 +34,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Physics",
 ]
 dependencies = [
-  'dkist>=1.0.0',
+  'dkist>=1.10.0',
   'ndcube>=2.3.0',
   'pandas>=1.3.3',
   'scipy>=1.7.0',
@@ -89,7 +89,7 @@ skip = "*.asdf,*.fits,*.fts,*.header,*.json,*.xsh,*cache*,*egg*,*extern*,.git,.i
 ignore-words-list = "sav,"
 
 [tool.towncrier]
-    package = "irispy-lmsal"
+    package = "irispy"
     filename = "CHANGELOG.rst"
     directory = "changelog/"
     issue_format = "`#{issue} <https://github.com/LM-SAL/irispy-lmsal/pull/{issue}>`__"
