@@ -102,7 +102,7 @@ search_results = Fido.search(
     a.Instrument.aia,
     a.Wavelength(1700 * u.AA),
 )
-files = Fido.fetch(search_results)
+files = Fido.fetch(search_results, site="NSO")
 aia_map = sunpy.map.Map(files[0])
 pointing_table = get_pointing_table(
     source="JSOC",

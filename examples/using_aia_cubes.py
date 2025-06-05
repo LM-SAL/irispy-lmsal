@@ -1,0 +1,63 @@
+"""
+==================================
+Opening the IRIS Aligned AIA Cubes
+==================================
+
+In this example we will show how ``irispy-lmsal`` handles the AIA cubes provided by the IRIS team.
+These cubes are aligned to the IRIS observation and are 50" larger than the IRIS FOV.
+
+They have the same format as IRIS SJI files, so you can read them via ``irispy-lmsal``.
+"""
+
+import matplotlib.pyplot as plt
+import pooch
+
+from irispy.io import read_files
+
+###############################################################################
+# We start by downloading an AIA cube from the IRIS data archive.
+#
+# In this case, we will use ``pooch`` to keep this example self-contained
+# but using your browser will also work.
+
+sdo_aia_file = pooch.retrieve(
+    "https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2025/05/19/20250519_165924_3640107442/iris_l2_20250519_165924_3640107442_SDO.tar.gz",
+    known_hash="b77d693fa328a96aec78b4a4aa420d5b167f8f670719fce815836627ed567f42",
+)
+
+###############################################################################
+# We will now open the AIA dataset.
+# It is provided as a compressed archive, with each AIA wavelength as a separate
+# file.
+#
+# In this example, they are:
+#
+# - aia_l2_20250519_165924_3640107442_171.fits
+# - aia_l2_20250519_165924_3640107442_94.fits
+# - aia_l2_20250519_165924_3640107442_304.fits
+# - aia_l2_20250519_165924_3640107442_193.fits
+# - aia_l2_20250519_165924_3640107442_335.fits
+# - aia_l2_20250519_165924_3640107442_211.fits
+# - aia_l2_20250519_165924_3640107442_1700.fits
+# - aia_l2_20250519_165924_3640107442_131.fits
+# - aia_l2_20250519_165924_3640107442_1600.fits
+
+# This will return a list of the AIA cubes.
+aia_collection = read_files(sdo_aia_file, memmap=False)
+
+###############################################################################
+# Let us look at the first collection returned of the AIA cube.
+
+print(aia_collection)
+
+###############################################################################
+# We will now plot the AIA data in the same manner as the SJI data.
+#
+# You can also change the axis labels and ticks if you so desire.
+# `WCSAxes provides us an API we can use. <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__
+
+# Note that the .get_animation() is used to animate this example and is not required normally.
+fig = plt.figure()
+aia_collection["304_THIN"].plot(fig=fig).get_animation()
+
+plt.show()

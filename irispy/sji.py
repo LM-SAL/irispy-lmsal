@@ -8,7 +8,7 @@ from sunraster import SpectrogramCube
 from irispy.utils import calculate_dust_mask
 from irispy.visualization import IRISPlotter, set_axis_properties
 
-__all__ = ["SJICube"]
+__all__ = ["AIACube", "SJICube"]
 
 
 class SJICube(SpectrogramCube):
@@ -89,7 +89,7 @@ class SJICube(SpectrogramCube):
             f"""
             SJICube
             -------
-            Observatory:           {self.meta.get("TELESCOP")}
+            Observatory:           {self.meta.get("TELESCOP", "IRIS")}
             Instrument:            {self.meta.get("INSTRUME")}
             Bandpass:              {self.meta.get("TWAVE1")}
             Obs. Start:            {self.meta.get("STARTOBS")}
@@ -155,3 +155,32 @@ class SJICube(SpectrogramCube):
         Returns a standard WCS instead of gWCS.
         """
         return self._basic_wcs
+
+
+class AIACube(SJICube):
+    # TODO: Work out better way to handle this
+    def __str__(self) -> str:
+        if self.wcs.world_n_dim == 2:
+            instance_start = self.global_coords["Time (UTC)"]
+            instance_end = None
+        else:
+            instance_start = self.wcs.pixel_to_world(0, 0, 0)[-1]
+            instance_end = self.wcs.pixel_to_world(0, 0, self.data.shape[0] - 1)[-1]
+        return textwrap.dedent(
+            f"""
+            AIACube
+            -------
+            Observatory:           {self.meta.get("TELESCOP", "SDO")}
+            Instrument:            {self.meta.get("INSTRUME")}
+            Bandpass:              {self.meta.get("TWAVE1")}
+            Obs. Start:            {self.meta.get("STARTOBS")}
+            Obs. End:              {self.meta.get("ENDOBS")}
+            Instance Start:        {instance_start}
+            Instance End:          {instance_end}
+            Total Frames in Obs.:  {self.meta.get("NBFRAMES")}
+            IRIS Obs. id:          {self.meta.get("OBSID")}
+            Axis Types:            {self.array_axis_physical_types}
+            Roll:                  {self.meta.get("SAT_ROT")}
+            Cube dimensions:       {self.shape}
+            """,
+        )
