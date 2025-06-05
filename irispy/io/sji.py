@@ -10,6 +10,7 @@ from astropy.io import fits
 from astropy.time import Time
 from astropy.wcs import WCS
 
+import dkist
 from dkist.wcs.models import CoupledCompoundModel, VaryingCelestialTransform
 from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst
 from sunpy.coordinates.frames import Helioprojective
@@ -39,11 +40,13 @@ def _create_gwcs(hdulist: fits.HDUList) -> gwcs.WCS:
     crval_table = hdulist[1].data[:, hdulist[1].header["XCENIX"] : hdulist[1].header["YCENIX"] + 1]
     crpix_table = [hdulist[0].header["CRPIX1"], hdulist[0].header["CRPIX2"]]
     cdelt = [hdulist[0].header["CDELT1"], hdulist[0].header["CDELT2"]]
+    older_dkist = dkist.__version__ < "1.12.0"
+    kwargs = {"crpix": crpix_table * u.pixel} if older_dkist else {"crpix_table": crpix_table * u.pixel}
     celestial = VaryingCelestialTransform(
-        crpix_table=crpix_table * u.pixel,
         cdelt=cdelt * u.arcsec / u.pixel,
         pc_table=pc_table * u.pixel,
         crval_table=crval_table * u.arcsec,
+        **kwargs,
     )
     base_time = Time(hdulist[0].header["STARTOBS"], format="isot", scale="utc")
     times = hdulist[1].data[:, hdulist[1].header["TIME"]] * u.s

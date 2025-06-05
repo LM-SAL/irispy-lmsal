@@ -96,7 +96,7 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
         instrume = fits.getval(file, "INSTRUME")
         logger.debug(f"Processing file: {file} with instrume: {instrume}")
         try:
-            if instrume == "IRIS" or instrume.startswith("AIA"):
+            if instrume in ["IRIS", "SJI"] or instrume.startswith("AIA"):
                 returns.append(read_sji_lvl2(file, memmap=memmap, uncertainty=uncertainty, **kwargs))
             elif instrume == "SPEC":
                 returns.append(
