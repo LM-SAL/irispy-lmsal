@@ -105,4 +105,4 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
                 logger.warning(f"File {file} failed to load with {e}")
                 continue
             raise
-    return NDCollection(returns) if len(returns) > 1 else next(iter(returns.values()))
+    return NDCollection(returns.items()) if len(returns) > 1 else next(iter(returns.values()))
