@@ -261,7 +261,7 @@ and for the raster file:
       4                1 ImageHDU        54   (47, 16)   float64
       5                1 TableHDU        53   16R x 7C   [A10, A10, A4, A10, A4, A66, A66]
 
-If you would like a bit more information, we have a similar function within `irispy-lmsal`:
+If you would like a bit more information, we have a similar function within ``irispy-lmsal``:
 
 .. code-block:: python
 

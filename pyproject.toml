@@ -89,7 +89,7 @@ skip = "*.asdf,*.fits,*.fts,*.header,*.json,*.xsh,*cache*,*egg*,*extern*,.git,.i
 ignore-words-list = "sav,"
 
 [tool.towncrier]
-    package = "irispy-lmsal"
+    package = "irispy"
     filename = "CHANGELOG.rst"
     directory = "changelog/"
     issue_format = "`#{issue} <https://github.com/LM-SAL/irispy-lmsal/pull/{issue}>`__"
