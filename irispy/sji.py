@@ -1,8 +1,10 @@
 import textwrap
+import warnings
 
 import matplotlib.pyplot as plt
 
 from sunpy import log as logger
+from sunpy.util.exceptions import SunpyMetadataWarning
 from sunraster import SpectrogramCube
 
 from irispy.utils import calculate_dust_mask
@@ -156,31 +158,45 @@ class SJICube(SpectrogramCube):
         """
         return self._basic_wcs
 
+    def to_maps(self, index: int | list[int] | None = None):
+        """
+        Return SunPy Maps for the requested frame(s).
+
+        Parameters
+        ----------
+        index : int, list, optional
+            The index of the SJI steps you want.
+            By default None which will return the entire cube as a map sequence.
+        """
+        from sunpy.map import Map
+
+        if isinstance(index, int):
+            idx_list = [index]
+        elif index is None:
+            idx_list = range(self.data.shape[0])
+        else:
+            idx_list = index
+        data_wcs = ((self.data[i], self.basic_wcs[i]) for i in idx_list)
+        times_iso = (self.wcs.pixel_to_world(0, 0, i)[-1].utc.isot for i in idx_list)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SunpyMetadataWarning)
+            maps = Map(data_wcs, sequence=True)
+        for m, t in zip(maps, times_iso, strict=True):
+            m.meta["DATE-OBS"] = t
+            m.meta["INSTRUME"] = self.meta.get("INSTRUME", "SJI")
+            m.meta["TELESCOP"] = self.meta.get("TELESCOP", "IRIS")
+            m.meta["EXPTIME"] = self.meta.get("EXPTIME", 0.0)
+            m.meta["TWAVE1"] = self.meta.get("TWAVE1")
+            m.plot_settings["cmap"] = f"irissji{int(self.meta['TWAVE1'])}"
+        return maps[0] if isinstance(index, int) else maps
+
 
 class AIACube(SJICube):
-    # TODO: Work out better way to handle this
+    """
+    Subclass of the SJICube.
+
+    It is the same outside of the name.
+    """
+
     def __str__(self) -> str:
-        if self.wcs.world_n_dim == 2:
-            instance_start = self.global_coords["Time (UTC)"]
-            instance_end = None
-        else:
-            instance_start = self.wcs.pixel_to_world(0, 0, 0)[-1]
-            instance_end = self.wcs.pixel_to_world(0, 0, self.data.shape[0] - 1)[-1]
-        return textwrap.dedent(
-            f"""
-            AIACube
-            -------
-            Observatory:           {self.meta.get("TELESCOP", "SDO")}
-            Instrument:            {self.meta.get("INSTRUME")}
-            Bandpass:              {self.meta.get("TWAVE1")}
-            Obs. Start:            {self.meta.get("STARTOBS")}
-            Obs. End:              {self.meta.get("ENDOBS")}
-            Instance Start:        {instance_start}
-            Instance End:          {instance_end}
-            Total Frames in Obs.:  {self.meta.get("NBFRAMES")}
-            IRIS Obs. id:          {self.meta.get("OBSID")}
-            Axis Types:            {self.array_axis_physical_types}
-            Roll:                  {self.meta.get("SAT_ROT")}
-            Cube dimensions:       {self.shape}
-            """,
-        )
+        return super().__str__().replace("SJICube", "AIACube")
