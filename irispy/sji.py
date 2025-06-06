@@ -158,10 +158,9 @@ class SJICube(SpectrogramCube):
         """
         return self._basic_wcs
 
-    def to_maps(self, index: int | list | None = None):
+    def to_maps(self, index: int | list[int] | None = None):
         """
-        Returns a set of sunpy maps (as a MapSequence) for each step of the
-        SJI.
+        Return SunPy Maps for the requested frame(s).
 
         Parameters
         ----------
@@ -172,23 +171,19 @@ class SJICube(SpectrogramCube):
         from sunpy.map import Map
 
         if isinstance(index, int):
-            map_ = Map((self.data[..., index], self.basic_wcs[index]))
-            map_.meta["DATE-OBS"] = self.wcs.pixel_to_world(0, 0, index)[-1].utc.isot
-            return map_
-        if index is None:
-            index = range(self.data.shape[-1])
-        data_wcs_pairs = []
-        times = []
-        for idx in index:
-            data_wcs_pairs.append([self.data[..., idx], self.basic_wcs[idx]])
-            times.append(self.wcs.pixel_to_world(0, 0, idx)[-1])
+            idx_list = [index]
+        elif index is None:
+            idx_list = range(self.data.shape[-1])
+        else:
+            idx_list = index
+        data_wcs = [(self.data[..., i], self.basic_wcs[i]) for i in idx_list]
+        times_iso = [self.wcs.pixel_to_world(0, 0, i)[-1].utc.isot for i in idx_list]
         with warnings.catch_warnings():
-            # Suppress the warning about missing observation time
             warnings.simplefilter("ignore", SunpyMetadataWarning)
-            maps = Map(data_wcs_pairs, sequence=True)
-        for map_, time in zip(maps, times, strict=True):
-            map_.meta["DATE-OBS"] = time.utc.isot
-        return maps
+            maps = Map(data_wcs, sequence=True)
+        for m, t in zip(maps, times_iso, strict=False):
+            m.meta["DATE-OBS"] = t
+        return maps[0] if isinstance(index, int) else maps
 
 
 class AIACube(SJICube):
