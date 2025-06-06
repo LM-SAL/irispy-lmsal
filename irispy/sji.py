@@ -173,16 +173,21 @@ class SJICube(SpectrogramCube):
         if isinstance(index, int):
             idx_list = [index]
         elif index is None:
-            idx_list = range(self.data.shape[-1])
+            idx_list = range(self.data.shape[0])
         else:
             idx_list = index
-        data_wcs = ((self.data[..., i], self.basic_wcs[i]) for i in idx_list)
+        data_wcs = ((self.data[i], self.basic_wcs[i]) for i in idx_list)
         times_iso = (self.wcs.pixel_to_world(0, 0, i)[-1].utc.isot for i in idx_list)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", SunpyMetadataWarning)
             maps = Map(data_wcs, sequence=True)
-        for m, t in zip(maps, times_iso, strict=False):
+        for m, t in zip(maps, times_iso, strict=True):
             m.meta["DATE-OBS"] = t
+            m.meta["INSTRUME"] = self.meta.get("INSTRUME", "SJI")
+            m.meta["TELESCOP"] = self.meta.get("TELESCOP", "IRIS")
+            m.meta["EXPTIME"] = self.meta.get("EXPTIME", 0.0)
+            m.meta["TWAVE1"] = self.meta.get("TWAVE1")
+            m.plot_settings["cmap"] = f"irissji{int(self.meta['TWAVE1'])}"
         return maps[0] if isinstance(index, int) else maps
 
 

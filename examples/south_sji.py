@@ -40,4 +40,17 @@ print(sji_2832)
 ax = sji_2832.plot().get_animation()
 plt.title(f"IRIS SJI {sji_2832.meta['TWAVE1']}", pad=25)
 
+###############################################################################
+# Finally we will output a frame of the SJI into a sunpy Map.
+
+sji_map = sji_2832.to_maps(0)
+print(sji_map)
+
+###############################################################################
+# We can now plot the SJI Map using sunpy Map's plotting capabilities.
+
+fig = plt.figure()
+ax = fig.add_subplot(projection=sji_map.wcs)
+sji_map.plot(axes=ax)
+
 plt.show()
