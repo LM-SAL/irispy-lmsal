@@ -51,13 +51,19 @@ aia_collection = read_files(sdo_aia_file, memmap=False)
 print(aia_collection)
 
 ###############################################################################
+# We will then select the 304 bandpass cube.
+
+print(aia_collection["304_THIN"])
+
+###############################################################################
 # We will now plot the AIA data in the same manner as the SJI data.
 #
 # You can also change the axis labels and ticks if you so desire.
 # `WCSAxes provides us an API we can use. <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__
 
-# Note that the .get_animation() is used to animate this example and is not required normally.
 fig = plt.figure()
+# Note that the .get_animation() is used to animate this example
+# and is not required normally.
 aia_collection["304_THIN"].plot(fig=fig).get_animation()
 
 plt.show()
