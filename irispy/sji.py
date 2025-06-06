@@ -156,31 +156,27 @@ class SJICube(SpectrogramCube):
         """
         return self._basic_wcs
 
+    def get_maps(self, index: int | slice | list | None = None):
+        """
+        Returns a set of sunpy maps (as a MapSequence) for each step of the
+        SJI.
+
+        Parameters
+        ----------
+        index : int, slice, list, optional
+            The index of the SJI steps you want.
+            By default None which will return the entire cube as a map sequence.
+        """
+        if index is None:
+            pass
+
 
 class AIACube(SJICube):
-    # TODO: Work out better way to handle this
+    """
+    Subclass of the SJICube.
+
+    It is the same outside of the name.
+    """
+
     def __str__(self) -> str:
-        if self.wcs.world_n_dim == 2:
-            instance_start = self.global_coords["Time (UTC)"]
-            instance_end = None
-        else:
-            instance_start = self.wcs.pixel_to_world(0, 0, 0)[-1]
-            instance_end = self.wcs.pixel_to_world(0, 0, self.data.shape[0] - 1)[-1]
-        return textwrap.dedent(
-            f"""
-            AIACube
-            -------
-            Observatory:           {self.meta.get("TELESCOP", "SDO")}
-            Instrument:            {self.meta.get("INSTRUME")}
-            Bandpass:              {self.meta.get("TWAVE1")}
-            Obs. Start:            {self.meta.get("STARTOBS")}
-            Obs. End:              {self.meta.get("ENDOBS")}
-            Instance Start:        {instance_start}
-            Instance End:          {instance_end}
-            Total Frames in Obs.:  {self.meta.get("NBFRAMES")}
-            IRIS Obs. id:          {self.meta.get("OBSID")}
-            Axis Types:            {self.array_axis_physical_types}
-            Roll:                  {self.meta.get("SAT_ROT")}
-            Cube dimensions:       {self.shape}
-            """,
-        )
+        return super().__str__().replace("SJICube", "AIACube")

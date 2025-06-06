@@ -51,6 +51,11 @@ aia_collection = read_files(sdo_aia_file, memmap=False)
 print(aia_collection)
 
 ###############################################################################
+# We will then select the 304.
+
+print(aia_collection["304_THIN"])
+
+###############################################################################
 # We will now plot the AIA data in the same manner as the SJI data.
 #
 # You can also change the axis labels and ticks if you so desire.
