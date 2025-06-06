@@ -176,8 +176,8 @@ class SJICube(SpectrogramCube):
             idx_list = range(self.data.shape[-1])
         else:
             idx_list = index
-        data_wcs = [(self.data[..., i], self.basic_wcs[i]) for i in idx_list]
-        times_iso = [self.wcs.pixel_to_world(0, 0, i)[-1].utc.isot for i in idx_list]
+        data_wcs = ((self.data[..., i], self.basic_wcs[i]) for i in idx_list)
+        times_iso = (self.wcs.pixel_to_world(0, 0, i)[-1].utc.isot for i in idx_list)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", SunpyMetadataWarning)
             maps = Map(data_wcs, sequence=True)
