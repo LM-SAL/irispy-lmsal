@@ -148,25 +148,29 @@ tr = aia_rot.wcs.world_to_pixel(
 )
 
 ###############################################################################
-# Finally we will plot the results.
+# Now we can see the results.
+
+aia_rotate_crop = aia_rot.submap(bl * u.pix, top_right=tr * u.pix)
 
 fig = plt.figure()
-ax1 = fig.add_subplot(1, 2, 1, projection=sji_cut.basic_wcs)
-aia_rotate_crop = aia_rot.submap(bl * u.pix, top_right=tr * u.pix)
+ax1 = fig.add_subplot(1, 2, 1, projection=aia_rotate_crop.wcs)
 aia_rotate_crop.plot(axes=ax1)
 ax1.set_title("")
 
 ax2 = fig.add_subplot(1, 2, 2, projection=sji_cut.basic_wcs)
-sji_cut.plot(axes=ax2, cmap="irissji2832")
-lon = ax2.coords[0]
-lat = ax2.coords[1]
-lon.set_ticks_visible(False)
-lon.set_ticklabel_visible(False)
-lat.set_ticks_visible(False)
-lat.set_ticklabel_visible(False)
-lon.set_axislabel("")
-lat.set_axislabel("")
+sji_cut.plot(axes=ax2)
 
 fig.tight_layout()
+
+###############################################################################
+# One other way to visualize the alignment is to plot the AIA
+# contours on the IRIS SJI image.
+
+fig = plt.figure()
+
+ax1 = fig.add_subplot(111, projection=sji_cut.basic_wcs)
+sji_cut.plot(axes=ax1)
+aia_rotate_crop.draw_contours(levels=[500], colors=["red"], linewidths=2)
+ax1.set_title("IRIS SJI with AIA contours")
 
 plt.show()
