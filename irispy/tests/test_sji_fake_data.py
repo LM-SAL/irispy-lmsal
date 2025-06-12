@@ -5,7 +5,7 @@ from astropy import units as u
 from astropy.time import Time
 from astropy.wcs import WCS
 
-from sunraster.extern.meta import Meta
+from ndcube.meta import NDMeta
 
 from irispy import SJICube, utils
 
@@ -51,7 +51,7 @@ def cube():
         mask=data >= 0,
         unit=utils.DN_UNIT["SJI"],
         scaled=True,
-        meta=Meta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_shape=data.shape),
+        meta=NDMeta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_shape=data.shape),
     )
     cube.extra_coords.add(*EXTRA_COORDS[0])
     return cube
@@ -84,7 +84,7 @@ def cube_2d():
         mask=data_2d >= 0,
         unit=utils.DN_UNIT["SJI"],
         scaled=True,
-        meta=Meta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_shape=data_2d.shape),
+        meta=NDMeta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_shape=data_2d.shape),
     )
     cube_2d.extra_coords.add(*EXTRA_COORDS[0])
     return cube_2d
@@ -110,7 +110,7 @@ def cube_1d():
         mask=data_1d >= 0,
         unit=utils.DN_UNIT["SJI"],
         scaled=True,
-        meta=Meta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_shape=data_1d.shape),
+        meta=NDMeta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_shape=data_1d.shape),
     )
     cube_1d.extra_coords.add(*EXTRA_COORDS[0])
     return cube_1d
@@ -153,7 +153,7 @@ def dust_cube():
     exposure_times = 2 * np.ones((2), float) * u.s
     extra_coords = [("time", 0, times)]
     scaled_T = True
-    meta = Meta(
+    meta = NDMeta(
         {"exposure time": exposure_times, "OBSID": 1},
         axes={"exposure time": 0},
         data_shape=data_dust.shape,

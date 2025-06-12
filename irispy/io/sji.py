@@ -1,5 +1,3 @@
-from copy import copy
-
 import numpy as np
 
 import astropy.modeling.models as m
@@ -14,6 +12,7 @@ import dkist
 from dkist.wcs.models import CoupledCompoundModel, VaryingCelestialTransform
 from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst
 from sunpy.coordinates.frames import Helioprojective
+from sunpy.map.header_helper import make_fitswcs_header
 
 from irispy.sji import AIACube, SJICube
 from irispy.utils import calculate_uncertainty
@@ -97,27 +96,32 @@ def _create_wcs(hdulist):
     base_time += times[0]
     times -= times[0]
     for i in range(hdulist[0].header["NAXIS3"]):
-        header = copy(hdulist[0].header)
-        header.pop("NAXIS3")
-        header.pop("PC3_1")
-        header.pop("PC3_2")
-        header.pop("CTYPE3")
-        header.pop("CUNIT3")
-        header.pop("CRVAL3")
-        header.pop("CRPIX3")
-        header.pop("CDELT3")
-        header["NAXIS"] = 2
-        header["CRVAL1"] = hdulist[1].data[i, hdulist[1].header["XCENIX"]]
-        header["CRVAL2"] = hdulist[1].data[i, hdulist[1].header["YCENIX"]]
-        header["PC1_1"] = hdulist[1].data[0, hdulist[1].header["PC1_1IX"]]
-        header["PC1_2"] = hdulist[1].data[0, hdulist[1].header["PC1_2IX"]]
-        header["PC2_1"] = hdulist[1].data[0, hdulist[1].header["PC2_1IX"]]
-        header["PC2_2"] = hdulist[1].data[0, hdulist[1].header["PC2_2IX"]]
-        header["DATE_OBS"] = (base_time + times[i]).isot
-        location = get_body_heliographic_stonyhurst("Earth", header["DATE_OBS"])
-        header["HGLN_OBS"] = location.lon.value
-        header["HGLT_OBS"] = location.lat.value
-        wcses.append(WCS(header))
+        location = get_body_heliographic_stonyhurst("Earth", (base_time + times[i]).isot)
+        observer = Helioprojective(
+            hdulist[1].data[i, hdulist[1].header["XCENIX"]] * u.arcsec,
+            hdulist[1].data[i, hdulist[1].header["YCENIX"]] * u.arcsec,
+            observer=location,
+            obstime=base_time + times[i],
+        )
+        rotation_matrix = np.asanyarray(
+            [
+                [hdulist[1].data[i, hdulist[1].header["PC1_1IX"]], hdulist[1].data[i, hdulist[1].header["PC1_2IX"]]],
+                [hdulist[1].data[i, hdulist[1].header["PC2_1IX"]], hdulist[1].data[i, hdulist[1].header["PC2_2IX"]]],
+            ]
+        )
+        new_header = make_fitswcs_header(
+            data=hdulist[0].data[i].shape,
+            coordinate=observer,
+            scale=[hdulist[0].header["CDELT1"], hdulist[0].header["CDELT2"]] * u.arcsec / u.pixel,
+            rotation_matrix=rotation_matrix,
+            instrument="SJI",
+            telescope="IRIS",
+            observatory="IRIS",
+            wavelength=int(hdulist[0].header["TWAVE1"]) * u.AA,
+            exposure=hdulist[1].data[i, hdulist[1].header["EXPTIMES"]] * u.second,
+            unit=u.DN,
+        )
+        wcses.append(WCS(new_header))
     return wcses
 
 

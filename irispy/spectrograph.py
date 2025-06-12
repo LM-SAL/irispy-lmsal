@@ -330,7 +330,7 @@ class SpectrogramCubeSequence(SpecSeq):
         return None
 
 
-class SGMeta(NDMeta, metaclass=SlitSpectrographMetaABC):
+class SGMeta(NDMeta, SlitSpectrographMetaABC):
     def __init__(self, header, spectral_window, **kwargs) -> None:
         super().__init__(header, **kwargs)
         spectral_windows = np.array([self[f"TDESC{i}"] for i in range(1, self["NWIN"] + 1)])
