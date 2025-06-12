@@ -39,7 +39,7 @@ dependencies = [
   'pandas>=1.3.3',
   'scipy>=1.7.0',
   'sunpy>=6.0.0',
-  'sunraster>=0.4.0',
+  'sunraster>=0.6.0',
   "mpl-animators>=1.2.3",
 ]
 
