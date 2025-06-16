@@ -1,3 +1,22 @@
+0.3.0 (2025-06-16)
+==================
+
+Breaking Changes
+----------------
+
+- Now ``read_files`` will return a NDCollection which you can access individual cubes based on keys like a dictionary.
+  If one item was passed into ``read_files``, that return type has bee unchanged. (`#63 <https://github.com/LM-SAL/irispy-lmsal/pull/63>`__)
+- Increased minimum version of dkist to 1.11.0. (`#63 <https://github.com/LM-SAL/irispy-lmsal/pull/63>`__)
+- Increased minimum version of sunraster to 0.6.0. (`#65 <https://github.com/LM-SAL/irispy-lmsal/pull/65>`__)
+
+
+New Features
+------------
+
+- Added explicit support for the IRIS aligned AIA cubes provided by LMSAL for each IRIS observation. (`#63 <https://github.com/LM-SAL/irispy-lmsal/pull/63>`__)
+- Added ``to_maps`` to ``SJICubes`` to allow a user to output a sunpy Map or MapSequence based on how many slices they need. (`#64 <https://github.com/LM-SAL/irispy-lmsal/pull/64>`__)
+
+
 0.2.5 (2025-06-02)
 ==================
 

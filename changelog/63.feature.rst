@@ -1,1 +1,0 @@
-Added explicit support for the IRIS aligned AIA cubes provided by LMSAL for each IRIS observation.
