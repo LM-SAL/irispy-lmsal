@@ -95,18 +95,24 @@ def _create_wcs(hdulist):
     # We need to account for a non-zero time delta.
     base_time += times[0]
     times -= times[0]
+    xcenix_idx = hdulist[1].header["XCENIX"]
+    ycenix_idx = hdulist[1].header["YCENIX"]
+    pc1_1ix = hdulist[1].header["PC1_1IX"]
+    pc1_2ix = hdulist[1].header["PC1_2IX"]
+    pc2_1ix = hdulist[1].header["PC2_1IX"]
+    pc2_2ix = hdulist[1].header["PC2_2IX"]
     for i in range(hdulist[0].header["NAXIS3"]):
         location = get_body_heliographic_stonyhurst("Earth", (base_time + times[i]).isot)
         observer = Helioprojective(
-            hdulist[1].data[i, hdulist[1].header["XCENIX"]] * u.arcsec,
-            hdulist[1].data[i, hdulist[1].header["YCENIX"]] * u.arcsec,
+            hdulist[1].data[i, xcenix_idx] * u.arcsec,
+            hdulist[1].data[i, ycenix_idx] * u.arcsec,
             observer=location,
             obstime=base_time + times[i],
         )
         rotation_matrix = np.asanyarray(
             [
-                [hdulist[1].data[i, hdulist[1].header["PC1_1IX"]], hdulist[1].data[i, hdulist[1].header["PC1_2IX"]]],
-                [hdulist[1].data[i, hdulist[1].header["PC2_1IX"]], hdulist[1].data[i, hdulist[1].header["PC2_2IX"]]],
+                [hdulist[1].data[i, pc1_1ix], hdulist[1].data[i, pc1_2ix]],
+                [hdulist[1].data[i, pc2_1ix], hdulist[1].data[i, pc2_2ix]],
             ]
         )
         new_header = make_fitswcs_header(
