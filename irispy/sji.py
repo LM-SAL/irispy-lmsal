@@ -82,7 +82,7 @@ class SJICube(SpectrogramCube):
 
     def __str__(self) -> str:
         if self.wcs.world_n_dim == 2:
-            instance_start = self.global_coords["Time (UTC)"]
+            instance_start = self.global_coords.get("Time (UTC)")
             instance_end = None
         else:
             instance_start = self.wcs.pixel_to_world(0, 0, 0)[-1]
@@ -176,6 +176,11 @@ class SJICube(SpectrogramCube):
             idx_list = range(self.data.shape[0])
         else:
             idx_list = index
+
+        # We can shortcut if the Cube has been reduced to a 2D slice
+        if self.wcs.world_n_dim == 2:
+            # TODO: Missing metadata
+            return Map(self.data, self.wcs)
         data_wcs = ((self.data[i], self.basic_wcs[i]) for i in idx_list)
         times_iso = (self.wcs.pixel_to_world(0, 0, i)[-1].utc.isot for i in idx_list)
         with warnings.catch_warnings():
