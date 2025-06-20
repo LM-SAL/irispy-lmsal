@@ -167,6 +167,11 @@ class SJICube(SpectrogramCube):
         index : int, list, optional
             The index of the SJI steps you want.
             By default None which will return the entire cube as a map sequence.
+
+        Returns
+        -------
+        `sunpy.map.Map` or `sunpy.map.MapSequence`
+            A single Map if index is an int, otherwise a MapSequence.
         """
         from sunpy.map import Map
 

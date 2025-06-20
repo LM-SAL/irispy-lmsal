@@ -1,2 +1,0 @@
-Now ``read_files`` will return a NDCollection which you can access individual cubes based on keys like a dictionary.
-If one item was passed into ``read_files``, that return type has bee unchanged.
