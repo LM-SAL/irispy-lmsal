@@ -366,7 +366,7 @@ class SGMeta(NDMeta, SlitSpectrographMetaABC):
                 Spectral Window: {self.spectral_window}
                 Spectral Range:  {self.spectral_range}
                 Spectral Band:   {self.spectral_band}
-                Dimensions:      {self.shape}
+                Dimensions:      {self.data_shape}
                 Date:            {self.date_reference}
                 OBS ID:          {self.observing_mode_id}
                 OBS Description: {self.observing_mode_description}
