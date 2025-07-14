@@ -39,8 +39,6 @@ def sji_2832_file():
 
 @pytest.fixture
 def sjicube_1330():
-    from irispy.io.sji import read_sji_lvl2
-
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_1330_t000_test.fits"))
 
 

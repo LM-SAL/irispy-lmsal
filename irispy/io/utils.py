@@ -6,6 +6,9 @@ from astropy.io import fits
 from ndcube import NDCollection
 from sunpy import log as logger
 
+from irispy.io.sji import read_sji_lvl2
+from irispy.io.spectrograph import read_spectrograph_lvl2
+
 __all__ = ["fitsinfo", "read_files"]
 
 
@@ -67,9 +70,6 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
     `NDCollection`
         With keys being the value of TDESC1, the values being the cube.
     """
-    from irispy.io.sji import read_sji_lvl2  # , read_aia_cube
-    from irispy.io.spectrograph import read_spectrograph_lvl2
-
     if isinstance(filename, str | Path):
         filename = [filename]
     filename = sorted(filename)

@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import animation, patheffects
@@ -73,8 +74,6 @@ def wobble_movie(
     They do not use the information in the AUX array.
     """
     if ffmpeg_path:
-        import matplotlib as mpl
-
         mpl.rcParams["animation.ffmpeg_path"] = ffmpeg_path
 
     if isinstance(files, str | Path):
