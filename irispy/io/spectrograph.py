@@ -1,4 +1,3 @@
-import tarfile
 from copy import copy
 from pathlib import Path
 
@@ -33,15 +32,15 @@ def read_spectrograph_lvl2(
     revert_v34=False,
 ):
     """
-    Reads IRIS level 2 spectrograph FITS from an OBS into an
-    `.IRISSpectrograph` instance.
+    Reads either a SINGLE IRIS level 2 spectrograph FITs or a list of them.
+
+    Does not handle tar files.
 
     Parameters
     ----------
     filenames: `list` of `str` or `str`
         Filename of filenames to be read. They must all be associated with the same
         OBS number.
-        If you provide a tar file, it will be extracted at the same location.
     spectral_windows: iterable of `str` or `str`
         Spectral windows to extract from files. Default=None, implies, extract all
         spectral windows.
@@ -61,20 +60,9 @@ def read_spectrograph_lvl2(
     -------
     `ndcube.NDCollection`
     """
-    to_add = []
-    to_remove = []
-    if isinstance(filenames, str | Path):
-        if tarfile.is_tarfile(filenames):
-            path = Path(str(filenames).replace(".tar.gz", ""))
-            path.mkdir(parents=True, exist_ok=True)
-            with tarfile.open(filenames, "r") as tar:
-                tar.extractall(path, filter="data")
-                to_add.extend([path / file for file in tar.getnames()])
-                to_remove.append(filenames)
+    if isinstance(filenames, (str, Path)):
         filenames = [filenames]
-    filenames.extend(to_add)
-    for remove in to_remove:
-        filenames.pop(filenames.index(remove))
+    filenames = [str(f) for f in filenames]
     # Collecting the window observations
     with fits.open(filenames[0], memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
         # After a discussion with the IRIS team, it was decided that instead of the
@@ -99,7 +87,6 @@ def read_spectrograph_lvl2(
                 raise ValueError(msg)
             window_fits_indices = np.nonzero(np.isin(windows_in_obs, spectral_windows))[0] + 1
         data_dict = {window_name: [] for window_name in spectral_windows_req}
-
     for filename in filenames:
         with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
             hdulist.verify("silentfix")
