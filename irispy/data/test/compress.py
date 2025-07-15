@@ -4,9 +4,9 @@ Short script I used to create the test FITS files in this folder.
 
 
 def compress(files: list) -> None:
-    from scipy.ndimage import zoom
+    from scipy.ndimage import zoom  # NOQA: PLC0415
 
-    from astropy.io import fits
+    from astropy.io import fits  # NOQA: PLC0415
 
     for file in files:
         hdus = fits.open(file)

@@ -354,6 +354,7 @@ class SGMeta(NDMeta, SlitSpectrographMetaABC):
                 msg,
             )
         self._iwin = np.arange(len(spectral_windows))[window_mask][0] + 1
+        self._fits_header = header
 
     def __str__(self) -> str:
         return textwrap.dedent(
@@ -366,7 +367,7 @@ class SGMeta(NDMeta, SlitSpectrographMetaABC):
                 Spectral Window: {self.spectral_window}
                 Spectral Range:  {self.spectral_range}
                 Spectral Band:   {self.spectral_band}
-                Dimensions:      {self.shape}
+                Dimensions:      {self.data_shape}
                 Date:            {self.date_reference}
                 OBS ID:          {self.observing_mode_id}
                 OBS Description: {self.observing_mode_description}
@@ -381,6 +382,10 @@ class SGMeta(NDMeta, SlitSpectrographMetaABC):
         if val is not None:
             val = Time(val, format="fits", scale="utc")
         return val
+
+    @property
+    def fits_header(self):
+        return self._fits_header
 
     @property
     def spectral_window(self):

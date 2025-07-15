@@ -133,7 +133,9 @@ def _create_wcs(hdulist):
 
 def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     """
-    Reads a level 2 SJI FITS or the IRIS aligned AIA Cubes.
+    Reads a SINGLE level 2 SJI FITS or the IRIS aligned AIA Cube.
+
+    Does not handle multiple files nor tar files.
 
     Parameters
     ----------
