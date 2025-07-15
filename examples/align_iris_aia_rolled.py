@@ -200,9 +200,13 @@ ax1.set_title("AIA with IRIS SJI contours")
 # For details of the implementation refer to the documentation of
 # `~sunkit_image.coalignment.match_template.match_template_coalign`.
 
-# We need to remove NaNs from the data, as they will cause issues with the co-alignment.
+# Replace NaNs with the local median to avoid introducing artificial edges for co-alignment.
 sji_map_corrected_data = sji_map.data.copy()
-sji_map_corrected_data[~np.isfinite(sji_map.data)] = 0
+nan_mask = ~np.isfinite(sji_map_corrected_data)
+if np.any(nan_mask):
+    # Compute the median of the finite values
+    local_median = np.nanmedian(sji_map_corrected_data)
+    sji_map_corrected_data[nan_mask] = local_median
 sji_map_corrected = sunpy.map.Map(sji_map_corrected_data, sji_map.meta)
 coaligned_sji_map = coalignment.coalign(aia_sub, sji_map_corrected, method="phase_cross_correlation")
 
