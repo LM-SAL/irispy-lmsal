@@ -1,4 +1,3 @@
-import tarfile
 from copy import copy
 from pathlib import Path
 
@@ -33,15 +32,15 @@ def read_spectrograph_lvl2(
     revert_v34=False,
 ):
     """
-    Reads IRIS level 2 spectrograph FITS from an OBS into an
-    `.IRISSpectrograph` instance.
+    Reads either a SINGLE IRIS level 2 spectrograph FITs or a list of them.
+
+    Does not handle tar files.
 
     Parameters
     ----------
     filenames: `list` of `str` or `str`
         Filename of filenames to be read. They must all be associated with the same
         OBS number.
-        If you provide a tar file, it will be extracted at the same location.
     spectral_windows: iterable of `str` or `str`
         Spectral windows to extract from files. Default=None, implies, extract all
         spectral windows.
@@ -63,23 +62,12 @@ def read_spectrograph_lvl2(
     """
     if isinstance(filenames, (str, Path)):
         filenames = [filenames]
-    expanded_files = []
-    for fname in filenames:
-        filename = Path(fname)
-        if tarfile.is_tarfile(filename):
-            extract_dir = filename.with_suffix("").with_suffix("")  # removes .tar.gz or .tar
-            extract_dir.mkdir(parents=True, exist_ok=True)
-            with tarfile.open(filename, "r") as tar:
-                tar.extractall(extract_dir, filter="data")
-                expanded_files.extend([extract_dir / member.name for member in tar.getmembers() if member.isfile()])
-        else:
-            expanded_files.append(filename)
-    filenames = [str(f) for f in expanded_files]
+    filenames = [str(f) for f in filenames]
     # Collecting the window observations
     with fits.open(filenames[0], memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
         # After a discussion with the IRIS team, it was decided that instead of the
         # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.
-        v34 = hdulist[0].header.get("STEPS_AV", 0) < -0.01
+        v34 = hdulist[0].header["STEPS_AV"] < -0.01
         hdulist.verify("silentfix")
         windows_in_obs = np.array(
             [hdulist[0].header[f"TDESC{i}"] for i in range(1, hdulist[0].header["NWIN"] + 1)],
@@ -99,7 +87,6 @@ def read_spectrograph_lvl2(
                 raise ValueError(msg)
             window_fits_indices = np.nonzero(np.isin(windows_in_obs, spectral_windows))[0] + 1
         data_dict = {window_name: [] for window_name in spectral_windows_req}
-
     for filename in filenames:
         with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
             hdulist.verify("silentfix")

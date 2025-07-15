@@ -64,6 +64,6 @@ print(aia_collection["304_THIN"])
 fig = plt.figure()
 # Note that the .get_animation() is used to animate this example
 # and is not required normally.
-aia_collection["304_THIN"].plot(fig=fig).get_animation()
+_ = aia_collection["304_THIN"].plot(fig=fig).get_animation()
 
 plt.show()
