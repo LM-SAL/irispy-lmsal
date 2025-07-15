@@ -77,7 +77,9 @@ def read_spectrograph_lvl2(
         filenames.pop(filenames.index(remove))
     # Collecting the window observations
     with fits.open(filenames[0], memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
-        v34 = bool(hdulist[0].header["OBSID"].startswith("34"))
+        # After a discussion with the IRIS team, it was decided that instead of the
+        # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.
+        v34 = hdulist[0].header["STEPS_AV"] < -0.01
         hdulist.verify("silentfix")
         windows_in_obs = np.array(
             [hdulist[0].header[f"TDESC{i}"] for i in range(1, hdulist[0].header["NWIN"] + 1)],
