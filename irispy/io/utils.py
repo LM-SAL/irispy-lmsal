@@ -1,4 +1,3 @@
-import tarfile
 from pathlib import Path
 
 from astropy.io import fits
@@ -73,28 +72,18 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
     if isinstance(filename, str | Path):
         filename = [filename]
     filename = sorted(filename)
-    to_add = []
-    to_remove = []
-    for file in filename:
-        if tarfile.is_tarfile(file):
-            path = Path(str(file).replace(".tar.gz", ""))
-            path.mkdir(parents=True, exist_ok=True)
-            with tarfile.open(file, "r") as tar:
-                tar.extractall(path, filter="data")
-                to_add.extend([path / file for file in tar.getnames()])
-                to_remove.append(file)
-    filename.extend(to_add)
-    for remove in to_remove:
-        filename.pop(filename.index(remove))
     returns = {}
     for file in filename:
-        instrume = fits.getval(file, "INSTRUME")
-        describe = fits.getval(file, "TDESC1")
+        instrume = ""
+        describe = ""
+        if file.endswith((".fits", ".fits.gz")):
+            instrume = fits.getval(file, "INSTRUME")
+            describe = fits.getval(file, "TDESC1")
         logger.debug(f"Processing file: {file} with instrume: {instrume}")
         try:
             if instrume in ["IRIS", "SJI"] or instrume.startswith("AIA"):
                 returns[f"{describe}"] = read_sji_lvl2(file, memmap=memmap, uncertainty=uncertainty, **kwargs)
-            elif instrume == "SPEC":
+            elif file.endswith(".tar.gz") or instrume == "SPEC":
                 returns[f"{describe}"] = read_spectrograph_lvl2(
                     file, spectral_windows=spectral_windows, memmap=memmap, uncertainty=uncertainty, **kwargs
                 )

@@ -61,15 +61,20 @@ def read_spectrograph_lvl2(
     -------
     `ndcube.NDCollection`
     """
+    to_add = []
+    to_remove = []
     if isinstance(filenames, str | Path):
         if tarfile.is_tarfile(filenames):
-            parent = Path(str(filenames).replace(".tar.gz", "")).mkdir(parents=True, exist_ok=True)
+            path = Path(str(filenames).replace(".tar.gz", ""))
+            path.mkdir(parents=True, exist_ok=True)
             with tarfile.open(filenames, "r") as tar:
-                tar.extractall(parent, filter="data")
-                filenames = [parent / file for file in tar.getnames()]
-        else:
-            filenames = [filenames]
-
+                tar.extractall(path, filter="data")
+                to_add.extend([path / file for file in tar.getnames()])
+                to_remove.append(filenames)
+        filenames = [filenames]
+    filenames.extend(to_add)
+    for remove in to_remove:
+        filenames.pop(filenames.index(remove))
     # Collecting the window observations
     with fits.open(filenames[0], memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
         v34 = bool(hdulist[0].header["OBSID"].startswith("34"))
