@@ -6,7 +6,54 @@ from astropy.io import fits
 from ndcube import NDCollection
 from sunpy import log as logger
 
+from irispy.io.sji import read_sji_lvl2
+from irispy.io.spectrograph import read_spectrograph_lvl2
+
 __all__ = ["fitsinfo", "read_files"]
+
+
+def _get_simple_metadata(file):
+    """
+    Get simple metadata from a FITS file.
+
+    Parameters
+    ----------
+    file : `pathlib.Path`
+        The FITS file to read.
+
+    Returns
+    -------
+    `tuple`
+        A tuple containing the instrument name and description.
+    """
+    if not file.name.endswith(".fits") and not file.name.endswith(".fits.gz"):
+        return "", ""
+    instrume = fits.getval(file, "INSTRUME")
+    describe = fits.getval(file, "TDESC1")
+    return instrume, describe
+
+
+def _extract_tarfile(filenames):
+    """
+    Extracts a tar file to the same location as the tar file.
+
+    Parameters
+    ----------
+    filenames : `list of str`
+        The filenames of the tar files to extract.
+    """
+    expanded_files = []
+    for fname in filenames:
+        filename = Path(fname)
+        if tarfile.is_tarfile(filename):
+            extract_dir = filename.with_suffix("").with_suffix("")  # removes .tar.gz or .tar
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            with tarfile.open(filename, "r") as tar:
+                tar.extractall(extract_dir, filter="data")
+                expanded_files.extend([extract_dir / member.name for member in tar.getmembers() if member.isfile()])
+        else:
+            expanded_files.append(filename)
+    return expanded_files
 
 
 def fitsinfo(filename):
@@ -34,17 +81,18 @@ def fitsinfo(filename):
             logger.info(msg)
 
 
-def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=False, allow_errors=False, **kwargs):
+def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=False, allow_errors=False, **kwargs):
     """
-    A wrapper function to read any number of raster, SJI or IRIS-algined AIA
+    A wrapper function to read any number of raster, SJI or IRIS-aligned AIA
     data files.
+
+    The goal is be able to download an entire IRIS observation and read it
+    in one go, without having to worry about the type of file.
 
     Parameters
     ----------
     filename : `list of `str`, `str`, `pathlib.Path`
         Filename(s) to load.
-        If given a string, will load that file.
-        If given a list of strings, load them.
     spectral_windows: iterable of `str` or `str`
         Spectral windows to extract from files. Default=None, implies, extract all
         spectral windows.
@@ -67,34 +115,25 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
     `NDCollection`
         With keys being the value of TDESC1, the values being the cube.
     """
-    from irispy.io.sji import read_sji_lvl2  # , read_aia_cube
-    from irispy.io.spectrograph import read_spectrograph_lvl2
-
-    if isinstance(filename, str | Path):
-        filename = [filename]
-    filename = sorted(filename)
-    to_add = []
-    to_remove = []
-    for file in filename:
-        if tarfile.is_tarfile(file):
-            path = Path(str(file).replace(".tar.gz", ""))
-            path.mkdir(parents=True, exist_ok=True)
-            with tarfile.open(file, "r") as tar:
-                tar.extractall(path, filter="data")
-                to_add.extend([path / file for file in tar.getnames()])
-                to_remove.append(file)
-    filename.extend(to_add)
-    for remove in to_remove:
-        filename.pop(filename.index(remove))
+    if isinstance(filenames, (str, Path)):
+        filenames = [filenames]
+    filenames = sorted(filenames)
+    filenames = [Path(f) for f in filenames]
     returns = {}
-    for file in filename:
-        instrume = fits.getval(file, "INSTRUME")
-        describe = fits.getval(file, "TDESC1")
-        logger.debug(f"Processing file: {file} with instrume: {instrume}")
+    for filename in filenames:
+        sdo_tarfile = bool(filename.name.endswith("SDO.tar.gz"))
+        raster_tarfile = bool(filename.name.endswith("_raster.tar.gz"))
+        instrume, describe = _get_simple_metadata(filename)
+        logger.debug(f"Processing file: {filename} with instrume: {instrume}")
         try:
-            if instrume in ["IRIS", "SJI"] or instrume.startswith("AIA"):
-                returns[f"{describe}"] = read_sji_lvl2(file, memmap=memmap, uncertainty=uncertainty, **kwargs)
-            elif instrume == "SPEC":
+            if sdo_tarfile or instrume in ["IRIS", "SJI"] or instrume.startswith("AIA"):
+                file = _extract_tarfile([filename]) if sdo_tarfile else [filename]
+                for f in file:
+                    instrume, describe = _get_simple_metadata(f)
+                    returns[f"{describe}"] = read_sji_lvl2(f, memmap=memmap, uncertainty=uncertainty, **kwargs)
+            elif raster_tarfile or instrume == "SPEC":
+                file = _extract_tarfile([filename]) if raster_tarfile else [filename]
+                instrume, describe = _get_simple_metadata(file[0])
                 returns[f"{describe}"] = read_spectrograph_lvl2(
                     file, spectral_windows=spectral_windows, memmap=memmap, uncertainty=uncertainty, **kwargs
                 )
@@ -102,7 +141,7 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
                 logger.warning(f"INSTRUME: {instrume} was not recognized and not loaded")
         except Exception as e:
             if allow_errors:
-                logger.warning(f"File {file} failed to load with {e}")
+                logger.warning(f"File {filename} failed to load with {e}")
                 continue
             raise
     return NDCollection(returns.items()) if len(returns) > 1 else next(iter(returns.values()))

@@ -1,0 +1,1 @@
+Improved how ``read_files`` handles tarfiles and mixed files.

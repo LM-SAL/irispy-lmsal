@@ -55,6 +55,7 @@ all = ["irispy-lmsal"]
 tests = [
   "irispy-lmsal[all]",
   'pytest-astropy',
+  'pooch',
 ]
 docs = [
   "irispy-lmsal[all]",

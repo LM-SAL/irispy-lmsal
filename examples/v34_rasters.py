@@ -30,7 +30,7 @@ from irispy.io import read_files
 
 raster_filename = pooch.retrieve(
     "https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2025/03/28/20250328_225628_3400109360/iris_l2_20250328_225628_3400109360_raster.tar.gz",
-    known_hash="fe890425c61a8d36e08806df19957ca264e62e13d7cda7e8d0a8f896ddd73db1",
+    known_hash="ce46e93a8962b04da344c203c4f75a8d7411d1f587e25d728a6ca8398208de1a",
 )
 
 ###############################################################################

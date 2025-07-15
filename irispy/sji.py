@@ -4,6 +4,7 @@ import warnings
 import matplotlib.pyplot as plt
 
 from sunpy import log as logger
+from sunpy.map import Map
 from sunpy.util.exceptions import SunpyMetadataWarning
 from sunraster import SpectrogramCube
 
@@ -173,8 +174,6 @@ class SJICube(SpectrogramCube):
         `sunpy.map.Map` or `sunpy.map.MapSequence`
             A single Map if index is an int, otherwise a MapSequence.
         """
-        from sunpy.map import Map
-
         if isinstance(index, int):
             idx_list = [index]
         elif index is None:
