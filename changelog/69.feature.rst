@@ -1,0 +1,1 @@
+Added ``fits_header`` property to the ``.meta``.

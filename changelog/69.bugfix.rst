@@ -1,0 +1,1 @@
+Fixed handling of raster tarfiles to not just use the first file.
