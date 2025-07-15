@@ -48,7 +48,7 @@ print(ObsID(sji_2832.meta["OBSID"]))
 # color the spatial axes.
 
 # This is an animation
-_ = sji_2832.plot()
+sji_2832.plot()
 
 ###############################################################################
 # We also have the option of going directly to an individual scan.
