@@ -61,23 +61,52 @@ Let us recover the header of the raster file and show the description of the obs
     ----------
     Cube keys: (np.str_('C II 1336'), np.str_('Si IV 1394'), np.str_('Mg II k 2796'))
     Number of Cubes: 3
-    Aligned dimensions: [1 16 548]
+    Aligned dimensions: [5 16 548]
     Aligned physical types: [('meta.obs.sequence',), ...]
     <BLANKLINE>
 
 We get some basic information about the raster file from this, what spectral windows were observed
 The size of the cube, the wavelength keys as well.
 
-If we want to check the header of the raster, we can do the following:
-Let us check the header of this collection, this is stored as a ``meta`` attribute:
+Let us check the metadata of this collection, this is stored as a ``meta`` attribute:
 
 .. code-block:: python
 
     >>> raster["C II 1336"][0].meta  # doctest: +REMOTE_DATA
-    {'SIMPLE': True, 'BITPIX': 16, 'NAXIS': 0, 'EXTEND': True, 'DATE': '2021-11-15', 'COMMENT': "and Astrophysics', volume 376, page 359; bibcode 2001A&A...376..359H", 'TELESCOP': 'IRIS', 'INSTRUME': 'SPEC', ...
+    <irispy.spectrograph.SGMeta object at ...>
+    <BLANKLINE>
+    SGMeta
+    ------
+    Observatory:     IRIS
+    Instrument:      SPEC
+    Detector:        FUV1
+    Spectral Window: C II 1336
+    Spectral Range:  [1331.70275015 1358.28579039] Angstrom
+    Spectral Band:   FUV
+    Dimensions:      [ 16 548 513]
+    Date:            2021-10-01T06:09:25.090
+    OBS ID:          3683602040
+    OBS Description: Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
+    <BLANKLINE>
 
 Note this is not on the main object but each individual element, in this case the spectral window.
 While the SJI files contain just one spectral window per file, the raster files have several spectral windows per file.
+
+If we want to check the primary header of the raster, we can do the following:
+
+.. code-block:: python
+
+    >>> raster["C II 1336"][0].meta.fits_header  # doctest: +REMOTE_DATA
+    SIMPLE  =                    T / Written by IDL:  Mon Nov 15 09:21:38 2021
+    BITPIX  =                   16 / Number of bits per data pixel
+    NAXIS   =                    0 / Number of data axes
+    EXTEND  =                    T / FITS data may contain extensions
+    DATE    = '2021-11-15'         / Creation UTC (CCCC-MM-DD) date of FITS header
+    COMMENT FITS (Flexible Image Transport System) format is defined in 'Astronomy
+    COMMENT and Astrophysics', volume 376, page 359; bibcode 2001A&A...376..359H
+    TELESCOP= 'IRIS    '           /
+    INSTRUME= 'SPEC    '           /
+    ...
 
 As the SJI level 2 data are simpler than the raster files, since they have only one spectral window per file, we will start with this data instead of the raster file above.
 

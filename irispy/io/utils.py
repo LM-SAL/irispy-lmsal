@@ -69,21 +69,24 @@ def read_files(filename, *, spectral_windows=None, uncertainty=False, memmap=Fal
     `NDCollection`
         With keys being the value of TDESC1, the values being the cube.
     """
-    if isinstance(filename, str | Path):
-        filename = [filename]
+    if isinstance(filename, (str, Path)):
+        filename = [Path(filename)]
     filename = sorted(filename)
+    filename = [Path(f) for f in filename]
     returns = {}
     for file in filename:
         instrume = ""
         describe = ""
-        if file.endswith((".fits", ".fits.gz")):
+        if file.name.endswith((".fits", ".fits.gz")):
             instrume = fits.getval(file, "INSTRUME")
             describe = fits.getval(file, "TDESC1")
         logger.debug(f"Processing file: {file} with instrume: {instrume}")
         try:
             if instrume in ["IRIS", "SJI"] or instrume.startswith("AIA"):
                 returns[f"{describe}"] = read_sji_lvl2(file, memmap=memmap, uncertainty=uncertainty, **kwargs)
-            elif file.endswith(".tar.gz") or instrume == "SPEC":
+            # Only raster files are tar.gz files, so we lump them together
+            # read_spectrograph_lvl2 itself handles tar.gz files.
+            elif file.name.endswith(".tar.gz") or instrume == "SPEC":
                 returns[f"{describe}"] = read_spectrograph_lvl2(
                     file, spectral_windows=spectral_windows, memmap=memmap, uncertainty=uncertainty, **kwargs
                 )

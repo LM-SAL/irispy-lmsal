@@ -61,25 +61,25 @@ def read_spectrograph_lvl2(
     -------
     `ndcube.NDCollection`
     """
-    to_add = []
-    to_remove = []
-    if isinstance(filenames, str | Path):
-        if tarfile.is_tarfile(filenames):
-            path = Path(str(filenames).replace(".tar.gz", ""))
-            path.mkdir(parents=True, exist_ok=True)
-            with tarfile.open(filenames, "r") as tar:
-                tar.extractall(path, filter="data")
-                to_add.extend([path / file for file in tar.getnames()])
-                to_remove.append(filenames)
+    if isinstance(filenames, (str, Path)):
         filenames = [filenames]
-    filenames.extend(to_add)
-    for remove in to_remove:
-        filenames.pop(filenames.index(remove))
+    expanded_files = []
+    for fname in filenames:
+        filename = Path(fname)
+        if tarfile.is_tarfile(filename):
+            extract_dir = filename.with_suffix("").with_suffix("")  # removes .tar.gz or .tar
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            with tarfile.open(filename, "r") as tar:
+                tar.extractall(extract_dir, filter="data")
+                expanded_files.extend([extract_dir / member.name for member in tar.getmembers() if member.isfile()])
+        else:
+            expanded_files.append(filename)
+    filenames = [str(f) for f in expanded_files]
     # Collecting the window observations
     with fits.open(filenames[0], memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
         # After a discussion with the IRIS team, it was decided that instead of the
         # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.
-        v34 = hdulist[0].header["STEPS_AV"] < -0.01
+        v34 = hdulist[0].header.get("STEPS_AV", 0) < -0.01
         hdulist.verify("silentfix")
         windows_in_obs = np.array(
             [hdulist[0].header[f"TDESC{i}"] for i in range(1, hdulist[0].header["NWIN"] + 1)],
