@@ -1,9 +1,9 @@
 """
-=====================================
-Aligning IRIS SJI (rolled) to SDO/AIA
-=====================================
+======================================
+Reproject IRIS SJI (rolled) to SDO/AIA
+======================================
 
-In this example we will show how to reproject and co-align a rolled IRIS dataset to SDO/AIA.
+In this example we will show how to reproject a rolled IRIS dataset to SDO/AIA.
 
 The IRIS team at LMSAL provides AIA data cubes which are coaligned to the IRIS FOV
 for each observation from https://iris.lmsal.com/search/
@@ -159,8 +159,7 @@ sji_cut.plot(axes=ax2)
 fig.tight_layout()
 
 ###############################################################################
-# One other way to visualize the alignment is to plot the AIA
-# contours on the IRIS SJI image.
+# Finally, one way to visualize the alignment is to plot the AIA contours on the IRIS SJI image.
 
 fig = plt.figure()
 
@@ -168,19 +167,5 @@ ax1 = fig.add_subplot(111, projection=sji_cut.wcs)
 sji_cut.plot(axes=ax1)
 aia_reprojected.draw_contours(levels=[500], colors=["red"], linewidths=2)
 ax1.set_title("IRIS SJI with AIA contours")
-
-###############################################################################
-# For prosperity, we will do the reverse re-projection and contouring
-# to see if there is a difference.
-
-sji_map = sji_cut.reproject_to(aia_sub.wcs).to_maps()
-
-fig = plt.figure()
-ax1 = fig.add_subplot(111, projection=aia_sub.wcs)
-aia_sub.plot(axes=ax1)
-# We turn the SJICube into a sunpy Map so we can draw the contour as that is not
-# part of the plotting API by default
-sji_map.draw_contours(levels=[500], colors=["red"], linewidths=2)
-ax1.set_title("AIA with IRIS SJI contours")
 
 plt.show()
