@@ -1,9 +1,9 @@
 """
-=====================================
-Aligning IRIS SJI (rolled) to SDO/AIA
-=====================================
+======================================
+Reproject IRIS SJI (rolled) to SDO/AIA
+======================================
 
-In this example we will show how to reproject and co-align a rolled IRIS dataset to SDO/AIA.
+In this example we will show how to reproject a rolled IRIS dataset to SDO/AIA.
 
 The IRIS team at LMSAL provides AIA data cubes which are coaligned to the IRIS FOV
 for each observation from https://iris.lmsal.com/search/
@@ -14,7 +14,6 @@ Therefore this example is more a showcase of functionally.
 import matplotlib.pyplot as plt
 import numpy as np
 import pooch
-from sunkit_image import coalignment
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -160,8 +159,7 @@ sji_cut.plot(axes=ax2)
 fig.tight_layout()
 
 ###############################################################################
-# One other way to visualize the alignment is to plot the AIA
-# contours on the IRIS SJI image.
+# Finally, one way to visualize the alignment is to plot the AIA contours on the IRIS SJI image.
 
 fig = plt.figure()
 
@@ -169,51 +167,5 @@ ax1 = fig.add_subplot(111, projection=sji_cut.wcs)
 sji_cut.plot(axes=ax1)
 aia_reprojected.draw_contours(levels=[500], colors=["red"], linewidths=2)
 ax1.set_title("IRIS SJI with AIA contours")
-
-###############################################################################
-# For prosperity, we will do the reverse re-projection and contouring
-# to see if there is a difference.
-
-sji_map = sji_cut.reproject_to(aia_sub.wcs).to_maps()
-
-fig = plt.figure()
-ax1 = fig.add_subplot(111, projection=aia_sub.wcs)
-aia_sub.plot(axes=ax1)
-# We turn the SJICube into a sunpy Map so we can draw the contour as that is not
-# part of the plotting API by default
-sji_map.draw_contours(levels=[500], colors=["red"], linewidths=2)
-ax1.set_title("AIA with IRIS SJI contours")
-
-###############################################################################
-# As one can see, the alignment is not perfect. Creating a pixel perfect WCS
-# is very difficult due to uncertainties in locations and the pointing information.
-#
-# So what we can do is a cross-correlation between IRIS and SDO/AIA to see if we can
-# improve this. The following uses ``sunkit-image`` and currently only works on sunpy Maps,
-# so we will use the SJI Map for this case and not the cube.
-#
-# Before co-aligning the images, we would normally make sure that both images have the
-# image scale, as this is important for the routine. But since we reprojected IRIS SJI
-# to SDO/AIA, we do not need to do this.
-#
-# Now we can co-align cross-correlation using the "match_template" method.
-# For details of the implementation refer to the documentation of
-# `~sunkit_image.coalignment.match_template.match_template_coalign`.
-
-# Replace NaNs with the local median to avoid introducing artificial edges for co-alignment.
-sji_map_corrected_data = sji_map.data.copy()
-nan_mask = ~np.isfinite(sji_map_corrected_data)
-if np.any(nan_mask):
-    # Compute the median of the finite values
-    local_median = np.nanmedian(sji_map_corrected_data)
-    sji_map_corrected_data[nan_mask] = local_median
-sji_map_corrected = sunpy.map.Map(sji_map_corrected_data, sji_map.meta)
-coaligned_sji_map = coalignment.coalign(aia_sub, sji_map_corrected, method="phase_cross_correlation")
-
-fig = plt.figure()
-ax1 = fig.add_subplot(111, projection=aia_sub.wcs)
-aia_sub.plot(axes=ax1)
-coaligned_sji_map.draw_contours(levels=[500], colors=["red"], linewidths=2)
-ax1.set_title("Co-aligned IRIS SJI with AIA contours")
 
 plt.show()
