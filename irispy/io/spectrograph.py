@@ -10,7 +10,10 @@ from astropy.time import Time, TimeDelta
 from astropy.wcs import WCS
 
 from sunpy import log as logger
-from sunpy.coordinates import Helioprojective
+from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst
+from sunpy.coordinates.frames import HeliographicStonyhurst, Helioprojective
+from sunpy.coordinates.screens import SphericalScreen
+from sunpy.coordinates.wcs_utils import _set_wcs_aux_obs_coord
 
 from irispy.spectrograph import Collection, SGMeta, SpectrogramCube, SpectrogramCubeSequence
 from irispy.utils import calculate_uncertainty
@@ -87,6 +90,17 @@ def read_spectrograph_lvl2(
                 raise ValueError(msg)
             window_fits_indices = np.nonzero(np.isin(windows_in_obs, spectral_windows))[0] + 1
         data_dict = {window_name: [] for window_name in spectral_windows_req}
+        # No observer information in the header, so we just assume its at Earth.
+        base_time = Time(hdulist[0].header["STARTOBS"])
+        location = get_body_heliographic_stonyhurst("Earth", (base_time).isot)
+        observer = Helioprojective(
+            hdulist[0].header["XCEN"] * u.arcsec,
+            hdulist[0].header["YCEN"] * u.arcsec,
+            observer=location,
+            obstime=base_time,
+        )
+        with SphericalScreen(observer.observer):
+            observer = observer.transform_to(HeliographicStonyhurst(obstime=base_time))
     for filename in filenames:
         with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
             hdulist.verify("silentfix")
@@ -170,6 +184,7 @@ def read_spectrograph_lvl2(
                     wcs = WCS(header)
                 else:
                     data = hdulist[window_fits_indices[i]].data
+                _set_wcs_aux_obs_coord(wcs, observer)
                 cube = SpectrogramCube(
                     data,
                     wcs=wcs,

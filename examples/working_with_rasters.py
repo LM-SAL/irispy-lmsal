@@ -13,6 +13,7 @@ import pooch
 import astropy.units as u
 from astropy.coordinates import SkyCoord, SpectralCoord
 from astropy.visualization import quantity_support
+from astropy.wcs.utils import wcs_to_celestial_frame
 
 from sunpy.coordinates.frames import Helioprojective
 
@@ -112,9 +113,11 @@ ax.plot(mg_wave.to("AA"), mg_ii.data[120, 200])
 # Now, let's take a look at the WCS information.
 # For example, what is the wavelength position that corresponds to Mg II k core (279.63 nm)?
 
+iris_observer = wcs_to_celestial_frame(mg_ii.wcs.celestial).observer
+iris_frame = Helioprojective(observer=iris_observer)
 wcs_loc = mg_ii.wcs.world_to_pixel(
     SpectralCoord(279.63, unit=u.nm),
-    SkyCoord(0 * u.arcsec, 0 * u.arcsec, frame=Helioprojective),
+    SkyCoord(0 * u.arcsec, 0 * u.arcsec, frame=iris_frame),
 )
 mg_index = int(np.round(wcs_loc[0]))
 print(mg_index)
@@ -138,8 +141,8 @@ mg_spec_crop.plot(axes=ax)
 # Imagine there's a really cool feature at (-338", 275"), how can you plot
 # the spectrum at that location?
 
-lower_corner = [None, SkyCoord(-338 * u.arcsec, 275 * u.arcsec, frame=Helioprojective)]
-upper_corner = [None, SkyCoord(-338 * u.arcsec, 275 * u.arcsec, frame=Helioprojective)]
+lower_corner = [None, SkyCoord(-338 * u.arcsec, 275 * u.arcsec, frame=iris_frame)]
+upper_corner = [None, SkyCoord(-338 * u.arcsec, 275 * u.arcsec, frame=iris_frame)]
 mg_ii_cut = mg_ii.crop(lower_corner, upper_corner)
 
 fig = plt.figure()
