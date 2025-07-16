@@ -10,7 +10,9 @@ from astropy.time import Time, TimeDelta
 from astropy.wcs import WCS
 
 from sunpy import log as logger
-from sunpy.coordinates import Helioprojective
+from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst
+from sunpy.coordinates.frames import HeliographicStonyhurst, Helioprojective
+from sunpy.coordinates.wcs_utils import _set_wcs_aux_obs_coord
 
 from irispy.spectrograph import Collection, SGMeta, SpectrogramCube, SpectrogramCubeSequence
 from irispy.utils import calculate_uncertainty
@@ -170,6 +172,16 @@ def read_spectrograph_lvl2(
                     wcs = WCS(header)
                 else:
                     data = hdulist[window_fits_indices[i]].data
+                # No observer information in the header, so we just assume its at Earth.
+                location = get_body_heliographic_stonyhurst("Earth", (times[0]).isot)
+                observer = Helioprojective(
+                    hdulist[0].header["XCEN"] * u.arcsec,
+                    hdulist[0].header["YCEN"] * u.arcsec,
+                    observer=location,
+                    obstime=times[0],
+                )
+                observer = observer.transform_to(HeliographicStonyhurst(obstime=times[0]))
+                _set_wcs_aux_obs_coord(wcs, observer)
                 cube = SpectrogramCube(
                     data,
                     wcs=wcs,
