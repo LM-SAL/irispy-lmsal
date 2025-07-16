@@ -20,8 +20,9 @@ from astropy.coordinates import SkyCoord, SpectralCoord
 from astropy.modeling import models as m
 from astropy.modeling.fitting import LevMarLSQFitter, parallel_fit_dask
 from astropy.visualization import time_support
+from astropy.wcs.utils import wcs_to_celestial_frame
 
-from sunpy.coordinates import frames
+from sunpy.coordinates.frames import Helioprojective
 
 from irispy.io import read_files
 
@@ -60,8 +61,10 @@ raster = read_files(raster_filename, memmap=False)
 si_iv_1403 = raster["Si IV 1403"][0]
 
 # However, before we get to that, we will shrink the data cube to make it easier to work with.
-top_left = [None, SkyCoord(-290 * u.arcsec, 260 * u.arcsec, frame=frames.Helioprojective)]
-bottom_right = [None, SkyCoord(-360 * u.arcsec, 310 * u.arcsec, frame=frames.Helioprojective)]
+iris_observer = wcs_to_celestial_frame(si_iv_1403.wcs.celestial).observer
+iris_frame = Helioprojective(observer=iris_observer)
+top_left = [None, SkyCoord(-290 * u.arcsec, 260 * u.arcsec, frame=iris_frame)]
+bottom_right = [None, SkyCoord(-360 * u.arcsec, 310 * u.arcsec, frame=iris_frame)]
 si_iv_1403 = si_iv_1403.crop(top_left, bottom_right)
 
 ###############################################################################
