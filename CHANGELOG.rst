@@ -1,3 +1,22 @@
+0.3.1 (2025-07-30)
+==================
+
+New Features
+------------
+
+- Added ``fits_header`` property to the ``.meta``. (`#69 <https://github.com/LM-SAL/irispy-lmsal/pull/69>`__)
+- Added observer location to the Spectrograph cubes.
+  This now matches the SJI cubes. (`#70 <https://github.com/LM-SAL/irispy-lmsal/pull/70>`__)
+
+
+Bug Fixes
+---------
+
+- Fixed handling of raster tarfiles to not just use the first file. (`#69 <https://github.com/LM-SAL/irispy-lmsal/pull/69>`__)
+- Improved how OBSID v34 is checked by using ``STEPS_AV`` in the FITS header. (`#69 <https://github.com/LM-SAL/irispy-lmsal/pull/69>`__)
+- Improved how ``read_files`` handles tarfiles and mixed files. (`#69 <https://github.com/LM-SAL/irispy-lmsal/pull/69>`__)
+
+
 0.3.0 (2025-06-16)
 ==================
 
