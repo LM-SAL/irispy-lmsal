@@ -1,2 +1,0 @@
-Added observer location to the Spectrograph cubes.
-This now matches the SJI cubes.

@@ -1,1 +1,0 @@
-Improved how OBSID v34 is checked by using ``STEPS_AV`` in the FITS header.
