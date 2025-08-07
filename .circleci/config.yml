@@ -60,7 +60,6 @@ jobs:
       - image: cimg/python:3.13
     environment:
       TOXENV: << parameters.jobname >>
-      GIT_SSH_COMMAND: ssh -i ~/.ssh/id_rsa_7b8fc81c13a3b446ec9aa50d3f626978
     steps:
       - checkout
       - run: *skip-check
@@ -70,7 +69,7 @@ jobs:
       - run: ssh-add -D
       # Add private key for deploying to the figure tests repo
       - add_ssh_keys:
-          fingerprints: "7b:8f:c8:1c:13:a3:b4:46:ec:9a:a5:0d:3f:62:69:78"
+          fingerprints: "SHA256:jVnptuBNlSZXcnweypnpX7Owzt6M8+jJCTDpmtJ9a30"
       - run: ssh-keyscan github.com >> ~/.ssh/known_hosts
       - run: git config --global user.email "lmsal@circleci" && git config --global user.name "Circle CI"
       - run: git clone git@github.com:LM-SAL/figure-test-images.git --depth 1 ~/irispy-figure-tests/
