@@ -1,4 +1,6 @@
 import os
+import logging
+import importlib
 
 import numpy as np
 import pooch
@@ -11,6 +13,45 @@ from sunpy.time import parse_time
 from irispy.data.test import get_test_filepath
 from irispy.io.sji import read_sji_lvl2
 from irispy.utils import get_iris_response
+
+console_logger = logging.getLogger()
+console_logger.setLevel("INFO")
+# Don't actually import pytest_remotedata because that can do things to the
+# entrypoints code in pytest.
+remotedata_spec = importlib.util.find_spec("pytest_remotedata")
+HAVE_REMOTEDATA = remotedata_spec is not None
+# Force MPL to use non-gui backends for testing.
+try:
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+
+    HAVE_MATPLOTLIB = True
+    mpl.use("Agg")
+except ImportError:
+    HAVE_MATPLOTLIB = False
+
+
+def pytest_runtest_setup(item):
+    """
+    Pytest hook to skip all tests that have the mark 'remotedata' if the
+    pytest_remotedata plugin is not installed.
+    """
+    if isinstance(item, pytest.Function) and "remote_data" in item.keywords and not HAVE_REMOTEDATA:
+        pytest.skip("skipping remotedata tests as pytest-remotedata is not installed")
+
+    # Confirm that the pyplot figure stack is empty before the test
+    if HAVE_MATPLOTLIB and plt.get_fignums():
+        msg = f"There are stale pyplot figures prior to running {item.name}"
+        raise UserWarning(msg)
+
+
+def pytest_runtest_teardown(item):
+    # Clear the pyplot figure stack if it is not empty after the test
+    # You can see these log messages by passing "-o log_cli=true" to pytest on the command line
+    if HAVE_MATPLOTLIB and plt.get_fignums():
+        msg = f"Removing {len(plt.get_fignums())} pyplot figure(s) left open by {item.name}"
+        console_logger.info(msg)
+        plt.close("all")
 
 
 @pytest.fixture
