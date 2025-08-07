@@ -14,8 +14,6 @@ from astropy.wcs import WCS
 from sunpy.time import parse_time
 from sunpy.visualization.colormaps.color_tables import iris_sji_color_table
 
-from irispy.utils import image_clipping
-
 __all__ = ["wobble_movie"]
 
 
@@ -73,6 +71,9 @@ def wobble_movie(
     Timestamps take the main header cadence and add that to the "DATEOBS".
     They do not use the information in the AUX array.
     """
+    # Avoid circular imports
+    from irispy.utils import image_clipping  # NOQA: PLC0415
+
     if ffmpeg_path:
         mpl.rcParams["animation.ffmpeg_path"] = ffmpeg_path
 
