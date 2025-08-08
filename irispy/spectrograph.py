@@ -146,11 +146,12 @@ class SpectrogramCube(SpecCube):
         set_axis_properties(ax)
         return ax
 
-    def convert_to(self, new_unit_type, time_obs=None, response_version=4):
+    def convert_to(self, new_unit_type, time_obs=None):
         """
         Converts data, unit and uncertainty attributes to new unit type.
 
-        Takes into consideration also the observation time and response version.
+        Takes into consideration also the observation time.
+        It uses the latest response.
 
         The presence or absence of the exposure time correction is
         preserved in the conversions.
@@ -167,8 +168,6 @@ class SpectrogramCube(SpecCube):
             Must be in the format of, e.g.,
             ``time_obs=Time('2013-09-03')``,
             The argument time_obs is ignored for versions 1 and 2.
-        response_version : `int`, optional
-            Version number of effective area file to be used, by default = 6.
 
         Returns
         -------
@@ -196,7 +195,6 @@ class SpectrogramCube(SpecCube):
                 new_data_quantities = utils.convert_or_undo_photons_per_sec_to_radiance(
                     (self.data * self.unit, self.uncertainty.array * self.unit),
                     time_obs,
-                    response_version,
                     obs_wavelength,
                     detector_type,
                     spectral_dispersion_per_pixel,
@@ -215,7 +213,7 @@ class SpectrogramCube(SpecCube):
                     mask=self.mask,
                 )
                 self._extra_coords = self.extra_coords
-            new_unit = utils.DN_UNIT[detector_type] if new_unit_type == "DN" else u.photon
+            new_unit = utils.constants.DN_UNIT[detector_type] if new_unit_type == "DN" else u.photon
             new_data_arrays, new_unit = utils.convert_between_dn_and_photons(
                 (self.data, self.uncertainty.array),
                 self.unit,
@@ -239,7 +237,6 @@ class SpectrogramCube(SpecCube):
                 new_data_quantities = utils.convert_or_undo_photons_per_sec_to_radiance(
                     (cube.data * cube.unit, cube.uncertainty.array * cube.unit),
                     time_obs,
-                    response_version,
                     obs_wavelength,
                     detector_type,
                     spectral_dispersion_per_pixel,

@@ -5,14 +5,13 @@ import importlib
 import numpy as np
 import pooch
 import pytest
+from scipy.io import readsav
 
 from astropy.io import fits
 
-from sunpy.time import parse_time
-
 from irispy.data.test import get_test_filepath
 from irispy.io.sji import read_sji_lvl2
-from irispy.utils import get_iris_response
+from irispy.utils import record_to_dict
 
 console_logger = logging.getLogger()
 console_logger.setLevel("INFO")
@@ -52,6 +51,21 @@ def pytest_runtest_teardown(item):
         msg = f"Removing {len(plt.get_fignums())} pyplot figure(s) left open by {item.name}"
         console_logger.info(msg)
         plt.close("all")
+
+
+@pytest.fixture
+def idl_response():
+    """
+    Reads the IDL response file and returns it as a dictionary.
+
+    This file was created from the IDL code calling:
+    ``iris_get_response('2025-08-05T22:25:04.723')``
+    on the 05/08/2025 using response version 9.
+    """
+    idl_response = readsav(
+        get_test_filepath("iris_response_2025_08_05T22_25_04_723.sav"), python_dict=True, verbose=False
+    )
+    return record_to_dict(idl_response["iris_response"][0])
 
 
 @pytest.fixture
@@ -105,36 +119,6 @@ def sjicube_2796():
 @pytest.fixture
 def sjicube_2832():
     return read_sji_lvl2(get_test_filepath("iris_l2_20210905_001833_3620258102_SJI_2832_t000_test.fits"))
-
-
-@pytest.fixture
-def iris_response_v1():
-    return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=1)
-
-
-@pytest.fixture
-def iris_response_v2():
-    return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=2)
-
-
-@pytest.fixture
-def iris_response_v3():
-    return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=3)
-
-
-@pytest.fixture
-def iris_response_v4():
-    return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=4)
-
-
-@pytest.fixture
-def iris_response_v5():
-    return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=5)
-
-
-@pytest.fixture
-def iris_response_v6():
-    return get_iris_response(time_obs=parse_time("2013-09-03"), response_version=6)
 
 
 @pytest.fixture

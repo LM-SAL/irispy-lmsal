@@ -49,7 +49,7 @@ def cube():
         wcs,
         uncertainty=uncertainty,
         mask=data >= 0,
-        unit=utils.DN_UNIT["SJI"],
+        unit=utils.constants.DN_UNIT["SJI"],
         scaled=True,
         meta=NDMeta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_shape=data.shape),
     )
@@ -82,7 +82,7 @@ def cube_2d():
         wcs_2d,
         uncertainty=uncertainty_2d,
         mask=data_2d >= 0,
-        unit=utils.DN_UNIT["SJI"],
+        unit=utils.constants.DN_UNIT["SJI"],
         scaled=True,
         meta=NDMeta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_shape=data_2d.shape),
     )
@@ -108,7 +108,7 @@ def cube_1d():
         wcs_1d,
         uncertainty=np.sqrt(np.array([1, 2])),
         mask=data_1d >= 0,
-        unit=utils.DN_UNIT["SJI"],
+        unit=utils.constants.DN_UNIT["SJI"],
         scaled=True,
         meta=NDMeta({"exposure time": exposure_times}, axes={"exposure time": 0}, data_shape=data_1d.shape),
     )
@@ -145,7 +145,7 @@ def dust_cube():
         "NAXIS3": 2,
     }
     wcs = WCS(header=header, naxis=3)
-    unit = utils.DN_UNIT["SJI"]
+    unit = utils.constants.DN_UNIT["SJI"]
     mask_dust = data_dust == -200
 
     uncertainty = 1
