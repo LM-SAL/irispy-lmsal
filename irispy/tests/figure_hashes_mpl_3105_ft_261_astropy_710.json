@@ -1,3 +1,9 @@
 {
-  "irispy.tests.test_figure.test_simple_plot": "f0a3e21d1ea219addfe7425096f74de0f85b3b40e5ad047ffce541a9e8579c38"
+  "irispy.utils.tests.test_response.test_plot_idl_vs_python_fuv_sg": "ba253be18e2552c2d3e9c73ed70f123cf0516fbe5b96315ace3a03536f35b2b6",
+  "irispy.utils.tests.test_response.test_plot_idl_vs_python_nuv_sg": "3eca254b88254afb59b11ce0ff42206e429acc5641111e3da97aa3a2c6cb2122",
+  "irispy.utils.tests.test_response.test_plot_idl_vs_python_sji_1": "1a4bcb4a066913096c50eaa179b0e8a17c76bca79581a9420516d64b083b0b3f",
+  "irispy.utils.tests.test_response.test_plot_idl_vs_python_sji_2": "05dfe54b09fc7319bd30a91254857a172f340c6cbdb4d9bbadcf4647c175e728",
+  "irispy.utils.tests.test_response.test_plot_idl_vs_python_sji_3": "f426ec7a6a876584c15c9e94b69a3e151c7667a43ca9fb12bd74a6c5b61450bb",
+  "irispy.utils.tests.test_response.test_plot_idl_vs_python_sji_4": "4f3a35489c9a0f70e216f2d67cf2de2f2b2457d802c80b24b8df8a91d842e81b",
+  "irispy.utils.tests.test_utils.test_plot_get_interpolated_effective_area": "31f69420bf0b2b996ca24b026c7009c6c348049d7b3e1cd4ea3b8a7eef1469b2"
 }

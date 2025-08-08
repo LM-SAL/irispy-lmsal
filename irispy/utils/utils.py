@@ -5,12 +5,11 @@ This module provides general utility functions.
 import numbers
 
 import numpy as np
-from scipy import interpolate, ndimage
+from scipy import ndimage
+from scipy.interpolate import make_splrep
 
 import astropy.units as u
 from astropy.modeling.models import custom_model
-
-from irispy.utils.response import get_iris_response
 
 __all__ = [
     "calculate_dust_mask",
@@ -19,7 +18,19 @@ __all__ = [
     "get_detector_type",
     "get_interpolated_effective_area",
     "image_clipping",
+    "record_to_dict",
 ]
+
+
+def record_to_dict(arr: np.ndarray):
+    """
+    Convert a structured numpy array to a regular dictionary.
+    """
+    new_arr = arr.copy()
+    for name in arr.dtype.names:
+        if isinstance(arr[name], np.ndarray) and arr[name].dtype == np.object_:
+            new_arr[name] = arr[name].tolist()
+    return {name: new_arr[name] for name in new_arr.dtype.names}
 
 
 def image_clipping(image, cutoff=1.5e-3, gamma=1.0):
@@ -106,7 +117,7 @@ def get_detector_type(meta):
     return "FUV" if "FUV" in meta["detector type"] else meta["detector type"]
 
 
-def get_interpolated_effective_area(time_obs, response_version, detector_type, obs_wavelength):
+def get_interpolated_effective_area(time_obs, detector_type, obs_wavelength):
     """
     To compute the interpolated time-dependent effective area.
 
@@ -117,9 +128,6 @@ def get_interpolated_effective_area(time_obs, response_version, detector_type, o
     time_obs : an `astropy.time.Time` object, as a kwarg, valid for version > 2
         Observation times of the datapoints.
         This argument is ignored for versions 1 and 2.
-    response_version : `int`
-        Version number of effective area file to be used. Cannot be set
-        simultaneously with response_file or pre_launch kwarg. Default=4.
     detector_type : `str`
         Detector type: 'FUV' or 'NUV'.
     obs_wavelength : `astropy.units.Quantity`
@@ -130,7 +138,10 @@ def get_interpolated_effective_area(time_obs, response_version, detector_type, o
     `numpy.array`
         The effective area(s) determined by interpolation with a spline fit.
     """
-    iris_response = get_iris_response(time_obs, response_version=response_version)
+    # Avoid circular imports
+    from irispy.utils.response import get_latest_response  # NOQA: PLC0415
+
+    iris_response = get_latest_response(time_obs)
     if detector_type == "FUV":
         detector_type_index = 0
     elif detector_type == "NUV":
@@ -143,12 +154,12 @@ def get_interpolated_effective_area(time_obs, response_version, detector_type, o
     # Interpolate the effective areas to cover the wavelengths
     # at which the data is recorded:
     eff_area_interp_base_unit = u.Angstrom
-    tck = interpolate.splrep(
+    tck = make_splrep(
         response_wavelength.to(eff_area_interp_base_unit).value,
         eff_area.to(eff_area_interp_base_unit**2).value,
         s=0,
     )
-    return interpolate.splev(obs_wavelength.to(eff_area_interp_base_unit).value, tck) * eff_area_interp_base_unit**2
+    return tck(obs_wavelength.to(eff_area_interp_base_unit).value) * eff_area_interp_base_unit**2
 
 
 def calculate_dust_mask(data_array):
