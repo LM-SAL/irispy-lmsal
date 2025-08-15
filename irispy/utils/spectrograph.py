@@ -184,7 +184,7 @@ def calculate_photons_per_sec_to_radiance_factor(
         for input wavelengths.
     """
     # Avoid circular imports
-    from irispy.utils import get_interpolated_effective_area  # NOQA: PLC0415
+    from irispy.utils.response import get_interpolated_effective_area  # NOQA: PLC0415
 
     # Get effective area and interpolate to observed wavelength grid.
     eff_area_interp = get_interpolated_effective_area(

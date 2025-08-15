@@ -2,8 +2,6 @@
 This module provides general utility functions for IRIS Responses.
 """
 
-import datetime
-
 import numpy as np
 import scipy
 import scipy.io
@@ -17,7 +15,7 @@ from sunpy.time import parse_time
 
 from irispy.data import ROOTDIR
 
-__all__ = ["_fit_xput_lite", "get_latest_response"]
+__all__ = ["_fit_xput_lite", "get_interpolated_effective_area", "get_latest_response"]
 
 
 def get_latest_response(
@@ -71,7 +69,7 @@ def get_latest_response(
     from irispy.utils import record_to_dict  # NOQA: PLC0415
 
     if observation_time is None:
-        observation_time = Time(datetime.datetime.now(datetime.UTC).isoformat())
+        observation_time = parse_time("now")
 
     number_of_obs_times = observation_time.size
     if observation_time.size == 1:
@@ -334,3 +332,48 @@ def _fit_xput_lite(observation_time, time_cal_coeffs, cal_coeffs):
             aux_cal_coeffs[idx - 2 : idx + 2] = np.array([dtt_0, dtt_0 * exp_0, dtt_1, dtt_1 * exp_1])
         fit_out[i] = np.matmul(aux_cal_coeffs, cal_coeffs[:, :2].reshape(aux_cal_coeffs.shape[0]))
     return fit_out
+
+
+def get_interpolated_effective_area(time_obs, detector_type, obs_wavelength):
+    """
+    To compute the interpolated time-dependent effective area.
+
+    It will generalize to the time of the observation.
+
+    Parameters
+    ----------
+    time_obs : an `astropy.time.Time` object, as a kwarg, valid for version > 2
+        Observation times of the datapoints.
+        This argument is ignored for versions 1 and 2.
+    detector_type : `str`
+        Detector type: 'FUV' or 'NUV'.
+    obs_wavelength : `astropy.units.Quantity`
+        The wavelength at which the observation has been taken in Angstroms.
+
+    Returns
+    -------
+    `numpy.array`
+        The effective area(s) determined by interpolation with a spline fit.
+    """
+    # Avoid circular imports
+    from irispy.utils.response import get_latest_response  # NOQA: PLC0415
+
+    iris_response = get_latest_response(time_obs)
+    if detector_type == "FUV":
+        detector_type_index = 0
+    elif detector_type == "NUV":
+        detector_type_index = 1
+    else:
+        msg = "Detector type not recognized."
+        raise ValueError(msg)
+    eff_area = iris_response["AREA_SG"][detector_type_index, :]
+    response_wavelength = iris_response["LAMBDA"]
+    # Interpolate the effective areas to cover the wavelengths
+    # at which the data is recorded:
+    eff_area_interp_base_unit = u.Angstrom
+    tck = make_interp_spline(
+        response_wavelength.to(eff_area_interp_base_unit).value,
+        eff_area.to(eff_area_interp_base_unit**2).value,
+        k=0,
+    )
+    return tck(obs_wavelength.to(eff_area_interp_base_unit).value) * eff_area_interp_base_unit**2

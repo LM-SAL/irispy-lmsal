@@ -6,13 +6,14 @@ import numpy.testing as np_test
 import pytest
 import scipy.io
 
+import astropy.units as u
 from astropy.time import Time
 
 from sunpy.time import parse_time
 
 from irispy.data.test import ROOTDIR, get_test_filepath
 from irispy.tests.helpers import figure_test
-from irispy.utils.response import _fit_xput_lite, get_latest_response
+from irispy.utils.response import _fit_xput_lite, get_interpolated_effective_area, get_latest_response
 
 
 def test_fit_xput_lite_idl():
@@ -106,6 +107,11 @@ def test_get_latest_response_mutliple_inputs():
     times = parse_time(["2025-08-05T22:25:04.723", "2025-08-06T22:25:04.723", "2025-08-07T22:25:04.723"])
     iris_response = get_latest_response(times)
     assert len(iris_response) == 3
+
+
+def test_get_latest_response_no_observation_time():
+    iris_response = get_latest_response()
+    assert iris_response is not None
 
 
 @figure_test
@@ -248,5 +254,26 @@ def test_plot_idl_vs_python_sji_4(idl_response):
     ax.set_ylabel("Effective Area (cm^2)")
     ax.set_title("IRIS Effective Area Comparison - SJI 4")
     ax.legend()
+    ax.grid()
+    return fig
+
+
+@figure_test
+def test_plot_get_interpolated_effective_area():
+    # No idea if this is correct as of yet.
+    start_obs = parse_time("2013-07-20T17:10:23")
+    obs_wavelength = np.linspace(1400.5, 1404.9915000926703, num=692, endpoint=True)
+    effective_area = get_interpolated_effective_area(
+        start_obs,
+        detector_type="FUV",
+        obs_wavelength=obs_wavelength * u.Angstrom,
+    )
+    assert effective_area.shape == obs_wavelength.shape
+
+    fig, ax = plt.subplots()
+    ax.plot(obs_wavelength, effective_area)
+    ax.set_xlabel("Wavelength (Angstrom)")
+    ax.set_ylabel("Effective Area (AA^2) ?")
+    ax.set_title("Interpolated Effective Area")
     ax.grid()
     return fig
