@@ -62,8 +62,6 @@ print(aia_collection["304_THIN"])
 # `WCSAxes provides us an API we can use. <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__
 
 fig = plt.figure()
-# Note that the .get_animation() is used to animate this example
-# and is not required normally.
-anim = aia_collection["304_THIN"].plot(fig=fig).get_animation()
+aia_collection["304_THIN"].plot(fig=fig)
 
 plt.show()

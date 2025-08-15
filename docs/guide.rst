@@ -55,10 +55,10 @@ Let us recover the header of the raster file and show the description of the obs
 .. code-block:: python
 
     >>> raster  # doctest: +REMOTE_DATA
-    <irispy.spectrograph.Collection object at ...>
+    <irispy.spectrograph.RasterCollection object at ...>
     <BLANKLINE>
-    Collection
-    ----------
+    Raster Collection
+    -----------------
     Cube keys: (np.str_('C II 1336'), np.str_('Si IV 1394'), np.str_('Mg II k 2796'))
     Number of Cubes: 3
     Aligned dimensions: [5 16 548]
@@ -73,7 +73,7 @@ Let us check the metadata of this collection, this is stored as a ``meta`` attri
 .. code-block:: python
 
     >>> raster["C II 1336"][0].meta  # doctest: +REMOTE_DATA
-    <irispy.spectrograph.SGMeta object at ...>
+    <irispy.meta.SGMeta object at ...>
     <BLANKLINE>
     SGMeta
     ------
