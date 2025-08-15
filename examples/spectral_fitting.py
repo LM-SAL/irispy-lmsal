@@ -36,7 +36,9 @@ time_support()
 #
 # Using the url: http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2018/01/02/20180102_153155_3610108077/iris_l2_20180102_153155_3610108077_raster.tar.gz
 # we are after the raster sequence (~300 MB).
-
+#
+# The full observation is at https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20180102_153155_3610108077_2018-01-02T15%3A31%3A552018-01-02T15%3A31%3A55.xml
+#
 raster_filename = pooch.retrieve(
     "http://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2018/01/02/20180102_153155_3610108077/iris_l2_20180102_153155_3610108077_raster.tar.gz",
     known_hash="0ec2b7b20757c52b02e0d92c27a5852b6e28759512c3d455f8b6505d4e1f5cd6",
@@ -77,7 +79,7 @@ si_iv_spec_crop = si_iv_1403.crop(lower_corner, upper_corner)
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection=si_iv_spec_crop.wcs)
-si_iv_spec_crop.plot(axes=ax, vmin=0, vmax=200)
+si_iv_spec_crop.plot(axes=ax, plot_axes=["x", "y"], vmin=0, vmax=200)
 plt.title("Si IV 1402.77 A")
 plt.colorbar(label="Intensity [DN]", shrink=0.8)
 
@@ -171,7 +173,8 @@ with warnings.catch_warnings():
 ################################################################################
 # Let us see the output!
 
-fig, axs = plt.subplots(nrows=1, ncols=3, subplot_kw={"projection": si_iv_spec_crop}, figsize=(16, 6))
+# Note that we are transposing the data arrays so they match up with the projection which is in X,Y.
+fig, axs = plt.subplots(nrows=3, ncols=1, subplot_kw={"projection": si_iv_spec_crop}, figsize=(6, 16))
 net_flux = (
     np.sqrt(2 * np.pi)
     * (iris_model_fit.amplitude_0 + iris_model_fit.amplitude_1)
@@ -179,7 +182,7 @@ net_flux = (
     / np.mean(si_iv_1403.axis_world_coords("wl")[0][1:] - si_iv_1403.axis_world_coords("wl")[0][:-1])
 )
 amp_max = np.nanpercentile(np.abs(net_flux.value), 99)
-amp = axs[0].imshow(net_flux.value, vmin=0, vmax=amp_max, origin="lower")
+amp = axs[0].imshow(net_flux.value.T, vmin=0, vmax=amp_max, origin="lower")
 cbar = fig.colorbar(amp, ax=axs[0])
 cbar.set_label(label=f"Intensity [{net_flux.unit.to_string()}]", fontsize=8)
 cbar.ax.tick_params(labelsize=8)
@@ -187,7 +190,7 @@ axs[0].set_title("Gaussian Net Flux")
 
 core_shift = ((iris_model_fit.mean_1.quantity.to(u.nm)) - si_iv_core) / si_iv_core * (constants.c.to(u.km / u.s))
 shift_max = np.nanpercentile(np.abs(core_shift.value), 95)
-shift = axs[1].imshow(core_shift.value, cmap="coolwarm", vmin=-shift_max, vmax=shift_max)
+shift = axs[1].imshow(core_shift.value.T, cmap="coolwarm", vmin=-shift_max, vmax=shift_max)
 cbar = fig.colorbar(shift, ax=axs[1], extend="both")
 cbar.set_label(label=f"Doppler shift [{core_shift.unit.to_string()}]", fontsize=8)
 cbar.ax.tick_params(labelsize=8)
@@ -195,7 +198,7 @@ axs[1].set_title("Velocity from Gaussian shift")
 
 sigma = (iris_model_fit.stddev_1.quantity.to(u.nm)) / si_iv_core * (constants.c.to(u.km / u.s))
 line_max = np.nanpercentile(np.abs(sigma.value), 95)
-line = axs[2].imshow(sigma.value, vmax=line_max)
+line = axs[2].imshow(sigma.value.T, vmax=line_max)
 cbar = fig.colorbar(line, ax=axs[2])
 cbar.set_label(label=f"Line Width [{sigma.unit.to_string()}]", fontsize=8)
 cbar.ax.tick_params(labelsize=8)
