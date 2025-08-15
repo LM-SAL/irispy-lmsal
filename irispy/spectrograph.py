@@ -3,43 +3,21 @@ import textwrap
 import matplotlib.pyplot as plt
 import numpy as np
 
-import astropy.units as u
-from astropy.coordinates import SkyCoord
-from astropy.time import Time
-
 from ndcube import NDCollection
-from ndcube.meta import NDMeta
 from sunpy import log as logger
-from sunpy.coordinates import Helioprojective
 from sunraster import SpectrogramCube as SpecCube
 from sunraster import SpectrogramSequence as SpecSeq
-from sunraster.meta import SlitSpectrographMetaABC
-from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
 
-from irispy import utils
-from irispy.utils.constants import SPECTRAL_BAND
 from irispy.visualization import IRISPlotter, IRISSequencePlotter, set_axis_properties
 
-__all__ = ["Collection", "SGMeta", "SpectrogramCube", "SpectrogramCubeSequence"]
-
-
-class Collection(NDCollection):
-    def __str__(self) -> str:
-        return textwrap.dedent(
-            f"""
-            Collection
-            ----------
-            Cube keys: {tuple(self.keys())}
-            Number of Cubes: {len(self)}
-            Aligned dimensions: {self.aligned_dimensions}
-            Aligned physical types: {self.aligned_axis_physical_types}
-            """,
-        )
+__all__ = ["RasterCollection", "SpectrogramCube", "SpectrogramCubeSequence"]
 
 
 class SpectrogramCube(SpecCube):
     """
-    Class representing SpectrogramCube data described by a single WCS.
+    Class representing spectrogram data described by a single WCS.
+
+    Idea is that this class holds one complete raster scan or a sit and stare.
 
     Parameters
     ----------
@@ -73,26 +51,8 @@ class SpectrogramCube(SpecCube):
         Default is False.
     """
 
-    def __init__(
-        self,
-        data,
-        wcs,
-        uncertainty,
-        unit,
-        meta,
-        *,
-        mask=None,
-        copy=False,
-    ) -> None:
-        super().__init__(
-            data,
-            wcs,
-            unit=unit,
-            uncertainty=uncertainty,
-            mask=mask,
-            meta=meta,
-            copy=copy,
-        )
+    def __init__(self, data, wcs, uncertainty, unit, meta, *, mask=None, copy=False, **kwargs) -> None:
+        super().__init__(data, wcs, unit=unit, uncertainty=uncertainty, mask=mask, meta=meta, copy=copy, **kwargs)
 
     def __getitem__(self, item):
         result = super().__getitem__(item)
@@ -146,126 +106,14 @@ class SpectrogramCube(SpecCube):
         set_axis_properties(ax)
         return ax
 
-    def convert_to(self, new_unit_type, time_obs=None):
-        """
-        Converts data, unit and uncertainty attributes to new unit type.
-
-        Takes into consideration also the observation time.
-        It uses the latest response.
-
-        The presence or absence of the exposure time correction is
-        preserved in the conversions.
-
-        Parameters
-        ----------
-        new_unit_type : `str`
-            Unit type to convert data to. Three values are accepted:
-            "DN": Relevant IRIS data number based on detector type.
-            "photons": photon counts
-            "radiance": Perorms radiometric calibration conversion.
-        time_obs : `astropy.time.Time`, optional
-            Observation times of the datapoints.
-            Must be in the format of, e.g.,
-            ``time_obs=Time('2013-09-03')``,
-            The argument time_obs is ignored for versions 1 and 2.
-
-        Returns
-        -------
-        `SpectrogramCube`
-            New SpectrogramCube in new units.
-        """
-        detector_type = utils.get_detector_type(self.meta)
-        if new_unit_type == "radiance" or self.unit.is_equivalent(utils.RADIANCE_UNIT):
-            # Get spectral dispersion per pixel.
-            spectral_wcs_index = np.where(np.array(self.wcs.wcs.ctype) == "WAVE")[0][0]
-            spectral_dispersion_per_pixel = (
-                self.wcs.wcs.cdelt[spectral_wcs_index] * self.wcs.wcs.cunit[spectral_wcs_index]
-            )
-            # Get solid angle from slit width for a pixel.
-            lat_wcs_index = ["HPLT" in c for c in self.wcs.wcs.ctype]
-            lat_wcs_index = np.arange(len(self.wcs.wcs.ctype))[lat_wcs_index]
-            lat_wcs_index = lat_wcs_index[0]
-            solid_angle = self.wcs.wcs.cdelt[lat_wcs_index] * self.wcs.wcs.cunit[lat_wcs_index] * utils.SLIT_WIDTH
-            # Get wavelength for each pixel.
-            obs_wavelength = self.axis_world_coords(2)
-
-        if new_unit_type in ["DN", "photons"]:
-            if self.unit.is_equivalent(utils.RADIANCE_UNIT):
-                # Convert from radiance to counts/s
-                new_data_quantities = utils.convert_or_undo_photons_per_sec_to_radiance(
-                    (self.data * self.unit, self.uncertainty.array * self.unit),
-                    time_obs,
-                    obs_wavelength,
-                    detector_type,
-                    spectral_dispersion_per_pixel,
-                    solid_angle,
-                    undo=True,
-                )
-                new_data = new_data_quantities[0].value
-                new_uncertainty = new_data_quantities[1].value
-                new_unit = new_data_quantities[0].unit
-                self = SpectrogramCube(  # NOQA: PLW0642 Reassigned `self` variable in instance method
-                    new_data,
-                    self.wcs,
-                    new_uncertainty,
-                    new_unit,
-                    self.meta,
-                    mask=self.mask,
-                )
-                self._extra_coords = self.extra_coords
-            new_unit = utils.constants.DN_UNIT[detector_type] if new_unit_type == "DN" else u.photon
-            new_data_arrays, new_unit = utils.convert_between_dn_and_photons(
-                (self.data, self.uncertainty.array),
-                self.unit,
-                new_unit,
-            )
-            new_data = new_data_arrays[0]
-            new_uncertainty = new_data_arrays[1]
-        elif new_unit_type == "radiance":
-            if self.unit.is_equivalent(utils.RADIANCE_UNIT):
-                new_data = self.data
-                new_uncertainty = self.uncertainty
-                new_unit = self.unit
-            else:
-                # Ensure spectrogram is in units of counts/s.
-                cube = self.convert_to("photons")
-                try:
-                    cube = cube.apply_exposure_time_correction()
-                except ValueError(APPLY_EXPOSURE_TIME_ERROR):
-                    pass
-                # Convert to radiance units.
-                new_data_quantities = utils.convert_or_undo_photons_per_sec_to_radiance(
-                    (cube.data * cube.unit, cube.uncertainty.array * cube.unit),
-                    time_obs,
-                    obs_wavelength,
-                    detector_type,
-                    spectral_dispersion_per_pixel,
-                    solid_angle,
-                )
-                new_data = new_data_quantities[0].value
-                new_uncertainty = new_data_quantities[1].value
-                new_unit = new_data_quantities[0].unit
-        else:
-            msg = "Input unit type not recognized."
-            raise ValueError(msg)
-        new_cube = SpectrogramCube(
-            new_data,
-            self.wcs,
-            new_uncertainty,
-            new_unit,
-            self.meta,
-            mask=self.mask,
-        )
-        new_cube._extra_coords = self.extra_coords
-        return new_cube
-
 
 class SpectrogramCubeSequence(SpecSeq):
     """
-    Class for holding, slicing and plotting IRIS spectrogram data.
+    Class representing spectrogram data described by a collection of separate
+    WCSes.
 
-    This class contains all the functionality of its super class with
-    some additional functionalities.
+    So each individual `SpectrogramCube` within represents a single complete raster scan.
+    The sequence contains multiple such cubes till the end of the observation.
 
     Parameters
     ----------
@@ -277,12 +125,12 @@ class SpectrogramCubeSequence(SpecSeq):
         The axis of the NDCubes corresponding to time.
     """
 
-    def __init__(self, data_list, meta=None, common_axis=0) -> None:
+    def __init__(self, data_list, meta=None, common_axis=0, **kwargs) -> None:
         # Check that all spectrograms are from same spectral window and OBS ID.
         if len(np.unique([cube.meta["OBSID"] for cube in data_list])) != 1:
             msg = "Constituent SpectrogramCube objects must have same value of 'OBSID' in its meta."
             raise ValueError(msg)
-        super().__init__(data_list, meta=meta, common_axis=common_axis)
+        super().__init__(data_list, meta=meta, common_axis=common_axis, **kwargs)
 
     def __str__(self) -> str:
         # Overload it get the class name in the string
@@ -303,255 +151,21 @@ class SpectrogramCubeSequence(SpecSeq):
         set_axis_properties(ax)
         return ax
 
-    def convert_to(self, new_unit_type, *, copy=False):
-        """
-        Converts data, uncertainty and unit of each spectrogram in sequence to
-        new unit.
 
-        Parameters
-        ----------
-        new_unit_type: `str`
-            Unit type to convert data to.  Three values are accepted:
-            "DN": Relevant IRIS data number based on detector type.
-            "photons": photon counts
-            "radiance": Performs radiometric calibration conversion.
-        copy: `bool`
-            If True a new instance with the converted data values is return.
-            If False, the current instance is overwritten.
-            Default=False
-        """
-        converted_data_list = [cube.convert_to(new_unit_type) for cube in self.data]
-        if copy is True:
-            return SpectrogramCubeSequence(converted_data_list, meta=self.meta, common_axis=self._common_axis)
-        self.data = converted_data_list
-        return None
-
-
-class SGMeta(NDMeta, SlitSpectrographMetaABC):
-    def __init__(self, header, spectral_window, **kwargs) -> None:
-        super().__init__(header, **kwargs)
-        spectral_windows = np.array([self[f"TDESC{i}"] for i in range(1, self["NWIN"] + 1)])
-        window_mask = np.array([spectral_window in window for window in spectral_windows])
-        if window_mask.sum() < 1:
-            msg = (
-                "Spectral window not found. "
-                f"Input spectral window: {spectral_window}; "
-                f"Spectral windows in header: {spectral_windows}"
-            )
-            raise ValueError(
-                msg,
-            )
-        if window_mask.sum() > 1:
-            msg = (
-                "Spectral window must be unique. "
-                f"Input spectral window: {spectral_window}; "
-                f"Ambiguous spectral windows in header: {spectral_windows[window_mask]}"
-            )
-            raise ValueError(
-                msg,
-            )
-        self._iwin = np.arange(len(spectral_windows))[window_mask][0] + 1
-        self._fits_header = header
+class RasterCollection(NDCollection):
+    """
+    Subclass of NDCollection for holding a collection of raster cubes with keys
+    as the spectral window.
+    """
 
     def __str__(self) -> str:
         return textwrap.dedent(
             f"""
-                SGMeta
-                ------
-                Observatory:     {self.observatory}
-                Instrument:      {self.instrument}
-                Detector:        {self.detector}
-                Spectral Window: {self.spectral_window}
-                Spectral Range:  {self.spectral_range}
-                Spectral Band:   {self.spectral_band}
-                Dimensions:      {self.data_shape}
-                Date:            {self.date_reference}
-                OBS ID:          {self.observing_mode_id}
-                OBS Description: {self.observing_mode_description}
-                """,
+            Raster Collection
+            -----------------
+            Cube keys: {tuple(self.keys())}
+            Number of Cubes: {len(self)}
+            Aligned dimensions: {self.aligned_dimensions}
+            Aligned physical types: {self.aligned_axis_physical_types}
+            """,
         )
-
-    def __repr__(self) -> str:
-        return f"{object.__repr__(self)}\n{self!s}"
-
-    def _construct_time(self, key):
-        val = self.get(key)
-        if val is not None:
-            val = Time(val, format="fits", scale="utc")
-        return val
-
-    @property
-    def fits_header(self):
-        return self._fits_header
-
-    @property
-    def spectral_window(self):
-        return self.get(f"TDESC{self._iwin}")
-
-    @property
-    def detector(self):
-        return self.get(f"TDET{self._iwin}")
-
-    @property
-    def instrument(self):
-        return self.get("INSTRUME")
-
-    @property
-    def observatory(self):
-        return self.get("TELESCOP")
-
-    @property
-    def processing_level(self):
-        return self.get("DATA_LEV")
-
-    @property
-    def distance_to_sun(self):
-        return self.get("DSUN_OBS") * u.m
-
-    @property
-    def date_reference(self):
-        return self._construct_time("DATE_OBS")
-
-    @property
-    def date_start(self):
-        return self.date_reference
-
-    @property
-    def date_end(self):
-        return self._construct_time("DATE_END")
-
-    @property
-    def observing_mode_id(self):
-        return int(self.get("OBSID"))
-
-    # ---------- IRIS-specific metadata properties ----------
-    @property
-    def dimensions(self):
-        return self.shape.tolist()
-
-    @property
-    def observing_mode_description(self):
-        return self.get("OBS_DESC")
-
-    @property
-    def observing_campaign_start(self):
-        """
-        Start time of observing campaign.
-        """
-        return self._construct_time("STARTOBS")
-
-    @property
-    def observing_campaign_end(self):
-        """
-        End time of observing mode.
-        """
-        return self._construct_time("ENDOBS")
-
-    @property
-    def observation_includes_saa(self):
-        """
-        Whether IRIS passed through SAA during observations.
-        """
-        return bool(self.get("SAA"))
-
-    @property
-    def satellite_rotation(self):
-        """
-        Satellite roll from solar north.
-        """
-        return self.get("SAT_ROT") * u.deg
-
-    @property
-    def exposure_control_triggers_in_observation(self):
-        """
-        Number of times automatic exposure control triggered during observing
-        campaign.
-        """
-        return self.get("AECNOBS")
-
-    @property
-    def exposure_control_triggers_in_raster(self):
-        """
-        Number of times automatic exposure control was triggered during this
-        raster.
-        """
-        return self.get("AECNRAS")
-
-    @property
-    def number_raster_positions(self):
-        """
-        Number of positions in raster.
-        """
-        self.get("NRASTERP")
-
-    @property
-    def spectral_range(self):
-        """
-        The spectral range of the spectral window.
-        """
-        return [self.get(f"TWMIN{self._iwin}"), self.get(f"TWMAX{self._iwin}")] * u.AA
-
-    @property
-    def spectral_band(self):
-        """
-        The spectral band of the spectral window.
-        """
-        return SPECTRAL_BAND[self.spectral_window]
-
-    @property
-    def raster_fov_width_y(self):
-        """
-        Width of the field of view of the raster in the Y (slit) direction.
-        """
-        return self.get("FOVY") * u.arcsec
-
-    @property
-    def raster_fov_width_x(self):
-        """
-        Width of the field of view of the raster in the X (rastering)
-        direction.
-        """
-        return self.get("FOVX") * u.arcsec
-
-    @property
-    def fov_center(self):
-        """
-        Location of the center of the field of view.
-        """
-        return SkyCoord(
-            Tx=self.get("XCEN"),
-            Ty=self.get("YCEN"),
-            unit=u.arcsec,
-            frame=Helioprojective,
-        )
-
-    @property
-    def automatic_exposure_control_enabled(self):
-        return bool(self.get("IAECFLAG"))
-
-    @property
-    def tracking_mode_enabled(self):
-        return bool(self.get("TR_MODE"))
-
-    @property
-    def observatory_at_high_latitude(self):
-        """
-        Whether IRIS passed through high Earth latitude during observations.
-        """
-        return bool(self.get("HLZ"))
-
-    @property
-    def spatial_summing_factor(self):
-        """
-        Number of pixels summed together in the spatial (Y/slit) direction.
-        """
-        return self.get("SUMSPAT")
-
-    @property
-    def spectral_summing_factor(self):
-        """
-        Number of pixels summed together in the spectral direction.
-        """
-        if "fuv" in self.detector.lower():
-            return self.get("SUMSPTRF")
-        return self.get("SUMSPTRN")

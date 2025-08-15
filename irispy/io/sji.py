@@ -14,6 +14,7 @@ from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst
 from sunpy.coordinates.frames import Helioprojective
 from sunpy.map.header_helper import make_fitswcs_header
 
+from irispy.meta import SJIMeta
 from irispy.sji import AIACube, SJICube
 from irispy.utils import calculate_uncertainty
 from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, BAD_PIXEL_VALUE_UNSCALED, DN_UNIT, READOUT_NOISE
@@ -212,7 +213,7 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             _create_gwcs(hdulist),
             uncertainty=out_uncertainty,
             unit=unit,
-            meta=hdulist[0].header,
+            meta=SJIMeta(hdulist[0].header),
             mask=mask,
             scaled=scaled,
             _basic_wcs=_create_wcs(hdulist),

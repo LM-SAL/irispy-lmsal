@@ -15,7 +15,8 @@ from sunpy.coordinates.frames import HeliographicStonyhurst, Helioprojective
 from sunpy.coordinates.screens import SphericalScreen
 from sunpy.coordinates.wcs_utils import _set_wcs_aux_obs_coord
 
-from irispy.spectrograph import Collection, SGMeta, SpectrogramCube, SpectrogramCubeSequence
+from irispy.meta import SGMeta
+from irispy.spectrograph import RasterCollection, SpectrogramCube, SpectrogramCubeSequence
 from irispy.utils import calculate_uncertainty
 from irispy.utils.constants import DN_UNIT, READOUT_NOISE, SLIT_WIDTH
 
@@ -61,7 +62,7 @@ def read_spectrograph_lvl2(
 
     Returns
     -------
-    `ndcube.NDCollection`
+    `RasterCollection`
     """
     if isinstance(filenames, (str, Path)):
         filenames = [filenames]
@@ -196,7 +197,7 @@ def read_spectrograph_lvl2(
                 cube.extra_coords.add("time", 0, times, physical_types="time")
                 data_dict[window_name].append(cube)
     window_data_pairs = [
-        (window_name, SpectrogramCubeSequence(data_dict[window_name], common_axis=0))
+        (window_name, SpectrogramCubeSequence(data_dict[window_name], common_axis=0, meta=hdulist[0].header))
         for window_name in spectral_windows_req
     ]
-    return Collection(window_data_pairs, aligned_axes=(0, 1, 2))
+    return RasterCollection(window_data_pairs, aligned_axes=(0, 1, 2))

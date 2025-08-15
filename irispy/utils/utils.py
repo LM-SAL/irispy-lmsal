@@ -6,7 +6,6 @@ import numbers
 
 import numpy as np
 from scipy import ndimage
-from scipy.interpolate import make_splrep
 
 import astropy.units as u
 from astropy.modeling.models import custom_model
@@ -16,7 +15,6 @@ __all__ = [
     "calculate_uncertainty",
     "gaussian1d_on_linear_bg",
     "get_detector_type",
-    "get_interpolated_effective_area",
     "image_clipping",
     "record_to_dict",
 ]
@@ -115,51 +113,6 @@ def get_detector_type(meta):
         Detector type.
     """
     return "FUV" if "FUV" in meta["detector type"] else meta["detector type"]
-
-
-def get_interpolated_effective_area(time_obs, detector_type, obs_wavelength):
-    """
-    To compute the interpolated time-dependent effective area.
-
-    It will generalize to the time of the observation.
-
-    Parameters
-    ----------
-    time_obs : an `astropy.time.Time` object, as a kwarg, valid for version > 2
-        Observation times of the datapoints.
-        This argument is ignored for versions 1 and 2.
-    detector_type : `str`
-        Detector type: 'FUV' or 'NUV'.
-    obs_wavelength : `astropy.units.Quantity`
-        The wavelength at which the observation has been taken in Angstroms.
-
-    Returns
-    -------
-    `numpy.array`
-        The effective area(s) determined by interpolation with a spline fit.
-    """
-    # Avoid circular imports
-    from irispy.utils.response import get_latest_response  # NOQA: PLC0415
-
-    iris_response = get_latest_response(time_obs)
-    if detector_type == "FUV":
-        detector_type_index = 0
-    elif detector_type == "NUV":
-        detector_type_index = 1
-    else:
-        msg = "Detector type not recognized."
-        raise ValueError(msg)
-    eff_area = iris_response["AREA_SG"][detector_type_index, :]
-    response_wavelength = iris_response["LAMBDA"]
-    # Interpolate the effective areas to cover the wavelengths
-    # at which the data is recorded:
-    eff_area_interp_base_unit = u.Angstrom
-    tck = make_splrep(
-        response_wavelength.to(eff_area_interp_base_unit).value,
-        eff_area.to(eff_area_interp_base_unit**2).value,
-        s=0,
-    )
-    return tck(obs_wavelength.to(eff_area_interp_base_unit).value) * eff_area_interp_base_unit**2
 
 
 def calculate_dust_mask(data_array):

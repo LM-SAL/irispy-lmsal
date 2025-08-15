@@ -11,13 +11,15 @@ __all__ = [
     "RADIANCE_UNIT",
     "READOUT_NOISE",
     "SLIT_WIDTH",
+    "SPECTRAL_BAND",
 ]
 
 # The following value is only appropriate for byte scaled images
 BAD_PIXEL_VALUE_SCALED = -200
 # The following value is only appropriate for unscaled images
 BAD_PIXEL_VALUE_UNSCALED = -32768
-# Define some properties of IRIS detectors. Source: IRIS instrument paper.
+# Define some properties of IRIS detectors.
+# Source: IRIS instrument paper (https://link.springer.com/article/10.1007/s11207-014-0485-y)
 DETECTOR_GAIN = {"NUV": 18.0, "FUV": 6.0, "SJI": 18.0}
 DETECTOR_YIELD = {"NUV": 1.0, "FUV": 1.5, "SJI": 1.0}
 DN_UNIT = {
@@ -26,7 +28,6 @@ DN_UNIT = {
     "SJI": u.def_unit("DN_IRIS_SJI", DETECTOR_GAIN["SJI"] / DETECTOR_YIELD["SJI"] * u.photon),
     "SJI_UNSCALED": u.def_unit("DN_IRIS_SJI_UNSCALED", u.ct),
 }
-
 READOUT_NOISE = {
     "NUV": 1.2 * DN_UNIT["NUV"],
     "FUV": 3.1 * DN_UNIT["FUV"],
