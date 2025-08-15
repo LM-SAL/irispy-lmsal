@@ -108,6 +108,11 @@ def test_get_latest_response_mutliple_inputs():
     assert len(iris_response) == 3
 
 
+def test_get_latest_response_no_observation_time():
+    iris_response = get_latest_response()
+    assert iris_response is not None
+
+
 @figure_test
 def test_plot_idl_vs_python_fuv_sg(idl_response):
     iris_response = get_latest_response(parse_time("2025-08-05T22:25:04.723"))

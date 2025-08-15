@@ -2,8 +2,6 @@
 This module provides general utility functions for IRIS Responses.
 """
 
-import datetime
-
 import numpy as np
 import scipy
 import scipy.io
@@ -12,13 +10,12 @@ from scipy.interpolate import make_interp_spline
 import astropy.units as u
 from astropy.time import Time
 from astropy.units.quantity import Quantity
-
+from scipy.interpolate import make_splrep
 from sunpy.time import parse_time
 
 from irispy.data import ROOTDIR
 
-__all__ = ["_fit_xput_lite", "get_latest_response"]
-
+__all__ = ["_fit_xput_lite", "get_latest_response", "get_interpolated_effective_area"]
 
 def get_latest_response(
     observation_time=None,
@@ -71,7 +68,7 @@ def get_latest_response(
     from irispy.utils import record_to_dict  # NOQA: PLC0415
 
     if observation_time is None:
-        observation_time = Time(datetime.datetime.now(datetime.UTC).isoformat())
+        observation_time = parse_time("now")
 
     number_of_obs_times = observation_time.size
     if observation_time.size == 1:
