@@ -51,28 +51,8 @@ class SpectrogramCube(SpecCube):
         Default is False.
     """
 
-    def __init__(
-        self,
-        data,
-        wcs,
-        uncertainty,
-        unit,
-        meta,
-        *,
-        mask=None,
-        copy=False,
-        **kwargs
-    ) -> None:
-        super().__init__(
-            data,
-            wcs,
-            unit=unit,
-            uncertainty=uncertainty,
-            mask=mask,
-            meta=meta,
-            copy=copy,
-            **kwargs
-        )
+    def __init__(self, data, wcs, uncertainty, unit, meta, *, mask=None, copy=False, **kwargs) -> None:
+        super().__init__(data, wcs, unit=unit, uncertainty=uncertainty, mask=mask, meta=meta, copy=copy, **kwargs)
 
     def __getitem__(self, item):
         result = super().__getitem__(item)
@@ -129,7 +109,8 @@ class SpectrogramCube(SpecCube):
 
 class SpectrogramCubeSequence(SpecSeq):
     """
-    Class representing spectrogram data described by a collection of separate WCSes.
+    Class representing spectrogram data described by a collection of separate
+    WCSes.
 
     So each individual `SpectrogramCube` within represents a single complete raster scan.
     The sequence contains multiple such cubes till the end of the observation.

@@ -11,25 +11,25 @@ OBS 3620258102: Medium sit-and-stare
 
 Where
 -----
-x,y:	-53",-400"
-Max FOV:	60"x60"
-Target:	AR
+x,y:    -53",-400"
+Max FOV:        60"x60"
+Target: AR
 
 Raster
 ------
-FOV:	0"x60"
-Steps:	1872x0"
-Step Cad:	9.3s
-Raster Cad:	9s, 1 ras
-Linelist:	v36_01
+FOV:    0"x60"
+Steps:  1872x0"
+Step Cad:       9.3s
+Raster Cad:     9s, 1 ras
+Linelist:       v36_01
 
 SJI
 ---
-FOV:	60"x65"
-1330:	34s, 520 imgs
-1400:	28s, 624 imgs
-2796:	28s, 624 imgs
-2832:	167s, 104 imgs
+FOV:    60"x65"
+1330:   34s, 520 imgs
+1400:   28s, 624 imgs
+2796:   28s, 624 imgs
+2832:   167s, 104 imgs
 """
 
 

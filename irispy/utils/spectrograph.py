@@ -82,7 +82,7 @@ def radiometric_calibration(
 
 def convert_photons_per_sec_to_radiance(
     data_quantities,
-    time_obs,
+    iris_response,
     obs_wavelength,
     detector_type,
     spectral_dispersion_per_pixel,
@@ -94,9 +94,10 @@ def convert_photons_per_sec_to_radiance(
     Parameters
     ----------
     data_quantities: iterable of `astropy.units.Quantity`
-        Quantities to be converted and must have units of counts/s.
-    time_obs: `astropy.time.Time`
-        Observation time of the datapoints.
+        Quantities to be converted.  Must have units of counts/s or
+        radiance equivalent counts, e.g. erg / cm**2 / s / sr / Angstrom.
+    iris_response: dict
+        The IRIS response data loaded from `irispy.utils.response.get_latest_response`.
     obs_wavelength: `astropy.units.Quantity`
         Wavelength at each element along spectral axis of data quantities.
     detector_type: `str`
@@ -108,8 +109,7 @@ def convert_photons_per_sec_to_radiance(
     Returns
     -------
     `list` of `astropy.units.Quantity`
-        Data quantities converted to radiance or counts/s
-        depending on value of undo kwarg.
+        Data quantities converted to radiance.
     """
     for i, data in enumerate(data_quantities):
         if data.unit != u.photon / u.s:
@@ -121,7 +121,7 @@ def convert_photons_per_sec_to_radiance(
                 msg,
             )
     photons_per_sec_to_radiance_factor = calculate_dn_to_radiance_factor(
-        time_obs.utime,
+        iris_response,
         obs_wavelength,
         detector_type,
         spectral_dispersion_per_pixel,
@@ -137,12 +137,12 @@ def convert_photons_per_sec_to_radiance(
 
 
 def calculate_dn_to_radiance_factor(
-    time_obs,
+    iris_response,
     wavelength,
     detector_type,
     spectral_dispersion_per_pixel,
     solid_angle,
-    meta,
+    wcs,
 ):
     """
     Calculates multiplicative factor that converts counts/s to radiance for
@@ -150,8 +150,8 @@ def calculate_dn_to_radiance_factor(
 
     Parameters
     ----------
-    time_obs: `astropy.time.Time`
-        Observation times of the datapoints.
+    iris_response: dict
+        The IRIS response data loaded from `irispy.utils.response.get_latest_response`.
     wavelength: `astropy.units.Quantity`
         Wavelengths for which counts/s-to-radiance factor is to be calculated
     detector_type: `str`
@@ -174,8 +174,6 @@ def calculate_dn_to_radiance_factor(
     second (cps) data to obtain the radiance data. In other words, the conversion factor is a
     scaling factor that is applied to the cps data to convert it to radiance units.
     """
-    from irispy.utils.response import get_latest_response
-
     if detector_type.startswith("FUV"):
         detector_type_index = 0
     elif detector_type.startswith("NUV"):
@@ -185,7 +183,6 @@ def calculate_dn_to_radiance_factor(
         raise ValueError(msg)
 
     dn_unit = DN_UNIT[detector_type]
-    iris_response = get_latest_response(time_obs)
     eff_area = iris_response["AREA_SG"][detector_type_index, :]
     response_wavelength = iris_response["LAMBDA"]
     # Interpolate the effective areas to cover the wavelengths

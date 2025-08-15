@@ -77,9 +77,7 @@ fig = plt.figure()
 # This will also "transpose" the data but this is only for visualization purposes
 # We have to set the vmin and vmax, as by default "plot" works out the
 # vmin,vmax from the first slice which in this case is 0.
-mg_ii.plot(fig=fig, plot_axes=["x", "y", None], vmin=0, vmax=1000).get_animation()
-# The call to `get_animation()` is necessary to display the animation in this example.
-# It is not needed in a normal script.
+mg_ii.plot(fig=fig, plot_axes=["x", "y", None], vmin=0, vmax=1000)
 
 ###############################################################################
 # This object is sliceable, so we can do things like this:

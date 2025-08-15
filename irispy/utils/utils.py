@@ -6,7 +6,6 @@ import numbers
 
 import numpy as np
 from scipy import ndimage
-from scipy.interpolate import make_splrep
 
 import astropy.units as u
 from astropy.modeling.models import custom_model

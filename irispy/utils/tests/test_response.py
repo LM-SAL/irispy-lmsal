@@ -6,13 +6,14 @@ import numpy.testing as np_test
 import pytest
 import scipy.io
 
+import astropy.units as u
 from astropy.time import Time
 
 from sunpy.time import parse_time
 
 from irispy.data.test import ROOTDIR, get_test_filepath
 from irispy.tests.helpers import figure_test
-from irispy.utils.response import _fit_xput_lite, get_latest_response
+from irispy.utils.response import _fit_xput_lite, get_interpolated_effective_area, get_latest_response
 
 
 def test_fit_xput_lite_idl():
@@ -253,5 +254,27 @@ def test_plot_idl_vs_python_sji_4(idl_response):
     ax.set_ylabel("Effective Area (cm^2)")
     ax.set_title("IRIS Effective Area Comparison - SJI 4")
     ax.legend()
+    ax.grid()
+    return fig
+
+
+@figure_test
+def test_plot_get_interpolated_effective_area():
+    # The idea is that this plot should look the same as the plot for test_plot_idl_vs_python_fuv_sg
+    start_obs = parse_time("2025-08-05T22:25:04.723")
+    iris_response = get_latest_response(start_obs)
+    obs_wavelength = np.linspace(1400.5, 1404.9915000926703, num=692, endpoint=True) * u.Angstrom
+    effective_area = get_interpolated_effective_area(
+        iris_response,
+        detector_type="FUV",
+        obs_wavelength=obs_wavelength,
+    )
+    assert effective_area.shape == obs_wavelength.shape
+    assert effective_area.unit.is_equivalent(u.cm**2)
+    fig, ax = plt.subplots()
+    ax.plot(obs_wavelength.to(u.nm), effective_area)
+    ax.set_xlabel("Wavelength (nm)")
+    ax.set_ylabel("Effective Area (cm^2)")
+    ax.set_title("Interpolated Effective Area")
     ax.grid()
     return fig

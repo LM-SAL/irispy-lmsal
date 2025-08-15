@@ -73,7 +73,7 @@ Let us check the metadata of this collection, this is stored as a ``meta`` attri
 .. code-block:: python
 
     >>> raster["C II 1336"][0].meta  # doctest: +REMOTE_DATA
-    <irispy.spectrograph.SGMeta object at ...>
+    <irispy.meta.SGMeta object at ...>
     <BLANKLINE>
     SGMeta
     ------
