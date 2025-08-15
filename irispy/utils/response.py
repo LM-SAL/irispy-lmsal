@@ -334,7 +334,7 @@ def _fit_xput_lite(observation_time, time_cal_coeffs, cal_coeffs):
     return fit_out
 
 
-def get_interpolated_effective_area(time_obs, detector_type, obs_wavelength):
+def get_interpolated_effective_area(iris_response, detector_type, obs_wavelength):
     """
     To compute the interpolated time-dependent effective area.
 
@@ -342,9 +342,8 @@ def get_interpolated_effective_area(time_obs, detector_type, obs_wavelength):
 
     Parameters
     ----------
-    time_obs : an `astropy.time.Time` object, as a kwarg, valid for version > 2
-        Observation times of the datapoints.
-        This argument is ignored for versions 1 and 2.
+    iris_response : dict
+        The IRIS response data loaded from `irispy.utils.response.get_latest_response`.
     detector_type : `str`
         Detector type: 'FUV' or 'NUV'.
     obs_wavelength : `astropy.units.Quantity`
@@ -355,25 +354,20 @@ def get_interpolated_effective_area(time_obs, detector_type, obs_wavelength):
     `numpy.array`
         The effective area(s) determined by interpolation with a spline fit.
     """
-    # Avoid circular imports
-    from irispy.utils.response import get_latest_response  # NOQA: PLC0415
-
-    iris_response = get_latest_response(time_obs)
-    if detector_type == "FUV":
+    if detector_type.startswith("FUV"):
         detector_type_index = 0
-    elif detector_type == "NUV":
+    elif detector_type.startswith("NUV"):
         detector_type_index = 1
     else:
         msg = "Detector type not recognized."
         raise ValueError(msg)
     eff_area = iris_response["AREA_SG"][detector_type_index, :]
     response_wavelength = iris_response["LAMBDA"]
-    # Interpolate the effective areas to cover the wavelengths
-    # at which the data is recorded:
-    eff_area_interp_base_unit = u.Angstrom
+    obs_wavelength = obs_wavelength.to(u.nm)
+    # Interpolate the effective areas to cover the wavelengths at which the data is recorded
     tck = make_interp_spline(
-        response_wavelength.to(eff_area_interp_base_unit).value,
-        eff_area.to(eff_area_interp_base_unit**2).value,
+        response_wavelength,
+        eff_area,
         k=0,
     )
-    return tck(obs_wavelength.to(eff_area_interp_base_unit).value) * eff_area_interp_base_unit**2
+    return tck(obs_wavelength) * u.cm**2

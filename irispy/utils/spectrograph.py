@@ -61,7 +61,7 @@ def convert_between_dn_and_photons(old_data_arrays, old_unit, new_unit):
 
 def convert_or_undo_photons_per_sec_to_radiance(
     data_quantities,
-    time_obs,
+    iris_response,
     obs_wavelength,
     detector_type,
     spectral_dispersion_per_pixel,
@@ -77,12 +77,8 @@ def convert_or_undo_photons_per_sec_to_radiance(
     data_quantities: iterable of `astropy.units.Quantity`
         Quantities to be converted.  Must have units of counts/s or
         radiance equivalent counts, e.g. erg / cm**2 / s / sr / Angstrom.
-    time_obs: an `astropy.time.Time` object, as a kwarg, valid for version > 2
-        Observation times of the datapoints.
-        Must be in the format of, e.g.,
-        time_obs parse_time('2013-09-03', format='utime'),
-        which yields 1094169600.0 seconds in value.
-        The argument time_obs is ignored for versions 1 and 2.
+    iris_response: dict
+        The IRIS response data loaded from `irispy.utils.response.get_latest_response`.
     obs_wavelength: `astropy.units.Quantity`
         Wavelength at each element along spectral axis of data quantities.
     detector_type: `str`
@@ -126,7 +122,7 @@ def convert_or_undo_photons_per_sec_to_radiance(
                     msg,
                 )
     photons_per_sec_to_radiance_factor = calculate_photons_per_sec_to_radiance_factor(
-        time_obs,
+        iris_response,
         obs_wavelength,
         detector_type,
         spectral_dispersion_per_pixel,
@@ -146,7 +142,7 @@ def convert_or_undo_photons_per_sec_to_radiance(
 
 
 def calculate_photons_per_sec_to_radiance_factor(
-    time_obs,
+    iris_response,
     wavelength,
     detector_type,
     spectral_dispersion_per_pixel,
@@ -158,12 +154,8 @@ def calculate_photons_per_sec_to_radiance_factor(
 
     Parameters
     ----------
-    time_obs: an `astropy.time.Time` object, as a kwarg, valid for version > 2
-        Observation times of the datapoints.
-        Must be in the format of, e.g.,
-        time_obs=parse_time('2013-09-03', format='utime'),
-        which yields 1094169600.0 seconds in value.
-        The argument time_obs is ignored for versions 1 and 2.
+    iris_response: dict
+        The IRIS response data loaded from `irispy.utils.response.get_latest_response`.
     wavelength: `astropy.units.Quantity`
         Wavelengths for which counts/s-to-radiance factor is to be calculated
     detector_type: `str`
@@ -188,7 +180,7 @@ def calculate_photons_per_sec_to_radiance_factor(
 
     # Get effective area and interpolate to observed wavelength grid.
     eff_area_interp = get_interpolated_effective_area(
-        time_obs,
+        iris_response,
         detector_type,
         obs_wavelength=wavelength,
     )
