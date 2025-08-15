@@ -31,8 +31,8 @@ def test_read_spectrograph_lvl2(raster_file):
     assert str(si_iv)
     # Test data only has a sequence of 1 long
     assert len(si_iv) == 1
-    # No meta is attached to the sequence
-    assert si_iv.meta is None
+    # The primary fits header is attached to the sequence
+    assert si_iv.meta is not None
     # Meta is attached one level down to the individual cube for now.
     assert si_iv[0].meta is not None
     meta = si_iv[0].meta

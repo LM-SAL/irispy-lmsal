@@ -154,8 +154,10 @@ class SpectrogramCubeSequence(SpecSeq):
 
 class RasterCollection(NDCollection):
     """
-    Subclass of NDCollection for holding a collection of raster cubes with keys as the spectral window.
+    Subclass of NDCollection for holding a collection of raster cubes with keys
+    as the spectral window.
     """
+
     def __str__(self) -> str:
         return textwrap.dedent(
             f"""

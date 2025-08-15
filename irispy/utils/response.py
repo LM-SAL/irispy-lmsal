@@ -10,7 +10,7 @@ from scipy.interpolate import make_interp_spline
 import astropy.units as u
 from astropy.time import Time
 from astropy.units.quantity import Quantity
-from scipy.interpolate import make_splrep
+
 from sunpy.time import parse_time
 
 from irispy.data import ROOTDIR
