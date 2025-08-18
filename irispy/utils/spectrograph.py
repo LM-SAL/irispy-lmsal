@@ -2,11 +2,13 @@
 This module provides general utility functions called by code in spectrograph.
 """
 
+from sys import breakpointhook
 import numpy as np
 
 import astropy.units as u
 from astropy import constants
 
+from irispy.utils.response import get_interpolated_effective_area
 from sunraster.spectrogram import APPLY_EXPOSURE_TIME_ERROR
 from scipy.interpolate import make_interp_spline
 from irispy.spectrograph import RasterCollection, SpectrogramCube, SpectrogramCubeSequence
@@ -142,7 +144,6 @@ def calculate_dn_to_radiance_factor(
     detector_type,
     spectral_dispersion_per_pixel,
     solid_angle,
-    wcs,
 ):
     """
     Calculates multiplicative factor that converts counts/s to radiance for
@@ -174,46 +175,22 @@ def calculate_dn_to_radiance_factor(
     second (cps) data to obtain the radiance data. In other words, the conversion factor is a
     scaling factor that is applied to the cps data to convert it to radiance units.
     """
-    if detector_type.startswith("FUV"):
-        detector_type_index = 0
-    elif detector_type.startswith("NUV"):
-        detector_type_index = 1
-    else:
-        msg = "Detector type not recognized."
-        raise ValueError(msg)
-
-    dn_unit = DN_UNIT[detector_type]
-    eff_area = iris_response["AREA_SG"][detector_type_index, :]
-    response_wavelength = iris_response["LAMBDA"]
-    # Interpolate the effective areas to cover the wavelengths
-    # at which the data is recorded:
-    eff_area_interp_base_unit = u.cm
-    tck = make_interp_spline(
-        response_wavelength.to(eff_area_interp_base_unit).value,
-        eff_area.to(eff_area_interp_base_unit**2).value,
-        k=0,
+    # Get effective area and interpolate to observed wavelength grid.
+    eff_area_interp = get_interpolated_effective_area(
+        iris_response,
+        detector_type,
+        wavelength,
     )
-    # These values are wrong
-    eff_area_interp = tck(wavelength.to(eff_area_interp_base_unit).value) * eff_area_interp_base_unit**2
-
-    spatialx = u.Quantity(0.33, u.arcsec)  # Spatial Pixel size in X (i.e the Slit width)  in arcsec CDELT3
-    spatialy = u.Quantity(meta.wcs.cdelt[1], u.arcsec)  # Spatial Pixel size in Y (along the slit) in arcsec CDELT2
-    dspectral = u.Quantity(meta.wcs.cdelt[0], u.angstrom) # Spectral scale (in X in the CCD, i.e. CDELT1)
-    pix_lambda = dspectral
-    # # See Section 6.2 of ITN26.pdf available at http://iris.lmsal.com/itn26/itn26.pdf
-    w_slit = spatialx.to(u.radian)
-    pix_xy = spatialy.to(u.radian)
-
-    exptime = u.Quantity(1.,u.s)
-    breakpoint()
-    # factor = (E * dn2photo)/(a_sel_eff_interp * pix_xy * pix_lambda * exptime * w_slit)
-    num = ((constants.h * constants.c) / (wavelength)) * dn_unit.to(u.photon)
-    dom = eff_area_interp * pix_xy * pix_lambda * exptime * w_slit
-    factor = num / dom
-    return factor
-    #return (
-    #    constants.h * constants.c * dn_unit.to(u.photon)
-    #) / wavelength / u.photon / spectral_dispersion_per_pixel / eff_area_interp / solid_angle / 1 *u.s
+    # Return radiometric conversed data assuming input data is in units of photons/s.
+    return (
+        constants.h
+        * constants.c
+        / wavelength
+        / u.photon
+        / spectral_dispersion_per_pixel
+        / eff_area_interp
+        / solid_angle
+    )
 
 
 def reshape_1d_wavelength_dimensions_for_broadcast(wavelength, n_data_dim):
