@@ -38,7 +38,7 @@ downloaded_tar_iris_file = pooch.retrieve(
 )
 
 ###############################################################################
-# Now to open the file using ``irispy-lmsal``.
+# Now to open the file using ``irispy``.
 # Note that when ``memmap=True``, the data values are read from the FITS file
 # directly without the scaling to Float 32, the data values are no longer in DN,
 # but in scaled integer units that start at -2$^{16}$/2.

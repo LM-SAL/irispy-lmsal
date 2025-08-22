@@ -1,4 +1,4 @@
-.. _changelog:
+.. _irispy_changelog:
 
 **************
 Full Changelog

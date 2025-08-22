@@ -39,12 +39,12 @@ print(sji_2832)
 ###############################################################################
 # Can't remember what is OBSID 3860608353?
 #
-# **irispy-lmsal** has an utility function that will provide more information.
+# **irispy** has an utility function that will provide more information.
 
 print(ObsID(sji_2832.meta["OBSID"]))
 
 ###############################################################################
-# Now, we will plot the SJI. By default, **irispy-lmsal** will
+# Now, we will plot the SJI. By default, **irispy** will
 # color the spatial axes.
 
 # This is an animation
