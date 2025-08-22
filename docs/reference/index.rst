@@ -1,4 +1,4 @@
-.. _api:
+.. _irispy_api:
 
 *************
 API Reference

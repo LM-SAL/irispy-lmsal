@@ -1,8 +1,8 @@
-.. _guide:
+.. _irispy_guide:
 
-*************************
+*******************
 An ``irispy`` guide
-*************************
+*******************
 
 This guide is intended to help the solar community to start working with level 2 data using Python.
 It is especially intended for those with limited Python experience who want to begin using the language to analyze data.
@@ -65,8 +65,7 @@ Let us retrieve the header of the raster file and display the description of the
     Aligned physical types: [('meta.obs.sequence',), ...]
     <BLANKLINE>
 
-We get some basic information about the raster file from this: what spectral windows were observed,
-the size of the cube, and the wavelength keys.
+We get some basic information about the raster file from this: what spectral windows were observed, the size of the cube, and the wavelength keys.
 
 Let us check the metadata of this collection, this is stored as a ``meta`` attribute:
 

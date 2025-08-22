@@ -1,4 +1,4 @@
-.. _install:
+.. _irispy_install:
 
 ************
 Installation
@@ -41,7 +41,7 @@ You can update to the latest version by running:
 
     $ conda update irispy-lmsal
 
-.. _dev_install:
+.. _irispy_dev_install:
 
 Development version
 ===================
@@ -69,10 +69,10 @@ Next, you must activate that environment, i.e., switch into it.
     $ conda activate irispy-dev
 
 Clone ``irispy`` repository
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Now we need to clone the `irispy repository`_ from `GitHub`_ into a directory called ``irispy-git``.
-From the directory in which you want ``irispy-git`` to reside:
+From the directory in which you want ``irispy-git`` to reside.
 If you want to develop ``irispy``, you will want to fork the repository on GitHub and use that URL in the clone step above.
 
 .. code-block:: console
@@ -82,7 +82,7 @@ If you want to develop ``irispy``, you will want to fork the repository on GitHu
     $ git remote add upstream git@github.com:LM-SAL/irispy.git
 
 Install ``irispy``
-^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
 
 Finally, we can install the development version.
 

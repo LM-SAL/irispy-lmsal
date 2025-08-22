@@ -11,8 +11,8 @@ Providing Feedback
 
 We could always use more voices and opinions in the discussions about ``irispy`` and its development from both users and developers.
 There are several ways to make your voice heard.
-You can open issues on our `issue tracker`_, comment on the `SunPy chat room`_, or email us directly at ``nabil.freij@gmail.com``.
-Whether it be (de)constructive criticism, inquiries about current or future capabilities, or flattering praise, we would love to hear from you.
+You can open issues on our `issue tracker`_, comment in the `SunPy chat room`_, or email us directly at ``nabil.freij@gmail.com``.
+Whether it be (non)constructive criticism, inquiries about current or future capabilities, or flattering praise, we would love to hear from you.
 
 Reporting Bugs
 ==============
