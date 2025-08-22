@@ -7,9 +7,9 @@ from sunpy.util.config import _is_writable_dir, get_and_create_sample_dir
 from sunpy.util.parfive_helpers import Downloader
 
 _BASE_URLS = (
-    "https://github.com/sunpy/data/raw/main/irispy/",
-    "https://github.com/sunpy/sample-data/raw/master/irispy/",
-    "http://data.sunpy.org/irispy/",
+    "https://github.com/sunpy/data/raw/main/irispy-lmsal/",
+    "https://github.com/sunpy/sample-data/raw/master/irispy-lmsal/",
+    "http://data.sunpy.org/irispy-lmsal/",
 )
 _SAMPLE_DATA = {
     "AIA_1700": "aia_20140919_060030_1700_image_lev1.fits",

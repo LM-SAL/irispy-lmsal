@@ -8,7 +8,7 @@ requires = [
 build-backend = 'setuptools.build_meta'
 
 [project]
-name = "irispy"
+name = "irispy-lmsal"
 dynamic = ["version"]
 description = "Provides tools to read and analyze data from the IRIS solar-observing satellite."
 readme = "README.rst"
@@ -50,15 +50,15 @@ issue_tracker = "https://github.com/LM-SAL/irispy/issues"
 repository = "https://github.com/LM-SAL/irispy"
 
 [project.optional-dependencies]
-all = ["irispy"]
+all = ["irispy-lmsal"]
 tests = [
-  "irispy[all]",
+  "irispy-lmsal[all]",
   'pytest-astropy',
   "pytest-mpl",
   'pooch',
 ]
 docs = [
-  "irispy[all]",
+  "irispy-lmsal[all]",
   'aiapy',
   'pooch',
   'dask[distributed]',
@@ -70,7 +70,7 @@ docs = [
   'sphinx-gallery',
   'sunpy-sphinx-theme',
 ]
-dev = ["irispy[tests,docs]"]
+dev = ["irispy-lmsal[tests,docs]"]
 
 [tool.setuptools_scm]
 write_to = "irispy/_version.py"

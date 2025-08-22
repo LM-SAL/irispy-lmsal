@@ -5,12 +5,12 @@ An ``irispy`` guide
 *************************
 
 This guide is intended to help the solar community to start working with level 2 data using Python.
-It is especially oriented to those who have a limited knowledge of Python and want to start using this language to analyze data.
+It is especially intended for those with limited Python experience who want to begin using the language to analyze data.
 
 This guide will cover:
 
 - reading level 2 files
-- load the data of any of the spectral windows
+- loading data from any of the spectral windows
 
 In the future more features will arrive:
 
@@ -23,7 +23,7 @@ In the future more features will arrive:
 - reading of L3 data
 
 Currently, ``irispy`` does not provide a way to download the data from the `IRIS archive <https://iris.lmsal.com/data.html>`__.
-We recommend you browse the catalogue using your browser.
+We recommend browsing the catalogue using your web browser.
 
 This guide uses some "sample data" from the IRIS archive that can be accessed:
 
@@ -40,17 +40,17 @@ Once the level 2 data has downloaded, the next step is to read, extract, and ins
 The sample data is from this `observation
 <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20211001_060925_3683602040_2021-10-01T06%3A09%3A252021-10-01T06%3A09%3A25.xml>`__.
 
-It is a small observation of a small activate region (NOAA 12880) that contains one sunspot.
-Let us recover the header of the raster file and show the description of the observation:
+It is a small observation of an active region (NOAA 12880) that contains one sunspot.
+Let us retrieve the header of the raster file and display the description of the observation:
 
 .. code-block:: python
 
     >>> raster = read_files(sample_data.RASTER)  # doctest: +REMOTE_DATA
 
 .. note::
-    This, by default will load the data into memory.
-    You can pass ``memmap=True`` to avoid this, the data array will be a `numpy.memmap` instead.
-    Thus, the data are not loaded in the memory of the system, but written in a temporary file.
+    By default, this will load the data into memory.
+    You can pass ``memmap=True`` to avoid this; the data array will be a `numpy.memmap` instead.
+    In this case, the data are not loaded into system memory, but written to a temporary file.
 
 .. code-block:: python
 
@@ -65,8 +65,8 @@ Let us recover the header of the raster file and show the description of the obs
     Aligned physical types: [('meta.obs.sequence',), ...]
     <BLANKLINE>
 
-We get some basic information about the raster file from this, what spectral windows were observed
-The size of the cube, the wavelength keys as well.
+We get some basic information about the raster file from this: what spectral windows were observed,
+the size of the cube, and the wavelength keys.
 
 Let us check the metadata of this collection, this is stored as a ``meta`` attribute:
 
@@ -90,7 +90,7 @@ Let us check the metadata of this collection, this is stored as a ``meta`` attri
     <BLANKLINE>
 
 Note this is not on the main object but each individual element, in this case the spectral window.
-While the SJI files contain just one spectral window per file, the raster files have several spectral windows per file.
+While SJI files contain just one spectral window per file, raster files have several spectral windows per file.
 
 If we want to check the primary header of the raster, we can do the following:
 
@@ -138,9 +138,9 @@ We use the following command to read and load the data from a SJI level 2 file:
 Metadata
 ========
 
-Here we will highlight some of the more important metadata that is available.
+Here we highlight some of the more important metadata that is available.
 
-We can use it to find out kind of data this is:
+We can use it to find out what kind of data this is:
 
 .. code-block:: python
 
@@ -154,7 +154,7 @@ When the observation started:
     >>> iris_sji.meta['STARTOBS']   # doctest: +REMOTE_DATA
     '2021-10-01T06:09:24.920'
 
-It possible it might be in a ``"DATE_OBS"`` instead.
+It is possible it might be in ``"DATE_OBS"`` instead.
 
 The exposure times:
 
@@ -167,7 +167,7 @@ The exposure times:
                0.50025803, 0.500283  , 0.50029802, 0.50029498, 0.50027299] s>
 
 In most cases, the exposure times are fixed for all scans in a raster.
-However, when automatic exposure compensation (AEC) is switched on and there is a very energetic event (e.g. a flare), IRIS will automatically use a lower exposure time to prevent saturation in the detectors.
+However, when automatic exposure compensation (AEC) is enabled and there is a very energetic event (e.g., a flare), IRIS will automatically use a lower exposure time to prevent detector saturation.
 
 If the exposure time varies, you can get the time-dependent exposure times in seconds from the auxiliary metadata, second to last HDU in the file with the keys ``"EXPTIMEF"`` and ``"EXPTIMEN"``.
 
@@ -234,22 +234,21 @@ Understanding a level 2 FITS file
 
 The structure of the level 2 FITS data file is as follows:
 
-The level 2 FITS are multi-extension FITS files.
-An extension" refers to a part of the file containing self-consistent information.
-This information may be, in the general case, a header or its corresponding data.
+Level 2 FITS files are multi-extension FITS files.
+An "extension" refers to a part of the file containing self-consistent information, which may be a header or its corresponding data.
 The first extension is called ``primary`` and its ``extension number`` is 0.
 
-The extensions in an level 2 SJI FITS file has the following numbers:
+The extensions in a level 2 SJI FITS file has the following numbers:
 
    - ``0``: header and data corresponding to the spectral images observed by the SJI.
    - ``1``: header and auxiliary 31 values from each exposure taken by the SJI in the spectral band of the file.
      It is an array of float values with dimensions :math:`no. images \times 31`.
    - ``2``: header and extra data from each exposure taken by the SJI in the spectral band of the file.
      It is a record array containing 5 string fields for each exposure.
-     The values of each field can be access as the key in a dictionary or as an attribute.
+     The values of each field can be accessed as the key in a dictionary or as an attribute.
      See example in the last code block of this section.
 
-An level 2 raster FITS file has the following extensions:
+A level 2 raster FITS file has the following extensions:
 
    -  ``0``: main header with the main information of the observation.
       This header has information about all the spectral windows contained in the file and other relevant and
@@ -260,10 +259,10 @@ An level 2 raster FITS file has the following extensions:
       It is an array of float values with dimensions :math:`no. acquisitions \times 47`.
    -  ``N+2``: header and extra information data from each exposure considered in the file.
       It is a record array containing 9 string fields for each exposure. The values of
-      each field can be access as the key in a dictionary or as an attribute.
+      each field can be accessed as the key in a dictionary or as an attribute.
       See example in the last code block of this section.
 
-The function `astropy.fits.io` shows the information of the extensions contained in the level 2 file.
+The function `astropy.io.fits.info` shows the information of the extensions contained in the level 2 file.
 For a SJI file:
 
 .. code-block:: python
@@ -369,7 +368,7 @@ If we now want to recover the main header of any file:
 
 The same can be done with the data using `astropy.io.fits.getdata`.
 
-As the number of spectral windows in a raster file may vary from an observation to another, a good option to access to the last 2 extensions of the level 2 file, is to use a negative index:
+As the number of spectral windows in a raster file may vary from one observation to another, a good way to access the last two extensions of the level 2 file is to use a negative index:
 
 .. code-block:: python
 
@@ -401,7 +400,7 @@ As the number of spectral windows in a raster file may vary from an observation 
      'FUVtemp',
      'NUVtemp')
 
-We can access to the values of the variables stored in the data corresponding to the extra information extension as an attribute or as a key:
+We can access the values of the variables stored in the data corresponding to the extra information extension as either an attribute or a key:
 
 .. code-block:: python
 

@@ -10,16 +10,16 @@ However, the package is imported as ``irispy`` and is referred to as ``irispy`` 
 Release version
 ===============
 
-``irispy`` is part of the wider ecosystem of scientific Python packages for solar physics and therefore a working installation is more about installing the scientific Python ecosystem.
+``irispy`` is part of the wider ecosystem of scientific Python packages for solar physics and therefore, a working installation is more about installing the scientific Python ecosystem.
 
 To install the Miniforge Python distribution `download the executable for your Operating System <https://github.com/conda-forge/miniforge#miniforge3>`__.
 
-The reason we choose Miniconda over Anaconda, is mainly due to the size as Anaconda comes with a full install of packages you probably do not need and this way you have more direct control over what has been installed into your Python virtual environment.
+The reason we choose Miniforge over Anaconda is mainly due to size, as Anaconda comes with a full install of packages you probably do not need, and this way you have more direct control over what has been installed into your Python virtual environment.
 
 Using Miniforge
 ---------------
 
-To install, launch a system command prompt or the 'Miniforge Prompt' (under Windows).
+To install, launch a system command prompt or the 'Miniforge Prompt' (on Windows).
 
 .. note::
 
@@ -72,7 +72,7 @@ Clone ``irispy`` repository
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Now we need to clone the `irispy repository`_ from `GitHub`_ into a directory called ``irispy-git``.
-From the directory in which you want ``irispy-git`` to reside.
+From the directory in which you want ``irispy-git`` to reside:
 If you want to develop ``irispy``, you will want to fork the repository on GitHub and use that URL in the clone step above.
 
 .. code-block:: console
@@ -94,9 +94,9 @@ Finally, we can install the development version.
 You are now ready to develop ``irispy``.
 
 Notice we install no dependencies or use ``conda`` to install this.
-The reason for this is that it is simply easier to use ``pip`` to setup development packages.
+The reason for this is that it is simply easier to use ``pip`` to set up development packages.
 
-At times you might need to get the updated changes, to do so:
+At times you might need to get the updated changes; to do so:
 
 .. code-block:: console
 
