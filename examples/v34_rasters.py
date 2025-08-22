@@ -3,7 +3,7 @@
 Dealing with IRIS v34 rasters
 =============================
 
-In this example we will show how ``irispy-lmsal`` deals with a v34 dataset by default and how to
+In this example we will show how ``irispy`` deals with a v34 dataset by default and how to
 undo that if you so desire.
 
 These v34 are scans which raster from west to east instead of the default east to west.
@@ -36,7 +36,7 @@ raster_filename = pooch.retrieve(
 
 ###############################################################################
 # We will now open the raster file we just downloaded.
-# By default, irispy-lmsal will read the v34 data, flipping the data so that it
+# By default, irispy will read the v34 data, flipping the data so that it
 # is in the same orientation as normal IRIS data and adjust the WCS accordingly.
 
 raster = read_files(raster_filename, memmap=False)

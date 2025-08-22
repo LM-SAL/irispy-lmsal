@@ -8,7 +8,7 @@ requires = [
 build-backend = 'setuptools.build_meta'
 
 [project]
-name = "irispy-lmsal"
+name = "irispy"
 dynamic = ["version"]
 description = "Provides tools to read and analyze data from the IRIS solar-observing satellite."
 readme = "README.rst"
@@ -43,22 +43,22 @@ dependencies = [
 ]
 
 [project.urls]
-changelog = "https://irispy-lmsal.readthedocs.io/en/stable/changelog"
-documentation = "https://irispy-lmsal.readthedocs.io/en/stable/"
+changelog = "https://irispy.readthedocs.io/en/stable/changelog"
+documentation = "https://irispy.readthedocs.io/en/stable/"
 homepage = "https://iris.lmsal.com/"
-issue_tracker = "https://github.com/LM-SAL/irispy-lmsal/issues"
-repository = "https://github.com/LM-SAL/irispy-lmsal"
+issue_tracker = "https://github.com/LM-SAL/irispy/issues"
+repository = "https://github.com/LM-SAL/irispy"
 
 [project.optional-dependencies]
-all = ["irispy-lmsal"]
+all = ["irispy"]
 tests = [
-  "irispy-lmsal[all]",
+  "irispy[all]",
   'pytest-astropy',
   "pytest-mpl",
   'pooch',
 ]
 docs = [
-  "irispy-lmsal[all]",
+  "irispy[all]",
   'aiapy',
   'pooch',
   'dask[distributed]',
@@ -70,7 +70,7 @@ docs = [
   'sphinx-gallery',
   'sunpy-sphinx-theme',
 ]
-dev = ["irispy-lmsal[tests,docs]"]
+dev = ["irispy[tests,docs]"]
 
 [tool.setuptools_scm]
 write_to = "irispy/_version.py"
@@ -119,7 +119,7 @@ ignore-words-list = "sav,"
     package = "irispy"
     filename = "CHANGELOG.rst"
     directory = "changelog/"
-    issue_format = "`#{issue} <https://github.com/LM-SAL/irispy-lmsal/pull/{issue}>`__"
+    issue_format = "`#{issue} <https://github.com/LM-SAL/irispy/pull/{issue}>`__"
     title_format = "{version} ({project_date})"
 
     [[tool.towncrier.type]]

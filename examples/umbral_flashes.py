@@ -38,7 +38,7 @@ sji_filename = pooch.retrieve(
 )
 
 ###############################################################################
-# Now to open the files using ``irispy-lmsal``.
+# Now to open the files using ``irispy``.
 
 # Note that when ``memmap=True``, the data values are read from the FITS file
 # directly without the scaling to Float32 (via "b_zero" and "b_scale"),

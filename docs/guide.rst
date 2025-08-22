@@ -1,7 +1,7 @@
 .. _guide:
 
 *************************
-An ``irispy-lmsal`` guide
+An ``irispy`` guide
 *************************
 
 This guide is intended to help the solar community to start working with level 2 data using Python.
@@ -22,7 +22,7 @@ In the future more features will arrive:
 - PSF and filter functions
 - reading of L3 data
 
-Currently, ``irispy-lmsal`` does not provide a way to download the data from the `IRIS archive <https://iris.lmsal.com/data.html>`__.
+Currently, ``irispy`` does not provide a way to download the data from the `IRIS archive <https://iris.lmsal.com/data.html>`__.
 We recommend you browse the catalogue using your browser.
 
 This guide uses some "sample data" from the IRIS archive that can be accessed:
@@ -290,7 +290,7 @@ and for the raster file:
       4                1 ImageHDU        54   (47, 16)   float64
       5                1 TableHDU        53   16R x 7C   [A10, A10, A4, A10, A4, A66, A66]
 
-If you would like a bit more information, we have a similar function within ``irispy-lmsal``:
+If you would like a bit more information, we have a similar function within ``irispy``:
 
 .. code-block:: python
 
