@@ -69,6 +69,7 @@ docs = [
   'sphinx-design',
   'sphinx-gallery',
   'sunpy-sphinx-theme',
+  'sunkit-image @ git+https://github.com/Deus1704/sunkit-image.git',
 ]
 dev = ["irispy-lmsal[tests,docs]"]
 
