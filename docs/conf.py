@@ -10,7 +10,7 @@ from sunpy_sphinx_theme import PNG_ICON
 from irispy import __version__
 
 # -- Project information -----------------------------------------------------
-project = "irispy-lmsal"
+project = "irispy"
 author = "IRIS Instrument Team"
 copyright = f"{datetime.datetime.now(datetime.timezone.utc).year}, {author}"  # NOQA: A001
 release = __version__

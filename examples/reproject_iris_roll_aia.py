@@ -53,7 +53,7 @@ print(sji_2832)
 
 ###############################################################################
 # Can't remember what is OBSID 3860608353?
-# **irispy-lmsal** has an utility function that will provide more information.
+# **irispy** has an utility function that will provide more information.
 
 print(ObsID(sji_2832.meta["OBSID"]))
 
@@ -120,7 +120,7 @@ aia_map = update_pointing(aia_map, pointing_table=pointing_table)
 # Now let's plot the IRIS field of view on the AIA image.
 #
 # This IRIS data has no observer coordinate information
-# **irispy-lmsal** will set this to be at Earth.
+# **irispy** will set this to be at Earth.
 # This will allow us to transform from IRIS to any another observer.
 #
 # Using :meth:`~.draw_extent`, drawing regions is straightforward.

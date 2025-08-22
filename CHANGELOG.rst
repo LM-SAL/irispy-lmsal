@@ -4,17 +4,17 @@
 New Features
 ------------
 
-- Added ``fits_header`` property to the ``.meta``. (`#69 <https://github.com/LM-SAL/irispy-lmsal/pull/69>`__)
+- Added ``fits_header`` property to the ``.meta``. (`#69 <https://github.com/LM-SAL/irispy/pull/69>`__)
 - Added observer location to the Spectrograph cubes.
-  This now matches the SJI cubes. (`#70 <https://github.com/LM-SAL/irispy-lmsal/pull/70>`__)
+  This now matches the SJI cubes. (`#70 <https://github.com/LM-SAL/irispy/pull/70>`__)
 
 
 Bug Fixes
 ---------
 
-- Fixed handling of raster tarfiles to not just use the first file. (`#69 <https://github.com/LM-SAL/irispy-lmsal/pull/69>`__)
-- Improved how OBSID v34 is checked by using ``STEPS_AV`` in the FITS header. (`#69 <https://github.com/LM-SAL/irispy-lmsal/pull/69>`__)
-- Improved how ``read_files`` handles tarfiles and mixed files. (`#69 <https://github.com/LM-SAL/irispy-lmsal/pull/69>`__)
+- Fixed handling of raster tarfiles to not just use the first file. (`#69 <https://github.com/LM-SAL/irispy/pull/69>`__)
+- Improved how OBSID v34 is checked by using ``STEPS_AV`` in the FITS header. (`#69 <https://github.com/LM-SAL/irispy/pull/69>`__)
+- Improved how ``read_files`` handles tarfiles and mixed files. (`#69 <https://github.com/LM-SAL/irispy/pull/69>`__)
 
 
 0.3.0 (2025-06-16)
@@ -24,16 +24,16 @@ Breaking Changes
 ----------------
 
 - Now ``read_files`` will return a NDCollection which you can access individual cubes based on keys like a dictionary.
-  If one item was passed into ``read_files``, that return type has bee unchanged. (`#63 <https://github.com/LM-SAL/irispy-lmsal/pull/63>`__)
-- Increased minimum version of dkist to 1.11.0. (`#63 <https://github.com/LM-SAL/irispy-lmsal/pull/63>`__)
-- Increased minimum version of sunraster to 0.6.0. (`#65 <https://github.com/LM-SAL/irispy-lmsal/pull/65>`__)
+  If one item was passed into ``read_files``, that return type has been unchanged. (`#63 <https://github.com/LM-SAL/irispy/pull/63>`__)
+- Increased minimum version of dkist to 1.11.0. (`#63 <https://github.com/LM-SAL/irispy/pull/63>`__)
+- Increased minimum version of sunraster to 0.6.0. (`#65 <https://github.com/LM-SAL/irispy/pull/65>`__)
 
 
 New Features
 ------------
 
-- Added explicit support for the IRIS aligned AIA cubes provided by LMSAL for each IRIS observation. (`#63 <https://github.com/LM-SAL/irispy-lmsal/pull/63>`__)
-- Added ``to_maps`` to ``SJICubes`` to allow a user to output a sunpy Map or MapSequence based on how many slices they need. (`#64 <https://github.com/LM-SAL/irispy-lmsal/pull/64>`__)
+- Added explicit support for the IRIS aligned AIA cubes provided by LMSAL for each IRIS observation. (`#63 <https://github.com/LM-SAL/irispy/pull/63>`__)
+- Added ``to_maps`` to ``SJICubes`` to allow a user to output a sunpy Map or MapSequence based on how many slices they need. (`#64 <https://github.com/LM-SAL/irispy/pull/64>`__)
 
 
 0.2.5 (2025-06-02)
@@ -163,7 +163,7 @@ Features
 0.1.0 (2022-01-14)
 ==================
 
-First formal release of ``irispy-lmsal``.
+First formal release of ``irispy``.
 
 Please note there are parts of this library that are still under going development and will be updated as time
 goes on.
