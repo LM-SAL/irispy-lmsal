@@ -1,3 +1,4 @@
+from astropy.utils.shapes import simplify_basic_index
 from astropy.wcs import WCS
 from astropy.wcs.utils import wcs_to_celestial_frame
 from astropy.wcs.wcsapi.wrappers.sliced_wcs import sanitize_slices
@@ -45,15 +46,11 @@ class _ResolveNegativeIndicesMixin:
     """
 
     def __getitem__(self, item):
-        if isinstance(item, tuple) and item.count(Ellipsis) == 1:
-            # sanitize_slices counts the Ellipsis itself against the dimensionality.
-            at = item.index(Ellipsis)
-            item = (*item[:at], *[slice(None)] * (len(self.shape) - len(item) + 1), *item[at + 1 :])
+        # Against the shape, as since astropy 8.0.2 sanitize_slices rejects negative indices without it
+        item = simplify_basic_index(item, shape=self.shape)
         # sanitize_slices raises for any step other than 1, so dropping the step loses nothing.
-        item = tuple(
-            slice(*index.indices(length)[:2]) if isinstance(index, slice) else range(length)[index]
-            for index, length in zip(sanitize_slices(item, len(self.shape)), self.shape, strict=True)
-        )
+        sanitize_slices(item, len(self.shape))
+        item = tuple(slice(index.start, index.stop) if isinstance(index, slice) else index for index in item)
         if 0 not in self.shape and any(isinstance(index, slice) and index.start >= index.stop for index in item):
             msg = "Slicing would give a length-0 axis, which a WCS cannot describe."
             raise IndexError(msg)
