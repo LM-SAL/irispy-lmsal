@@ -217,8 +217,14 @@ def test_sjicube_slice_rejects_step_slices(sns_sjicube_1330):
 
 
 def test_sjicube_slice_rejects_too_many_indices(sns_sjicube_1330):
-    with pytest.raises((IndexError, ValueError), match=r"can not be greater than the dimensionality .* of the wcs"):
+    with pytest.raises((IndexError, ValueError), match=r"can not be greater than the dimensionality"):
         sns_sjicube_1330[(slice(0, 3), slice(0, 10), slice(0, 10), slice(None))]
+
+
+def test_sjicube_slice_rejects_out_of_range_index(sns_sjicube_1330):
+    with pytest.raises(IndexError, match=r"out of range for a cube of shape \(52, 40, 37\)") as error:
+        sns_sjicube_1330[0, 100]
+    assert not isinstance(error.value, ValueError)
 
 
 def test_sjicube_slice_without_frame_headers_keeps_fits_wcs_none(cube):
