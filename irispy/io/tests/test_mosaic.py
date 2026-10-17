@@ -83,15 +83,18 @@ def test_read_mosaic(mosaic_file):
     assert cube.data.shape == (5, 4, 3)
     assert cube.data.dtype == np.float32
     assert cube.data[2, 1, 1] == 28.25
-    # The uncovered position and the fill value are masked, the covered zeros are not.
-    assert cube.mask.sum() == 6
+    # The uncovered position, the fill value and the clipped sample are masked, the covered zeros are not.
+    assert cube.mask.sum() == 7
     assert cube.mask[:, 0, 0].all()
     assert cube.mask[1, 2, 1]
-    assert np.isnan(cube.data[cube.mask]).all()
     np.testing.assert_array_equal(cube.data[:, 3, 2], 0)
-    # The clipped sample is +Inf, as in level 2 cubes, and not masked
-    assert np.isposinf(cube.data[4, 1, 2])
-    assert not cube.mask[4, 1, 2]
+    # The clipped sample keeps its value, as in level 2 cubes, and is marked saturated; the others are NaN
+    saturated = np.zeros(cube.shape, dtype=bool)
+    saturated[4, 1, 2] = True
+    np.testing.assert_array_equal(cube.meta["saturated"], saturated)
+    assert cube.data[4, 1, 2] == 16182
+    assert cube.mask[4, 1, 2]
+    assert np.isnan(cube.data[cube.mask & ~saturated]).all()
 
     # The FITS reference pixel (CRPIX, 1-based) is at the reference value (CRVAL).
     coord, wavelength = cube.wcs.pixel_to_world(1, 2, 2)

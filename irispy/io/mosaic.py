@@ -34,7 +34,8 @@ def read_mosaic(filename, *, wavelength_range=None):
     -------
     `irispy.spectrograph.MosaicCube`
         The mosaic in DN. Positions no raster covered, and the Level 2 fill values, are
-        masked and NaN.
+        masked and NaN. Samples at the level 2 ceiling, ``irispy.utils.constants.SATURATION_LIMIT``,
+        keep their value and are marked in the mask and, if there are any, in ``meta["saturated"]``.
 
     Notes
     -----
@@ -79,9 +80,12 @@ def read_mosaic(filename, *, wavelength_range=None):
     mask = np.isin(data, BAD_PIXEL_VALUES_SCALED) | uncovered
     data[mask] = np.nan
     # Scaled like level 2, which clips at the ceiling where iris_prep's +Inf saturation flags were lost
-    data[data >= SATURATION_LIMIT.value] = np.inf
+    saturated = data >= SATURATION_LIMIT.value
+    mask |= saturated
     times = date_obs + np.nan_to_num(time_offset) * u.s
     times[uncovered] = np.ma.masked
     meta = MosaicMeta(header, data_shape=data.shape)
     meta.add("time", times, "Time of each mosaic position, masked where no raster covered it", (1, 2))
+    if saturated.any():
+        meta.add("saturated", saturated, "Samples at the level 2 ceiling, also masked", (0, 1, 2))
     return MosaicCube(data, wcs, unit=DN_UNIT[meta.detector], meta=meta, mask=mask)

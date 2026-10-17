@@ -184,7 +184,7 @@ def test_si_iv_1403_model_ignores_clipped_samples():
     )
     clipped = _cube(truth, WAVELENGTH, rng)
     masked = copy.deepcopy(clipped)
-    clipped.data[3, 4, 30] = np.inf  # as the readers set clipped samples
+    clipped.data[3, 4, 30] = np.inf  # left out, like a masked sample
     masked.mask = np.zeros(masked.data.shape, dtype=bool)
     masked.mask[3, 4, 30] = True
     for name in truth.param_names:

@@ -11,6 +11,8 @@ import astropy.units as u
 from irispy.data.test import get_test_filepath
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.spectrograph import SpectrogramCube
+from irispy.tests.helpers import mark_saturated
+from irispy.utils.constants import SATURATION_LIMIT
 from irispy.utils.mg_features import _center_vertex, _maxima, _peak_vertex, _peaks, _spline, calculate_mg_features
 
 TEST_FILE = "mg_features/iris_l2_20130902_182935_4000005156_raster_t000_r00000_mg_features_test.fits"
@@ -103,8 +105,11 @@ def test_both_lines(raster, both_lines):
 
 def test_saturated(both_lines):
     cube = copy.deepcopy(both_lines)
-    cube.data[1, 300, 10] = np.inf  # at -17.0 km/s from k, as the readers set clipped samples
-    cube.data[1, 400, 0] = np.inf  # at -44.3 km/s, not searched
+    saturated = np.zeros(cube.data.shape, dtype=bool)
+    saturated[1, 300, 10] = True  # at -17.0 km/s from k, marked as the readers mark clipped samples
+    saturated[1, 400, 0] = True  # at -44.3 km/s, not searched
+    cube.data[saturated] = SATURATION_LIMIT.value
+    mark_saturated(cube, saturated)
     plain = calculate_mg_features(both_lines)
     features = calculate_mg_features(cube)
     assert list(zip(*np.nonzero(features["k_saturated"].data), strict=True)) == [(1, 300)]
@@ -122,10 +127,12 @@ def test_saturated(both_lines):
 
 def test_saturated_ignores_masked_samples(both_lines):
     cube = copy.deepcopy(both_lines)
-    cube.data[1, 300, 10] = np.inf
-    cube.mask[1, 300, 10] = True
+    cube.data[1, 300:302, 10] = SATURATION_LIMIT.value
+    marked = np.zeros(cube.data.shape, dtype=bool)
+    marked[1, 301, 10] = True  # marked, so saturated
+    mark_saturated(cube, marked)
+    cube.mask[1, 300, 10] = True  # masked, but not marked
     cube.mask = cube.mask.astype(int) * 2  # not boolean, so `~` must not complement it bitwise
-    cube.data[1, 301, 10] = np.inf  # unmasked, so saturated
     saturated = calculate_mg_features(cube, lines=("k",))["k_saturated"].data
     assert list(zip(*np.nonzero(saturated), strict=True)) == [(1, 301)]
 

@@ -13,6 +13,7 @@ import astropy.units as u
 from irispy.spectrograph import RasterCollection, SpectrogramCube
 from irispy.utils._spectral import check_scaled, make_map_cube, make_spatial_template
 from irispy.utils.constants import BAD_PIXEL_VALUES_SCALED
+from irispy.utils.utils import _saturated_samples
 
 __all__ = ["calculate_mg_features"]
 
@@ -45,9 +46,9 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
         (step, slit) maps keyed ``"{feature}_velocity"`` (km/s) and ``"{feature}_intensity"`` (the
         unit of ``cube``) for the blue peak, line center and red peak of each measured line:
         ``"k2v"``, ``"k3"``, ``"k2r"`` and ``"h2v"``, ``"h3"``, ``"h2r"``. Features that are not
-        found are NaN and masked. ``"{line}_saturated"`` is `True` where an unmasked sample searched
-        over (``velocity_range`` widened by 3 km/s) is +Inf, as the readers set the samples clipped at
-        the level 2 ceiling; such a line has no features either.
+        found are NaN and masked. ``"{line}_saturated"`` is `True` where a sample searched over
+        (``velocity_range`` widened by 3 km/s) is saturated, as the mask and ``cube.meta["saturated"]``
+        mark the samples the readers find at the level 2 ceiling; such a line has no features either.
 
     Notes
     -----
@@ -113,8 +114,8 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
         mask = False if cube.mask is None else np.asarray(cube.mask, dtype=bool)
         masked = np.broadcast_to(mask, cube.data.shape)[..., inside]
         missing = ~np.isfinite(window) | np.isin(window, BAD_PIXEL_VALUES_SCALED) | masked
-        # Missing, so no features; masked samples are not searched, so they do not saturate either
-        saturated = np.any(np.isposinf(window) & ~masked, axis=-1)
+        # Masked, so missing, and no features
+        saturated = np.any(_saturated_samples(cube)[..., inside], axis=-1)
         grid = np.linspace(velocity[inside][0], velocity[inside][-1], 300)
         features = np.full((*window.shape[:2], 3, 2), np.nan)  # blue peak, center, red peak
         for step, (data, bad) in enumerate(zip(window, missing, strict=True)):

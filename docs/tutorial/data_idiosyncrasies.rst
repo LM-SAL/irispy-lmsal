@@ -125,11 +125,12 @@ Flagging of saturated data
 
 Some observations show strong solar activity and resulting saturation either on the CCD or (especially in OBS sequences where data is summed) in the A/D converter.
 Level 2 processing flags saturated pixels as ``inf``, but level 2 files hold none: every sample, saturated or merely bright, is clipped at 16182 DN (``irispy.utils.constants.SATURATION_LIMIT``), and their ``NSATPIX`` and ``TSATPXn`` keywords are 0.
-The readers, the mosaic reader included, restore the flag: samples at the ceiling are ``+inf`` in the cubes they return with ``memmap=False``, and ``+inf`` survives `~irispy.utils.spectrograph.subtract_background`, exposure time correction and calibration.
-`~irispy.utils.moments.calculate_moments`, `~irispy.utils.mg_features.calculate_mg_features` and `~irispy.utils.red_blue.calculate_red_blue_asymmetry` flag the pixels with such a sample and give them no values.
-`~irispy.utils.moments.average_window` masks the pixel, the burst finders count the sample as bright, and the other utilities treat it as missing, like NaN.
-For a stricter limit, set the samples yourself first: ``cube.data[cube.data >= limit] = np.inf``.
-To fit such spectra, give the samples no weight, as the fitting examples do with ``np.isfinite(cube.data)``.
+The readers, the mosaic reader included, restore the flag: in the cubes they return with ``memmap=False``, samples at the ceiling keep their value, which viewers that skip non-finite values can show, and are marked in the mask and in ``cube.meta["saturated"]``, which tells them from the other masked samples.
+Both survive slicing, `~irispy.utils.spectrograph.subtract_background`, exposure time correction and calibration, but not rebinning.
+`~irispy.utils.moments.calculate_moments`, `~irispy.utils.mg_features.calculate_mg_features` and `~irispy.utils.red_blue.calculate_red_blue_asymmetry` flag the pixels with a sample that both mark and give them no values.
+`~irispy.utils.moments.average_window` masks the pixel, the burst finders see the sample at its value, as IDL does, the slit-jaw one counting it as bright, and the other utilities leave it out like any masked sample.
+For a stricter limit, mark the samples yourself first, in the mask and ``cube.meta["saturated"]``.
+To fit such spectra, give the samples no weight, as the fitting examples do with ``~cube.mask``.
 
 Cosmetic finishing in quicklook movies
 ======================================

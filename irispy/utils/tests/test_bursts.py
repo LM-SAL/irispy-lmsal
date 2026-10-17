@@ -19,7 +19,8 @@ from irispy.utils.bursts import (
     find_si_iv_bursts,
     find_sji_bursts,
 )
-from irispy.utils.constants import DN_UNIT
+from irispy.tests.helpers import mark_saturated
+from irispy.utils.constants import DN_UNIT, SATURATION_LIMIT
 
 IRISPY_DATA = "https://github.com/LM-SAL/irispy-data/releases/download/v1"
 SJI_SUMMARY = get_test_filepath("bursts/iris_sji_burst_check_4000255147_summary.ecsv")
@@ -190,9 +191,13 @@ def test_sji_edge_and_small_events(bursts_sjicube_1400):
 def test_sji_frames_without_valid_pixels(bursts_sjicube_1400):
     sji = copy.deepcopy(bursts_sjicube_1400)
     sji.mask[1] = True
+    sji.meta["saturated"][1] = False  # nor saturated ones, which count as bright though masked
     _, events = find_sji_bursts(sji)
     assert 1 not in events["frame"]
-    sji.data[0, 100, 100:102] = np.inf  # clipped, as the readers set them: bright, and out of the statistics
+    saturated = np.zeros(sji.data.shape, dtype=bool)
+    saturated[0, 100, 100:102] = True
+    sji.data[saturated] = SATURATION_LIMIT.value
+    mark_saturated(sji, saturated)  # as the readers mark clipped pixels: bright, and in the statistics at their value
     labels, events = find_sji_bursts(sji)
     assert np.isfinite(events["threshold"]).all()
     assert labels.data[0, 100, 100] == labels.data[0, 100, 101] > 0
