@@ -1,3 +1,5 @@
+import numpy as np
+
 from astropy.utils.shapes import simplify_basic_index
 from astropy.wcs import WCS
 from astropy.wcs.utils import wcs_to_celestial_frame
@@ -47,7 +49,12 @@ class _ResolveNegativeIndicesMixin:
 
     def __getitem__(self, item):
         # Against the shape, as since astropy 8.0.2 sanitize_slices rejects negative indices without it
-        item = simplify_basic_index(item, shape=self.shape)
+        try:
+            item = simplify_basic_index(item, shape=self.shape)
+        except np.exceptions.AxisError:
+            # An IndexError, as for arrays, not numpy's AxisError, which is a ValueError and speaks of axes
+            msg = f"Index {item} is out of range for a cube of shape {self.shape}"
+            raise IndexError(msg) from None
         # sanitize_slices raises for any step other than 1, so dropping the step loses nothing.
         sanitize_slices(item, len(self.shape))
         item = tuple(slice(index.start, index.stop) if isinstance(index, slice) else index for index in item)
