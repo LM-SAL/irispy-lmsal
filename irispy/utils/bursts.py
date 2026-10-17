@@ -223,8 +223,9 @@ def find_sji_bursts(sji, *, sigma_factor=10, min_pixels=2):
 
     * Edge pixels can belong to events; IDL's ``REGION_GROW`` leaves them out of every region,
       and an above-threshold edge pixel makes the IDL loop never end.
-    * Masked pixels, including both -200 and -199 fill values, are left out of the statistics
-      and are never burst pixels. IDL excludes only -200, so the frame thresholds can differ.
+    * Masked pixels other than saturated ones, including both -200 and -199 fill values, are left
+      out of the statistics and are never burst pixels. IDL excludes only -200, so the frame
+      thresholds can differ.
     * The median of an even number of pixels is the mean of the two middle values, not IDL's
       upper one, and the standard deviation is accumulated in double precision.
     * Labels are unique through the cube; IDL numbers the events of each frame from 1, in bytes
@@ -272,11 +273,10 @@ def find_bright_image_events(cube, *, sigma_factor=10, min_pixels=2):
     if cube.data.ndim != 3:
         msg = "The slit-jaw cube must have axes (frame, y, x); slice with a range, such as [0:1], not an index"
         raise ValueError(msg)
-    # Saturated pixels are masked, but the statistics see them at their value, as IDL does, and they count as bright
-    saturated = _saturated_samples(cube)
+    # Saturated pixels are masked, but count at their value, as in IDL
     data = cube.data
     if cube.mask is not None:
-        data = np.where(np.asarray(cube.mask, dtype=bool) & ~saturated, np.nan, data)
+        data = np.where(np.asarray(cube.mask, dtype=bool) & ~_saturated_samples(cube), np.nan, data)
     frames = data.reshape(len(data), -1)
     with warnings.catch_warnings():
         # Frames without valid pixels, or with only one
@@ -284,7 +284,7 @@ def find_bright_image_events(cube, *, sigma_factor=10, min_pixels=2):
         warnings.filterwarnings("ignore", "Degrees of freedom <= 0", RuntimeWarning)
         threshold = np.nanmedian(frames, axis=1) + sigma_factor * np.nanstd(frames, axis=1, ddof=1, dtype=float)
     within_frame = np.stack([np.zeros_like(_EIGHT_CONNECTED), _EIGHT_CONNECTED, np.zeros_like(_EIGHT_CONNECTED)])
-    burst = (data >= threshold[:, np.newaxis, np.newaxis]) | saturated
+    burst = data >= threshold[:, np.newaxis, np.newaxis]
     labels, _ = ndimage.label(burst, structure=within_frame)
     burst &= (np.bincount(labels.ravel()) >= min_pixels)[labels]
     labels, count = ndimage.label(burst, structure=within_frame)

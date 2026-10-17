@@ -127,12 +127,14 @@ def make_test_spectrogram_cube(data, wavelengths, *, uncertainty=None, unit=u.DN
 
 def mark_saturated(cube, saturated):
     """
-    Mark the ``saturated`` samples of ``cube`` as the readers mark those at the level 2 ceiling:
-    in its mask and ``meta["saturated"]``, which keeps any samples marked already. A plain `dict`
-    meta, which slicing leaves as it is, holds the array as it is.
+    Mark the ``saturated`` samples of ``cube`` as the readers mark clipped ones.
+
+    They go in its mask and in ``meta["saturated"]``, which keeps any samples marked
+    already. A plain `dict` meta, which slicing leaves as it is, holds the array as it
+    is.
     """
     saturated = np.asarray(saturated, dtype=bool) | cube.meta.get("saturated", False)
-    cube.mask = saturated if cube.mask is None else np.asarray(cube.mask, dtype=bool) | saturated
+    cube.mask = np.asarray(cube.mask, dtype=bool) | saturated  # a copy, so either can change alone
     if hasattr(cube.meta, "add"):
         cube.meta.add("saturated", saturated, None, tuple(range(saturated.ndim)), overwrite=True)
     else:

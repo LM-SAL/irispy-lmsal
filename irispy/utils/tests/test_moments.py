@@ -394,14 +394,23 @@ def test_calculate_moments_saturated():
     np.testing.assert_array_equal(inside["saturated"].data, [[False, True, False, False]])
 
 
-def test_calculate_moments_saturated_ignores_masked_samples():
-    data = np.array([[[10.0, 500.0, 1000.0, 500.0, np.inf]]])
-    mask = np.zeros(data.shape, dtype=bool)
-    mask[..., -1] = True
-    cube = make_test_spectrogram_cube(data, (500 + np.arange(5)) * u.nm, mask=mask)
+def test_calculate_moments_saturated_needs_mask_and_mark():
+    data = np.tile([10.0, 500.0, 1000.0, 500.0, SATURATION_LIMIT.value], (1, 2, 1))
+    cube = make_test_spectrogram_cube(data, (500 + np.arange(5)) * u.nm)
+    mark_saturated(cube, cube.data >= SATURATION_LIMIT.value)
+    cube.meta["saturated"][0, 0] = False  # masked, but not marked, so left out
+    cube.mask[0, 1] = False  # marked, but unmasked, so used at its value
     moments = calculate_moments(cube)
     assert not moments["saturated"].data.any()
-    assert moments["intensity"].data[0, 0] == 2010
+    np.testing.assert_array_equal(moments["intensity"].data, [[2010, 2010 + SATURATION_LIMIT.value]])
+
+
+def test_calculate_moments_rebinned_has_no_saturated():
+    # Rebinning leaves meta["saturated"] at the old shape, so it marks nothing
+    data = np.tile([1.0, 2.0, SATURATION_LIMIT.value, 2.0, 1.0], (1, 4, 1))
+    cube = make_test_spectrogram_cube(data, (500 + np.arange(5)) * u.nm)
+    mark_saturated(cube, cube.data >= SATURATION_LIMIT.value)
+    assert not calculate_moments(cube.rebin((1, 2, 1)))["saturated"].data.any()
 
 
 def test_calculate_moments_saturated_survives_exposure_time_correction(sns_sg_file):
