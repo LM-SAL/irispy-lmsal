@@ -40,17 +40,21 @@ def _import_optional(module_name: str, *, reason: str, extra: str):
 
 def _saturated_samples(cube):
     """
-    `True` for the saturated samples of ``cube``: those its mask and ``cube.meta["saturated"]`` mark.
+    `True` for the saturated samples of ``cube``: those its mask and
+    ``cube.meta["saturated"]`` mark.
 
-    The readers mask the samples at the level 2 ceiling, ``irispy.utils.constants.SATURATION_LIMIT``,
-    keeping their value, and mark them in ``meta["saturated"]``, which follows the cube through
-    slicing, exposure time correction, calibration and `~irispy.utils.spectrograph.subtract_background`.
+    The readers mask the samples at the level 2 ceiling,
+    ``irispy.utils.constants.SATURATION_LIMIT``, keeping their value, and mark them in
+    ``meta["saturated"]``, which follows the cube through slicing, exposure time
+    correction, calibration and `~irispy.utils.spectrograph.subtract_background`, but
+    not rebinning.
     """
     saturated = cube.meta.get("saturated")
-    if saturated is None or cube.mask is None:
+    # Rebinning leaves the mark at the old shape
+    if saturated is None or cube.mask is None or np.shape(saturated) != cube.data.shape:
         return np.zeros(cube.data.shape, dtype=bool)
     mask = np.broadcast_to(np.asarray(cube.mask, dtype=bool), cube.data.shape)
-    return mask & np.broadcast_to(np.asarray(saturated, dtype=bool), cube.data.shape)
+    return mask & np.asarray(saturated, dtype=bool)
 
 
 def record_to_dict(arr: np.ndarray):
