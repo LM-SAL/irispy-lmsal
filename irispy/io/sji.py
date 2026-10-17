@@ -225,7 +225,9 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
         When ``memmap=True``, missing pixels retain their original values and are marked in a
         lazy Dask mask, computed only for the slices that are used.
         With ``memmap=False``, missing pixels are marked in the mask and replaced with ``NaN`` for
-        floating-point data or ``-200`` for integer data.
+        floating-point data or ``-200`` for integer data, and IRIS pixels at the level 2 ceiling,
+        ``irispy.utils.constants.SATURATION_LIMIT``, keep their value and are marked in the mask
+        and, if there are any, in ``meta["saturated"]``.
         Hinode/SOT data retain their units and ``NaN`` values with either setting.
         Compressed filenames are decompressed into memory once and cannot be memory-mapped.
 
@@ -283,6 +285,7 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
         data = hdulist[0].data
         data_nan_masked = hdulist[0].data
         out_uncertainty = None
+        saturated = None
         # Negative SOT magnetic values are valid measurements; only NaN marks missing pixels.
         if memmap:
             mask = _memmap_fill_mask(data, hdulist[0].header, nan_only=is_sot)
@@ -295,9 +298,10 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             if not data_nan_masked.flags["W"]:
                 data_nan_masked = data_nan_masked.copy()
             data_nan_masked[mask] = mask_value
-            if instrume in ["IRIS", "SJI"] and np.issubdtype(data_nan_masked.dtype, np.floating):
+            if instrume in ["IRIS", "SJI"]:
                 # Level 2 clips at the ceiling, where iris_prep's +Inf saturation flags were lost
-                data_nan_masked[data_nan_masked >= SATURATION_LIMIT.value] = np.inf
+                saturated = data_nan_masked >= SATURATION_LIMIT.value
+                mask |= saturated
             scaled = True
             unit = DN_UNIT["SJI"]
             if uncertainty and instrume in ["IRIS", "SJI"]:
@@ -313,6 +317,8 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
         meta = SJIMeta(hdulist[0].header)
         meta["frame_wcs_headers"] = _create_headers_wcs(hdulist, t_obs)  # root-relative, not axis-aware
         meta["scaled"] = scaled
+        if saturated is not None and saturated.any():
+            meta.add("saturated", saturated, "Samples at the level 2 ceiling, also masked", (0, 1, 2))
         map_cube = cube_class(
             data_nan_masked,
             _create_gwcs(hdulist, t_obs),

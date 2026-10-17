@@ -264,7 +264,7 @@ def test_subtract_background_keeps_inf():
     wavelengths = np.linspace(1333, 1337, 81) * u.AA
     data = np.tile(3 + 0.5 * (wavelengths.to_value(u.AA) - 1335), (1, 2, 1))
     data[0, 0, 0] = np.inf  # in a window, so left out of the fit
-    data[0, 1, 40] = np.inf  # as the readers set clipped samples
+    data[0, 1, 40] = np.inf  # in the line
     cube = make_test_spectrogram_cube(data, wavelengths)
     corrected = subtract_background(cube, [[1333, 1334], [1336, 1337]] * u.AA)
     assert np.isposinf(corrected.data[0, 0, 0])

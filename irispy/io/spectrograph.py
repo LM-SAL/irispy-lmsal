@@ -144,6 +144,9 @@ def read_spectrograph_lvl2(
         integer data stay unscaled, in ``DN_IRIS_FUV_UNSCALED`` or ``DN_IRIS_NUV_UNSCALED``,
         not the usual data numbers (DN).
         The fill mask is a lazy Dask array, computed only for the slices that are used.
+        With ``memmap=False``, the samples at the level 2 ceiling,
+        ``irispy.utils.constants.SATURATION_LIMIT``, keep their value and are marked in the mask
+        and, if there are any, in ``meta["saturated"]``.
     revert_v34 : `bool`, optional.
         Will undo the flipping of the raster step axis made to V34 observations
         (data, mask, uncertainty, WCS, times and per-step metadata).
@@ -259,9 +262,11 @@ def read_spectrograph_lvl2(
                     if np.issubdtype(data.dtype, np.integer):  # the FITS integers, not DN
                         dn_unit = DN_UNIT[f"{meta.detector_band}_UNSCALED"]
                 else:
-                    data_mask = np.isin(data, BAD_PIXEL_VALUES_SCALED)
                     # Level 2 clips at the ceiling, where iris_prep's +Inf saturation flags were lost
-                    data[data >= SATURATION_LIMIT.value] = np.inf
+                    saturated = data >= SATURATION_LIMIT.value
+                    data_mask = np.isin(data, BAD_PIXEL_VALUES_SCALED) | saturated
+                    if saturated.any():
+                        meta.add("saturated", saturated, "Samples at the level 2 ceiling, also masked", (0, 1, 2))
                     # memmap data are unscaled integers, so the photon noise would be wrong
                     if uncertainty:
                         out_uncertainty = StdDevUncertainty(calculate_uncertainty(data, readout_noise, dn_unit))

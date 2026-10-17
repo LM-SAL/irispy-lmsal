@@ -10,9 +10,9 @@ from astropy.tests.helper import assert_quantity_allclose
 
 from irispy.io.utils import read_files
 from irispy.spectrograph import RasterCollection, SpectrogramCube
-from irispy.tests.helpers import figure_test, make_test_spectrogram_cube
+from irispy.tests.helpers import figure_test, make_test_spectrogram_cube, mark_saturated
 from irispy.utils import calculate_uncertainty
-from irispy.utils.constants import DN_UNIT, READOUT_NOISE
+from irispy.utils.constants import DN_UNIT, READOUT_NOISE, SATURATION_LIMIT
 from irispy.utils.moments import average_window, calculate_moments
 from irispy.utils.spectrograph import subtract_background
 
@@ -375,10 +375,11 @@ def test_calculate_moments_velocity_range_empty_window():
 
 def test_calculate_moments_saturated():
     wvls = (500 + np.arange(5)) * u.nm
-    # Pixels with +Inf, as the readers set clipped samples, and with -Inf and NaN, which are not saturated
+    # Pixels with a clipped sample, marked as the readers mark them, and with -Inf and NaN, which are not saturated
     data = np.tile([1.0, 2.0, 16181.75, 2.0, 1.0], (4, 1))
-    data[1, 2], data[2, 0], data[3, 0], data[3, 4] = np.inf, np.inf, -np.inf, np.nan
+    data[1, 2], data[2, 0], data[3, 0], data[3, 4] = SATURATION_LIMIT.value, SATURATION_LIMIT.value, -np.inf, np.nan
     cube = make_test_spectrogram_cube(data[np.newaxis], wvls)
+    mark_saturated(cube, cube.data >= SATURATION_LIMIT.value)
     moments = calculate_moments(cube, rest_wavelength=502 * u.nm)
     np.testing.assert_array_equal(moments["saturated"].data, [[False, True, True, False]])
     for key, moment in moments.items():
@@ -388,7 +389,7 @@ def test_calculate_moments_saturated():
         assert np.isnan(moment.data[0, 1:3]).all(), key
         assert np.isfinite(moment.data[0, [0, 3]]).all(), key
         np.testing.assert_array_equal(moment.mask, [[False, True, True, False]], err_msg=key)
-    # Only the samples within velocity_range count: 700 km/s is 1.17 nm, short of the +Inf at 500 nm
+    # Only the samples within velocity_range count: 700 km/s is 1.17 nm, short of the clipped sample at 500 nm
     inside = calculate_moments(cube, rest_wavelength=502 * u.nm, velocity_range=(-700, 700) * u.km / u.s)
     np.testing.assert_array_equal(inside["saturated"].data, [[False, True, False, False]])
 
@@ -405,7 +406,8 @@ def test_calculate_moments_saturated_ignores_masked_samples():
 
 def test_calculate_moments_saturated_survives_exposure_time_correction(sns_sg_file):
     cube = read_files(sns_sg_file)["C II 1336"][0]
-    cube.data[0, 3, 5] = np.inf
+    cube.data[0, 3, 5] = SATURATION_LIMIT.value
+    mark_saturated(cube, cube.data >= SATURATION_LIMIT.value)
     for unit_cube in (cube, cube.apply_exposure_time_correction()):
         saturated = calculate_moments(unit_cube)["saturated"].data
         assert saturated[0, 3]
@@ -414,12 +416,13 @@ def test_calculate_moments_saturated_survives_exposure_time_correction(sns_sg_fi
 
 def test_calculate_moments_saturated_survives_subtract_background():
     data = si_iv_on_background(1)
-    data[1, 2, 80] = np.inf  # 1403.0 Å, within velocity_range
-    data[0, 1, 1:] = np.inf  # one finite sample in the windows, too few to fit a straight line
+    data[1, 2, 80] = SATURATION_LIMIT.value  # 1403.0 Å, within velocity_range
+    data[0, 1, 1:] = SATURATION_LIMIT.value  # one unsaturated sample in the windows, too few to fit a straight line
     cube = make_test_spectrogram_cube(data, SI_IV_WAVELENGTHS)
+    mark_saturated(cube, cube.data >= SATURATION_LIMIT.value)
     corrected = subtract_background(cube, SI_IV_WINDOWS)
     assert np.isnan(corrected.data[0, 1, 0])
-    assert np.isposinf(corrected.data[0, 1, 1:]).all()
+    np.testing.assert_array_equal(corrected.data[0, 1, 1:], SATURATION_LIMIT.value)
     moments = calculate_moments(corrected, **SI_IV_MOMENTS)
     saturated = np.zeros((2, 3), dtype=bool)
     saturated[0, 1] = saturated[1, 2] = True
@@ -638,8 +641,9 @@ def test_average_window_by_hand(method, values, errors):
 
 def test_average_window_saturated_is_nan_and_masked():
     cube = make_test_spectrogram_cube(
-        [[[1.0, np.inf, 4.0, 8.0], [1.0, 2.0, 4.0, 8.0]]], [500.0, 501.0, 502.0, 503.0] * u.nm
+        [[[1.0, SATURATION_LIMIT.value, 4.0, 8.0], [1.0, 2.0, 4.0, 8.0]]], [500.0, 501.0, 502.0, 503.0] * u.nm
     )
+    mark_saturated(cube, cube.data >= SATURATION_LIMIT.value)
     window = average_window(cube, [5005, 5025] * u.AA)
     assert np.isnan(window.data[0, 0])
     assert window.mask[0, 0]

@@ -221,7 +221,7 @@ def test_masked_pixels_count_as_zero():
     cube.data[:, :300] = 5000
     cube.mask[:, :300] = True
     np.testing.assert_array_equal(_line_shifts(cube, wavelength, *_LINES["Ni I"]), zeroed)
-    cube.data[:, :300] = np.inf  # as the readers set clipped samples
+    cube.data[:, :300] = np.inf  # zero too
     cube.mask[:, :300] = False
     np.testing.assert_array_equal(_line_shifts(cube, wavelength, *_LINES["Ni I"]), zeroed)
 

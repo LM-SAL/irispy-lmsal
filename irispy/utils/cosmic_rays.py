@@ -8,7 +8,7 @@ from collections.abc import Mapping
 import dask.array as da
 import numpy as np
 
-from irispy.utils.utils import _import_optional
+from irispy.utils.utils import _import_optional, _saturated_samples
 
 __all__ = ["remove_cosmic_rays"]
 
@@ -33,7 +33,7 @@ def _remove_cosmic_rays_rsliding(
     working_data = data.astype(np.float64, copy=True)
     working_data[mask] = np.nan
     cleaned = np.ma.getdata(slidingsigmaclipping(data=working_data, **method_kwargs).clipped)
-    # Clipped samples stay +Inf, as the readers set them; they were masked, not cleaned
+    # +Inf stays +Inf; it was masked, not cleaned
     cleaned[np.isposinf(data)] = np.inf
     return cleaned
 
@@ -70,7 +70,7 @@ def _remove_cosmic_rays_astroscrappy(
     for index in np.ndindex(data_shape[:-2]):
         frame = np.asarray(data[index]).copy()
         frame_mask = _mask_for_frame(mask, index, data_shape, frame.shape)
-        clipped = np.isposinf(frame)  # as the readers set clipped samples: masked, not cleaned
+        clipped = np.isposinf(frame)  # masked, not cleaned
         if np.issubdtype(frame.dtype, np.floating):
             frame_mask = frame_mask | ~np.isfinite(frame)
         if inmask is not None:
@@ -138,6 +138,10 @@ def remove_cosmic_rays(
         msg = f"Unsupported method {method!r}. Supported methods are: {sorted(backends)}."
         raise ValueError(msg)
     cleaned_data = backends[method](cube.data, working_mask, sigma=sigma, max_iters=max_iters, method_kwargs=kwargs)
+    # Saturated samples keep their value; they were masked, not cleaned
+    saturated = _saturated_samples(cube)
+    if saturated.any():
+        cleaned_data[saturated] = np.asarray(cube.data)[saturated]
     cleaned_cube_kwargs = {
         "data": cleaned_data,
         "mask": "copy",
