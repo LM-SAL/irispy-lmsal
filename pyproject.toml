@@ -42,19 +42,24 @@ dependencies = [
   "sunraster>=0.7.0",
 ]
 
+# The optional features, documented in docs/tutorial/installation.rst; "all" is the three together.
 optional-dependencies.all = [
   "irispy-lmsal[cosmic-rays,density,rgb]",
 ]
+# The two methods of irispy.utils.cosmic_rays.remove_cosmic_rays.
 optional-dependencies.cosmic-rays = [
   "astroscrappy>=1.3.0",
   "rsliding>=1.0.0",
 ]
+# The theoretical line ratios of irispy.utils.density.density_diagnostic.
 optional-dependencies.density = [
   "fiasco>=0.4.0",
 ]
+# The false-color images of irispy.utils.rgb.
 optional-dependencies.rgb = [
   "colorsynth>=1.1.0",
 ]
+# Development: everything the tests and the documentation build need.
 optional-dependencies.dev = [
   "irispy-lmsal[all,docs,tests]",
 ]
@@ -74,8 +79,8 @@ optional-dependencies.docs = [
   "sunkit-image>=0.6.0",
   "sunpy-sphinx-theme>=2.0.17",
 ]
+# The test suite alone; the tests of an optional feature skip without its extra.
 optional-dependencies.tests = [
-  "irispy-lmsal[all]",
   "pooch>=1.9.0",
   "pytest-astropy>=0.12.0",
   "pytest-mpl>=0.18.0",

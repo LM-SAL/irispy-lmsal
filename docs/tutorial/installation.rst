@@ -158,9 +158,10 @@ Optional dependencies
 ---------------------
 
 Some functions need packages that are not installed by default.
-They are grouped in extras, which you add to the package name, for example ``pip install "irispy-lmsal[cosmic-rays,rgb]"``.
+They are grouped in extras of the ``irispy-lmsal`` distribution, which you add to the package name, for example ``pip install "irispy-lmsal[cosmic-rays,rgb]"``.
 Each of these functions raises an error that names the missing package and the extra.
 Not every package is available on conda-forge; the ``rsliding`` package, the default backend of ``remove_cosmic_rays``, is only on PyPI, so install it with ``pip`` even in a conda environment.
+No fiasco release ships ``fiasco.line_ratio`` yet, so install fiasco from its git main branch until one does.
 
 .. list-table::
    :widths: 20 30 50
@@ -184,6 +185,8 @@ Not every package is available on conda-forge; the ``rsliding`` package, the def
    * - ``tests``, ``docs``, ``dev``
      - Test, documentation and all of the above
      - Running the tests and building the documentation, see :ref:`irispy-dev-install`
+
+With conda, install the packages by name instead, or use ``pip`` in the same environment.
 
 .. _irispy-dev-install:
 
