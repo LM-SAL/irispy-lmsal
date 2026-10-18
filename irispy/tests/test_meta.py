@@ -4,6 +4,7 @@ import pytest
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
+from astropy.time import Time
 
 from sunpy.coordinates import Helioprojective, get_earth
 from sunpy.coordinates.utils import get_heliocentric_angle
@@ -84,14 +85,6 @@ def test_sgmeta_observer_uses_campaign_start_when_date_obs_is_blank():
     assert meta.observer.obstime.isot == "2014-03-29T14:09:38.830"
 
 
-def test_sgmeta_temporal_cadence():
-    header = _make_sg_header()
-    header["CADEX_AV"] = 9.264
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    cadence = meta.temporal_cadence
-    assert u.isclose(cadence, 9.264 * u.s, rtol=1e-4)
-
-
 def test_sgmeta_real_sns_data(sns_sg_file):
     raster = read_files(sns_sg_file)
     cube = raster["Si IV 1403"][0]
@@ -103,20 +96,6 @@ def test_sgmeta_real_sns_data(sns_sg_file):
     assert meta.temporal_cadence.unit.is_equivalent(u.s)
     assert meta.camera == 1
     assert meta.number_of_spectral_windows is not None
-
-
-def test_sgmeta_camera():
-    header = _make_sg_header()
-    header["CAMERA"] = 1
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.camera == 1
-
-
-def test_sgmeta_sun_angular_radius_from_rsun():
-    header = _make_sg_header()
-    header["RSUN_OBS"] = 975.0
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert u.isclose(meta.sun_angular_radius, 975.0 * u.arcsec)
 
 
 def test_sgmeta_sun_angular_radius_from_dsun():
@@ -161,13 +140,6 @@ def test_sgmeta_exposure_mu(raster_sg_file):
     np.testing.assert_array_equal(cube[1:3].meta.exposure_mu, exposure_mu[1:3])
 
 
-def test_sgmeta_observer_radial_velocity():
-    header = _make_sg_header()
-    header["OBS_VR"] = 3500.0
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert u.isclose(meta.observer_radial_velocity, 3500.0 * u.m / u.s)
-
-
 def test_sgmeta_observer_radial_velocity_per_exposure(sns_sg_file):
     # Level 2 primary headers have no OBS_VR, only the per-exposure OBS_VRIX
     meta = read_files(sns_sg_file)["Si IV 1403"][0].meta
@@ -175,6 +147,73 @@ def test_sgmeta_observer_radial_velocity_per_exposure(sns_sg_file):
         assert "OBS_VR" not in hdulist[0].header
         expected = hdulist[-2].data[:, hdulist[-2].header["OBS_VRIX"]] * u.m / u.s
     assert u.allclose(meta.observer_radial_velocity, expected)
+
+
+@pytest.mark.parametrize(
+    ("keyword", "value", "name", "expected"),
+    [
+        ("CAMERA", 1, "camera", 1),
+        ("RSUN_OBS", 975.0, "sun_angular_radius", 975.0 * u.arcsec),
+        ("CADEX_AV", 9.264, "temporal_cadence", 9.264 * u.s),
+        ("OBS_VR", 3500.0, "observer_radial_velocity", 3500.0 * u.m / u.s),
+        ("NWIN", 1, "number_of_spectral_windows", 1),
+        ("RASRPT", 3, "raster_repetition", 3),
+        ("EXPTIME", 12.5, "exposure_time", 12.5 * u.s),
+        ("EXPMIN", 10.0, "exposure_time_min", 10.0 * u.s),
+        ("EXPMAX", 15.0, "exposure_time_max", 15.0 * u.s),
+        ("BTYPE", "Intensity", "data_type", "Intensity"),
+        ("BUNIT", "DN/s", "data_unit", "DN/s"),
+        ("STATUS", "Final", "data_status", "Final"),
+        ("BLD_VERS", "v9.4", "build_version", "v9.4"),
+        ("VER_RF2", "1.2.3", "reformat_version", "1.2.3"),
+        ("DATE_RF2", "2024-01-15T10:30:00", "reformat_date", Time("2024-01-15T10:30:00", scale="utc")),
+        ("OBSLABEL", "OBS_12345", "observing_label", "OBS_12345"),
+        ("OBSTITLE", "Test Campaign", "observing_title", "Test Campaign"),
+        ("LUTID", 7, "lut_id", 7),
+        ("NEXP", 180, "number_of_exposures", 180),
+        ("NEXP_PRP", 200, "number_of_exposures_planned", 200),
+        ("NEXPOBS", 400, "number_of_exposures_observation", 400),
+        ("NSATPIX", 42, "number_of_saturated_pixels", 42),
+        ("NSPIKES", 15, "number_of_spikes", 15),
+        ("PERCENTD", 98.5, "percent_data", 98.5),
+        ("DATAMEAN", 120.5, "data_mean", 120.5),
+        ("DATARMS", 45.2, "data_rms", 45.2),
+        ("DATAMEDN", 110.0, "data_median", 110.0),
+        ("DATAMIN", 5.0, "data_min", 5.0),
+        ("DATAMAX", 500.0, "data_max", 500.0),
+        ("STEPS_AV", 0.35, "step_size_average", 0.35),
+        ("STEPS_DV", 0.02, "step_size_stddev", 0.02),
+        ("STEPT_AV", 18.5, "step_time_average", 18.5),
+        ("STEPT_DV", 1.2, "step_time_stddev", 1.2),
+        ("CADPL_AV", 15.0, "cadence_planned_average", 15.0 * u.s),
+        ("CADPL_DV", 0.5, "cadence_planned_stddev", 0.5 * u.s),
+        ("CADEX_DV", 0.3, "cadence_executed_stddev", 0.3 * u.s),
+        ("RASTYPDX", 3, "raster_type_index", 3),
+        ("RASTYPNX", 8, "raster_type_total", 8),
+        ("MISSRAS", 2, "number_of_missing_raster_files", 2),
+        ("MISSOBS", 5, "number_of_missing_observation_files", 5),
+        ("TDMEAN1", 150.0, "window_mean", 150.0),
+        ("TDRMS1", 30.0, "window_rms", 30.0),
+        ("TDMEDN1", 145.0, "window_median", 145.0),
+        ("TDMIN1", 10.0, "window_min", 10.0),
+        ("TDMAX1", 400.0, "window_max", 400.0),
+        ("TSATPX1", 3, "window_saturated_pixels", 3),
+        ("TSPIKE1", 7, "window_spikes", 7),
+    ],
+)
+def test_sgmeta_reads_one_keyword(keyword, value, name, expected):
+    header = _make_sg_header()
+    header[keyword] = value
+    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
+
+    result = getattr(meta, name)
+
+    if isinstance(expected, u.Quantity):
+        assert u.isclose(result, expected)
+    elif isinstance(expected, Time):
+        assert (result.isot, result.scale) == (expected.isot, expected.scale)
+    else:
+        assert result == expected
 
 
 def test_sgmeta_missing_cadence_keys():
@@ -211,170 +250,6 @@ def test_sjimeta_aia_cutout_header():
     ):
         assert getattr(meta, name) is None, name
     assert "Spectral Range:  None" in str(meta)
-
-
-def test_sgmeta_number_of_spectral_windows():
-    meta = SGMeta(_make_sg_header(), "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.number_of_spectral_windows == 1
-
-
-def test_sgmeta_raster_repetition():
-    header = _make_sg_header()
-    header["RASRPT"] = 3
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.raster_repetition == 3
-
-
-def test_meta_exposure_time():
-    header = _make_sg_header()
-    header["EXPTIME"] = 12.5
-    header["EXPMIN"] = 10.0
-    header["EXPMAX"] = 15.0
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert u.isclose(meta.exposure_time, 12.5 * u.s)
-    assert u.isclose(meta.exposure_time_min, 10.0 * u.s)
-    assert u.isclose(meta.exposure_time_max, 15.0 * u.s)
-
-
-def test_meta_data_type_and_unit():
-    header = _make_sg_header()
-    header["BTYPE"] = "Intensity"
-    header["BUNIT"] = "DN/s"
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.data_type == "Intensity"
-    assert meta.data_unit == "DN/s"
-
-
-def test_meta_data_status():
-    header = _make_sg_header()
-    header["STATUS"] = "Final"
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.data_status == "Final"
-
-
-def test_meta_build_and_reformat_info():
-    header = _make_sg_header()
-    header["BLD_VERS"] = "v9.4"
-    header["VER_RF2"] = "1.2.3"
-    header["DATE_RF2"] = "2024-01-15T10:30:00"
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.build_version == "v9.4"
-    assert meta.reformat_version == "1.2.3"
-    assert meta.reformat_date.scale == "utc"
-
-
-def test_meta_observing_label_and_title():
-    header = _make_sg_header()
-    header["OBSLABEL"] = "OBS_12345"
-    header["OBSTITLE"] = "Test Campaign"
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.observing_label == "OBS_12345"
-    assert meta.observing_title == "Test Campaign"
-
-
-def test_meta_lut_id():
-    header = _make_sg_header()
-    header["LUTID"] = 7
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.lut_id == 7
-
-
-def test_meta_number_of_exposures():
-    header = _make_sg_header()
-    header["NEXP"] = 180
-    header["NEXP_PRP"] = 200
-    header["NEXPOBS"] = 400
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.number_of_exposures == 180
-    assert meta.number_of_exposures_planned == 200
-    assert meta.number_of_exposures_observation == 400
-
-
-def test_meta_data_quality_counts():
-    header = _make_sg_header()
-    header["NSATPIX"] = 42
-    header["NSPIKES"] = 15
-    header["PERCENTD"] = 98.5
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.number_of_saturated_pixels == 42
-    assert meta.number_of_spikes == 15
-    assert meta.percent_data == 98.5
-
-
-def test_meta_data_statistics():
-    header = _make_sg_header()
-    header["DATAMEAN"] = 120.5
-    header["DATARMS"] = 45.2
-    header["DATAMEDN"] = 110.0
-    header["DATAMIN"] = 5.0
-    header["DATAMAX"] = 500.0
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.data_mean == 120.5
-    assert meta.data_rms == 45.2
-    assert meta.data_median == 110.0
-    assert meta.data_min == 5.0
-    assert meta.data_max == 500.0
-
-
-def test_sgmeta_raster_step_properties():
-    header = _make_sg_header()
-    header["STEPS_AV"] = 0.35
-    header["STEPS_DV"] = 0.02
-    header["STEPT_AV"] = 18.5
-    header["STEPT_DV"] = 1.2
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.step_size_average == 0.35
-    assert meta.step_size_stddev == 0.02
-    assert meta.step_time_average == 18.5
-    assert meta.step_time_stddev == 1.2
-
-
-def test_sgmeta_cadence_planned():
-    header = _make_sg_header()
-    header["CADPL_AV"] = 15.0
-    header["CADPL_DV"] = 0.5
-    header["CADEX_DV"] = 0.3
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert u.isclose(meta.cadence_planned_average, 15.0 * u.s)
-    assert u.isclose(meta.cadence_planned_stddev, 0.5 * u.s)
-    assert u.isclose(meta.cadence_executed_stddev, 0.3 * u.s)
-
-
-def test_sgmeta_raster_type():
-    header = _make_sg_header()
-    header["RASTYPDX"] = 3
-    header["RASTYPNX"] = 8
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.raster_type_index == 3
-    assert meta.raster_type_total == 8
-
-
-def test_sgmeta_missing_files():
-    header = _make_sg_header()
-    header["MISSRAS"] = 2
-    header["MISSOBS"] = 5
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.number_of_missing_raster_files == 2
-    assert meta.number_of_missing_observation_files == 5
-
-
-def test_sgmeta_window_statistics():
-    header = _make_sg_header()
-    header["TDMEAN1"] = 150.0
-    header["TDRMS1"] = 30.0
-    header["TDMEDN1"] = 145.0
-    header["TDMIN1"] = 10.0
-    header["TDMAX1"] = 400.0
-    header["TSATPX1"] = 3
-    header["TSPIKE1"] = 7
-    meta = SGMeta(header, "Si IV 1403", data_shape=(10, 2, 2))
-    assert meta.window_mean == 150.0
-    assert meta.window_rms == 30.0
-    assert meta.window_median == 145.0
-    assert meta.window_min == 10.0
-    assert meta.window_max == 400.0
-    assert meta.window_saturated_pixels == 3
-    assert meta.window_spikes == 7
 
 
 def test_sjmeta_base_properties():
