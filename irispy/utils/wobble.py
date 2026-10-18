@@ -95,16 +95,13 @@ def generate_wobble_movie(
             timestamps = [
                 parse_time(header["STARTOBS"]) + TimeDelta(cadence, format="sec") * i for i in range(numframes)
             ]
-            # Trim down to only that part of the movie that contains data in all frames
+            # Trim down to the rows and columns that contain data in all frames
             if trim:
-                # TODO: improve this, it trims a bit but not fully
-                dmin = np.min(data, axis=0)
-                dmask = dmin > max(BAD_PIXEL_VALUES_SCALED)
-                dmx = np.sum(dmask, axis=1)
-                dmy = np.sum(dmask, axis=0)
-                (subx,) = np.where(dmx > (np.max(dmx) * 0.8))
-                (suby,) = np.where(dmy > (np.max(dmy) * 0.8))
-                data = data[:, suby[0] : suby[-1], subx[0] : subx[-1]]
+                has_data = np.min(data, axis=0) > max(BAD_PIXEL_VALUES_SCALED)
+                rows, columns = has_data.sum(axis=1), has_data.sum(axis=0)
+                (rows,) = np.where(rows > rows.max() * 0.8)
+                (columns,) = np.where(columns > columns.max() * 0.8)
+                data = data[:, rows[0] : rows[-1] + 1, columns[0] : columns[-1] + 1]
 
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1, projection=wcs.dropaxis(-1))
