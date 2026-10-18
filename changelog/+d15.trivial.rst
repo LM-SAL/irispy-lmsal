@@ -1,0 +1,1 @@
+The documentation configuration no longer carries Open Graph settings, unused extensions or sunpy-only nitpick exceptions, and Read the Docs now fails on warnings like CI.

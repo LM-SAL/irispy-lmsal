@@ -80,12 +80,10 @@ extensions = [
     "sphinx_design",
     "sphinx_gallery.gen_gallery",
     "sphinx.ext.autodoc",
-    "sphinx.ext.coverage",
     "sphinx.ext.doctest",
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
-    "sphinx.ext.todo",
     "sphinx.ext.viewcode",
     "sphinxcontrib.bibtex",
 ]
@@ -154,13 +152,6 @@ bibtex_bibfiles = ["references.bib"]
 bibtex_default_style = "plain"
 # Cite as "Pereira et al. [2013]" with :cite:t: and "[Pereira et al., 2013]" with :cite:p:
 bibtex_reference_style = "author_year"
-
-# -- Options for sphinxext-opengraph ------------------------------------------
-
-ogp_image = "https://lmsal.com/images/lmsal_logo_highres_small.png"
-ogp_use_first_image = True
-ogp_description_length = 160
-ogp_custom_meta_tags = ('<meta property="og:ignore_canonical" content="true" />',)
 
 # -- Options for sphinx-copybutton ---------------------------------------------
 
