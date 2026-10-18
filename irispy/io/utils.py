@@ -13,6 +13,7 @@ from astropy.table import Table
 from ndcube import NDCollection
 from sunpy import log
 
+from irispy.io._level2 import _check_level2
 from irispy.io.sji import read_sji_lvl2
 from irispy.io.spectrograph import read_spectrograph_lvl2
 
@@ -259,13 +260,11 @@ def read_files(
                 else [filename]
             )
             for file in files:
-                if not file.name.endswith((".fits", ".fits.gz")):
-                    log.warning(f"File {file} is not a FITS file and was not loaded")
-                    continue
-                header = _primary_header(file)
-                instrume, describe = _get_simple_metadata(header)
-                log.debug(f"Processing file: {file} with instrume: {instrume}")
-                if sji_tarfile or instrume in ["IRIS", "SJI"] or instrume.startswith(("AIA", "SOT")):
+                header = _primary_header(file) if file.name.endswith((".fits", ".fits.gz")) else None
+                product = _check_level2(file, header)
+                _, describe = _get_simple_metadata(header)
+                log.debug(f"Processing file: {file} as {product}")
+                if product == "SJI":
                     # SOT-SP archives may contain multiple observations of the same quantity.
                     key = describe if describe not in returns else f"{describe} ({file.stem})"
                     suffix = 2
@@ -273,12 +272,10 @@ def read_files(
                         key = f"{describe} ({file.stem}, {suffix})"
                         suffix += 1
                     returns[key] = read_sji_lvl2(file, memmap=memmap, uncertainty=uncertainty)
-                elif instrume == "SPEC":
+                else:
                     # Keep the first file's description, so the group needs no second header read.
                     group_key = _get_spec_group_key(file, header)
                     spec_groups.setdefault(group_key, (describe, []))[1].append(file)
-                else:
-                    log.warning(f"File {file} has unrecognized INSTRUME={instrume!r} and was not loaded")
         except Exception as e:
             if allow_errors:
                 log.warning(f"File {filename} failed to load with {e}")

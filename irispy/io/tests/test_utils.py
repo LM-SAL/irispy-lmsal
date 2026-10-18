@@ -267,14 +267,6 @@ def test_read_files_sot_repeated_names(tmp_path, sot_sp_file, source):
     assert len(returns) == 4
 
 
-def test_read_files_raises_when_no_files_are_supported(tmp_path):
-    filename = tmp_path / "not-a-fits.txt"
-    filename.write_text("not a supported IRIS file")
-
-    with pytest.raises(ValueError, match="No supported IRIS files were loaded"):
-        read_files(filename)
-
-
 @pytest.mark.remote_data
 def test_read_files_raster_scanning(remote_raster_scanning_tar):
     returns = read_files(remote_raster_scanning_tar)

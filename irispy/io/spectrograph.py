@@ -15,6 +15,7 @@ from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst
 from sunpy.coordinates.frames import Helioprojective
 from sunpy.coordinates.wcs_utils import _set_wcs_aux_obs_coord
 
+from irispy.io._level2 import _check_level2
 from irispy.io._mask import _memmap_fill_mask
 from irispy.meta import SGMeta
 from irispy.spectrograph import RasterCollection, SpectrogramCube, SpectrogramCubeSequence
@@ -166,6 +167,7 @@ def read_spectrograph_lvl2(
     for file_index, filename in enumerate(filenames):
         # The extensions are read out of order, which rewinds a gzip stream: inflate it once instead.
         with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True) as hdulist:
+            _check_level2(filename, hdulist[0].header, "raster")
             if file_index == 0:
                 # After a discussion with the IRIS team, it was decided that instead of the
                 # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.
