@@ -1,0 +1,1 @@
+The test suite no longer disables pytest's unraisable-exception and thread-exception plugins, so leaked handles and failures in worker threads fail the run.
