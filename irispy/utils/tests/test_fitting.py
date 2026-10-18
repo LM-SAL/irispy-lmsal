@@ -370,6 +370,18 @@ def test_starts_from_model_finds_lines_on_a_steep_background(background):
     np.testing.assert_allclose(starts.amplitude_1.value + level, flat.amplitude_1.value + flat_level)
 
 
+def test_starts_from_model_keeps_lines_without_a_peak():
+    # A shallow absorption line in spectra whose 10th percentile lies in a deeper one.
+    model = models.Const1D(100) + models.Gaussian1D(-80, 1402.4, 0.1) + models.Gaussian1D(-10, 1403.2, 0.06)
+    cube = make_test_spectrogram_cube(np.tile(model(WAVELENGTH.value), (2, 3, 1)), WAVELENGTH)
+    starts = starts_from_model(model, cube)
+    assert np.all(starts.amplitude_1.value < 0)
+    # No sample near the shallow line lies below the background, so it keeps its start rather than turning into
+    # emission.
+    np.testing.assert_array_equal(starts.amplitude_2.value, -10)
+    np.testing.assert_array_equal(starts.mean_2.value, 1403.2)
+
+
 @pytest.mark.parametrize("constraint", ["fixed", "tied"])
 def test_starts_from_model_keeps_polynomial_constraints(constraint):
     _, cube = _line_cube(np.random.default_rng(11))

@@ -395,8 +395,9 @@ def starts_from_model(model, cube):
 
     Fixed and tied parameters and those of other components keep the values of ``model``, and the
     others are clipped to their bounds. Masked and non-finite samples are left out of the starts.
-    A line with no samples left within two widths keeps the center and amplitude of ``model``,
-    and a spectrum with none at all gets a NaN background.
+    A line with no samples left within two widths, or none above the background (below it for a
+    negative amplitude), keeps the center and amplitude of ``model``, and a spectrum with no
+    samples at all gets a NaN background.
     """
     check_scaled(cube)
     if any(np.ndim(getattr(model, name).value) for name in model.param_names):
@@ -457,7 +458,7 @@ def starts_from_model(model, cube):
             excess = np.where(near & ~np.isnan(spectra), sign * (spectra - level), -np.inf)
             peak = np.argmax(excess, axis=-1)
             height = np.take_along_axis(excess, peak[..., np.newaxis], axis=-1)[..., 0]
-            found = np.isfinite(height)
+            found = height > 0  # Otherwise no sample lies beyond the background on the side of the line.
             starts[center] = np.where(found, wavelength[peak], fitted(center, u.AA)) * u.AA
             starts[amplitude] = np.where(found, sign * height, fitted(amplitude, cube.unit)) * cube.unit
     values = {}
