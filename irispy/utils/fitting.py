@@ -11,6 +11,7 @@ import astropy.units as u
 from astropy import constants
 from astropy.modeling import models
 from astropy.modeling.fitting import FitInfoArrayContainer
+from astropy.modeling.utils import poly_map_domain
 from astropy.nddata import StdDevUncertainty
 
 from irispy.spectrograph import RasterCollection, SpectrogramCube
@@ -383,8 +384,9 @@ def starts_from_model(model, cube):
     -----
     Each spectrum is started from its own data, as ``scale_guess`` in EISPAC does for EIS fits.
     A `~astropy.modeling.functional_models.Const1D` background starts at the spectrum's 10th
-    percentile, and a `~astropy.modeling.functional_models.Linear1D` one passes through it at
-    the middle of the wavelengths, with the slope of ``model``. A Gaussian or Lorentzian line
+    percentile, and a `~astropy.modeling.functional_models.Linear1D` or
+    `~astropy.modeling.polynomial.Polynomial1D` one passes through it at the middle of the
+    wavelengths, with the slope or the higher terms of ``model``. A Gaussian or Lorentzian line
     starts at the spectrum's peak above that background within two widths of the center of
     ``model``, its center at the peak's wavelength and its amplitude at the peak's height, below
     the background for a line with a negative amplitude. Its width is that of ``model``. In a
@@ -428,6 +430,12 @@ def starts_from_model(model, cube):
         elif isinstance(leaf, models.Linear1D):
             slope, intercept = names
             starts[intercept] = (background - fitted(slope, cube.unit / u.AA) * wavelength.mean()) * cube.unit
+        elif isinstance(leaf, models.Polynomial1D):
+            constant, *terms = names
+            # The middle in the polynomial's own variable, for one with a domain.
+            middle = poly_map_domain(wavelength.mean(), leaf.domain, leaf.window)
+            above = sum(fitted(term, cube.unit / u.AA**power) * middle**power for power, term in enumerate(terms, 1))
+            starts[constant] = (background - above) * cube.unit
         elif isinstance(leaf, lines):
             amplitude, center, width = names
             sign = np.sign(getattr(model, amplitude).value) or 1  # Negative for an absorption line.
