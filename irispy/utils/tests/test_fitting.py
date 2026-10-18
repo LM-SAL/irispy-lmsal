@@ -320,6 +320,43 @@ def test_starts_from_model_follows_each_spectrum(profile, background):
     np.testing.assert_array_equal(getattr(starts, width).value, getattr(model, width).value)
 
 
+@pytest.mark.parametrize(
+    "model",
+    [
+        models.Polynomial1D(2, c0=5 * u.DN, c1=0.5 * u.DN / u.AA, c2=-0.01 * u.DN / u.AA**2)
+        + models.Gaussian1D(150 * u.DN, 1402.75 * u.AA, 0.06 * u.AA),
+        # A polynomial with a domain takes parameters without units, in Å and the unit of the cube.
+        models.Polynomial1D(2, c0=5, c1=0.5, c2=-0.01, domain=(1402, 1404)) + models.Gaussian1D(150, 1402.75, 0.06),
+    ],
+)
+def test_starts_from_model_follows_each_spectrum_on_a_polynomial(model):
+    _, cube = _line_cube(np.random.default_rng(10))
+    starts = starts_from_model(model, cube)
+    assert starts.c0_0.unit == model.c0_0.unit
+    for name in ("c1_0", "c2_0"):
+        np.testing.assert_array_equal(getattr(starts, name).value, getattr(model, name).value)
+    # The background passes through each spectrum's 10th percentile in the middle of the window.
+    level = np.percentile(cube.data, 10, axis=-1)
+    middle = WAVELENGTH.mean() if model.c0_0.unit else WAVELENGTH.mean().value
+    np.testing.assert_allclose(u.Quantity(starts[0](middle)).value, level)
+    np.testing.assert_allclose(starts.amplitude_1.value, cube.data.max(axis=-1) - level)
+
+
+@pytest.mark.parametrize("constraint", ["fixed", "tied"])
+def test_starts_from_model_keeps_polynomial_constraints(constraint):
+    _, cube = _line_cube(np.random.default_rng(11))
+    model = models.Polynomial1D(2, c0=5, c1=0.5, c2=-0.01) + models.Gaussian1D(150, 1402.75, 0.06)
+    if constraint == "fixed":
+        model.c0_0.fixed = True
+    else:
+        model.c0_0.tied = lambda model: model.c1_0 + 4.5
+    starts = starts_from_model(model, cube)
+    assert starts.fixed == model.fixed
+    assert starts.tied == model.tied
+    for name in ("c0_0", "c1_0", "c2_0"):
+        np.testing.assert_array_equal(getattr(starts, name).value, getattr(model, name).value)
+
+
 def test_starts_from_model_keeps_absorption():
     truth, cube = _line_cube(np.random.default_rng(6), amplitudes=(-60, -20), background_level=100)
     model = profiles_on_background(
@@ -415,7 +452,8 @@ def test_starts_from_model_starts_blended_lines_at_their_own_peaks():
     assert np.all(starts.mean_1.value < starts.mean_2.value)
 
 
-def test_starts_from_model_on_level_2_data():
+@pytest.mark.parametrize("background", ["constant", "polynomial"])
+def test_starts_from_model_on_level_2_data(background):
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
     cube = raster["Mg II k 2796"][0][:, 700:740]  # Rows 731 to 739 are masked in full.
     wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
@@ -426,6 +464,9 @@ def test_starts_from_model_on_level_2_data():
         widths=[0.08, 0.08] * u.AA,
         background_level=10 * cube.unit,
     )
+    if background == "polynomial":
+        polynomial = models.Polynomial1D(2, c0=10 * cube.unit, c1=0 * cube.unit / u.AA, c2=0 * cube.unit / u.AA**2)
+        start = polynomial + start[1] + start[2]
     # A model fitted to one spectrum, then to every spectrum with its masked samples left out.
     model = TRFLSQFitter()(start, wavelength, data[1, 0] * cube.unit)
     fitted, fitter = _fit(
