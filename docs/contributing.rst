@@ -46,6 +46,23 @@ To find out how, see :ref:`irispy-dev-install`.
 Use US English in documentation, comments, and internal names.
 Cite scientific references using the :doc:`bibliography` roles so they link to the bibliography.
 
+Releasing
+=========
+
+A release is a tag on ``main``; CI builds and publishes it.
+
+#. Preview the changelog with ``towncrier build --draft --version X.Y.Z``, then run ``towncrier build --version X.Y.Z``, which writes the fragments into ``CHANGELOG.rst`` and deletes them, and merge that change through a pull request.
+#. Tag the merge commit ``vX.Y.Z`` (``vX.Y.ZbN`` or ``vX.Y.ZrcN`` for a pre-release) and push the tag.
+   Never tag a post-release: the CI workflow ignores ``*dev*``, ``*pre*`` and ``*post*`` tags, so ``v0.9.1post1`` made a GitHub release and a Zenodo version but no PyPI release, and ``setuptools_scm`` then reported ``0.9.1.post2.devN`` on ``main``.
+   A fix after a release, a documentation fix included, is a new patch release.
+#. The tag runs the CI workflow: the tests, the documentation build and ``build_dists``, which builds the sdist and the wheel and tests the installed wheel; the ``publish`` job then uploads both to PyPI through the ``pypi`` environment with trusted publishing.
+   Watch the run and check the release on `PyPI <https://pypi.org/project/irispy-lmsal/>`__.
+#. Publish a GitHub release from the tag, with the changelog section as its notes.
+   The Zenodo integration archives it under the concept DOI `10.5281/zenodo.10443678 <https://doi.org/10.5281/zenodo.10443678>`__; check that the new version appears with the right version number and authors.
+#. Read the Docs builds the tag on its own; check that the new version is active, that ``stable`` points at it and that the changelog page shows the release.
+#. The conda-forge bot opens a pull request on the ``irispy-lmsal`` feedstock once the release is on PyPI.
+   Check the recipe's run requirements and ``python`` floor against ``dependencies`` and ``requires-python`` in ``pyproject.toml`` before merging it.
+
 .. _issue tracker: https://github.com/LM-SAL/irispy/issues
 .. _SunPy Newcomers Guide: http://docs.sunpy.org/en/latest/dev_guide/newcomers.html
 .. _GitHub: https://github.com/
