@@ -164,7 +164,8 @@ def read_spectrograph_lvl2(
         date_obs = Time([fits.getheader(filename)["DATE_OBS"] for filename in filenames])
         filenames = [filenames[i] for i in date_obs.argsort()]
     for file_index, filename in enumerate(filenames):
-        with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
+        # The extensions are read out of order, which rewinds a gzip stream: inflate it once instead.
+        with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True) as hdulist:
             if file_index == 0:
                 # After a discussion with the IRIS team, it was decided that instead of the
                 # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.

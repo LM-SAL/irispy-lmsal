@@ -13,36 +13,60 @@ import pytest
 from astropy.io import fits
 from astropy.io.fits import file as fits_file
 
+from ndcube import NDCollection
+
 from irispy.data.test import get_test_filepath
 from irispy.io.sji import read_sji_lvl2
+from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.io.utils import _extract_tarfile, _get_spec_group_key, fits_info, read_files
 from irispy.sji import SOTCube
 
 
 @pytest.mark.parametrize("memmap", [False, True])
-@pytest.mark.parametrize("reader", [read_files, read_sji_lvl2], ids=["read-files", "sji-reader"])
-def test_decompresses_sji_once(tmp_path, monkeypatch, memmap, reader):
-    source = get_test_filepath("bursts/iris_l2_20130902_163935_4000255147_SJI_1400_t000_test.fits")
-    filename = tmp_path / "sji.fits.gz"
+@pytest.mark.parametrize(
+    ("source", "reader"),
+    [
+        ("bursts/iris_l2_20130902_163935_4000255147_SJI_1400_t000_test.fits", read_files),
+        ("bursts/iris_l2_20130902_163935_4000255147_SJI_1400_t000_test.fits", read_sji_lvl2),
+        (
+            "raster/iris_l2_20140329_140938_3860258481_raster/iris_l2_20140329_140938_3860258481_raster_t000_r00000_test.fits",
+            read_files,
+        ),
+        (
+            "raster/iris_l2_20140329_140938_3860258481_raster/iris_l2_20140329_140938_3860258481_raster_t000_r00000_test.fits",
+            read_spectrograph_lvl2,
+        ),
+    ],
+    ids=["sji-read-files", "sji-reader", "raster-read-files", "raster-reader"],
+)
+def test_decompresses_file_once(tmp_path, monkeypatch, memmap, source, reader):
+    source = get_test_filepath(source)
+    filename = tmp_path / "compressed.fits.gz"
     with Path(source).open("rb") as original, gzip.open(filename, "wb") as compressed:
         compressed.write(original.read())
-    expected = read_files(source, memmap=memmap)
-    opens = []
-    real_open = gzip.GzipFile.__init__
 
-    def tracked_open(self, *args, **kwargs):
-        opens.append(1)
-        return real_open(self, *args, **kwargs)
+    def first_cube(result):
+        return result["C II 1336"][0] if isinstance(result, NDCollection) else result
+
+    expected = first_cube(reader(source, memmap=memmap))
+    inflated = []
+    real_read = gzip._GzipReader.read
+
+    def tracked_read(self, size=-1):
+        chunk = real_read(self, size)
+        inflated.append(len(chunk))
+        return chunk
 
     def unexpected_rewind(_self):
         pytest.fail("The gzip stream was rewound and decompressed again")
 
-    monkeypatch.setattr(gzip.GzipFile, "__init__", tracked_open)
+    monkeypatch.setattr(gzip._GzipReader, "read", tracked_read)
     monkeypatch.setattr(gzip._GzipReader, "_rewind", unexpected_rewind)
 
-    cube = reader(filename, memmap=memmap)
+    cube = first_cube(reader(filename, memmap=memmap))
 
-    assert opens == [1]
+    # Inflated once for the data; read_files reads the primary header first, not the whole file.
+    assert sum(inflated) < 2 * Path(source).stat().st_size
     np.testing.assert_array_equal(cube.data, expected.data)
     np.testing.assert_array_equal(cube.mask, expected.mask)
 
@@ -50,10 +74,21 @@ def test_decompresses_sji_once(tmp_path, monkeypatch, memmap, reader):
 @pytest.mark.parametrize(
     "file_fixture", ["sns_sg_file", "sns_sji_1330_file", "sns_sji_1400_file", "sns_sji_2796_file", "sns_sji_2832_file"]
 )
-def test_fits_info(capsys, request, file_fixture):
+def test_fits_info(capsys, request, monkeypatch, file_fixture):
     filename = request.getfixturevalue(file_fixture)
+    opens = []
+    real_init = fits_file._File.__init__
+
+    def tracked_init(self, *args, **kwargs):
+        opens.append(1)
+        return real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(fits_file._File, "__init__", tracked_init)
+
     fits_info(filename)
+
     assert filename in capsys.readouterr().out
+    assert opens == [1]
 
 
 @pytest.mark.parametrize(
@@ -124,7 +159,7 @@ def test_read_files_raster_file_list_multiple_observations_use_unique_keys(
     assert set(returns.keys()) == {first_describe, f"{first_describe} ({second_obsid})"}
 
 
-def test_read_files_opens_each_spectrograph_file_twice(monkeypatch, raster_sg_files, sns_sg_file):
+def test_read_files_opens_each_spectrograph_file_at_most_twice(monkeypatch, raster_sg_files, sns_sg_file):
     # Two observations whose TDESC1 match, so the second needs its OBSID in the key.
     filenames = [*raster_sg_files, sns_sg_file]
     opens = []
@@ -137,10 +172,10 @@ def test_read_files_opens_each_spectrograph_file_twice(monkeypatch, raster_sg_fi
     monkeypatch.setattr(fits_file._File, "__init__", tracked_init)
 
     assert len(read_files(filenames)) == 2
-    # Once for the header that sorts the files into observations, once by the reader and, in an
-    # observation of more than one file, once more for the header that orders the files in time.
-    expected = {Path(filename).name: 3 for filename in raster_sg_files}
-    expected[Path(sns_sg_file).name] = 2
+    # The header that sorts the files into observations is read without opening a FITS file; the
+    # reader opens each file once, and once more in an observation of several files to order them.
+    expected = {Path(filename).name: 2 for filename in raster_sg_files}
+    expected[Path(sns_sg_file).name] = 1
     assert Counter(opens) == expected
 
 

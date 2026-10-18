@@ -1,4 +1,5 @@
 import sys
+import gzip
 import json
 import tarfile
 from pathlib import Path
@@ -17,21 +18,32 @@ from irispy.io.spectrograph import read_spectrograph_lvl2
 __all__ = ["fits_info", "read_files"]
 
 
-def _get_simple_metadata(hdulist):
+def _primary_header(file):
     """
-    Get simple metadata from an open FITS file.
+    Read the primary header, and nothing else, of a FITS file that may be gzipped.
+
+    `astropy.io.fits.getheader` seeks past the primary data, which inflates a gzipped
+    slit-jaw cube in full just to classify it.
+    """
+    opener = gzip.open if file.suffix == ".gz" else open
+    with opener(file, "rb") as fileobj:
+        return fits.Header.fromfile(fileobj)
+
+
+def _get_simple_metadata(header):
+    """
+    Get simple metadata from a primary FITS header.
 
     Parameters
     ----------
-    hdulist : `astropy.io.fits.HDUList`
-        The open HDU list to inspect.
+    header : `astropy.io.fits.Header`
+        The primary header to inspect.
 
     Returns
     -------
     `tuple`
         A tuple containing the instrument name and description.
     """
-    header = hdulist[0].header
     instrume = header.get("INSTRUME", "")
     describe = header.get("TDESC1", "")
     if instrume == "SOT-SP":
@@ -143,11 +155,6 @@ def fits_info(filename: str) -> None:
             return f"{header[f'TDESC{idx + idx_mod}'].replace('_', ' ')} ({header[f'TWMIN{idx + idx_mod}']:.0f} - {header[f'TWMAX{idx + idx_mod}']:.0f} AA{text_modifier})"
         return "Auxiliary data"
 
-    results = [
-        f"Filename: {Path(filename).absolute()}",
-        f"Observation: {fits.getval(filename, 'OBS_DESC')}",
-        f"OBS ID: {fits.getval(filename, 'OBSID')}",
-    ]
     table = Table(
         names=("No.", "Name", "Ver", "Type", "Cards", "Dimensions", "Format", "Description"),
         dtype=("S8", "S32", "S8", "S16", "S8", "S40", "S16", "U200"),
@@ -155,6 +162,11 @@ def fits_info(filename: str) -> None:
     with fits.open(filename) as hdulist:
         hdu_info = hdulist.info(output=False)
         header = hdulist[0].header
+        results = [
+            f"Filename: {Path(filename).absolute()}",
+            f"Observation: {header['OBS_DESC']}",
+            f"OBS ID: {header['OBSID']}",
+        ]
         num_extensions = len(hdulist)
         for idx in range(num_extensions):
             description = get_description(idx, 0 if "SPEC" in header["INSTRUME"] else 1)
@@ -225,25 +237,23 @@ def read_files(
                 if not file.name.endswith((".fits", ".fits.gz")):
                     log.warning(f"File {file} is not a FITS file and was not loaded")
                     continue
-                with fits.open(
-                    file, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True
-                ) as hdulist:
-                    instrume, describe = _get_simple_metadata(hdulist)
-                    log.debug(f"Processing file: {file} with instrume: {instrume}")
-                    if sji_tarfile or instrume in ["IRIS", "SJI"] or instrume.startswith(("AIA", "SOT")):
-                        # SOT-SP archives may contain multiple observations of the same quantity.
-                        key = describe if describe not in returns else f"{describe} ({file.stem})"
-                        suffix = 2
-                        while key in returns:
-                            key = f"{describe} ({file.stem}, {suffix})"
-                            suffix += 1
-                        returns[key] = read_sji_lvl2(hdulist, memmap=memmap, uncertainty=uncertainty)
-                    elif instrume == "SPEC":
-                        # Keep the first file's description, so the group needs no second header read.
-                        group_key = _get_spec_group_key(file, hdulist[0].header)
-                        spec_groups.setdefault(group_key, (describe, []))[1].append(file)
-                    else:
-                        log.warning(f"File {file} has unrecognized INSTRUME={instrume!r} and was not loaded")
+                header = _primary_header(file)
+                instrume, describe = _get_simple_metadata(header)
+                log.debug(f"Processing file: {file} with instrume: {instrume}")
+                if sji_tarfile or instrume in ["IRIS", "SJI"] or instrume.startswith(("AIA", "SOT")):
+                    # SOT-SP archives may contain multiple observations of the same quantity.
+                    key = describe if describe not in returns else f"{describe} ({file.stem})"
+                    suffix = 2
+                    while key in returns:
+                        key = f"{describe} ({file.stem}, {suffix})"
+                        suffix += 1
+                    returns[key] = read_sji_lvl2(file, memmap=memmap, uncertainty=uncertainty)
+                elif instrume == "SPEC":
+                    # Keep the first file's description, so the group needs no second header read.
+                    group_key = _get_spec_group_key(file, header)
+                    spec_groups.setdefault(group_key, (describe, []))[1].append(file)
+                else:
+                    log.warning(f"File {file} has unrecognized INSTRUME={instrume!r} and was not loaded")
         except Exception as e:
             if allow_errors:
                 log.warning(f"File {filename} failed to load with {e}")
