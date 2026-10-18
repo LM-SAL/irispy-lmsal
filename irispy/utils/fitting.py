@@ -385,14 +385,16 @@ def starts_from_model(model, cube):
     -----
     Each spectrum is started from its own data, as ``scale_guess`` in EISPAC does for EIS fits.
     A `~astropy.modeling.functional_models.Const1D` background starts at the spectrum's 10th
-    percentile, and a `~astropy.modeling.functional_models.Linear1D` or
-    `~astropy.modeling.polynomial.Polynomial1D` one passes through it at the middle of the
-    wavelengths, with the slope or the higher terms of ``model``. A Gaussian or Lorentzian line
-    starts at the spectrum's peak above that background, at each wavelength, within two widths of
-    the center of ``model``, its center at the peak's wavelength and its amplitude at the peak's
-    height, below the background for a line with a negative amplitude. Its width is that of
-    ``model``. In a blend, such as the Mg II k2v and k2r peaks, each line searches only the samples
-    nearer its own center in ``model`` than any other line's, so the lines start at their own peaks.
+    percentile. A `~astropy.modeling.functional_models.Linear1D` or
+    `~astropy.modeling.polynomial.Polynomial1D` one keeps the slope or the higher terms of
+    ``model``, and passes through the 10th percentile of the spectrum less those terms at the
+    middle of the wavelengths, so that a steep slope does not lower it. A Gaussian or Lorentzian
+    line starts at the spectrum's peak above that background, at each wavelength, within two
+    widths of the center of ``model``, its center at the peak's wavelength and its amplitude at
+    the peak's height, below the background for a line with a negative amplitude. Its width is
+    that of ``model``. In a blend, such as the Mg II k2v and k2r peaks, each line searches only
+    the samples nearer its own center in ``model`` than any other line's, so the lines start at
+    their own peaks.
 
     Fixed and tied parameters and those of other components keep the values of ``model``, and the
     others are clipped to their bounds. Masked and non-finite samples are left out of the starts.
@@ -411,7 +413,6 @@ def starts_from_model(model, cube):
         raise ValueError(msg)
     wavelength = _wavelength(cube).value
     spectra = _spectra(cube)
-    background = _background_level(spectra)
 
     def fitted(name, unit):
         """
@@ -431,9 +432,10 @@ def starts_from_model(model, cube):
         fitted(leaf_names[1], u.AA) for leaf, leaf_names in zip(leaves, names, strict=True) if isinstance(leaf, lines)
     ]
     shape = np.zeros_like(wavelength)  # The started background less its value at the middle of the wavelengths.
+    constants = {}  # The constant term of each background, and the rest of it at the middle of the wavelengths.
     for leaf, leaf_names in zip(leaves, names, strict=True):
         if isinstance(leaf, models.Const1D):
-            starts[leaf_names[0]] = background * cube.unit
+            constants[leaf_names[0]] = 0
         elif isinstance(leaf, (models.Linear1D, models.Polynomial1D)):
             # The background less its constant term, at each wavelength and, last, at their middle.
             x = np.append(wavelength, wavelength.mean())
@@ -448,8 +450,12 @@ def starts_from_model(model, cube):
                     (fitted(term, cube.unit / u.AA**power) * x**power for power, term in enumerate(powers, 1)),
                     np.zeros_like(x),
                 )
-            starts[constant] = (background - terms[-1]) * cube.unit
+            constants[constant] = terms[-1]
             shape += terms[:-1] - terms[-1]
+    # The level of each spectrum with the shape of the background removed, which a steep slope would lower.
+    background = _background_level(spectra - shape)
+    for constant, rest in constants.items():
+        starts[constant] = (background - rest) * cube.unit
     level = background[..., np.newaxis] + shape  # The started background at each wavelength.
     for leaf, leaf_names in zip(leaves, names, strict=True):
         if isinstance(leaf, lines):
