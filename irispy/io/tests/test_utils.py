@@ -1,6 +1,7 @@
 import io
 import os
 import gzip
+import shutil
 import tarfile
 import threading
 from pathlib import Path
@@ -75,6 +76,11 @@ def test_read_files_single_file(request, file_fixture, as_list):
     assert read_files([filename] if as_list else filename)
 
 
+def test_read_files_accepts_mixed_types_and_reads_duplicates_once(sns_sji_1330_file, sns_sji_1400_file):
+    returns = read_files([Path(sns_sji_1330_file), sns_sji_1330_file, sns_sji_1400_file])
+    assert set(returns.keys()) == {"SJI_1330", "SJI_1400"}
+
+
 def test_read_files_raster_file_list(raster_sg_files):
     returns = read_files(raster_sg_files)
     assert set(returns.keys()) == {
@@ -131,8 +137,11 @@ def test_read_files_opens_each_spectrograph_file_twice(monkeypatch, raster_sg_fi
     monkeypatch.setattr(fits_file._File, "__init__", tracked_init)
 
     assert len(read_files(filenames)) == 2
-    # Once for the header that sorts the files into observations, once by the reader.
-    assert Counter(opens) == {Path(filename).name: 2 for filename in filenames}
+    # Once for the header that sorts the files into observations, once by the reader and, in an
+    # observation of more than one file, once more for the header that orders the files in time.
+    expected = {Path(filename).name: 3 for filename in raster_sg_files}
+    expected[Path(sns_sg_file).name] = 2
+    assert Counter(opens) == expected
 
 
 def test_read_files_grouped_spectrograph_honors_allow_errors(
@@ -172,15 +181,20 @@ def test_read_files_sot(tmp_path, sot_fg_file, sot_mg_file, sot_sp_file):
     assert all(isinstance(cube, SOTCube) for cube in returns.values())
 
 
-@pytest.mark.parametrize("source", ["files", "archive"], ids=["repeated-input", "same-stem-members"])
+@pytest.mark.parametrize("source", ["files", "archive"], ids=["same-stem-files", "same-stem-members"])
 def test_read_files_sot_repeated_names(tmp_path, sot_sp_file, source):
-    filenames = [sot_sp_file] * 4
+    # Four files with the same stem in different directories
     if source == "archive":
         tar_path = tmp_path / "obs_SOTSP.tar.gz"
         with tarfile.open(tar_path, "w:gz") as tar:
             for i in range(4):
                 tar.add(sot_sp_file, arcname=f"{i}/sotsp.fits")
         filenames = [tar_path]
+    else:
+        filenames = []
+        for i in range(4):
+            (tmp_path / str(i)).mkdir()
+            filenames.append(shutil.copy(sot_sp_file, tmp_path / str(i) / "sotsp.fits"))
 
     returns = read_files(filenames)
 
