@@ -188,6 +188,13 @@ No fiasco release ships ``fiasco.line_ratio`` yet, so install fiasco from its gi
 
 With conda, install the packages by name instead, or use ``pip`` in the same environment.
 
+Why ``dkist`` is a dependency
+-----------------------------
+
+``irispy`` depends on `dkist <https://docs.dkist.nso.edu/projects/python-tools/>`__, which brings in about sixteen distributions of its own, for two model classes only: ``VaryingCelestialTransform`` and ``CoupledCompoundModel`` from ``dkist.wcs.models``.
+They describe the pointing of every slit-jaw and AIA frame as one ``gwcs`` transform, so a cube's coordinates follow the roll and the pointing of each exposure.
+The two classes have no home outside ``dkist`` yet; ``irispy`` keeps the dependency rather than copy them, and will drop it once they move to ``gwcs`` or a models-only distribution.
+
 .. _irispy-dev-install:
 
 Installing a development version
