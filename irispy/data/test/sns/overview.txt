@@ -27,3 +27,33 @@ FOV:    60"x65"
 1400:   28s, 624 imgs
 2796:   28s, 624 imgs
 2832:   167s, 104 imgs
+
+Single exposures
+----------------
+
+Two cuts of the whole files, from the same directory of the archive, with one exposure
+each, so the time axis and the step axis have length 1:
+
+iris_l2_20210905_001833_3620258102_raster_t000_r00000_single_exposure_test.fits
+        Cut from iris_l2_20210905_001833_3620258102_raster_t000_r00000.fits (in
+        iris_l2_20210905_001833_3620258102_raster.tar.gz). Kept: step 935 (0-based, of
+        1872, the reference step CRPIX3 = 936) of the C II 1336 window (extension 1) and
+        the Mg II k 2796 window (extension 8), whole, with its rows of the auxiliary and
+        filename tables; NEXP = NRASTERP = 1 and CRPIX3 = 1. NWIN = 2 and the window
+        keywords are numbered 1 and 2. The filename table declares TFIELDS = 9 for its
+        9 columns (the whole file says 7, see ../compress.py). TSR/TER/TSC/TEC and the
+        statistics keywords still describe the whole window or file.
+        Made:   python ../cut.py iris_l2_20210905_001833_3620258102_raster_t000_r00000.fits \
+                    iris_l2_20210905_001833_3620258102_raster_t000_r00000_single_exposure_test.fits \
+                    --exposures 935 --window "C II 1336" --window "Mg II k 2796"
+
+iris_l2_20210905_001833_3620258102_SJI_2832_t000_single_exposure_test.fits
+        Cut from iris_l2_20210905_001833_3620258102_SJI_2832_t000.fits.gz. Kept: frame 51
+        (0-based, of 104, the reference frame CRPIX3 = 52), whole, with its rows of the
+        auxiliary and filename tables; NEXP = NAXIS3 = 1 and CRPIX3 = 1. 19555 of its
+        147200 pixels are -200 fill.
+        Made:   python ../cut.py iris_l2_20210905_001833_3620258102_SJI_2832_t000.fits \
+                    iris_l2_20210905_001833_3620258102_SJI_2832_t000_single_exposure_test.fits \
+                    --exposures 51
+
+The data values of both cuts are unchanged.

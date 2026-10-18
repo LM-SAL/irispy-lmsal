@@ -332,6 +332,33 @@ def test_sji_first_and_last_frames_round_trip(sns_sjicube_1400):
         assert cube.wcs.world_to_array_index(*cube.wcs.array_index_to_world(*index)) == index
 
 
+@pytest.mark.parametrize("memmap", [False, True])
+def test_read_sji_lvl2_single_exposure(sns_sji_2832_single_exposure_file, memmap):
+    # A slit-jaw file with one exposure: the time axis has length 1
+    with fits.open(sns_sji_2832_single_exposure_file) as hdulist:
+        assert hdulist[0].header["NEXP"] == 1
+        aux, columns = hdulist[1].data, hdulist[1].header
+        expected = (
+            Time(hdulist[0].header["STARTOBS"]) + (aux[0, columns["TIME"]] + aux[0, columns["EXPTIMES"]] / 2) * u.s
+        )
+
+    cube = read_sji_lvl2(sns_sji_2832_single_exposure_file, memmap=memmap)
+
+    assert cube.shape == (1, 400, 368)
+    assert cube.axis_world_coords("time")[0].isot.tolist() == [expected.isot]
+    assert np.isfinite(cube.axis_world_coords("time", pixel_corners=True)[0].jd).all()
+    assert len(cube.fits_wcs) == 1
+    assert cube.to_maps(0).date.isot == expected.isot
+    assert cube[0].shape == (400, 368)
+    assert cube[0].to_maps().date.isot == expected.isot
+
+
+@pytest.mark.xfail(strict=True, reason="The time lookup table of one frame is constant, so it has no inverse")
+def test_single_exposure_sji_wcs_round_trips(sns_sji_2832_single_exposure_file):
+    cube = read_sji_lvl2(sns_sji_2832_single_exposure_file)
+    assert cube.wcs.world_to_array_index(*cube.wcs.array_index_to_world(0, 5, 3)) == (0, 5, 3)
+
+
 def test_frame_wcs_headers_match_per_frame_make_fitswcs_header(sns_sji_1400_file):
     # The headers are built from one template; each frame must equal a header made for that frame alone.
     with fits.open(sns_sji_1400_file) as hdulist:

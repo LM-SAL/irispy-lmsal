@@ -295,6 +295,56 @@ def test_read_spectrograph_flips_v34_mask_uncertainty_and_meta(raster_sg_file, t
         np.testing.assert_array_equal(center.Ty, reference_center.Ty)
 
 
+def test_read_spectrograph_flips_a_real_v34_raster(v34_sg_file):
+    # OBS 3460104433 steps the slit by -2": solar x falls along the file's steps and rises along the cube's
+    windows = ["C II 1336", "Mg II k 2796"]
+    with fits.open(v34_sg_file) as hdulist:
+        assert hdulist[0].header["STEPS_AV"] < -0.01
+        auxiliary = hdulist[-2]
+        x_center = auxiliary.data[:, auxiliary.header["XCENIX"]]
+        file_data = [hdulist[index].data for index in (1, 2)]
+        reference_rows = [hdulist[index].header["CRPIX2"] - 1 for index in (1, 2)]
+    assert np.all(np.diff(x_center) < 0)
+
+    flipped = read_spectrograph_lvl2(v34_sg_file, spectral_windows=windows)
+    reverted = read_spectrograph_lvl2(v34_sg_file, spectral_windows=windows, revert_v34=True)
+    steps = np.arange(len(x_center))
+    for window, data, row in zip(windows, file_data, reference_rows, strict=True):
+        cube = flipped[window][0]
+        np.testing.assert_array_equal(cube.data, data[::-1])
+        np.testing.assert_array_equal(reverted[window][0].data, data)
+        times = cube.axis_world_coords("time", wcs=cube.extra_coords)[0]
+        assert np.all(np.diff(times.jd) < 0)
+        assert_quantity_allclose(cube.meta["exposure FOV center"].Tx, x_center[::-1] * u.arcsec)
+        _, _, longitude = cube.wcs.pixel_to_world_values(np.zeros(len(steps)), np.full(len(steps), row), steps)
+        np.testing.assert_allclose(longitude, x_center[::-1] / 3600)
+
+
+def test_read_spectrograph_single_exposure(sns_sg_single_exposure_file):
+    # One exposure of a sit-and-stare: the step axis has length 1, with one time and one pointing
+    with fits.open(sns_sg_single_exposure_file) as hdulist:
+        assert hdulist[0].header["NEXP"] == hdulist[0].header["NRASTERP"] == 1
+        auxiliary = hdulist[-2]
+        x_center = auxiliary.data[0, auxiliary.header["XCENIX"]]
+        reference_rows = {hdulist[0].header[f"TDESC{i}"]: hdulist[i].header["CRPIX2"] - 1 for i in (1, 2)}
+
+    raster = read_spectrograph_lvl2(sns_sg_single_exposure_file)
+
+    # The FUV time is the auxiliary time plus half the exposure; the NUV time comes from its level 1 filename
+    for window, n_wavelengths, time in (
+        ("C II 1336", 182, "2021-09-05T02:43:00.060"),
+        ("Mg II k 2796", 520, "2021-09-05T02:43:00.000"),
+    ):
+        cube = raster[window][0]
+        assert cube.shape == (1, 400, n_wavelengths)
+        assert cube.axis_world_coords("time", wcs=cube.extra_coords)[0].isot.tolist() == [time]
+        assert cube.meta["auxiliary times"].isot.tolist() == ["2021-09-05T02:42:56.060"]
+        _, _, longitude = cube.wcs.pixel_to_world_values(0, reference_rows[window], 0)
+        np.testing.assert_allclose(longitude * 3600, x_center)
+        assert cube[0].shape == (400, n_wavelengths)
+        assert cube[0, 200].axis_world_coords()[0].shape == (n_wavelengths,)
+
+
 def test_raster_wcs_steps_have_no_index_vector(raster_sg_file):
     # wcslib searches a -TAB index vector linearly, so a 1..N step index made each lookup O(step)
     cube = read_spectrograph_lvl2(raster_sg_file, spectral_windows="C II 1336")["C II 1336"][0]

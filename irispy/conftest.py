@@ -104,6 +104,16 @@ def sns_sji_2832_file():
 
 
 @pytest.fixture
+def sns_sg_single_exposure_file():
+    return get_test_filepath("sns/iris_l2_20210905_001833_3620258102_raster_t000_r00000_single_exposure_test.fits")
+
+
+@pytest.fixture
+def sns_sji_2832_single_exposure_file():
+    return get_test_filepath("sns/iris_l2_20210905_001833_3620258102_SJI_2832_t000_single_exposure_test.fits")
+
+
+@pytest.fixture
 def sns_sjicube_1330():
     return read_sji_lvl2(get_test_filepath("sns/iris_l2_20210905_001833_3620258102_SJI_1330_t000_test.fits"))
 
@@ -195,3 +205,8 @@ def sot_sp_file():
 @pytest.fixture
 def aia_1700_file():
     return get_test_filepath("aia/aia_l2_20170305_164021_3620106076_1700_test.fits")
+
+
+@pytest.fixture
+def v34_sg_file():
+    return get_test_filepath("v34/iris_l2_20260206_210853_3460104433_raster_t000_r00000_test.fits")

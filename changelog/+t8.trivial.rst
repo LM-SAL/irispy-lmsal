@@ -1,0 +1,1 @@
+A real V34 raster, whose slit steps from solar west to east, and a slit-jaw file and a sit-and-stare raster with a single exposure are now test data, and the Level 2 readers are tested on them.
