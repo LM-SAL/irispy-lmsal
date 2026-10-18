@@ -14,7 +14,7 @@ from astropy.wcs import WCS
 from irispy.meta import SGMeta
 from irispy.spectrograph import SpectrogramCube
 
-__all__ = ["make_test_spectrogram_cube"]
+__all__ = ["make_test_spectrogram_cube", "mark_saturated"]
 
 
 def get_hash_library_name():
@@ -123,3 +123,19 @@ def make_test_spectrogram_cube(data, wavelengths, *, uncertainty=None, unit=u.DN
     meta_header["TDET1"] = "FUV"
     meta = SGMeta(meta_header, "test")
     return SpectrogramCube(data, wcs=wcs, uncertainty=uncertainty, unit=unit, meta=meta, mask=mask)
+
+
+def mark_saturated(cube, saturated):
+    """
+    Mark the ``saturated`` samples of ``cube`` as the readers mark clipped ones.
+
+    They go in its mask and in ``meta["saturated"]``, which keeps any samples marked
+    already. A plain `dict` meta, which slicing leaves as it is, holds the array as it
+    is.
+    """
+    saturated = np.asarray(saturated, dtype=bool) | cube.meta.get("saturated", False)
+    cube.mask = np.asarray(cube.mask, dtype=bool) | saturated  # a copy, so either can change alone
+    if hasattr(cube.meta, "add"):
+        cube.meta.add("saturated", saturated, None, tuple(range(saturated.ndim)), overwrite=True)
+    else:
+        cube.meta["saturated"] = saturated

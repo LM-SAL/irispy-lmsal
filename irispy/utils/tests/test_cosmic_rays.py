@@ -5,6 +5,8 @@ import dask.array as da
 import numpy as np
 import pytest
 
+from irispy.tests.helpers import mark_saturated
+from irispy.utils.constants import SATURATION_LIMIT
 from irispy.utils.cosmic_rays import remove_cosmic_rays
 
 
@@ -233,10 +235,13 @@ def test_remove_cosmic_rays_keeps_clipped_pixels(sns_sjicube_1330, method, kwarg
     cube = sns_sjicube_1330[0, :10, :10]
     data = np.full((10, 10), 10.0)
     data[5, 5] = 500.0
-    data[2, 2] = np.inf  # as the readers set clipped pixels
+    data[2, 2] = np.inf
+    data[7, 7] = SATURATION_LIMIT.value
     cube.data[...] = data
     cube.mask = np.zeros((10, 10), dtype=bool)
+    mark_saturated(cube, data == SATURATION_LIMIT.value)  # as the readers mark clipped pixels
     cleaned = remove_cosmic_rays(cube, method=method, **kwargs)
     assert np.isposinf(cleaned.data[2, 2])
+    assert cleaned.data[7, 7] == SATURATION_LIMIT.value
     np.testing.assert_allclose(cleaned.data[5, 5], 10.0, atol=2.0)
     assert np.isfinite(np.delete(cleaned.data, 22)).all()

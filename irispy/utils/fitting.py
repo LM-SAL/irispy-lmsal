@@ -99,7 +99,7 @@ def _spectra(cube):
     along the last axis.
     """
     data = np.asarray(cube.data, dtype=float)
-    kept = np.isfinite(data)  # not +Inf, as the readers set clipped samples
+    kept = np.isfinite(data)
     if cube.mask is not None:
         kept &= ~np.asarray(cube.mask, dtype=bool)
     return np.moveaxis(np.where(kept, data, np.nan), cube.wavelength_axis, -1)

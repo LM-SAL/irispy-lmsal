@@ -21,6 +21,7 @@ from irispy.utils._spectral import (
     make_spatial_template,
     standard_deviation,
 )
+from irispy.utils.utils import _saturated_samples
 
 __all__ = ["RBAQualityFlag", "calculate_red_blue_asymmetry"]
 
@@ -149,9 +150,10 @@ def calculate_red_blue_asymmetry(
 
     Notes
     -----
-    Pixels with an unmasked +Inf sample, as the readers set the samples clipped at the level 2
-    ceiling, are flagged `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`. Subtract a background
-    first with `~irispy.utils.spectrograph.subtract_background` if the line sits on one.
+    Pixels with a saturated sample, as the mask and ``cube.meta["saturated"]`` mark the samples the
+    readers find at the level 2 ceiling, are flagged `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`.
+    Subtract a background first with `~irispy.utils.spectrograph.subtract_background` if the line
+    sits on one.
     """
     check_scaled(cube)
     if rest_wavelength is None:
@@ -211,8 +213,7 @@ def calculate_red_blue_asymmetry(
     if min_intensity is not None:
         low_signal = raw_peak < u.Quantity(min_intensity, cube.unit).value
         quality = np.where(low_signal, RBAQualityFlag.LOW_SIGNAL, quality).astype(np.uint8)
-    # Masked samples are NaN here, so they do not saturate, as in calculate_moments
-    saturated = np.isposinf(data).any(axis=-1)
+    saturated = _saturated_samples(cube).any(axis=wavelength_axis)
     quality = np.where(saturated, RBAQualityFlag.SATURATED, quality).astype(np.uint8)
 
     interpolated_profiles = (

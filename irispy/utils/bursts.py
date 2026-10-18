@@ -15,8 +15,9 @@ from astropy.time import Time
 
 from irispy.spectrograph import SpectrogramCubeSequence
 from irispy.utils._spectral import check_scaled, make_map_cube, make_spatial_template
-from irispy.utils.constants import DN_UNIT, SATURATION_LIMIT
+from irispy.utils.constants import DN_UNIT
 from irispy.utils.response import get_interpolated_effective_area, get_latest_response
+from irispy.utils.utils import _saturated_samples
 
 __all__ = ["find_bright_image_events", "find_bright_spectral_events", "find_si_iv_bursts", "find_sji_bursts"]
 
@@ -156,7 +157,9 @@ def find_bright_spectral_events(
         # NaN, the -200 fill and, as in iris_getwindata.pro, any other value below -10
         data = np.ma.masked_where(~(data >= -10), data)
         if cube.mask is not None:
-            data[np.broadcast_to(cube.mask, cube.data.shape)[..., bins]] = np.ma.masked
+            # Saturated samples are masked, but count at their value, as in IDL
+            left_out = np.broadcast_to(np.asarray(cube.mask, dtype=bool), cube.data.shape) & ~_saturated_samples(cube)
+            data[left_out[..., bins]] = np.ma.masked
         mean = data.mean(axis=-1, dtype=float)
         intensity = (mean / cube.meta["exposure time"].to_value(u.s)[:, np.newaxis]).filled(np.nan)
         burst = intensity >= threshold.to_value(cube.unit / u.s)
@@ -220,8 +223,9 @@ def find_sji_bursts(sji, *, sigma_factor=10, min_pixels=2):
 
     * Edge pixels can belong to events; IDL's ``REGION_GROW`` leaves them out of every region,
       and an above-threshold edge pixel makes the IDL loop never end.
-    * Masked pixels, including both -200 and -199 fill values, are left out of the statistics
-      and are never burst pixels. IDL excludes only -200, so the frame thresholds can differ.
+    * Masked pixels other than saturated ones, including both -200 and -199 fill values, are left
+      out of the statistics and are never burst pixels. IDL excludes only -200, so the frame
+      thresholds can differ.
     * The median of an even number of pixels is the mean of the two middle values, not IDL's
       upper one, and the standard deviation is accumulated in double precision.
     * Labels are unique through the cube; IDL numbers the events of each frame from 1, in bytes
@@ -269,10 +273,11 @@ def find_bright_image_events(cube, *, sigma_factor=10, min_pixels=2):
     if cube.data.ndim != 3:
         msg = "The slit-jaw cube must have axes (frame, y, x); slice with a range, such as [0:1], not an index"
         raise ValueError(msg)
-    data = cube.data if cube.mask is None else np.where(cube.mask, np.nan, cube.data)
-    # The statistics see clipped pixels at the ceiling, as IDL does; their +Inf would make the deviation NaN.
-    # shortcut: the ceiling is in DN, as the readers give; a cube in DN per second would see it in the wrong unit
-    frames = np.where(np.isposinf(data), SATURATION_LIMIT.value, data).reshape(len(data), -1)
+    # Saturated pixels are masked, but count at their value, as in IDL
+    data = cube.data
+    if cube.mask is not None:
+        data = np.where(np.asarray(cube.mask, dtype=bool) & ~_saturated_samples(cube), np.nan, data)
+    frames = data.reshape(len(data), -1)
     with warnings.catch_warnings():
         # Frames without valid pixels, or with only one
         warnings.filterwarnings("ignore", "All-NaN slice encountered", RuntimeWarning)

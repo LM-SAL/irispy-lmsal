@@ -293,6 +293,6 @@ def test_plot_rgb_figure():
 
 def test_calculate_rgb_blanks_clipped_samples(si_iv_cube):
     clipped, masked = copy.deepcopy(si_iv_cube), copy.deepcopy(si_iv_cube)
-    clipped.data[0, 0, 5] = np.inf  # as the readers set clipped samples
+    clipped.data[0, 0, 5] = np.inf  # blank, like a masked sample
     masked.mask[0, 0, 5] = True
     np.testing.assert_array_equal(calculate_rgb(clipped)[0], calculate_rgb(masked)[0])
