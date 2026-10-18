@@ -188,8 +188,14 @@ No fiasco release ships ``fiasco.line_ratio`` yet, so install fiasco from its gi
 
 With conda, install the packages by name instead, or use ``pip`` in the same environment.
 
+Supported Python and dependency versions
+========================================
+
+``irispy`` follows `SPEC 0 <https://scientific-python.org/specs/spec-0000/>`__: it supports each Python version for three years after its release and each core dependency (numpy, scipy, matplotlib, astropy, sunpy and their kind) for two years, and raises its minimum versions in the first release after that, whether or not the dependencies have dropped the version themselves.
+``irispy`` 1.0 therefore needs Python 3.13 or later, as Python 3.12 turns three in October 2026, and the ``update-spec0`` workflow proposes the next floors every quarter.
+
 Why ``dkist`` is a dependency
------------------------------
+=============================
 
 ``irispy`` depends on `dkist <https://docs.dkist.nso.edu/projects/python-tools/>`__, which brings in about sixteen distributions of its own, for two model classes only: ``VaryingCelestialTransform`` and ``CoupledCompoundModel`` from ``dkist.wcs.models``.
 They describe the pointing of every slit-jaw and AIA frame as one ``gwcs`` transform, so a cube's coordinates follow the roll and the pointing of each exposure.
