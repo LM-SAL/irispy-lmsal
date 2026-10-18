@@ -190,3 +190,8 @@ def sot_mg_file():
 @pytest.fixture
 def sot_sp_file():
     return get_test_filepath("sot/sotsp_l2_20160108_191211_3680100932_20160108_185006_blapp_index_test.fits")
+
+
+@pytest.fixture
+def aia_1700_file():
+    return get_test_filepath("aia/aia_l2_20170305_164021_3620106076_1700_test.fits")

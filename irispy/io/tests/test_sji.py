@@ -283,19 +283,46 @@ def test_sji_slit_positions_are_zero_based_pixels(sns_sji_1400_file):
         assert_quantity_allclose(position, (aux[:, columns[column]] - 1) * u.pix)
 
 
-def test_read_aia_cube(tmp_path, sns_sji_1330_file):
-    filename = tmp_path / "aia.fits"
-    with fits.open(sns_sji_1330_file) as hdulist:
-        hdulist[0].header["INSTRUME"] = "AIA"
-        hdulist.writeto(filename)
+def test_read_aia_cube(aia_1700_file):
+    # Three frames of the AIA 1700 Å cube the IRIS team co-aligned with OBS 3620106076
+    with fits.open(aia_1700_file) as hdulist:
+        data = hdulist[0].data
+        aux, columns = hdulist[1].data, hdulist[1].header
+        expected_times = Time(hdulist[0].header["STARTOBS"]) + (
+            (aux[:, columns["TIME"]] + aux[:, columns["EXPTIMES"]] / 2) * u.s
+        )
 
-    aia = read_sji_lvl2(filename)
+    aia = read_sji_lvl2(aia_1700_file)
 
     assert isinstance(aia, AIACube)
-    assert aia[-3:].shape == (3, 40, 37)
-    assert isinstance(aia[:, 10:, 20:].fits_wcs, list)
+    assert "AIACube" in str(aia)
+    assert aia.shape == (3, 382, 320)
+    assert aia.unit == DN_UNIT["SJI"]
+    assert aia.meta.instrument == "AIA_3"
+    assert aia.meta.observing_mode_id == 3620106076
+    # The cube keeps the file's integers: no fill values, so nothing to replace or mask
+    np.testing.assert_array_equal(aia.data, data)
+    assert not aia.mask.any()
+    times = aia.axis_world_coords("time")[0]
+    assert times.isot.tolist() == expected_times.isot.tolist()
+    assert_quantity_allclose((times[1:] - times[:-1]).to(u.s), 24 * u.s, atol=1e-3 * u.s)
     # The frame headers carry the file's instrument, so sunpy picks its AIA map class
-    assert isinstance(aia.to_maps(0), AIAMap)
+    aia_map = aia.to_maps(1)
+    assert isinstance(aia_map, AIAMap)
+    assert aia_map.date.isot == expected_times[1].isot
+    assert aia_map.wavelength == 1700 * u.angstrom
+    assert aia_map.exposure_time == aux[1, columns["EXPTIMES"]] * u.s
+    assert_quantity_allclose(aia_map.reference_coordinate.Tx, aux[1, columns["XCENIX"]] * u.arcsec)
+    assert_quantity_allclose(aia_map.reference_coordinate.Ty, aux[1, columns["YCENIX"]] * u.arcsec)
+    np.testing.assert_array_equal(aia_map.data, data[1])
+    assert len(aia.to_maps()) == 3
+    # Slicing keeps the frame times and the FITS WCS of the frames
+    assert aia[1:].shape == (2, 382, 320)
+    assert aia[1:].axis_world_coords("time")[0].isot.tolist() == expected_times[1:].isot.tolist()
+    sub = aia[:, 10:, 20:]
+    assert isinstance(sub.fits_wcs, list)
+    assert sub.fits_wcs[0].wcs.crpix.tolist() == [141.0, 182.0]
+    assert isinstance(aia[0].to_maps(), AIAMap)
 
 
 def test_sji_first_and_last_frames_round_trip(sns_sjicube_1400):
