@@ -115,6 +115,10 @@ def remove_cosmic_rays(
     `~irispy.sji.SJICube` or `~irispy.spectrograph.SpectrogramCube`
         A new cube with cleaned data and copied metadata/coordinates.
     """
+    # Avoid circular imports
+    from irispy.utils._spectral import check_scaled  # NOQA: PLC0415
+
+    check_scaled(cube)
     method = method.lower()
     kwargs = dict(method_kwargs or {})
     dask_backed = isinstance(cube.data, da.Array) or isinstance(cube.mask, da.Array)
