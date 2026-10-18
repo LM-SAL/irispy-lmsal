@@ -119,6 +119,14 @@ def test_negative_slices(sns_sjicube_1330):
     assert len(sns_sjicube_1330[:-2].fits_wcs) == 50
 
 
+def test_array_index_raises_index_error(sns_sjicube_1330):
+    # As ndcube: a list reads as a tuple of indices, an array is rejected
+    assert sns_sjicube_1330[[0, 1]].shape == sns_sjicube_1330[0, 1].shape
+    for item in (np.array([0, 1]), (slice(None), np.array([0, 1]))):
+        with pytest.raises(IndexError, match="only integer or range slices"):
+            sns_sjicube_1330[item]
+
+
 def test_rebinned_cube_has_no_fits_wcs(sns_sjicube_1330):
     rebinned = sns_sjicube_1330[:, :, :36].rebin((1, 2, 2))
 

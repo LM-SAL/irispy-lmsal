@@ -48,6 +48,10 @@ class _ResolveNegativeIndicesMixin:
     """
 
     def __getitem__(self, item):
+        if any(np.iterable(index) for index in (item if isinstance(item, tuple | list) else (item,))):
+            # As ndcube, where sanitize_slices rejects an array index, which simplify_basic_index trips over
+            msg = "This slice is invalid, only integer or range slices are supported."
+            raise IndexError(msg)
         # Against the shape, as since astropy 8.0.2 sanitize_slices rejects negative indices without it
         try:
             item = simplify_basic_index(item, shape=self.shape)
