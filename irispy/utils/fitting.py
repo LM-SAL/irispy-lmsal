@@ -369,8 +369,9 @@ def starts_from_model(model, cube):
     Parameters
     ----------
     model : `~astropy.modeling.Model`
-        A model with one value per parameter, such as one fitted to a spectrum of ``cube``.
-        Parameters without units are taken in Å and the unit of ``cube``.
+        A model with one value per parameter, such as one fitted to a spectrum of ``cube``, and
+        the sum of its components, such as lines on a background. Parameters without units are
+        taken in Å and the unit of ``cube``.
     cube : `~irispy.spectrograph.SpectrogramCube`
         The cube to fit, read with ``memmap=False`` and cropped to the wavelengths to fit.
 
@@ -404,6 +405,10 @@ def starts_from_model(model, cube):
         msg = "model has array parameters; pass one with a value per parameter, such as one fitted to one spectrum."
         raise ValueError(msg)
     compound = model.n_submodels > 1
+    nodes = model.traverse_postorder(include_operator=True) if compound else []
+    if operators := sorted({node for node in nodes if isinstance(node, str)} - {"+"}):
+        msg = f"model joins its components with {', '.join(map(repr, operators))}; pass a sum of backgrounds and lines."
+        raise ValueError(msg)
     wavelength = _wavelength(cube).value
     spectra = _spectra(cube)
     background = _background_level(spectra)
