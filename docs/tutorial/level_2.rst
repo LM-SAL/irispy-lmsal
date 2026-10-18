@@ -59,7 +59,7 @@ The tables below illustrate the HDU structure for slit-jaw and spectrograph file
     2       Table Extension  Technical metadata            [``nt``, 5]
     ======  ===============  ============================  =========================================
 
-`A description of the level 2 keywords, for primary and extension headers, is available for download. <https://www.lmsal.com/iris_science/doc?cmd=dcur&proj_num=IS0211&file_type=pdf>`__
+A description of the level 2 keywords, for primary and extension headers, is available for download :cite:p:`is0211`.
 
 The auxiliary metadata contain several quantities for each exposure.
 These are parameters that may vary for different exposures and are therefore stored here.

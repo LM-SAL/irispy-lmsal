@@ -17,7 +17,7 @@ There are several photospheric spectral lines that can be used for accurate wave
    The slit may cover regions of significant line-of-sight flows, such as flux emergence in active regions, and thus these photospheric lines may not necessarily be at their nominal rest wavelengths as assumed by the automatic calibration.
    In such cases, the user is advised, again, to perform manual wavelength calibration by avoiding such regions under the slit coverage.
 
-A detailed discussion of the wavelength calibration steps for IRIS and how to use them on data can be found in `IRIS Technical Note 20 <https://www.lmsal.com/iris_science/doc?cmd=dcur&proj_num=IS0203&file_type=pdf>`__.
+A detailed discussion of the wavelength calibration steps for IRIS and how to use them on data can be found in IRIS Technical Note 20 :cite:p:`itn20`.
 
 Radiometric Calibration
 =======================
@@ -58,7 +58,7 @@ To convert the spectral units from DN to flux one must do the following conversi
 
 where :math:`E_\lambda \equiv h \cdot c / \lambda` is the photon energy (in erg), :math:`\mathrm{DN2PHOT\_SG}` is the number of photons per DN (``response["DN2PHOT_SG"]`` from `~irispy.utils.response.get_latest_response`), :math:`A_\mathrm{eff}` is the effective area (in cm\ :sup:`2`), :math:`\mathrm{Pix}_{xy}` is the size of the spatial pixels in radians (e.g. multiply the spatial binning factor by :math:`\pi/(180\cdot 3600 \cdot 6)`), :math:`\mathrm{Pix}_{\lambda}` is the size of the spectral pixels in Å, :math:`t_\mathrm{exp}` is the exposure time in seconds and :math:`W_\mathrm{slit}` is the slit width in radians (:math:`W_\mathrm{slit}\equiv \pi/(180\cdot 3600 \cdot 3)`).
 
-A detailed discussion of the radiometric calibration steps for IRIS and how to use them on data can be found in `IRIS Technical Note 24 <https://www.lmsal.com/iris_science/doc?cmd=dcur&proj_num=IS0123&file_type=pdf>`__.
+A detailed discussion of the radiometric calibration steps for IRIS and how to use them on data can be found in IRIS Technical Note 24 :cite:p:`itn24`.
 
 .. note::
 
@@ -67,7 +67,7 @@ A detailed discussion of the radiometric calibration steps for IRIS and how to u
    The level 2 FITS headers have only one value for the exposure time (the value without AEC).
    The sequence-dependent exposure times are available in the auxiliary metadata in the FITS files (see :ref:`irispy-tutorial-lev2`), with table index given by ``EXPTIMEF``, ``EXPTIMEN``, and ``EXPTIME`` for FUV, NUV, and slit-jaw, respectively.
 
-The routine that converts DN to physical units is described in this example :ref:`sphx_glr_generated_gallery_calibration_03_radiometric_calibration.py`.
+The routine that converts DN to physical units is described in this example :ref:`sphx_glr_generated_gallery_calibration_03_radiometric_calibration.py`; IRIS Technical Note 26 :cite:p:`itn26` describes the calibration process it follows.
 
 Radiation Temperature
 =====================
