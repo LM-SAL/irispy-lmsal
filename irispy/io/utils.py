@@ -2,7 +2,6 @@ import sys
 import json
 import tarfile
 from pathlib import Path
-from contextlib import nullcontext
 
 from filelock import FileLock
 
@@ -18,26 +17,21 @@ from irispy.io.spectrograph import read_spectrograph_lvl2
 __all__ = ["fits_info", "read_files"]
 
 
-def _get_simple_metadata(file):
+def _get_simple_metadata(hdulist):
     """
-    Get simple metadata from a FITS file.
+    Get simple metadata from an open FITS file.
 
     Parameters
     ----------
-    file : `pathlib.Path` or `astropy.io.fits.HDUList`
-        The FITS file or open HDU list to inspect.
+    hdulist : `astropy.io.fits.HDUList`
+        The open HDU list to inspect.
 
     Returns
     -------
     `tuple`
         A tuple containing the instrument name and description.
     """
-    if isinstance(file, fits.HDUList):
-        header = file[0].header
-    else:
-        if not file.name.endswith((".fits", ".fits.gz")):
-            return "", ""
-        header = fits.getheader(file)
+    header = hdulist[0].header
     instrume = header.get("INSTRUME", "")
     describe = header.get("TDESC1", "")
     if instrume == "SOT-SP":
@@ -220,44 +214,33 @@ def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=Fa
             raise ValueError(msg)
         try:
             sji_tarfile = filename.name.endswith(("SDO.tar.gz", "SOTFG.tar.gz", "SOTSP.tar.gz"))
-            raster_tarfile = bool(filename.name.endswith("_raster.tar.gz"))
-            context = (
-                fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
-                if filename.name.endswith((".fits", ".fits.gz"))
-                else nullcontext()
-            )
-            with context as hdulist:
-                instrume, describe = _get_simple_metadata(hdulist if hdulist is not None else filename)
-                log.debug(f"Processing file: {filename} with instrume: {instrume}")
-                if sji_tarfile or instrume in ["IRIS", "SJI"] or instrume.startswith(("AIA", "SOT")):
-                    file = _extract_tarfile([filename]) if sji_tarfile else [filename]
-                    for f in sorted(file):
-                        sji_context = (
-                            fits.open(f, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
-                            if sji_tarfile
-                            else nullcontext(hdulist)
-                        )
-                        with sji_context as sji_hdulist:
-                            instrume, describe = _get_simple_metadata(sji_hdulist)
-                            # SOT-SP archives may contain multiple observations of the same quantity.
-                            key = describe if describe not in returns else f"{describe} ({f.stem})"
-                            suffix = 2
-                            while key in returns:
-                                key = f"{describe} ({f.stem}, {suffix})"
-                                suffix += 1
-                            returns[key] = read_sji_lvl2(sji_hdulist, memmap=memmap, uncertainty=uncertainty, **kwargs)
-                elif raster_tarfile:
-                    file = _extract_tarfile([filename]) if raster_tarfile else [filename]
-                    instrume, describe = _get_simple_metadata(file[0])
-                    returns[f"{describe}"] = read_spectrograph_lvl2(
-                        file, spectral_windows=spectral_windows, memmap=memmap, uncertainty=uncertainty, **kwargs
-                    )
-                elif instrume == "SPEC":
-                    # Keep the first file's description, so the group needs no second header read.
-                    group_key = _get_spec_group_key(filename, hdulist[0].header)
-                    spec_groups.setdefault(group_key, (describe, []))[1].append(filename)
-                else:
-                    log.warning(f"File {filename} has unrecognized INSTRUME={instrume!r} and was not loaded")
+            raster_tarfile = filename.name.endswith("_raster.tar.gz")
+            # The members of a tarball are classified like loose files, so the rasters of several
+            # tarballs are grouped by observation instead of overwriting each other by first window.
+            files = sorted(_extract_tarfile([filename])) if sji_tarfile or raster_tarfile else [filename]
+            for file in files:
+                if not file.name.endswith((".fits", ".fits.gz")):
+                    log.warning(f"File {file} is not a FITS file and was not loaded")
+                    continue
+                with fits.open(
+                    file, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True
+                ) as hdulist:
+                    instrume, describe = _get_simple_metadata(hdulist)
+                    log.debug(f"Processing file: {file} with instrume: {instrume}")
+                    if sji_tarfile or instrume in ["IRIS", "SJI"] or instrume.startswith(("AIA", "SOT")):
+                        # SOT-SP archives may contain multiple observations of the same quantity.
+                        key = describe if describe not in returns else f"{describe} ({file.stem})"
+                        suffix = 2
+                        while key in returns:
+                            key = f"{describe} ({file.stem}, {suffix})"
+                            suffix += 1
+                        returns[key] = read_sji_lvl2(hdulist, memmap=memmap, uncertainty=uncertainty, **kwargs)
+                    elif instrume == "SPEC":
+                        # Keep the first file's description, so the group needs no second header read.
+                        group_key = _get_spec_group_key(file, hdulist[0].header)
+                        spec_groups.setdefault(group_key, (describe, []))[1].append(file)
+                    else:
+                        log.warning(f"File {file} has unrecognized INSTRUME={instrume!r} and was not loaded")
         except Exception as e:
             if allow_errors:
                 log.warning(f"File {filename} failed to load with {e}")

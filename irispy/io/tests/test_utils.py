@@ -91,10 +91,20 @@ def test_get_spec_group_key_falls_back_when_metadata_is_missing():
     assert _get_spec_group_key(filename, {"OBSID": None, "STARTOBS": ""}) == (filename, None)
 
 
-def test_read_files_raster_file_list_multiple_observations_use_unique_keys(raster_sg_file, sns_sg_file):
+@pytest.mark.parametrize("source", ["files", "tarballs"])
+def test_read_files_raster_file_list_multiple_observations_use_unique_keys(
+    tmp_path, raster_sg_file, sns_sg_file, source
+):
+    # Two observations whose first window is C II 1336, as in most line lists
     filenames = sorted([raster_sg_file, sns_sg_file])
     first_describe = fits.getheader(filenames[0]).get("TDESC1")
     second_obsid = fits.getheader(filenames[1]).get("OBSID")
+    if source == "tarballs":
+        tarballs = [tmp_path / f"{i}_raster.tar.gz" for i in range(len(filenames))]
+        for tar_path, filename in zip(tarballs, filenames, strict=True):
+            with tarfile.open(tar_path, "w:gz") as tar:
+                tar.add(filename, arcname=Path(filename).name)
+        filenames = tarballs
 
     returns = read_files(filenames)
 
