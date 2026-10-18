@@ -210,7 +210,7 @@ def read_files(
         Defaults to `False`.
     revert_v34 : `bool`, optional
         Will undo the flipping of the raster step axis made to V34 observations.
-        Passed to `irispy.io.read_spectrograph_lvl2` only; slit-jaw, AIA and SOT files are not affected.
+        Passed to `irispy.io.spectrograph.read_spectrograph_lvl2` only; slit-jaw, AIA and SOT files are not affected.
         Defaults to `False`.
 
     Returns
