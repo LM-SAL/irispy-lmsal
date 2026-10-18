@@ -136,6 +136,11 @@ def test_rebinned_cube_has_no_fits_wcs(sns_sjicube_1330):
         rebinned.to_maps(0)
 
 
+@pytest.mark.parametrize("item", [np.s_[5], np.s_[:, 0], np.s_[:, 0, 0]])
+def test_celestial_frame_does_not_depend_on_slicing(sns_sjicube_1330, item):
+    assert sns_sjicube_1330[item].celestial_frame == sns_sjicube_1330.celestial_frame
+
+
 def test_spatial_slice_fits_wcs_describes_sliced_pixels(sns_sjicube_1330):
     sliced = sns_sjicube_1330[:, 10:, 20:].fits_wcs[0].pixel_to_world(0, 0)
     full = sns_sjicube_1330.fits_wcs[0].pixel_to_world(20, 10)

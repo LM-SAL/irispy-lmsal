@@ -20,12 +20,14 @@ def _celestial_frame_from_cube(cube):
     if observer is not None:
         return Helioprojective(observer=observer, obstime=observer.obstime)
 
-    fits_wcs = cube.fits_wcs
-    if fits_wcs is None:
-        fits_wcs = cube.meta.get("fits_wcs")
-    if fits_wcs is None and cube.meta.get("frame_wcs_headers") is not None:
-        # A rebinned SJI cube has no fits_wcs, but binning does not change the frame.
-        fits_wcs = WCS(cube.meta["frame_wcs_headers"][0])
+    headers = cube.meta.get("frame_wcs_headers")
+    if headers is not None:
+        # The first frame, whatever the slice: fits_wcs follows an integer index and a rebinned cube has none.
+        fits_wcs = WCS(headers[0])
+    else:
+        fits_wcs = cube.fits_wcs
+        if fits_wcs is None:
+            fits_wcs = cube.meta.get("fits_wcs")
     if isinstance(fits_wcs, list):
         fits_wcs = fits_wcs[0] if fits_wcs else None
     if fits_wcs is None or not hasattr(fits_wcs, "celestial"):
