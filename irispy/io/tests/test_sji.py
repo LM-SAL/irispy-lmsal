@@ -278,6 +278,16 @@ def test_sji_extra_coordinate_units(sns_sji_1400_file):
     assert units["ophaseix"] == ""
 
 
+def test_sji_slit_positions_are_zero_based_pixels(sns_sji_1400_file):
+    # The file stores the slit at 1-based FITS pixels; the extra coordinates follow the cube's 0-based pixels
+    cube = read_sji_lvl2(sns_sji_1400_file)
+    with fits.open(sns_sji_1400_file) as hdulist:
+        aux, columns = hdulist[1].data, hdulist[1].header
+    for name, column in (("slit x position", "SLTPX1IX"), ("slit y position", "SLTPX2IX")):
+        position = cube.axis_world_coords(wcs=cube.extra_coords[name])[0]
+        assert_quantity_allclose(position, (aux[:, columns[column]] - 1) * u.pix)
+
+
 def test_read_aia_cube(tmp_path, sns_sji_1330_file):
     filename = tmp_path / "aia.fits"
     with fits.open(sns_sji_1330_file) as hdulist:

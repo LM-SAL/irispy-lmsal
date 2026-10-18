@@ -281,15 +281,16 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             ),
             ("pztx", 0, hdulist[1].data[:, hdulist[1].header["PZTX"]] * u.arcsec),
             ("pzty", 0, hdulist[1].data[:, hdulist[1].header["PZTY"]] * u.arcsec),
+            # SLTPX1IX and SLTPX2IX are 1-based FITS pixels (the level 1 CRPIX); the cube's pixels are 0-based
             (
                 "slit x position",
                 0,
-                hdulist[1].data[:, hdulist[1].header["SLTPX1IX"]] * u.pix,
+                (hdulist[1].data[:, hdulist[1].header["SLTPX1IX"]] - 1) * u.pix,
             ),
             (
                 "slit y position",
                 0,
-                hdulist[1].data[:, hdulist[1].header["SLTPX2IX"]] * u.pix,
+                (hdulist[1].data[:, hdulist[1].header["SLTPX2IX"]] - 1) * u.pix,
             ),
             ("xcenix", 0, hdulist[1].data[:, hdulist[1].header["XCENIX"]] * u.arcsec),
             ("ycenix", 0, hdulist[1].data[:, hdulist[1].header["YCENIX"]] * u.arcsec),
