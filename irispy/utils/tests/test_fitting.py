@@ -382,6 +382,20 @@ def test_starts_from_model_keeps_lines_without_a_peak():
     np.testing.assert_array_equal(starts.mean_2.value, 1403.2)
 
 
+@pytest.mark.parametrize(
+    ("model", "operator"),
+    [
+        (models.Const1D(5) * models.Gaussian1D(150, 1402.77, 0.06), "'*'"),
+        (models.Const1D(5) + (models.Shift(0.1) | models.Gaussian1D(150, 1402.77, 0.06)), "'|'"),
+    ],
+)
+def test_starts_from_model_rejects_models_other_than_sums(model, operator):
+    _, cube = _line_cube(np.random.default_rng(13))
+    with pytest.raises(ValueError, match="sum of backgrounds and lines") as error:
+        starts_from_model(model, cube)
+    assert operator in str(error.value)
+
+
 @pytest.mark.parametrize("constraint", ["fixed", "tied"])
 def test_starts_from_model_keeps_polynomial_constraints(constraint):
     _, cube = _line_cube(np.random.default_rng(11))
