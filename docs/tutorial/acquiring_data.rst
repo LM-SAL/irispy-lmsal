@@ -143,8 +143,8 @@ To see a summary of the results print the result variable that came back from th
            Start Time               End Time        Source Instrument    Wavelength    Provider  Physobs  Wavetype     Extent X         Extent Y       Extent Width   Extent Type  Size
                                                                           Angstrom                                                                                                Mibyte
     ----------------------- ----------------------- ------ ---------- ---------------- -------- --------- -------- ---------------- ---------------- ---------------- ----------- ------
-    2020-03-03 22:53:35.000 2020-03-04 01:59:14.000   IRIS       IRIS 1332.0 .. 2835.0    LMSAL intensity   NARROW 790.775695800781 16.8814430236816 230.227996826172 PARTIAL_SUN 2019.0
     2020-03-03 22:53:35.000 2020-03-04 01:59:05.000   IRIS       IRIS 2796.0 .. 2796.0    LMSAL intensity   NARROW 790.774841308594 16.8615531921387 230.227996826172 PARTIAL_SUN   88.0
+    2020-03-03 22:53:35.000 2020-03-04 01:59:14.000   IRIS       IRIS 1332.0 .. 2835.0    LMSAL intensity   NARROW 790.775695800781 16.8814430236816 230.227996826172 PARTIAL_SUN 2019.0
     2020-03-03 22:53:38.000 2020-03-04 01:59:09.000   IRIS       IRIS 2832.0 .. 2832.0    LMSAL intensity   NARROW    790.775390625 16.8734436035156 230.227996826172 PARTIAL_SUN  104.0
     2020-03-03 22:53:41.000 2020-03-04 01:59:11.000   IRIS       IRIS 1400.0 .. 1400.0    LMSAL intensity   NARROW 790.775695800781 16.8814430236816 230.227996826172 PARTIAL_SUN   54.0
     <BLANKLINE>
@@ -154,7 +154,7 @@ This shows that there are 4 results from the Virtual Solar Observatory (VSO), wh
 Note that the results are not from the IRIS website, but from the VSO, which is a different service and as such does not have the full set of data products available on the IRIS website.
 
 We shall detail the returned results a bit more.
-The first result is the spectrograph data, we know this for two reasons, first because the wavelength range covers the full IRIS spectrograph range, and second because the size of the file is much larger than the slit jaw images.
+The second result is the spectrograph data, we know this for two reasons, first because the wavelength range covers the full IRIS spectrograph range, and second because the size of the file is much larger than the slit jaw images.
 The other three results are slit jaw images, we know this because the wavelength range covers only a single slit jaw wavelength and the file size is much smaller than the spectrograph data.
 
 We can also filter by other attributes, for example if we only wanted the slit jaw images we could add a filter for the wavelength:
@@ -174,18 +174,18 @@ We can also filter by other attributes, for example if we only wanted the slit j
            Start Time               End Time        Source Instrument    Wavelength    Provider  Physobs  Wavetype     Extent X         Extent Y       Extent Width   Extent Type  Size
                                                                           Angstrom                                                                                                Mibyte
     ----------------------- ----------------------- ------ ---------- ---------------- -------- --------- -------- ---------------- ---------------- ---------------- ----------- ------
-    2020-03-03 22:53:35.000 2020-03-04 01:59:14.000   IRIS       IRIS 1332.0 .. 2835.0    LMSAL intensity   NARROW 790.775695800781 16.8814430236816 230.227996826172 PARTIAL_SUN 2019.0
     2020-03-03 22:53:35.000 2020-03-04 01:59:05.000   IRIS       IRIS 2796.0 .. 2796.0    LMSAL intensity   NARROW 790.774841308594 16.8615531921387 230.227996826172 PARTIAL_SUN   88.0
+    2020-03-03 22:53:35.000 2020-03-04 01:59:14.000   IRIS       IRIS 1332.0 .. 2835.0    LMSAL intensity   NARROW 790.775695800781 16.8814430236816 230.227996826172 PARTIAL_SUN 2019.0
     <BLANKLINE>
     <BLANKLINE>
 
 But we still get the spectrograph data because it also matches the wavelength filter.
-If we want to only get the raster, we can simply index the results to get just the first result, which is the spectrograph data:
+If we want to only get the raster, we can simply index the results to get just the second result, which is the spectrograph data:
 
 .. code-block:: python
 
-    >>> filtered_result[0][0] # doctest: +REMOTE_DATA
-    <QueryResponseRow index=0>
+    >>> filtered_result[0][1] # doctest: +REMOTE_DATA
+    <QueryResponseRow index=1>
         Start Time               End Time        Source Instrument    Wavelength    Provider  Physobs  Wavetype     Extent X         Extent Y       Extent Width   Extent Type   Size                                                          fileid
                                                                         Angstrom                                                                                                 Mibyte
             Time                    Time           str4     str4       float64[2]      str5      str9     str6        str16            str16            str16          str11    float64                                                         str117
@@ -202,7 +202,7 @@ Here we'll just download the first file in the result:
 
 .. code-block:: python
 
-    >>> downloaded_files = Fido.fetch(filtered_result[0][1]) # doctest: +SKIP
+    >>> downloaded_files = Fido.fetch(filtered_result[0][0]) # doctest: +SKIP
     >>> downloaded_files # doctest: +SKIP
     <parfive.results.Results object at ...>
     ['.../iris_l2_20200303_225335_3605202860_SJI_2796_t000.fits.gz']
