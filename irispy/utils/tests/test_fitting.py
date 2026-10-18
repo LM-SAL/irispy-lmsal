@@ -312,21 +312,23 @@ def test_starts_from_model_follows_each_spectrum(profile, background):
     else:
         np.testing.assert_allclose(starts.slope_0.value, 0.5)
         np.testing.assert_allclose(starts.intercept_0.value + starts.slope_0.value * WAVELENGTH.mean().value, level)
-    # Each line starts at its brightest sample, the nearest to its center, with the model's width.
+    # Each line starts at its brightest sample, the nearest to its center, its height above the started background
+    # there, with the model's width.
     center, width = truth.param_names[-2:]
     spacing = np.diff(WAVELENGTH.value)[0]
     assert np.all(np.abs(getattr(starts, center).value - getattr(truth, center).value) < spacing / 2)
-    np.testing.assert_allclose(starts.amplitude_1.value, cube.data.max(axis=-1) - level)
+    background_at_peak = starts[0](getattr(starts, center).quantity).value
+    np.testing.assert_allclose(starts.amplitude_1.value, cube.data.max(axis=-1) - background_at_peak)
     np.testing.assert_array_equal(getattr(starts, width).value, getattr(model, width).value)
 
 
 @pytest.mark.parametrize(
     "model",
     [
-        models.Polynomial1D(2, c0=5 * u.DN, c1=0.5 * u.DN / u.AA, c2=-0.01 * u.DN / u.AA**2)
+        models.Polynomial1D(2, c0=5 * u.DN, c1=0.5 * u.DN / u.AA, c2=1e-4 * u.DN / u.AA**2)
         + models.Gaussian1D(150 * u.DN, 1402.75 * u.AA, 0.06 * u.AA),
         # A polynomial with a domain takes parameters without units, in Å and the unit of the cube.
-        models.Polynomial1D(2, c0=5, c1=0.5, c2=-0.01, domain=(1402, 1404)) + models.Gaussian1D(150, 1402.75, 0.06),
+        models.Polynomial1D(2, c0=5, c1=0.5, c2=1e-4, domain=(1402, 1404)) + models.Gaussian1D(150, 1402.75, 0.06),
     ],
 )
 def test_starts_from_model_follows_each_spectrum_on_a_polynomial(model):
@@ -336,10 +338,36 @@ def test_starts_from_model_follows_each_spectrum_on_a_polynomial(model):
     for name in ("c1_0", "c2_0"):
         np.testing.assert_array_equal(getattr(starts, name).value, getattr(model, name).value)
     # The background passes through each spectrum's 10th percentile in the middle of the window.
+    angstrom = u.AA if model.c0_0.unit else 1
     level = np.percentile(cube.data, 10, axis=-1)
-    middle = WAVELENGTH.mean() if model.c0_0.unit else WAVELENGTH.mean().value
-    np.testing.assert_allclose(u.Quantity(starts[0](middle)).value, level)
-    np.testing.assert_allclose(starts.amplitude_1.value, cube.data.max(axis=-1) - level)
+    np.testing.assert_allclose(u.Quantity(starts[0](WAVELENGTH.mean().value * angstrom)).value, level)
+    # The line starts at its height above the started background at the sample it starts at.
+    peak = np.searchsorted(WAVELENGTH.value, starts.mean_1.value)
+    at_peak = np.take_along_axis(cube.data, peak[..., np.newaxis], axis=-1)[..., 0]
+    background_at_peak = u.Quantity(starts[0](starts.mean_1.value * angstrom)).value
+    np.testing.assert_allclose(starts.amplitude_1.value, at_peak - background_at_peak)
+
+
+@pytest.mark.parametrize(
+    "background",
+    [
+        models.Linear1D(slope=1000),
+        # A domain centered on the window keeps the coefficients small.
+        models.Polynomial1D(2, c1=1000, c2=-400, domain=(1401.77, 1403.77)),
+    ],
+)
+def test_starts_from_model_finds_lines_on_a_steep_background(background):
+    _, cube = _line_cube(np.random.default_rng(12))
+    line = models.Gaussian1D(150, 1402.75, 0.06)
+    flat = starts_from_model(models.Const1D(5) + line, cube)
+    flat_level = np.percentile(cube.data, 10, axis=-1)
+    # The same lines on a background as steep as that of the model, which would move their peaks.
+    cube.data += background(WAVELENGTH.value) - background(WAVELENGTH.mean().value)
+    starts = starts_from_model(background + line, cube)
+    # The lines start at the same samples, as high above the started background as above a flat one.
+    np.testing.assert_array_equal(starts.mean_1.value, flat.mean_1.value)
+    level = np.percentile(cube.data, 10, axis=-1)
+    np.testing.assert_allclose(starts.amplitude_1.value + level, flat.amplitude_1.value + flat_level)
 
 
 @pytest.mark.parametrize("constraint", ["fixed", "tied"])
