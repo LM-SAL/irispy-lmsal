@@ -444,6 +444,22 @@ Both the raster and slit-jaw cubes can be visualized using the ``plot`` method.
 A cube with a time axis is shown as an animation, and this is its first frame.
 The slider below the image selects the frame by its time.
 
+The default stretch of the colors runs linearly from the minimum to the maximum of the data, and a few hot pixels, in the thousands of DN, make the rest of the image look black.
+Pass ``clip_interval`` to let the stretch of each frame ignore the extremes:
+
+.. plot::
+    :include-source:
+    :context: close-figs
+
+    import matplotlib.pyplot as plt
+
+    iris_sji.plot(clip_interval=(1, 99.5) * u.percent)
+
+    plt.show()
+
+The colors now run from the 1st to the 99.5th percentile of each frame.
+The same argument works for the raster plot below, in place of ``vmax``.
+
 .. note::
 
     We imported `matplotlib.pyplot` in order to create the figure.
