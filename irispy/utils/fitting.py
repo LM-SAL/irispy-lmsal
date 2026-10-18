@@ -387,9 +387,9 @@ def starts_from_model(model, cube):
     the middle of the wavelengths, with the slope of ``model``. A Gaussian or Lorentzian line
     starts at the spectrum's peak above that background within two widths of the center of
     ``model``, its center at the peak's wavelength and its amplitude at the peak's height, below
-    the background for a line with a negative amplitude. Its width is that of ``model``. Lines
-    within two widths of each other can start at the same peak; `mg_ii_model` starts the Mg II
-    k2v and k2r peaks apart.
+    the background for a line with a negative amplitude. Its width is that of ``model``. In a
+    blend, such as the Mg II k2v and k2r peaks, each line searches only the samples nearer its own
+    center in ``model`` than any other line's, so the lines start at their own peaks.
 
     Fixed and tied parameters and those of other components keep the values of ``model``, and the
     others are clipped to their bounds. Masked and non-finite samples are left out of the starts.
@@ -415,6 +415,12 @@ def starts_from_model(model, cube):
     starts = {}
     compound = model.n_submodels > 1
     leaves = [model[index] for index in range(model.n_submodels)] if compound else [model]
+    lines = (models.Gaussian1D, models.Lorentz1D)
+    centers = [
+        fitted(leaf.param_names[1] + (f"_{index}" if compound else ""), u.AA)
+        for index, leaf in enumerate(leaves)
+        if isinstance(leaf, lines)
+    ]
     for index, leaf in enumerate(leaves):
         names = [name + (f"_{index}" if compound else "") for name in leaf.param_names]
         if isinstance(leaf, models.Const1D):
@@ -422,10 +428,14 @@ def starts_from_model(model, cube):
         elif isinstance(leaf, models.Linear1D):
             slope, intercept = names
             starts[intercept] = (background - fitted(slope, cube.unit / u.AA) * wavelength.mean()) * cube.unit
-        elif isinstance(leaf, (models.Gaussian1D, models.Lorentz1D)):
+        elif isinstance(leaf, lines):
             amplitude, center, width = names
             sign = np.sign(getattr(model, amplitude).value) or 1  # Negative for an absorption line.
-            near = np.abs(wavelength - fitted(center, u.AA)) <= 2 * fitted(width, u.AA)
+            distance = np.abs(wavelength - fitted(center, u.AA))
+            # In a blend, each line searches only the samples nearer its own center than any other's.
+            near = (distance <= 2 * fitted(width, u.AA)) & np.all(
+                [distance <= np.abs(wavelength - other) for other in centers], axis=0
+            )
             excess = np.where(near & ~np.isnan(spectra), sign * (spectra - background[..., np.newaxis]), -np.inf)
             peak = np.argmax(excess, axis=-1)
             height = np.take_along_axis(excess, peak[..., np.newaxis], axis=-1)[..., 0]

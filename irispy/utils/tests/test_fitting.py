@@ -399,6 +399,22 @@ def test_starts_from_model_units():
         starts_from_model(si_iv_1403_model(cube), cube)
 
 
+def test_starts_from_model_starts_blended_lines_at_their_own_peaks():
+    raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
+    cube = raster["Mg II k 2796"][0]
+    wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
+    start = profiles_on_background(
+        [2796.20, 2796.50] * u.AA,
+        amplitudes=[100, 100] * cube.unit,
+        widths=[0.08, 0.08] * u.AA,
+        background_level=10 * cube.unit,
+    )
+    mean = np.nanmean(np.where(cube.mask, np.nan, cube.data), axis=(0, 1))
+    starts = starts_from_model(TRFLSQFitter()(start, wavelength, mean * cube.unit), cube)
+    # The k2v and k2r Gaussians lie within two widths of each other, and would otherwise share the brighter peak.
+    assert np.all(starts.mean_1.value < starts.mean_2.value)
+
+
 def test_starts_from_model_on_level_2_data():
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
     cube = raster["Mg II k 2796"][0][:, 700:740]  # Rows 731 to 739 are masked in full.
