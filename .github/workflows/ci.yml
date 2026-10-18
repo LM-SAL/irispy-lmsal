@@ -78,6 +78,7 @@ jobs:
       envs: |
         - windows: py314
         - macos: py313
+        - linux: py313-core
         - linux: py313-oldestdeps
         - linux: py314-devdeps
 
