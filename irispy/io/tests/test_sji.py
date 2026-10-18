@@ -14,6 +14,7 @@ from astropy.wcs import WCS
 
 from sunpy.coordinates import Helioprojective, get_body_heliographic_stonyhurst
 from sunpy.map.header_helper import make_fitswcs_header
+from sunpy.map.sources import AIAMap, SOTMap
 
 from irispy.data.test import get_test_filepath
 from irispy.io.sji import _create_headers_wcs, _fill_dropped_pointing_rows, _t_obs, read_sji_lvl2
@@ -288,6 +289,8 @@ def test_read_aia_cube(tmp_path, sns_sji_1330_file):
     assert isinstance(aia, AIACube)
     assert aia[-3:].shape == (3, 40, 37)
     assert isinstance(aia[:, 10:, 20:].fits_wcs, list)
+    # The frame headers carry the file's instrument, so sunpy picks its AIA map class
+    assert isinstance(aia.to_maps(0), AIAMap)
 
 
 def test_sji_first_and_last_frames_round_trip(sns_sjicube_1400):
@@ -303,7 +306,7 @@ def test_frame_wcs_headers_match_per_frame_make_fitswcs_header(sns_sji_1400_file
         hdulist.verify("silentfix")
         t_obs = _t_obs(hdulist)
         _fill_dropped_pointing_rows(hdulist)
-        headers = _create_headers_wcs(hdulist, t_obs)
+        headers = _create_headers_wcs(hdulist, t_obs, "DN")
         aux = hdulist[1]
         for i in (1, len(headers) - 1):
             pointing = Helioprojective(
@@ -318,13 +321,13 @@ def test_frame_wcs_headers_match_per_frame_make_fitswcs_header(sns_sji_1400_file
                 coordinate=pointing,
                 scale=[hdulist[0].header["CDELT1"], hdulist[0].header["CDELT2"]] * u.arcsec / u.pixel,
                 rotation_matrix=np.asanyarray([[pc[0], pc[1]], [pc[2], pc[3]]]),
-                instrument="SJI",
-                telescope="IRIS",
-                observatory="IRIS",
+                instrument=hdulist[0].header["INSTRUME"],
+                telescope=hdulist[0].header["TELESCOP"],
                 wavelength=int(hdulist[0].header["TWAVE1"]) * u.AA,
                 exposure=aux.data[i, aux.header["EXPTIMES"]] * u.second,
                 unit=u.DN,
             )
+            expected["twave1"] = hdulist[0].header["TWAVE1"]
             assert dict(headers[i]) == dict(expected)
 
 
@@ -397,10 +400,12 @@ def test_sot_cube_to_maps(kind, conversion, request):
         sot_map = cube.to_maps([index])[0]
     else:
         sot_map = cube.to_maps(index)
+    # sunpy's SOTMap knows the narrowband files ("SOT/NB") and spells the observatory "Hinode"
+    assert isinstance(sot_map, SOTMap) == (cube.meta["INSTRUME"] in SOTMap.Instruments)
     assert sot_map.unit == cube.unit
     assert sot_map.instrument == cube.meta["INSTRUME"]
-    assert sot_map.observatory == cube.meta["TELESCOP"]
-    assert sot_map.exposure_time == cube.meta["EXPTIME"] * u.s
+    assert sot_map.observatory.upper() == cube.meta["TELESCOP"]
+    assert sot_map.exposure_time == cube.axis_world_coords(wcs=cube.extra_coords["exposure time"])[0][index]
     assert sot_map.meta["TWAVE1"] == cube.meta["TWAVE1"]
     assert sot_map.date.utc.isot == cube.wcs.pixel_to_world(0, 0, index)[-1].utc.isot
     # The SOT cubes have no wavelength (TWAVE1 is 0), nor an IRIS colormap to plot with

@@ -136,7 +136,7 @@ def _create_gwcs(hdulist: fits.HDUList, t_obs) -> gwcs.WCS:
     return gwcs.WCS(forward_transform, input_frame=input_frame, output_frame=output_frame)
 
 
-def _create_headers_wcs(hdulist, t_obs):
+def _create_headers_wcs(hdulist, t_obs, bunit):
     """
     This is required as occasionally we need a normal WCS instead of a gWCS due to
     compatibility issues.
@@ -144,7 +144,9 @@ def _create_headers_wcs(hdulist, t_obs):
     This has been set to have an Earth Observer at the time of the observation.
 
     However, this only creates the WCS headers, not the full WCS objects. Those are
-    created in the SJICube class property fits_wcs.
+    created in the SJICube class property fits_wcs, and `irispy.sji.SJICube.to_maps`
+    builds its maps from them, so they carry the keys sunpy reads: the instrument and
+    telescope that pick the map class, ``bunit`` and the frame's exposure time.
     """
     from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst  # NOQA: PLC0415
     from sunpy.coordinates.frames import Helioprojective  # NOQA: PLC0415
@@ -170,14 +172,15 @@ def _create_headers_wcs(hdulist, t_obs):
             "cdelt1": hdulist[0].header["CDELT1"],
             "cdelt2": hdulist[0].header["CDELT2"],
             "lonpole": 180.0 if pointing[0].spherical.lat.to_value(u.deg) < 90 else 0.0,
-            "instrume": "SJI",
-            "telescop": "IRIS",
-            "obsrvtry": "IRIS",
-            "wavelnth": int(hdulist[0].header["TWAVE1"]),
-            "waveunit": "Angstrom",
-            "bunit": "DN",
+            "instrume": hdulist[0].header["INSTRUME"],
+            "telescop": hdulist[0].header["TELESCOP"],
+            "twave1": hdulist[0].header["TWAVE1"],
+            "bunit": bunit,
         }
     )
+    # Hinode/SOT cubes have no wavelength (TWAVE1 is 0)
+    if hdulist[0].header["TWAVE1"]:
+        template.update({"wavelnth": int(hdulist[0].header["TWAVE1"]), "waveunit": "Angstrom"})
     per_frame = {
         "crval1": pointing.spherical.lon.to_value(template["cunit1"]),
         "crval2": pointing.spherical.lat.to_value(template["cunit2"]),
@@ -324,7 +327,9 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             bunit = hdulist[0].header.get("BUNIT", "")
             unit = u.Unit(_SOT_BUNIT.get(bunit, bunit), parse_strict="silent")
         meta = SJIMeta(hdulist[0].header)
-        meta["frame_wcs_headers"] = _create_headers_wcs(hdulist, t_obs)  # root-relative, not axis-aware
+        # The IRIS DN units are not FITS units; sunpy reads the SOT units ("", G) as they are
+        bunit = unit.to_string() if is_sot else "DN"
+        meta["frame_wcs_headers"] = _create_headers_wcs(hdulist, t_obs, bunit)  # root-relative, not axis-aware
         meta["scaled"] = scaled
         if saturated is not None and saturated.any():
             meta.add("saturated", saturated, "Samples at the level 2 ceiling, also masked", (0, 1, 2))

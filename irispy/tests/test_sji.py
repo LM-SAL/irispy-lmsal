@@ -71,6 +71,22 @@ def test_sji_plotter_does_not_expose_plot_rgb(sns_sjicube_1400):
     assert not hasattr(sns_sjicube_1400.plotter, "plot_rgb")
 
 
+def test_to_maps_are_sji_maps_with_the_frame_metadata(sns_sjicube_1330):
+    # Maps were built from the WCS alone: GenericMap, no unit, the file-level EXPTIME in every frame
+    exposure_times = sns_sjicube_1330.axis_world_coords(wcs=sns_sjicube_1330.extra_coords["exposure time"])[0]
+    sji_map = sns_sjicube_1330.to_maps(2)
+    assert isinstance(sji_map, sunpy.map.sources.SJIMap)
+    assert sji_map.unit == u.DN
+    assert sji_map.exposure_time == exposure_times[2]
+    assert (sji_map.observatory, sji_map.instrument) == ("IRIS", "SJI")
+    assert sji_map.date.utc.isot == sns_sjicube_1330.wcs.pixel_to_world(0, 0, 2)[-1].utc.isot
+    assert sji_map.plot_settings["cmap"] == "irissji1330"
+    sliced_map = sns_sjicube_1330[2, 10:, 20:].to_maps()
+    assert isinstance(sliced_map, sunpy.map.sources.SJIMap)
+    assert sliced_map.data.shape == (30, 17)
+    assert sliced_map.wcs.pixel_to_world(0, 0).separation(sji_map.wcs.pixel_to_world(20, 10)) < 1e-6 * u.arcsec
+
+
 def test_to_map(sns_sjicube_1330):
     # Basic smoke tests
     output = sns_sjicube_1330.to_maps(0)
@@ -161,8 +177,11 @@ def test_spatial_slice_fits_wcs_describes_sliced_pixels(sns_sjicube_1330):
 def test_to_maps_negative_index(sns_sjicube_1330):
     last = sns_sjicube_1330.shape[0] - 1
     assert sns_sjicube_1330.to_maps(-1).meta["DATE-OBS"] == sns_sjicube_1330.to_maps(last).meta["DATE-OBS"]
-    dates = [m.meta["DATE-OBS"] for m in sns_sjicube_1330.to_maps([-1, 0])]
-    assert dates == [sns_sjicube_1330.to_maps(i).meta["DATE-OBS"] for i in (last, 0)]
+    maps = sns_sjicube_1330.to_maps([-1, 0])
+    # The frames come in the requested order; the sequence used to sort them by date but label them in request order
+    assert [m.meta["DATE-OBS"] for m in maps] == [sns_sjicube_1330.to_maps(i).meta["DATE-OBS"] for i in (last, 0)]
+    for m, i in zip(maps, (last, 0), strict=True):
+        np.testing.assert_array_equal(m.data, sns_sjicube_1330.data[i])
 
 
 def test_to_maps_accepts_numpy_integers(sns_sjicube_1330):

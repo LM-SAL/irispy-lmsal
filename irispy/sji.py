@@ -1,5 +1,4 @@
 import textwrap
-import warnings
 from numbers import Integral
 from functools import cached_property
 
@@ -12,7 +11,6 @@ from astropy.wcs.wcsapi import SlicedLowLevelWCS
 
 from ndcube.visualization import PlotterDescriptor
 from sunpy.util import MetaDict
-from sunpy.util.exceptions import SunpyMetadataWarning
 from sunraster import SpectrogramCube
 
 from irispy._wcs import _celestial_frame_from_cube, _ResolveNegativeIndicesMixin
@@ -23,6 +21,22 @@ from irispy.utils.dust import remove_dust as _remove_dust
 from irispy.visualization import SJIPlotter
 
 __all__ = ["AIACube", "SJICube", "SOTCube"]
+
+
+def _slice_header(header, spatial):
+    """
+    The FITS header of one frame after the spatial slice ``spatial`` (numpy order) of
+    its cube.
+    """
+    # ndcube spells a full axis slice(0, n, None)
+    shape = (header["naxis2"], header["naxis1"])
+    if all(axis.indices(n) == (0, n, 1) for axis, n in zip(spatial, shape, strict=True)):
+        return header
+    sliced = WCS(header).slice(spatial, numpy_order=True)
+    header = header.copy()
+    header.update(sliced.to_header())
+    header["naxis1"], header["naxis2"] = sliced.pixel_shape
+    return header
 
 
 class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
@@ -153,9 +167,11 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
     celestial_frame = property(_celestial_frame_from_cube)
 
     @cached_property
-    def fits_wcs(self):
+    def _frame_headers(self):
         """
-        Returns a standard WCS instead of gWCS.
+        The FITS header of each frame of this cube, following its slicing: one header
+        for a single frame, a list for a time axis, `None` when the cube has no frame
+        headers.
         """
         headers = self.meta.get("frame_wcs_headers") if self.meta is not None else None
         low = self.wcs.low_level_wcs
@@ -168,8 +184,20 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         frames = headers[item[0]]
         spatial = tuple(item[1:])
         if isinstance(frames, MetaDict):
-            return WCS(frames).slice(spatial, numpy_order=True)
-        return [WCS(h).slice(spatial, numpy_order=True) for h in frames]
+            return _slice_header(frames, spatial)
+        return [_slice_header(h, spatial) for h in frames]
+
+    @cached_property
+    def fits_wcs(self):
+        """
+        Returns a standard WCS instead of gWCS.
+        """
+        headers = self._frame_headers
+        if headers is None:
+            return None
+        if isinstance(headers, MetaDict):
+            return WCS(headers)
+        return [WCS(h) for h in headers]
 
     def to_maps(self, index: int | list[int] | None = None):
         """
@@ -185,10 +213,13 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         -------
         `sunpy.map.Map` or `sunpy.map.MapSequence`
             A single Map if index is an int, otherwise a MapSequence.
+            Each map is built from its frame's FITS header, so sunpy picks the map class
+            from the instrument (`~sunpy.map.sources.SJIMap` for slit-jaw images) and the
+            map has the data unit and the frame's own exposure time.
         """
         from sunpy.map import Map  # NOQA: PLC0415
 
-        if self.fits_wcs is None:
+        if self._frame_headers is None:
             msg = "This cube has no FITS WCS (for example, it was rebinned), so it cannot be converted to maps."
             raise ValueError(msg)
         if isinstance(index, Integral):
@@ -198,35 +229,19 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         else:
             idx_list = index
 
-        # The original SOT BUNIT can be descriptive text; maps need the normalized unit.
-        unit_meta = {"BUNIT": self.unit.to_string()} if isinstance(self, SOTCube) and self.unit is not None else {}
         is_2d = self.wcs.world_n_dim == 2
         if is_2d:
-            data_wcs = [(self.data, self.fits_wcs)]
-            times_iso = [self.global_coords["Time (UTC)"].utc.isot]
+            frames = [(self.data, self._frame_headers)]
         else:
-            # pixel_to_world does not wrap negative indices the way the data and fits_wcs lists do.
+            # The data and header lists wrap negative indices; resolve them once for both.
             idx_list = [range(self.data.shape[0])[i] for i in idx_list]
-            data_wcs = ((self.data[i], self.fits_wcs[i]) for i in idx_list)
-            times_iso = (self.wcs.pixel_to_world(0, 0, i)[-1].utc.isot for i in idx_list)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", SunpyMetadataWarning)
-            maps = Map(data_wcs, sequence=True)
-        for m, t in zip(maps, times_iso, strict=True):
-            m.meta.update(unit_meta)
-            m.meta["DATE-OBS"] = t
-            m.meta["INSTRUME"] = self.meta.get("INSTRUME", "SJI")
-            m.meta["TELESCOP"] = self.meta.get("TELESCOP", "IRIS")
-            m.meta["EXPTIME"] = self.meta.get("EXPTIME", 0.0)
-            m.meta["TWAVE1"] = self.meta.get("TWAVE1")
-            # Hinode/SOT cubes have no wavelength (TWAVE1 is 0)
-            if self.meta.get("TWAVE1"):
-                # sunpy reads the wavelength (shown in the map name and plot title) from these.
-                m.meta["WAVELNTH"] = self.meta.get("TWAVE1")
-                m.meta["WAVEUNIT"] = "Angstrom"
-            # Hinode/SOT cubes and most AIA channels have no IRIS colormap
-            cmap = f"irissji{int(self.meta['TWAVE1'])}"
-            if cmap in mpl.colormaps:
+            frames = [(self.data[i], self._frame_headers[i]) for i in idx_list]
+        # Keep the requested order; a MapSequence sorts by date by default
+        maps = Map(frames, sequence=True, sortby=None)
+        # Hinode/SOT cubes and most AIA channels have no IRIS colormap
+        cmap = f"irissji{int(self.meta['TWAVE1'])}"
+        if cmap in mpl.colormaps:
+            for m in maps:
                 m.plot_settings["cmap"] = cmap
         return maps[0] if is_2d or isinstance(index, Integral) else maps
 
