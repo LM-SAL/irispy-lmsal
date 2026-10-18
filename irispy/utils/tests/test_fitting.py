@@ -305,19 +305,111 @@ def test_starts_from_model_follows_each_spectrum(profile, background):
     starts = starts_from_model(model, cube)
     assert starts.param_names == model.param_names
     assert all(getattr(starts, name).shape == SHAPE for name in starts.param_names)
-    # The background passes through each spectrum's 10th percentile in the middle of the window.
-    level = np.percentile(cube.data, 10, axis=-1)
+    # The background passes through each spectrum's 10th percentile, with its slope removed, in the middle of the window.
+    slope = model[0](WAVELENGTH) - model[0](WAVELENGTH.mean())
+    level = np.percentile(cube.data - slope.to_value(u.DN), 10, axis=-1)
     if background == "constant":
         np.testing.assert_allclose(starts.amplitude_0.value, level)
     else:
         np.testing.assert_allclose(starts.slope_0.value, 0.5)
         np.testing.assert_allclose(starts.intercept_0.value + starts.slope_0.value * WAVELENGTH.mean().value, level)
-    # Each line starts at its brightest sample, the nearest to its center, with the model's width.
+    # Each line starts at its brightest sample, the nearest to its center, its height above the started background
+    # there, with the model's width.
     center, width = truth.param_names[-2:]
     spacing = np.diff(WAVELENGTH.value)[0]
     assert np.all(np.abs(getattr(starts, center).value - getattr(truth, center).value) < spacing / 2)
-    np.testing.assert_allclose(starts.amplitude_1.value, cube.data.max(axis=-1) - level)
+    background_at_peak = starts[0](getattr(starts, center).quantity).value
+    np.testing.assert_allclose(starts.amplitude_1.value, cube.data.max(axis=-1) - background_at_peak)
     np.testing.assert_array_equal(getattr(starts, width).value, getattr(model, width).value)
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        models.Polynomial1D(2, c0=5 * u.DN, c1=0.5 * u.DN / u.AA, c2=1e-4 * u.DN / u.AA**2)
+        + models.Gaussian1D(150 * u.DN, 1402.75 * u.AA, 0.06 * u.AA),
+        # A polynomial with a domain takes parameters without units, in Å and the unit of the cube.
+        models.Polynomial1D(2, c0=5, c1=0.5, c2=1e-4, domain=(1402, 1404)) + models.Gaussian1D(150, 1402.75, 0.06),
+    ],
+)
+def test_starts_from_model_follows_each_spectrum_on_a_polynomial(model):
+    _, cube = _line_cube(np.random.default_rng(10))
+    starts = starts_from_model(model, cube)
+    assert starts.c0_0.unit == model.c0_0.unit
+    for name in ("c1_0", "c2_0"):
+        np.testing.assert_array_equal(getattr(starts, name).value, getattr(model, name).value)
+    # The background passes through each spectrum's 10th percentile, with its higher terms removed, in the middle of
+    # the window.
+    angstrom = u.AA if model.c0_0.unit else 1
+    terms = u.Quantity(model[0](WAVELENGTH.value * angstrom) - model[0](WAVELENGTH.mean().value * angstrom)).value
+    level = np.percentile(cube.data - terms, 10, axis=-1)
+    np.testing.assert_allclose(u.Quantity(starts[0](WAVELENGTH.mean().value * angstrom)).value, level)
+    # The line starts at its height above the started background at the sample it starts at.
+    peak = np.searchsorted(WAVELENGTH.value, starts.mean_1.value)
+    at_peak = np.take_along_axis(cube.data, peak[..., np.newaxis], axis=-1)[..., 0]
+    background_at_peak = u.Quantity(starts[0](starts.mean_1.value * angstrom)).value
+    np.testing.assert_allclose(starts.amplitude_1.value, at_peak - background_at_peak)
+
+
+@pytest.mark.parametrize(
+    "background",
+    [
+        models.Linear1D(slope=1000),
+        # A domain centered on the window keeps the coefficients small.
+        models.Polynomial1D(2, c1=1000, c2=-400, domain=(1401.77, 1403.77)),
+    ],
+)
+def test_starts_from_model_finds_lines_on_a_steep_background(background):
+    truth, cube = _line_cube(np.random.default_rng(12))
+    # The lines on a background as steep as that of the model, which would move their peaks and lower its level.
+    cube.data += background(WAVELENGTH.value) - background(WAVELENGTH.mean().value)
+    starts = starts_from_model(background + models.Gaussian1D(150, 1402.75, 0.06), cube)
+    # The started background passes through the true one in the middle of the window.
+    np.testing.assert_allclose(starts[0](WAVELENGTH.mean().value), truth.amplitude_0.value)
+    # Each line starts at its sample nearest its center, at its true height there.
+    assert np.all(np.abs(starts.mean_1.value - truth.mean_1.value) < np.diff(WAVELENGTH.value)[0] / 2)
+    np.testing.assert_allclose(starts.amplitude_1.value, truth[1](starts.mean_1.value * u.AA).to_value(u.DN))
+
+
+def test_starts_from_model_keeps_lines_without_a_peak():
+    # A shallow absorption line in spectra whose 10th percentile lies in a deeper one.
+    model = models.Const1D(100) + models.Gaussian1D(-80, 1402.4, 0.1) + models.Gaussian1D(-10, 1403.2, 0.06)
+    cube = make_test_spectrogram_cube(np.tile(model(WAVELENGTH.value), (2, 3, 1)), WAVELENGTH)
+    starts = starts_from_model(model, cube)
+    assert np.all(starts.amplitude_1.value < 0)
+    # No sample near the shallow line lies below the background, so it keeps its start rather than turning into
+    # emission.
+    np.testing.assert_array_equal(starts.amplitude_2.value, -10)
+    np.testing.assert_array_equal(starts.mean_2.value, 1403.2)
+
+
+@pytest.mark.parametrize(
+    ("model", "operator"),
+    [
+        (models.Const1D(5) * models.Gaussian1D(150, 1402.77, 0.06), "'*'"),
+        (models.Const1D(5) + (models.Shift(0.1) | models.Gaussian1D(150, 1402.77, 0.06)), "'|'"),
+    ],
+)
+def test_starts_from_model_rejects_models_other_than_sums(model, operator):
+    _, cube = _line_cube(np.random.default_rng(13))
+    with pytest.raises(ValueError, match="sum of backgrounds and lines") as error:
+        starts_from_model(model, cube)
+    assert operator in str(error.value)
+
+
+@pytest.mark.parametrize("constraint", ["fixed", "tied"])
+def test_starts_from_model_keeps_polynomial_constraints(constraint):
+    _, cube = _line_cube(np.random.default_rng(11))
+    model = models.Polynomial1D(2, c0=5, c1=0.5, c2=-0.01) + models.Gaussian1D(150, 1402.75, 0.06)
+    if constraint == "fixed":
+        model.c0_0.fixed = True
+    else:
+        model.c0_0.tied = lambda model: model.c1_0 + 4.5
+    starts = starts_from_model(model, cube)
+    assert starts.fixed == model.fixed
+    assert starts.tied == model.tied
+    for name in ("c0_0", "c1_0", "c2_0"):
+        np.testing.assert_array_equal(getattr(starts, name).value, getattr(model, name).value)
 
 
 def test_starts_from_model_keeps_absorption():
@@ -415,7 +507,8 @@ def test_starts_from_model_starts_blended_lines_at_their_own_peaks():
     assert np.all(starts.mean_1.value < starts.mean_2.value)
 
 
-def test_starts_from_model_on_level_2_data():
+@pytest.mark.parametrize("background", ["constant", "polynomial"])
+def test_starts_from_model_on_level_2_data(background):
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
     cube = raster["Mg II k 2796"][0][:, 700:740]  # Rows 731 to 739 are masked in full.
     wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
@@ -426,6 +519,9 @@ def test_starts_from_model_on_level_2_data():
         widths=[0.08, 0.08] * u.AA,
         background_level=10 * cube.unit,
     )
+    if background == "polynomial":
+        polynomial = models.Polynomial1D(2, c0=10 * cube.unit, c1=0 * cube.unit / u.AA, c2=0 * cube.unit / u.AA**2)
+        start = polynomial + start[1] + start[2]
     # A model fitted to one spectrum, then to every spectrum with its masked samples left out.
     model = TRFLSQFitter()(start, wavelength, data[1, 0] * cube.unit)
     fitted, fitter = _fit(

@@ -11,6 +11,7 @@ import astropy.units as u
 from astropy import constants
 from astropy.modeling import models
 from astropy.modeling.fitting import FitInfoArrayContainer
+from astropy.modeling.utils import poly_map_domain
 from astropy.nddata import StdDevUncertainty
 
 from irispy.spectrograph import RasterCollection, SpectrogramCube
@@ -368,8 +369,9 @@ def starts_from_model(model, cube):
     Parameters
     ----------
     model : `~astropy.modeling.Model`
-        A model with one value per parameter, such as one fitted to a spectrum of ``cube``.
-        Parameters without units are taken in Å and the unit of ``cube``.
+        A model with one value per parameter, such as one fitted to a spectrum of ``cube``, and
+        the sum of its components, such as lines on a background. Parameters without units are
+        taken in Å and the unit of ``cube``.
     cube : `~irispy.spectrograph.SpectrogramCube`
         The cube to fit, read with ``memmap=False`` and cropped to the wavelengths to fit.
 
@@ -383,26 +385,34 @@ def starts_from_model(model, cube):
     -----
     Each spectrum is started from its own data, as ``scale_guess`` in EISPAC does for EIS fits.
     A `~astropy.modeling.functional_models.Const1D` background starts at the spectrum's 10th
-    percentile, and a `~astropy.modeling.functional_models.Linear1D` one passes through it at
-    the middle of the wavelengths, with the slope of ``model``. A Gaussian or Lorentzian line
-    starts at the spectrum's peak above that background within two widths of the center of
-    ``model``, its center at the peak's wavelength and its amplitude at the peak's height, below
-    the background for a line with a negative amplitude. Its width is that of ``model``. In a
-    blend, such as the Mg II k2v and k2r peaks, each line searches only the samples nearer its own
-    center in ``model`` than any other line's, so the lines start at their own peaks.
+    percentile. A `~astropy.modeling.functional_models.Linear1D` or
+    `~astropy.modeling.polynomial.Polynomial1D` one keeps the slope or the higher terms of
+    ``model``, and passes through the 10th percentile of the spectrum less those terms at the
+    middle of the wavelengths, so that a steep slope does not lower it. A Gaussian or Lorentzian
+    line starts at the spectrum's peak above that background, at each wavelength, within two
+    widths of the center of ``model``, its center at the peak's wavelength and its amplitude at
+    the peak's height, below the background for a line with a negative amplitude. Its width is
+    that of ``model``. In a blend, such as the Mg II k2v and k2r peaks, each line searches only
+    the samples nearer its own center in ``model`` than any other line's, so the lines start at
+    their own peaks.
 
     Fixed and tied parameters and those of other components keep the values of ``model``, and the
     others are clipped to their bounds. Masked and non-finite samples are left out of the starts.
-    A line with no samples left within two widths keeps the center and amplitude of ``model``,
-    and a spectrum with none at all gets a NaN background.
+    A line with no samples left within two widths, or none above the background (below it for a
+    negative amplitude), keeps the center and amplitude of ``model``, and a spectrum with no
+    samples at all gets a NaN background.
     """
     check_scaled(cube)
     if any(np.ndim(getattr(model, name).value) for name in model.param_names):
         msg = "model has array parameters; pass one with a value per parameter, such as one fitted to one spectrum."
         raise ValueError(msg)
+    compound = model.n_submodels > 1
+    nodes = model.traverse_postorder(include_operator=True) if compound else []
+    if operators := sorted({node for node in nodes if isinstance(node, str)} - {"+"}):
+        msg = f"model joins its components with {', '.join(map(repr, operators))}; pass a sum of backgrounds and lines."
+        raise ValueError(msg)
     wavelength = _wavelength(cube).value
     spectra = _spectra(cube)
-    background = _background_level(spectra)
 
     def fitted(name, unit):
         """
@@ -413,33 +423,53 @@ def starts_from_model(model, cube):
         return parameter.value if parameter.unit is None else parameter.quantity.to_value(unit)
 
     starts = {}
-    compound = model.n_submodels > 1
     leaves = [model[index] for index in range(model.n_submodels)] if compound else [model]
+    names = [
+        [name + (f"_{index}" if compound else "") for name in leaf.param_names] for index, leaf in enumerate(leaves)
+    ]
     lines = (models.Gaussian1D, models.Lorentz1D)
     centers = [
-        fitted(leaf.param_names[1] + (f"_{index}" if compound else ""), u.AA)
-        for index, leaf in enumerate(leaves)
-        if isinstance(leaf, lines)
+        fitted(leaf_names[1], u.AA) for leaf, leaf_names in zip(leaves, names, strict=True) if isinstance(leaf, lines)
     ]
-    for index, leaf in enumerate(leaves):
-        names = [name + (f"_{index}" if compound else "") for name in leaf.param_names]
+    shape = np.zeros_like(wavelength)  # The started background less its value at the middle of the wavelengths.
+    constants = {}  # The constant term of each background, and the rest of it at the middle of the wavelengths.
+    for leaf, leaf_names in zip(leaves, names, strict=True):
         if isinstance(leaf, models.Const1D):
-            starts[names[0]] = background * cube.unit
-        elif isinstance(leaf, models.Linear1D):
-            slope, intercept = names
-            starts[intercept] = (background - fitted(slope, cube.unit / u.AA) * wavelength.mean()) * cube.unit
-        elif isinstance(leaf, lines):
-            amplitude, center, width = names
+            constants[leaf_names[0]] = 0
+        elif isinstance(leaf, (models.Linear1D, models.Polynomial1D)):
+            # The background less its constant term, at each wavelength and, last, at their middle.
+            x = np.append(wavelength, wavelength.mean())
+            if isinstance(leaf, models.Linear1D):
+                slope, constant = leaf_names
+                terms = fitted(slope, cube.unit / u.AA) * x
+            else:
+                constant, *powers = leaf_names
+                # In the polynomial's own variable, for one with a domain.
+                x = poly_map_domain(x, leaf.domain, leaf.window)
+                terms = sum(
+                    (fitted(term, cube.unit / u.AA**power) * x**power for power, term in enumerate(powers, 1)),
+                    np.zeros_like(x),
+                )
+            constants[constant] = terms[-1]
+            shape += terms[:-1] - terms[-1]
+    # The level of each spectrum with the shape of the background removed, which a steep slope would lower.
+    background = _background_level(spectra - shape)
+    for constant, rest in constants.items():
+        starts[constant] = (background - rest) * cube.unit
+    level = background[..., np.newaxis] + shape  # The started background at each wavelength.
+    for leaf, leaf_names in zip(leaves, names, strict=True):
+        if isinstance(leaf, lines):
+            amplitude, center, width = leaf_names
             sign = np.sign(getattr(model, amplitude).value) or 1  # Negative for an absorption line.
             distance = np.abs(wavelength - fitted(center, u.AA))
             # In a blend, each line searches only the samples nearer its own center than any other's.
             near = (distance <= 2 * fitted(width, u.AA)) & np.all(
                 [distance <= np.abs(wavelength - other) for other in centers], axis=0
             )
-            excess = np.where(near & ~np.isnan(spectra), sign * (spectra - background[..., np.newaxis]), -np.inf)
+            excess = np.where(near & ~np.isnan(spectra), sign * (spectra - level), -np.inf)
             peak = np.argmax(excess, axis=-1)
             height = np.take_along_axis(excess, peak[..., np.newaxis], axis=-1)[..., 0]
-            found = np.isfinite(height)
+            found = height > 0  # Otherwise no sample lies beyond the background on the side of the line.
             starts[center] = np.where(found, wavelength[peak], fitted(center, u.AA)) * u.AA
             starts[amplitude] = np.where(found, sign * height, fitted(amplitude, cube.unit)) * cube.unit
     values = {}
