@@ -319,6 +319,7 @@ def test_frame_wcs_headers_match_per_frame_make_fitswcs_header(sns_sji_1400_file
             expected = make_fitswcs_header(
                 data=hdulist[0].data[i].shape,
                 coordinate=pointing,
+                reference_pixel=[hdulist[0].header["CRPIX1"] - 1, hdulist[0].header["CRPIX2"] - 1] * u.pixel,
                 scale=[hdulist[0].header["CDELT1"], hdulist[0].header["CDELT2"]] * u.arcsec / u.pixel,
                 rotation_matrix=np.asanyarray([[pc[0], pc[1]], [pc[2], pc[3]]]),
                 instrument=hdulist[0].header["INSTRUME"],

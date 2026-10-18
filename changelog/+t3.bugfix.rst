@@ -1,0 +1,1 @@
+The FITS WCS of each slit-jaw frame, `~irispy.sji.SJICube.fits_wcs`, and the maps from `~irispy.sji.SJICube.to_maps` now put the pointing at the file's reference pixel ``CRPIX`` instead of the array center, so they agree with the cube's WCS; for a file whose reference pixel is off-center, such as a cropped one, their coordinates were off by that distance.

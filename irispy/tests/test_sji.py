@@ -174,6 +174,32 @@ def test_spatial_slice_fits_wcs_describes_sliced_pixels(sns_sjicube_1330):
     assert sliced.separation(full) < 1e-6 * u.arcsec
 
 
+@pytest.mark.parametrize(
+    "file_fixture",
+    [
+        "sns_sji_1330_file",
+        "sns_sji_1400_file",
+        "sns_sji_2796_file",
+        "sns_sji_2832_file",
+        "raster_sji_1400_file",
+        "raster_sji_2796_file",
+        "raster_sji_2832_file",
+        "bursts_sji_1400_file",
+    ],
+)
+def test_to_maps_wcs_matches_the_cube_wcs(request, file_fixture):
+    # The frame headers put the pointing at the array center; these files' CRPIX is off it by up to a pixel
+    cube = read_files(request.getfixturevalue(file_fixture))
+    n_frames, ny, nx = cube.shape
+    x = np.array([0, nx - 1, 0, nx - 1, (nx - 1) / 2])
+    y = np.array([0, 0, ny - 1, ny - 1, (ny - 1) / 2])
+    for frame in (0, n_frames - 1):
+        from_map = cube.to_maps(frame).wcs.pixel_to_world(x, y)
+        from_cube = cube.wcs.pixel_to_world(x, y, frame)[0]
+        np.testing.assert_allclose(from_map.Tx.to_value(u.arcsec), from_cube.Tx.to_value(u.arcsec), atol=1e-6)
+        np.testing.assert_allclose(from_map.Ty.to_value(u.arcsec), from_cube.Ty.to_value(u.arcsec), atol=1e-6)
+
+
 def test_to_maps_negative_index(sns_sjicube_1330):
     last = sns_sjicube_1330.shape[0] - 1
     assert sns_sjicube_1330.to_maps(-1).meta["DATE-OBS"] == sns_sjicube_1330.to_maps(last).meta["DATE-OBS"]

@@ -165,8 +165,9 @@ def _create_headers_wcs(hdulist, t_obs, bunit):
             "naxis": 2,
             "naxis1": width,
             "naxis2": height,
-            "crpix1": (width + 1) / 2,
-            "crpix2": (height + 1) / 2,
+            # The reference pixel of the file, where XCENIX/YCENIX point; it need not be the array center
+            "crpix1": hdulist[0].header["CRPIX1"],
+            "crpix2": hdulist[0].header["CRPIX2"],
             "cunit1": "arcsec",
             "cunit2": "arcsec",
             "cdelt1": hdulist[0].header["CDELT1"],
