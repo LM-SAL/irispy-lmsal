@@ -46,6 +46,35 @@ To find out how, see :ref:`irispy-dev-install`.
 Use US English in documentation, comments, and internal names.
 Cite scientific references using the :doc:`bibliography` roles so they link to the bibliography.
 
+Running the tests
+=================
+
+``pytest`` runs the offline suite, the documentation doctests included, and treats warnings as errors.
+``pytest --remote-data=any`` adds the tests that download data, and ``tox -e py314`` runs the suite as CI does, against an installed copy of the package.
+
+Figure tests
+------------
+
+The tests decorated with ``figure_test`` (in ``irispy.tests.helpers``) render a Matplotlib figure and compare its hash with the library in ``irispy/tests/``; ``pytest.ini`` deselects them by default with ``-m "not mpl_image_compare"``.
+The hashes depend on the exact Matplotlib, FreeType and astropy versions and on the platform, so there is one library, ``figure_hashes_mpl_3112_ft_2143_astropy_801.json``, made on Linux by the ``py313-figure`` tox environment, which pins Matplotlib 3.11.2 (with the FreeType 2.14.3 its wheel bundles) and astropy 8.0.1.
+The same versions on macOS or Windows render slightly differently and fail the hash comparison, so compare figures on Linux or read the image comparison page that CircleCI makes.
+
+CircleCI runs ``py313-figure`` on every pull request, and the Giles bot links its comparison page, which shows the baseline, the new figure and their difference for every failure, from a status check on the pull request.
+On ``main`` CircleCI also uploads the new figures and the hash library to `LM-SAL/figure-test-images <https://github.com/LM-SAL/figure-test-images>`__, the public repository the tox environment reads the baseline images back from with ``--mpl-baseline-path``; no secret is needed to run the environment yourself.
+
+To run the figure tests on Linux:
+
+.. code-block:: bash
+
+    $ tox -e py313-figure
+
+The run downloads the remote data the figure tests use and writes the comparison page to ``.tmp/py313-figure/figure_test_images/fig_comparison.html``.
+After an intended change to a figure, regenerate the library in that environment and commit it:
+
+.. code-block:: bash
+
+    $ tox -e py313-figure -- --mpl-generate-hash-library=$PWD/irispy/tests/figure_hashes_mpl_3112_ft_2143_astropy_801.json
+
 Releasing
 =========
 
