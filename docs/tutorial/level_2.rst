@@ -441,6 +441,9 @@ Both the raster and slit-jaw cubes can be visualized using the ``plot`` method.
 
     plt.show()
 
+A cube with a time axis is shown as an animation, and this is its first frame.
+The slider below the image selects the frame by its time.
+
 .. note::
 
     We imported `matplotlib.pyplot` in order to create the figure.
@@ -462,5 +465,39 @@ This only applies to the slit-jaw images, as the raster cubes do not have a sing
 
 Since they are both series of images, the plot method will automatically create a slider to scroll through the different time steps or raster steps.
 Furthermore, the tick and axes labels have been automatically set based on the coordinate system of the cube and are colored according to the axis direction.
+
+The raster plot shows the spectrograms of the Mg II k window, one for each position of the slit.
+In a spectrogram the slit runs along the vertical axis, so the vertical axis is the solar Y coordinate, the helioprojective latitude, and the horizontal axis is the wavelength.
+The sliders step through the raster steps and the repeated scans of the raster, which move the slit along solar X.
+We set ``vmax=255`` because a few hot pixels reach 11,700 DN while 99.9% of the samples are below about 100 DN, so the default stretch, from the minimum to the maximum of the data, would show a nearly black image.
+The value is a choice for this data and not a property of the instrument.
+
+To plot a single image, slice the cube down to two dimensions, here the first frame:
+
+.. plot::
+    :include-source:
+    :context: close-figs
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    frame = iris_sji[0]
+    frame.plot(vmax=np.nanpercentile(frame.data, 99.5))
+
+    plt.show()
+
+A single image has no slider, so we set the upper limit of the stretch to the 99.5th percentile of the frame ourselves.
+
+Slicing a raster down to one dimension gives a single spectrum, here raster step 0 of the first scan at pixel 274 along the slit:
+
+.. plot::
+    :include-source:
+    :context: close-figs
+
+    import matplotlib.pyplot as plt
+
+    raster["Mg II k 2796"][0][0, 274].plot()
+
+    plt.show()
 
 Within the :ref:`irispy-example-index`, there are more examples of how to visualize the data and customize the plots.
