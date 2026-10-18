@@ -119,6 +119,17 @@ def test_negative_slices(sns_sjicube_1330):
     assert len(sns_sjicube_1330[:-2].fits_wcs) == 50
 
 
+def test_apply_exposure_time_correction(sns_sjicube_1330):
+    # The exposure time of a slit-jaw cube is an extra coordinate, which raised in sunraster
+    corrected = sns_sjicube_1330.apply_exposure_time_correction()
+    exposure_time = sns_sjicube_1330.exposure_time.to_value(u.s)[:, np.newaxis, np.newaxis]
+    assert corrected.unit == sns_sjicube_1330.unit / u.s
+    np.testing.assert_allclose(corrected.data, sns_sjicube_1330.data / exposure_time)
+    undone = corrected.apply_exposure_time_correction(undo=True)
+    assert undone.unit == sns_sjicube_1330.unit
+    np.testing.assert_allclose(undone.data, sns_sjicube_1330.data)
+
+
 def test_array_index_raises_index_error(sns_sjicube_1330):
     # As ndcube: a list reads as a tuple of indices, an array is rejected
     assert sns_sjicube_1330[[0, 1]].shape == sns_sjicube_1330[0, 1].shape
