@@ -1,7 +1,13 @@
+import sys
+import textwrap
+import subprocess
+from pathlib import Path
+
 import numpy as np
 import numpy.testing as np_test
 import pytest
 
+import irispy
 from irispy import utils
 from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, DN_UNIT, READOUT_NOISE
 
@@ -97,3 +103,23 @@ def test_calculate_uncertainty_of_negative_data():
     np_test.assert_allclose(uncertainty[:3], readout)
     assert uncertainty[3] > readout
     assert np.isnan(uncertainty[4])
+
+
+def test_import_irispy_defers_the_analysis_modules_and_the_sample_downloader():
+    # import irispy used to import every irispy.utils module and the sample data downloader
+    code = textwrap.dedent(
+        """
+        import sys
+
+        import irispy
+        import irispy.data
+
+        deferred = {"irispy.utils.bursts", "irispy.utils.fiducials", "irispy.utils.response", "irispy.data.sample"}
+        assert not deferred & set(sys.modules), sorted(deferred & set(sys.modules))
+        assert "bursts" in dir(irispy.utils)
+        assert callable(irispy.utils.bursts.find_sji_bursts)
+        assert callable(irispy.data.download_all)
+        """
+    )
+    # A fresh interpreter, started where this irispy is importable
+    subprocess.run([sys.executable, "-c", code], check=True, cwd=Path(irispy.__file__).parents[1])  # noqa: S603
