@@ -1,0 +1,1 @@
+`~irispy.spectrograph.SpectrogramCube.plot` defaults to the viridis colormap outright, instead of falling back to it from a failed lookup of a passband colormap.

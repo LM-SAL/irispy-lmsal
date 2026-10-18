@@ -213,8 +213,9 @@ def test_solid_angle_real_data(sns_sg_file):
 
 def test_spectrogram_cube_plot_defaults(sns_sg_file):
     cube = read_files(sns_sg_file)["Si IV 1403"][0][0]
+    # Spectra have no passband colormap, so viridis is their default itself, not a fallback.
+    assert cube.plotter._default_cmap_name() == "viridis"
     ax = cube.plot()
-    # FUV detectors have no irissji colormap, so the default falls back to viridis.
     assert ax.images[0].get_cmap().name == "viridis"
     plt.close(ax.figure)
 

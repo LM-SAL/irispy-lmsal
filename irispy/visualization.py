@@ -102,16 +102,16 @@ class _IRISPlotMixin:
     """
 
     def _default_cmap_name(self):
-        return f"irissji{int(self._ndcube.meta.detector[:3])}"
+        return "viridis"
 
     def plot(self, *args, **kwargs):
         """
         Plot the cube with IRIS defaults.
 
-        If ``cmap`` is falsey, it is replaced with a default IRIS colormap derived from
-        the cube metadata (falling back to viridis). For one-dimensional cubes ``cmap``
-        is dropped entirely, even when given. IRIS axis styling is applied to the
-        result; all other arguments are passed to the parent plotter's ``plot``.
+        If ``cmap`` is falsey, slit-jaw images get the IRIS colormap of their passband,
+        falling back to viridis, and spectra get viridis. For one-dimensional cubes
+        ``cmap`` is dropped entirely, even when given. IRIS axis styling is applied to
+        the result; all other arguments are passed to the parent plotter's ``plot``.
         """
         cmap = kwargs.get("cmap")
         if not cmap:
