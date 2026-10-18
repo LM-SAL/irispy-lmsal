@@ -117,6 +117,17 @@ def test_get_latest_response_multiple_inputs():
     assert len(iris_response) == 3
 
 
+def test_get_latest_response_multiple_times_do_not_share_areas():
+    # The responses used to share one AREA_SG and AREA_SJI array, so every time got the last time's areas
+    times = parse_time(["2014-01-01", "2024-01-01"])
+    responses = get_latest_response(times)
+    for response, time in zip(responses, times, strict=True):
+        single = get_latest_response(time)
+        np_test.assert_array_equal(response["AREA_SG"], single["AREA_SG"])
+        np_test.assert_array_equal(response["AREA_SJI"], single["AREA_SJI"])
+    assert not np.array_equal(responses[0]["AREA_SG"], responses[1]["AREA_SG"])
+
+
 def test_get_latest_response_no_observation_time():
     iris_response = get_latest_response()
     assert iris_response is not None
