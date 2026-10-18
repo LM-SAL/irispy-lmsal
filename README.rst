@@ -14,6 +14,16 @@ For more information see the instrument paper which is available `online for fre
 
 `The data is publicly available <https://iris.lmsal.com/data.html>`__.
 
+Install it with ``pip install irispy-lmsal`` or ``conda install -c conda-forge irispy-lmsal``, and read and plot slit-jaw images and rasters:
+
+.. code-block:: python
+
+    import astropy.units as u
+    from irispy.io import read_files
+    sji = read_files("iris_l2_20211001_060925_3683602040_SJI_1330_t000.fits.gz")
+    raster = read_files("iris_l2_20211001_060925_3683602040_raster.tar.gz")
+    sji.plot(clip_interval=(1, 99.5) * u.percent)
+
 `Documentation is hosted on Read the Docs <https://irispy.readthedocs.io/en/stable/>`__
 
 .. warning::

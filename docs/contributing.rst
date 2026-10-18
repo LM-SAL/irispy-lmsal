@@ -41,7 +41,7 @@ The principles in the SunPy guides for contributing code and utilizing GitHub an
 If you are a more seasoned developer and would like to get further information, you can check out the `sunpy Developers Guide`_.
 
 Before you can contribute code to irispy, you first need to install the development version of ``irispy``.
-To find out how, see :ref:`dev_install`.
+To find out how, see :ref:`irispy-dev-install`.
 
 Use US English in documentation, comments, and internal names.
 Cite scientific references using the :doc:`bibliography` roles so they link to the bibliography.
