@@ -118,6 +118,20 @@ def test_density_diagnostic_builds_theoretical_ratio_with_fiasco(monkeypatch):
     assert u.allclose(result["density"], [2] * u.cm**-3)
 
 
+def test_density_diagnostic_names_the_fiasco_without_line_ratio(monkeypatch):
+    # Every fiasco release up to 0.8.2 lacks line_ratio; the error must say so instead of an AttributeError
+    monkeypatch.setitem(sys.modules, "fiasco", types.SimpleNamespace(__version__="0.8.2"))
+    with pytest.raises(ImportError, match=r"fiasco 0\.8\.2 has no line_ratio.*wtbarnes/fiasco"):
+        density_diagnostic(
+            [4, 8] * u.ct,
+            [2, 4] * u.ct,
+            [1e10, 1e11] * u.cm**-3,
+            ion=types.SimpleNamespace(),
+            numerator=1399.78 * u.angstrom,
+            denominator=1401.16 * u.angstrom,
+        )
+
+
 def test_density_diagnostic_requires_ion():
     with pytest.raises(ValueError, match="ion, numerator, and denominator are required"):
         density_diagnostic(

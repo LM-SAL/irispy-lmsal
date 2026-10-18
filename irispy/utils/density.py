@@ -146,6 +146,14 @@ def density_diagnostic(
         raise ValueError(msg)
 
     fiasco = _import_optional("fiasco", reason="IRIS density diagnostics", extra="density")
+    # No fiasco release ships line_ratio yet (0.8.2 is the latest); it is on fiasco's main branch
+    if not hasattr(fiasco, "line_ratio"):
+        msg = (
+            f"fiasco {fiasco.__version__} has no line_ratio, which IRIS density diagnostics need. "
+            "Install fiasco's development version with "
+            "`pip install git+https://github.com/wtbarnes/fiasco.git`."
+        )
+        raise ImportError(msg)
 
     if line_ratio_kwargs is None:
         line_ratio_kwargs = {}
