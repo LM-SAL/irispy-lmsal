@@ -1,0 +1,1 @@
+`irispy.utils.fitting.starts_from_model` now starts a `~astropy.modeling.polynomial.Polynomial1D` background at each spectrum's level, as it does for constant and linear backgrounds.
