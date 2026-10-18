@@ -164,6 +164,27 @@ def fits_info(filename: str) -> None:
     ----------
     filename : str
         Filename to load.
+
+    Examples
+    --------
+    >>> from irispy.data.test import get_test_filepath
+    >>> from irispy.io import fits_info
+    >>> fits_info(
+    ...     get_test_filepath(
+    ...         "sns/iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits"
+    ...     )
+    ... )
+    Filename: ...iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits
+    Observation: Medium sit-and-stare 0.3x60 1s  C II   Si IV   Mg II h/k   Mg II w s
+    OBS ID: 3620258102
+    No. Name ... Description
+    --- ------- ... ...
+      0 PRIMARY ... Primary Header (no data)
+      1 ... C II 1336 (1333 - 1337 AA)
+    ...
+      8 ... Mg II k 2796 (2793 - 2807 AA)
+      9 ... Auxiliary data
+     10 ... Auxiliary data
     """
 
     def get_description(idx, idx_mod):
@@ -252,6 +273,27 @@ def read_files(
     -------
     `ndcube.NDCollection`
         Cubes keyed by band or measured quantity. Repeated names include the filename.
+
+    Examples
+    --------
+    One slit-jaw file gives an `~irispy.sji.SJICube`; one raster file gives a
+    `~irispy.spectrograph.RasterCollection` keyed by spectral window:
+
+    >>> from irispy.data.test import get_test_filepath
+    >>> from irispy.io import read_files
+    >>> sji = read_files(
+    ...     get_test_filepath(
+    ...         "sns/iris_l2_20210905_001833_3620258102_SJI_1400_t000_test.fits"
+    ...     )
+    ... )
+    >>> sji.shape
+    (62, 40, 37)
+    >>> filename = get_test_filepath(
+    ...     "sns/iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits"
+    ... )
+    >>> raster = read_files(filename)
+    >>> len(raster), raster["Si IV 1403"][0].shape
+    (8, (187, 40, 29))
     """
     if isinstance(filenames, (str, Path)):
         filenames = [filenames]

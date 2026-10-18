@@ -54,6 +54,26 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
         before saving it while False tries to save every parameter as reference.
         Note however that it is not always possible to save the input as reference.
         Default is False.
+
+    Examples
+    --------
+    The array axes are raster step or time, slit position and wavelength; the exposure
+    times are an extra coordinate:
+
+    >>> from irispy.data.test import get_test_filepath
+    >>> from irispy.io import read_files
+    >>> filename = get_test_filepath(
+    ...     "sns/iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits"
+    ... )
+    >>> cube = read_files(filename, spectral_windows="Si IV 1403")["Si IV 1403"][0]
+    >>> cube.shape, cube.unit, cube.wavelength_axis
+    ((187, 40, 29), Unit("DN_IRIS_FUV"), 2)
+    >>> cube.meta.spectral_window, cube.meta.rest_wavelength
+    ('Si IV 1403', <Quantity 140.27700195 nm>)
+    >>> cube.spectral_dispersion.to("pm")
+    <Quantity 25.44 pm>
+    >>> cube[:, 10:20, 5:10].shape
+    (187, 10, 5)
     """
 
     plotter = PlotterDescriptor(default_type=SpectrogramPlotter)

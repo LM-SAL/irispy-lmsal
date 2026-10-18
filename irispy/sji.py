@@ -75,6 +75,26 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         as reference. Note however that it is not always possible to save the
         input as reference.
         Default is False.
+
+    Examples
+    --------
+    The array axes are time, solar Y and solar X; the exposure times are an extra coordinate:
+
+    >>> from irispy.data.test import get_test_filepath
+    >>> from irispy.io import read_files
+    >>> cube = read_files(
+    ...     get_test_filepath(
+    ...         "sns/iris_l2_20210905_001833_3620258102_SJI_1330_t000_test.fits"
+    ...     )
+    ... )
+    >>> cube.shape, cube.unit
+    ((52, 40, 37), Unit("DN_IRIS_SJI"))
+    >>> cube.meta.spectral_window, cube.meta.observing_mode_id
+    ('1330', 3620258102)
+    >>> cube[0, 10:20, 10:20].shape
+    (10, 10)
+    >>> cube.exposure_time[:2]
+    <Quantity [8.00004959, 8.00007725] s>
     """
 
     plotter = PlotterDescriptor(default_type=SJIPlotter)
@@ -232,6 +252,21 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
             Each map is built from its frame's FITS header, so sunpy picks the map class
             from the instrument (`~sunpy.map.sources.SJIMap` for slit-jaw images) and the
             map has the data unit and the frame's own exposure time.
+
+        Examples
+        --------
+        >>> from irispy.data.test import get_test_filepath
+        >>> from irispy.io import read_files
+        >>> cube = read_files(
+        ...     get_test_filepath(
+        ...         "sns/iris_l2_20210905_001833_3620258102_SJI_1330_t000_test.fits"
+        ...     )
+        ... )
+        >>> sji_map = cube.to_maps(0)
+        >>> sji_map.date.isot, sji_map.wavelength, sji_map.data.shape
+        ('2021-09-05T00:18:37.740', <Quantity 1330. Angstrom>, (40, 37))
+        >>> len(cube.to_maps([0, 1]))
+        2
         """
         from sunpy.map import Map  # NOQA: PLC0415
 
