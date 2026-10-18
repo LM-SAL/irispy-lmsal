@@ -222,7 +222,7 @@ sphinx_gallery_conf = {
     "abort_on_example_error": False,
     "plot_gallery": "True",
     "remove_config_comments": True,
-    "doc_module": ("sunpy"),
+    "doc_module": ("irispy",),
     "only_warn_on_example_error": True,
     "matplotlib_animations": (True, "html5"),
     "write_computation_times": profile_gallery,
