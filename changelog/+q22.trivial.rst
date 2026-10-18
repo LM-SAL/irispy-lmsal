@@ -1,0 +1,1 @@
+`~irispy.utils.red_blue.calculate_red_blue_asymmetry` fits one spline per peak position to the profiles without gaps and computes the asymmetries of all pixels at once, instead of looping over every pixel in Python; the results are unchanged.

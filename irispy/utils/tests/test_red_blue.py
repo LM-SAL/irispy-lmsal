@@ -379,6 +379,36 @@ def test_calculate_red_blue_asymmetry_flags_saturated():
     assert RBAQualityFlag(result["quality"].data[0, 1]) is RBAQualityFlag.OK
 
 
+def test_calculate_red_blue_asymmetry_pixels_are_independent():
+    # Profiles without gaps share one spline per peak sample and those with gaps get their own,
+    # so each pixel must come out as it does alone.
+    velocity = np.arange(-200, 201, 10) * u.km / u.s
+    rng = np.random.default_rng(1)
+    centers = rng.normal(0, 30, (2, 3, 1))
+    data = 100 * np.exp(-(((velocity.to_value(u.km / u.s) - centers) / 25) ** 2)) + rng.normal(0, 1, (2, 3, 41))
+    data[0, 1, 3] = np.nan  # a gap
+    data[1, 2, 30] = -1  # dropped, so a gap too
+    errors = np.sqrt(np.abs(data) + 1)
+    errors[1, 0, 5] = np.nan
+    mask = np.zeros(data.shape, dtype=bool)
+    mask[1, 1, 7] = True
+    cube = make_test_spectrogram_cube(
+        data, _wavelengths_from_velocity(velocity), uncertainty=StdDevUncertainty(errors), mask=mask
+    )
+
+    result = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH)
+    assert set(np.unique(result["quality"].data)) == {RBAQualityFlag.OK}
+    for i, j in np.ndindex(2, 3):
+        alone = calculate_red_blue_asymmetry(cube[i : i + 1, j : j + 1], rest_wavelength=REST_WAVELENGTH)
+        for name in result:
+            np.testing.assert_allclose(result[name].data[i, j], alone[name].data[0, 0], rtol=1e-12, err_msg=name)
+        np.testing.assert_allclose(
+            result["interpolated_profile"].uncertainty.array[i, j],
+            alone["interpolated_profile"].uncertainty.array[0, 0],
+            rtol=1e-12,
+        )
+
+
 def test_calculate_red_blue_asymmetry_real_cube_shape_and_coords(sns_sg_file):
     raster = read_files(sns_sg_file)
     cube = raster["C II 1336"][0]

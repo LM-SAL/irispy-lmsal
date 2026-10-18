@@ -196,120 +196,121 @@ def calculate_red_blue_asymmetry(
     velocity_range_kms = (velocity_low.to_value(u.km / u.s), velocity_high.to_value(u.km / u.s))
 
     data, errors = _prepare_data(cube, wavelength_axis)
-
     output_shape = data.shape[:-1]
+    # One row per spatial pixel
+    profiles = data.reshape(-1, data.shape[-1])
+    profile_errors = None if errors is None else errors.reshape(profiles.shape)
 
     low, high = velocity_range_kms
     red_mask = (interp_velocity >= low) & (interp_velocity <= high)
     blue_mask = (interp_velocity >= -high) & (interp_velocity <= -low)
 
-    red_blue = np.full(output_shape, np.nan)
-    red_blue_error = np.full(output_shape, np.nan)
-    quality = np.full(output_shape, RBAQualityFlag.OK, dtype=np.uint8)
-
+    quality = np.full(len(profiles), RBAQualityFlag.OK, dtype=np.uint8)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
-        raw_peak = np.nanmax(data, axis=-1)
+        raw_peak = np.nanmax(profiles, axis=-1)
     if min_intensity is not None:
-        low_signal = raw_peak < u.Quantity(min_intensity, cube.unit).value
-        quality = np.where(low_signal, RBAQualityFlag.LOW_SIGNAL, quality).astype(np.uint8)
-    saturated = _saturated_samples(cube).any(axis=wavelength_axis)
-    quality = np.where(saturated, RBAQualityFlag.SATURATED, quality).astype(np.uint8)
-
-    interpolated_profiles = (
-        np.full((*output_shape, interp_velocity.size), np.nan, dtype=float) if return_profiles else None
-    )
-    interpolated_errors = (
-        np.full((*output_shape, interp_velocity.size), np.nan, dtype=float)
-        if errors is not None and return_profiles
-        else None
-    )
+        quality[raw_peak < u.Quantity(min_intensity, cube.unit).value] = RBAQualityFlag.LOW_SIGNAL
+    quality[_saturated_samples(cube).any(axis=wavelength_axis).ravel()] = RBAQualityFlag.SATURATED
 
     min_points = spline_degree + 1
-    for index in np.ndindex(output_shape):
-        if quality[index] in (RBAQualityFlag.LOW_SIGNAL, RBAQualityFlag.SATURATED):
-            continue
+    finite = np.isfinite(profiles)
+    finite_velocity = np.isfinite(velocity)
+    todo = quality == RBAQualityFlag.OK
+    quality[todo & ~finite.any(axis=-1)] = RBAQualityFlag.NO_FINITE_DATA
+    todo &= quality == RBAQualityFlag.OK
+    peak_index = np.argmax(np.where(finite, profiles, -np.inf), axis=-1)
+    quality[todo & ((peak_index == 0) | (peak_index == profiles.shape[1] - 1))] = RBAQualityFlag.PEAK_AT_EDGE
+    todo &= quality == RBAQualityFlag.OK
+    # The spline goes through the finite samples at finite velocities from the peak
+    points = finite & finite_velocity
+    n_points = np.where(finite_velocity[peak_index], points.sum(axis=-1), 0)
+    quality[todo & (n_points < min_points)] = RBAQualityFlag.TOO_FEW_POINTS
+    todo &= quality == RBAQualityFlag.OK
 
-        profile = data[index]
-        profile_error = None if errors is None else errors[index]
-        finite_profile = np.isfinite(profile)
-        if not finite_profile.any():
-            quality[index] = RBAQualityFlag.NO_FINITE_DATA
-            continue
+    interpolated = np.full((len(profiles), interp_velocity.size), np.nan)
+    interpolated_errors = None if profile_errors is None else np.full_like(interpolated, np.nan)
 
-        peak_index = np.nanargmax(np.where(finite_profile, profile, np.nan))
-        if peak_index == 0 or peak_index == profile.size - 1:
-            quality[index] = RBAQualityFlag.PEAK_AT_EDGE
-            continue
+    def interpolate(x, y):
+        return make_interp_spline(x, y, k=spline_degree, axis=-1)(interp_velocity, extrapolate=False)
 
-        shifted_velocity = velocity - velocity[peak_index]
-        finite = np.isfinite(shifted_velocity) & finite_profile
-        if finite.sum() < min_points:
-            quality[index] = RBAQualityFlag.TOO_FEW_POINTS
-            continue
-
-        order = np.argsort(shifted_velocity[finite])
-        ordered_velocity = shifted_velocity[finite][order]
-        ordered_profile = profile[finite][order]
+    # Profiles without gaps share their velocity grid, so one spline fits all of those whose peak
+    # is at the same sample; a gap leaves a profile its own grid, and its own spline.
+    complete = todo & points.all(axis=-1)
+    if profile_errors is not None:
+        complete &= np.isfinite(profile_errors).all(axis=-1)
+    order = np.argsort(velocity)
+    for index in np.unique(peak_index[complete]):
+        rows = np.flatnonzero(complete & (peak_index == index))
+        x = velocity[order] - velocity[index]
         try:
-            interp_profile = make_interp_spline(ordered_velocity, ordered_profile, k=spline_degree)(
-                interp_velocity, extrapolate=False
-            )
+            interpolated[rows] = interpolate(x, profiles[rows][:, order])
+            if profile_errors is not None:
+                interpolated_errors[rows] = interpolate(x, profile_errors[rows][:, order])
         except ValueError:
-            quality[index] = RBAQualityFlag.INTERP_FAILED
-            continue
+            quality[rows] = RBAQualityFlag.INTERP_FAILED
+            interpolated[rows] = np.nan
+    for row in np.flatnonzero(todo & ~complete):
+        kept = points[row]
+        shifted_velocity = velocity[kept] - velocity[peak_index[row]]
+        order = np.argsort(shifted_velocity)
+        x = shifted_velocity[order]
+        samples = profiles[row][kept][order]
+        row_errors = None if profile_errors is None else profile_errors[row][kept][order]
+        finite_errors = None if row_errors is None else np.isfinite(row_errors)
+        try:
+            if row_errors is not None and finite_errors.all():
+                # Errors on the same grid: one spline through both
+                interpolated[row], interpolated_errors[row] = interpolate(x, [samples, row_errors])
+            else:
+                interpolated[row] = interpolate(x, samples)
+                if row_errors is not None and finite_errors.sum() >= min_points:
+                    interpolated_errors[row] = interpolate(x[finite_errors], row_errors[finite_errors])
+        except ValueError:
+            quality[row] = RBAQualityFlag.INTERP_FAILED
+            interpolated[row] = np.nan
+    if interpolated_errors is not None:
+        interpolated_errors = np.where(interpolated_errors >= 0, interpolated_errors, np.nan)
 
-        interp_error = None
-        if profile_error is not None:
-            ordered_error = profile_error[finite][order]
-            finite_error = np.isfinite(ordered_error)
-            if finite_error.sum() >= min_points:
-                try:
-                    interp_error = make_interp_spline(
-                        ordered_velocity[finite_error], ordered_error[finite_error], k=spline_degree
-                    )(interp_velocity, extrapolate=False)
-                except ValueError:
-                    quality[index] = RBAQualityFlag.INTERP_FAILED
-                    continue
-                interp_error = np.where(interp_error >= 0, interp_error, np.nan)
+    finite_interpolated = np.isfinite(interpolated)
+    incomplete = ((finite_interpolated & red_mask).sum(axis=-1) < _MIN_WING_COVERAGE * red_mask.sum()) | (
+        (finite_interpolated & blue_mask).sum(axis=-1) < _MIN_WING_COVERAGE * blue_mask.sum()
+    )
+    quality[(quality == RBAQualityFlag.OK) & incomplete] = RBAQualityFlag.INCOMPLETE_WINGS
+    rows = np.flatnonzero(quality == RBAQualityFlag.OK)  # with finite samples in both wings
+    profile = interpolated[rows]
+    red_intensity = np.nanmean(profile[:, red_mask], axis=-1)
+    blue_intensity = np.nanmean(profile[:, blue_mask], axis=-1)
+    peak = np.nanmax(profile, axis=-1)
+    zero = ~np.isfinite(peak) | np.isclose(peak, 0)
+    quality[rows[zero]] = RBAQualityFlag.PEAK_IS_ZERO
+    rows, profile, peak = rows[~zero], profile[~zero], peak[~zero]
+    numerator = (red_intensity - blue_intensity)[~zero]
+    red_blue = np.full(len(profiles), np.nan)
+    red_blue[rows] = numerator / peak
+    red_blue_error = np.full(len(profiles), np.nan)
+    if interpolated_errors is not None:
+        error = interpolated_errors[rows]
 
-        if return_profiles:
-            interpolated_profiles[index] = interp_profile
-            if interpolated_errors is not None and interp_error is not None:
-                interpolated_errors[index] = interp_error
+        def wing_error(wing):
+            count = np.isfinite(error[:, wing]).sum(axis=-1)
+            total = np.sqrt(np.nansum(error[:, wing] ** 2, axis=-1))
+            return np.divide(total, count, out=np.full(count.shape, np.nan), where=count > 0)
 
-        red_finite = red_mask & np.isfinite(interp_profile)
-        blue_finite = blue_mask & np.isfinite(interp_profile)
-        if red_finite.sum() < _MIN_WING_COVERAGE * red_mask.sum():
-            quality[index] = RBAQualityFlag.INCOMPLETE_WINGS
-            continue
-        if blue_finite.sum() < _MIN_WING_COVERAGE * blue_mask.sum():
-            quality[index] = RBAQualityFlag.INCOMPLETE_WINGS
-            continue
+        numerator_error = np.sqrt(wing_error(red_mask) ** 2 + wing_error(blue_mask) ** 2)
+        peak_error = error[np.arange(len(rows)), np.nanargmax(profile, axis=-1)]
+        numerator_is_zero = np.isclose(numerator, 0)
+        valid = np.isfinite(numerator_error) & (numerator_is_zero | np.isfinite(peak_error))
+        variance = (numerator_error / peak) ** 2
+        variance = variance + np.where(numerator_is_zero, 0, (numerator * peak_error / peak**2) ** 2)
+        red_blue_error[rows[valid]] = np.sqrt(variance[valid])
 
-        red_intensity = np.nanmean(interp_profile[red_finite]) if red_finite.any() else np.nan
-        blue_intensity = np.nanmean(interp_profile[blue_finite]) if blue_finite.any() else np.nan
-        peak = np.nanmax(interp_profile)
-        if not np.isfinite(peak) or np.isclose(peak, 0):
-            quality[index] = RBAQualityFlag.PEAK_IS_ZERO
-            continue
-
-        numerator = red_intensity - blue_intensity
-        red_blue[index] = numerator / peak
-
-        if interp_error is not None:
-            n_red = np.isfinite(interp_error[red_mask]).sum()
-            n_blue = np.isfinite(interp_error[blue_mask]).sum()
-            red_err = np.sqrt(np.nansum(interp_error[red_mask] ** 2)) / n_red if n_red > 0 else np.nan
-            blue_err = np.sqrt(np.nansum(interp_error[blue_mask] ** 2)) / n_blue if n_blue > 0 else np.nan
-            peak_err = interp_error[np.nanargmax(interp_profile)]
-            num_err = np.sqrt(red_err**2 + blue_err**2)
-            numerator_is_zero = np.isclose(numerator, 0)
-            if np.isfinite(num_err) and (numerator_is_zero or np.isfinite(peak_err)):
-                variance = (num_err / peak) ** 2
-                if not numerator_is_zero:
-                    variance += (numerator * peak_err / peak**2) ** 2
-                red_blue_error[index] = np.sqrt(variance)
+    red_blue = red_blue.reshape(output_shape)
+    red_blue_error = red_blue_error.reshape(output_shape)
+    quality = quality.reshape(output_shape)
+    interpolated_profiles = interpolated.reshape(*output_shape, -1)
+    if interpolated_errors is not None:
+        interpolated_errors = interpolated_errors.reshape(*output_shape, -1)
 
     meta = {
         "rba_rest_wavelength": rest_wavelength.to_value(u.nm),
