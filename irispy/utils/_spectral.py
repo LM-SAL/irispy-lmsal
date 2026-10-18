@@ -14,6 +14,7 @@ from astropy.nddata import StdDevUncertainty, UnknownUncertainty
 from ndcube import ExtraCoords
 
 from irispy.spectrograph import SpectrogramCube, _wavelength_indices
+from irispy.utils.utils import _boolean_mask
 
 
 class _QualityFlag(IntEnum):
@@ -74,8 +75,7 @@ def _fit_background(cube, windows, degree):
     vander = np.polynomial.polynomial.polyvander((wavelengths - wavelengths.mean()).to_value(u.AA), degree)
     samples = np.moveaxis(cube.data, wavelength_axis, -1)[..., index].astype(float)
     kept = np.isfinite(samples)
-    if cube.mask is not None:
-        kept &= ~np.moveaxis(np.broadcast_to(cube.mask, cube.data.shape), wavelength_axis, -1)[..., index]
+    kept &= ~np.moveaxis(_boolean_mask(cube), wavelength_axis, -1)[..., index]
     # Center each spectrum on its first kept sample. A constant the samples hold exactly is then
     # fitted exactly, whatever order the contractions round in, so its residuals stay zero instead
     # of crossing the sign cutoff in calculate_moments by a few ulps.
@@ -150,7 +150,7 @@ def make_spatial_template(cube, wavelength_axis):
     if cube.mask is not None:
         # Broadcast before slicing without changing the input cube's mask.
         cube = copy(cube)
-        cube.mask = np.broadcast_to(np.asarray(cube.mask, dtype=bool), cube.data.shape)
+        cube.mask = _boolean_mask(cube)
     template_slicer = [slice(None)] * cube.data.ndim
     template_slicer[wavelength_axis] = 0
     sliced_template = super(SpectrogramCube, cube).__getitem__(tuple(template_slicer))

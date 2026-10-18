@@ -12,6 +12,8 @@ from astropy.convolution import Box1DKernel, convolve
 from astropy.table import QTable, vstack
 from astropy.utils.exceptions import AstropyUserWarning
 
+from irispy.utils.utils import _boolean_mask
+
 __all__ = ["calculate_wavelength_drift"]
 
 # Name: rest wavelength (Å), fit range (Å), minimum slit-mean intensity (DN), sign (-1 absorption, 1 emission)
@@ -152,8 +154,7 @@ def _line_shifts(cube, wavelength, rest, fit_range, min_intensity, sign):
     data = cube.data[..., bins]
     if np.issubdtype(data.dtype, np.integer):
         data = data.astype(np.float32) * cube.meta["BSCALE"] + cube.meta["BZERO"]
-    if cube.mask is not None:
-        data[np.broadcast_to(cube.mask, cube.data.shape)[..., bins]] = 0
+    data[_boolean_mask(cube)[..., bins]] = 0
     profiles = np.clip(np.nan_to_num(data, copy=False, posinf=0), 0, None, out=data).mean(axis=1, dtype=float)
     offset = wavelength[bins] - rest
     for step in np.flatnonzero(profiles.mean(axis=1) > min_intensity):

@@ -18,6 +18,7 @@ from irispy.spectrograph import RasterCollection, SpectrogramCube
 from irispy.utils._spectral import _QualityFlag, check_scaled, make_map_cube, make_spatial_template, standard_deviation
 from irispy.utils.constants import ATOMIC_MASS, INSTRUMENTAL_FWHM, PASSBAND_LIMITS
 from irispy.utils.mg_features import calculate_mg_features
+from irispy.utils.utils import _boolean_mask
 
 __all__ = [
     "FitQualityFlag",
@@ -101,9 +102,7 @@ def _spectra(cube):
     along the last axis.
     """
     data = np.asarray(cube.data, dtype=float)
-    kept = np.isfinite(data)
-    if cube.mask is not None:
-        kept &= ~np.asarray(cube.mask, dtype=bool)
+    kept = np.isfinite(data) & ~_boolean_mask(cube)
     return np.moveaxis(np.where(kept, data, np.nan), cube.wavelength_axis, -1)
 
 
@@ -646,10 +645,7 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None):
         ]
 
     quality = np.full(shape, FitQualityFlag.OK, dtype=np.uint8)
-    if cube.mask is not None:
-        mask = np.broadcast_to(np.asarray(cube.mask, dtype=bool), cube.data.shape)
-        masked = np.any(mask, axis=cube.wavelength_axis)
-        quality[masked] = FitQualityFlag.MASKED_INPUT
+    quality[np.any(_boolean_mask(cube), axis=cube.wavelength_axis)] = FitQualityFlag.MASKED_INPUT
     for name in free:
         bounds = [bound for bound in fitted_model.bounds[name] if bound is not None and np.isfinite(bound)]
         scale = max([np.nanmax(np.abs(values[name].value), initial=0), *(abs(bound) for bound in bounds)])

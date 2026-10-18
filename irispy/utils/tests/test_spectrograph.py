@@ -244,6 +244,21 @@ def test_subtract_background(degree):
     assert result.unit == cube.unit
 
 
+def test_subtract_background_integer_mask():
+    # An integer mask, which the Mg II feature finder accepts, raised in the background fit
+    wavelengths = np.linspace(1333, 1337, 5) * u.AA
+    data = np.full((2, 3, 5), 3.0)
+    data[0, 0, 0] = 1e6
+    mask = np.zeros(data.shape, dtype=np.uint8)
+    mask[0, 0, 0] = 1
+    windows = [[1333, 1334], [1336, 1337]] * u.AA
+    result = subtract_background(make_test_spectrogram_cube(data, wavelengths, mask=mask), windows, degree=0)
+    boolean = make_test_spectrogram_cube(data, wavelengths, mask=mask.astype(bool))
+    expected = subtract_background(boolean, windows, degree=0)
+    np.testing.assert_array_equal(result.data, expected.data)
+    np.testing.assert_array_equal(result.mask, mask.astype(bool))
+
+
 @pytest.mark.parametrize(
     ("windows", "match"),
     [([1333, 1334, 1335] * u.AA, r"shape \(2,\) or \(n, 2\)"), ([1340, 1341] * u.AA, "No wavelengths between")],
