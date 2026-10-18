@@ -305,8 +305,9 @@ def test_starts_from_model_follows_each_spectrum(profile, background):
     starts = starts_from_model(model, cube)
     assert starts.param_names == model.param_names
     assert all(getattr(starts, name).shape == SHAPE for name in starts.param_names)
-    # The background passes through each spectrum's 10th percentile in the middle of the window.
-    level = np.percentile(cube.data, 10, axis=-1)
+    # The background passes through each spectrum's 10th percentile, with its slope removed, in the middle of the window.
+    slope = model[0](WAVELENGTH) - model[0](WAVELENGTH.mean())
+    level = np.percentile(cube.data - slope.to_value(u.DN), 10, axis=-1)
     if background == "constant":
         np.testing.assert_allclose(starts.amplitude_0.value, level)
     else:
@@ -337,9 +338,11 @@ def test_starts_from_model_follows_each_spectrum_on_a_polynomial(model):
     assert starts.c0_0.unit == model.c0_0.unit
     for name in ("c1_0", "c2_0"):
         np.testing.assert_array_equal(getattr(starts, name).value, getattr(model, name).value)
-    # The background passes through each spectrum's 10th percentile in the middle of the window.
+    # The background passes through each spectrum's 10th percentile, with its higher terms removed, in the middle of
+    # the window.
     angstrom = u.AA if model.c0_0.unit else 1
-    level = np.percentile(cube.data, 10, axis=-1)
+    terms = u.Quantity(model[0](WAVELENGTH.value * angstrom) - model[0](WAVELENGTH.mean().value * angstrom)).value
+    level = np.percentile(cube.data - terms, 10, axis=-1)
     np.testing.assert_allclose(u.Quantity(starts[0](WAVELENGTH.mean().value * angstrom)).value, level)
     # The line starts at its height above the started background at the sample it starts at.
     peak = np.searchsorted(WAVELENGTH.value, starts.mean_1.value)
@@ -357,17 +360,15 @@ def test_starts_from_model_follows_each_spectrum_on_a_polynomial(model):
     ],
 )
 def test_starts_from_model_finds_lines_on_a_steep_background(background):
-    _, cube = _line_cube(np.random.default_rng(12))
-    line = models.Gaussian1D(150, 1402.75, 0.06)
-    flat = starts_from_model(models.Const1D(5) + line, cube)
-    flat_level = np.percentile(cube.data, 10, axis=-1)
-    # The same lines on a background as steep as that of the model, which would move their peaks.
+    truth, cube = _line_cube(np.random.default_rng(12))
+    # The lines on a background as steep as that of the model, which would move their peaks and lower its level.
     cube.data += background(WAVELENGTH.value) - background(WAVELENGTH.mean().value)
-    starts = starts_from_model(background + line, cube)
-    # The lines start at the same samples, as high above the started background as above a flat one.
-    np.testing.assert_array_equal(starts.mean_1.value, flat.mean_1.value)
-    level = np.percentile(cube.data, 10, axis=-1)
-    np.testing.assert_allclose(starts.amplitude_1.value + level, flat.amplitude_1.value + flat_level)
+    starts = starts_from_model(background + models.Gaussian1D(150, 1402.75, 0.06), cube)
+    # The started background passes through the true one in the middle of the window.
+    np.testing.assert_allclose(starts[0](WAVELENGTH.mean().value), truth.amplitude_0.value)
+    # Each line starts at its sample nearest its center, at its true height there.
+    assert np.all(np.abs(starts.mean_1.value - truth.mean_1.value) < np.diff(WAVELENGTH.value)[0] / 2)
+    np.testing.assert_allclose(starts.amplitude_1.value, truth[1](starts.mean_1.value * u.AA).to_value(u.DN))
 
 
 def test_starts_from_model_keeps_lines_without_a_peak():
