@@ -1,0 +1,1 @@
+The slit-jaw reader is now checked against each test file's own FITS header instead of two value snapshots, and the mixed-file ``read_files`` test checks what comes back.
