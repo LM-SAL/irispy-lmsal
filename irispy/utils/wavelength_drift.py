@@ -4,6 +4,7 @@ Utilities for measuring the orbital drift of the IRIS spectrograph wavelength sc
 
 import warnings
 
+import dask.array as da
 import numpy as np
 from scipy.optimize import least_squares
 
@@ -154,7 +155,10 @@ def _line_shifts(cube, wavelength, rest, fit_range, min_intensity, sign):
     data = cube.data[..., bins]
     if np.issubdtype(data.dtype, np.integer):
         data = data.astype(np.float32) * cube.meta["BSCALE"] + cube.meta["BZERO"]
-    data[_boolean_mask(cube)[..., bins]] = 0
+    # The lazy mask of memmap=True spans the whole raster and marks the fill values only, which
+    # are negative, so the clip below zeroes them without computing it
+    if not isinstance(cube.mask, da.Array):
+        data[_boolean_mask(cube)[..., bins]] = 0
     profiles = np.clip(np.nan_to_num(data, copy=False, posinf=0), 0, None, out=data).mean(axis=1, dtype=float)
     offset = wavelength[bins] - rest
     for step in np.flatnonzero(profiles.mean(axis=1) > min_intensity):

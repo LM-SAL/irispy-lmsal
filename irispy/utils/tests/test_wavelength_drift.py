@@ -1,3 +1,4 @@
+import dask.array as da
 import numpy as np
 import pooch
 import pytest
@@ -6,6 +7,7 @@ import astropy.units as u
 from astropy.table import QTable
 
 from irispy.data.test import get_test_filepath
+from irispy.io import _mask
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.spectrograph import RasterCollection, SpectrogramCubeSequence
 from irispy.tests.helpers import make_test_spectrogram_cube
@@ -234,6 +236,14 @@ def test_window_chosen_by_its_wavelengths():
     np.testing.assert_array_equal(
         calculate_wavelength_drift(first_cut)["Ni I"], calculate_wavelength_drift(raster)["Ni I"]
     )
+
+
+def test_memmap_mask_is_not_computed(monkeypatch):
+    # The lazy fill mask of memmap=True spans the whole raster, which the fit never reads
+    monkeypatch.setattr(_mask, "_fill_mask_values", lambda *_: pytest.fail("the lazy mask was computed"))
+    cube = read_spectrograph_lvl2(CROP, memmap=True)["Mg II k 2796"].data[0]
+    assert isinstance(cube.mask, da.Array)  # fixture check
+    assert np.isfinite(_line_shifts(cube, _wavelengths(cube), *_LINES["Ni I"])).any()
 
 
 def test_memmap_data_give_the_same_table():
