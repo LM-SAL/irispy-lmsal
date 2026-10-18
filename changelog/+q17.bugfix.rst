@@ -1,0 +1,1 @@
+`irispy.io.read_sji_lvl2` no longer writes the replaced fill values into the image of a supplied `astropy.io.fits.HDUList`: with ``memmap=False`` the returned cube holds a copy, and the in-place filling of the auxiliary table is documented.
