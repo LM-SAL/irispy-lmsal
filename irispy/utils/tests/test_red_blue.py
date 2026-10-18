@@ -12,7 +12,8 @@ import irispy.utils.red_blue as red_blue_module
 from irispy.io.utils import read_files
 from irispy.meta import SGMeta
 from irispy.spectrograph import RasterCollection, SpectrogramCube
-from irispy.tests.helpers import figure_test, make_test_spectrogram_cube
+from irispy.tests.helpers import figure_test, make_test_spectrogram_cube, mark_saturated
+from irispy.utils.constants import SATURATION_LIMIT
 from irispy.utils.red_blue import RBAQualityFlag, calculate_red_blue_asymmetry
 from irispy.utils.spectrograph import subtract_background
 
@@ -366,10 +367,12 @@ def test_calculate_red_blue_asymmetry_flags_saturated():
     wavelengths = _wavelengths_from_velocity(velocity)
     data = np.tile(_flat_wing_profile(velocity, red_excess=2), (1, 2, 1))
     mask = np.zeros(data.shape, dtype=bool)
-    data[0, 0, 20] = np.inf  # the peak, as the readers set clipped samples
-    data[0, 1, 5] = np.inf  # masked, so not saturated
-    mask[0, 1, 5] = True
+    data[0, 0, 20] = data[0, 1, 5] = SATURATION_LIMIT.value
+    mask[0, 1, 5] = True  # masked, but not marked, so not saturated
     cube = make_test_spectrogram_cube(data, wavelengths, mask=mask)
+    saturated = np.zeros(data.shape, dtype=bool)
+    saturated[0, 0, 20] = True  # the peak, marked as the readers mark clipped samples
+    mark_saturated(cube, saturated)
     result = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH, spline_degree=1)
     assert RBAQualityFlag(result["quality"].data[0, 0]) is RBAQualityFlag.SATURATED
     assert np.isnan(result["red_blue_asymmetry"].data[0, 0])

@@ -139,16 +139,18 @@ def test_read_sji_lvl2_masks_both_fill_values_without_changing_raw_data(memmap):
 
     cube = read_sji_lvl2(filename, memmap=memmap, uncertainty=True)
 
-    np.testing.assert_array_equal(cube.mask, expected_mask)
     assert cube.meta["scaled"] is not memmap
     if memmap:
+        np.testing.assert_array_equal(cube.mask, expected_mask)
         np.testing.assert_array_equal(cube.data, raw)
         assert cube.uncertainty is None
     else:
         expected = raw.astype(float) * scale + offset
         expected[expected_mask] = np.nan
-        expected[expected >= SATURATION_LIMIT.value] = np.inf  # the clipped pixels of this flare
-        assert np.isposinf(expected).any()
+        clipped = expected >= SATURATION_LIMIT.value  # the clipped pixels of this flare, which keep their value
+        assert clipped.any()
+        np.testing.assert_array_equal(cube.mask, expected_mask | clipped)
+        np.testing.assert_array_equal(cube.meta["saturated"], clipped)
         np.testing.assert_allclose(cube.data, expected)
         assert isinstance(cube.uncertainty, StdDevUncertainty)
         assert cube.uncertainty.array.shape == cube.data.shape

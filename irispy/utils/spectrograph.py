@@ -12,6 +12,7 @@ from irispy.spectrograph import SpectrogramCube, SpectrogramCubeSequence
 from irispy.utils._spectral import _fit_background, check_scaled, make_map_cube, standard_deviation
 from irispy.utils.constants import RADIANCE_UNIT, RADIANCE_UNIT_PER_HZ
 from irispy.utils.response import get_interpolated_effective_area, get_latest_response
+from irispy.utils.utils import _saturated_samples
 
 __all__ = [
     "calculate_dn_to_radiance_factor",
@@ -144,8 +145,8 @@ def radiation_temperature(
       radiation whose source function is the Planck function (:cite:t:`rybicki1985`, Sections 1.4
       and 1.5), which holds only approximately for Mg II h & k :cite:p:`leenaarts2013` and not at
       all for optically thin lines.
-    * Samples with zero, negative or NaN radiance are NaN and masked, and +Inf samples, as the readers
-      set the ones clipped at the level 2 ceiling, are +Inf and masked; the input mask is kept.
+    * Samples with zero, negative or NaN radiance are NaN and masked, and +Inf samples are +Inf and
+      masked; the input mask is kept.
       Noise just above zero still gives several thousand kelvin.
     * The uncertainty is propagated to first order, so it is unreliable where it is comparable to the radiance.
     """
@@ -334,7 +335,7 @@ def subtract_background(cube, windows, *, degree=1):
     -------
     `irispy.spectrograph.SpectrogramCube`
         ``cube`` minus the fitted background, with the same mask, uncertainty and coordinates.
-        Spectra with no more than ``degree`` samples to fit are NaN, except their +Inf samples.
+        Spectra with no more than ``degree`` samples to fit are NaN, except their saturated samples.
 
     Notes
     -----
@@ -343,13 +344,13 @@ def subtract_background(cube, windows, *, degree=1):
     `~astropy.nddata.StdDevUncertainty` of independent samples cannot hold. For a constant
     (``degree=0``) fitted to :math:`n` samples of error :math:`\sigma`, it is :math:`\sigma / \sqrt{n}`.
 
-    +Inf samples, as the readers set the ones clipped at the level 2 ceiling, are left out of the fit
-    and stay +Inf, also in spectra with too few samples to fit, so that
+    Saturated samples (see `~irispy.utils.moments.calculate_moments`) are masked, so left out of the
+    fit, and keep their value in spectra with too few samples to fit, so that
     `~irispy.utils.moments.calculate_moments` still flags a spectrum saturated across its line and its
     windows.
     """
     check_scaled(cube)
     background = _fit_background(cube, windows, degree)
-    # +Inf - NaN would be NaN
-    background[np.isposinf(cube.data)] = 0
+    # Their value minus NaN would be NaN
+    background[np.isnan(background) & _saturated_samples(cube)] = 0
     return cube - u.Quantity(background, cube.unit)

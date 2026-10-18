@@ -10,6 +10,7 @@ from astropy.nddata import NDDataArray, StdDevUncertainty
 
 from irispy.spectrograph import RasterCollection, _wavelength_indices
 from irispy.utils._spectral import check_scaled, make_map_cube, make_spatial_template, standard_deviation
+from irispy.utils.utils import _saturated_samples
 
 __all__ = ["average_window", "calculate_moments"]
 
@@ -50,7 +51,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
         * ``"width"`` — 2nd moment, in nm
         * ``"velocity"`` — Doppler velocity of the centroid in km/s, if ``rest_wavelength`` is known
         * ``"velocity_width"`` — width in km/s, if ``rest_wavelength`` is known
-        * ``"saturated"`` — `True` where a sample used is +Inf
+        * ``"saturated"`` — `True` where a sample used is saturated
 
         Each moment map has a `~astropy.nddata.StdDevUncertainty` if ``cube`` has an uncertainty
         (e.g. read with ``uncertainty=True``).
@@ -58,12 +59,14 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
     Notes
     -----
     * Negative, non-finite and masked samples are set to zero and add no uncertainty.
-    * Pixels with an unmasked +Inf sample within ``velocity_range`` are saturated: NaN in every moment
-      map and `True` in ``"saturated"``. The level 2 readers set the samples clipped at
-      ``irispy.utils.constants.SATURATION_LIMIT`` to +Inf (see the comment on the constant), and +Inf
-      survives `~irispy.utils.spectrograph.subtract_background`, exposure time correction and
-      calibration. For a stricter limit, set ``cube.data[cube.data >= limit] = np.inf`` first.
-    * Every map is masked where no sample within ``velocity_range`` is unmasked and not NaN.
+    * Pixels with a saturated sample within ``velocity_range`` are NaN in every moment map and `True`
+      in ``"saturated"``. Saturated samples are those the mask and ``cube.meta["saturated"]`` both
+      mark: the level 2 readers mark the samples clipped at ``irispy.utils.constants.SATURATION_LIMIT``
+      (see the comment on the constant) in both, keeping their value, and both survive
+      `~irispy.utils.spectrograph.subtract_background`, exposure time correction and calibration.
+      Other masked samples are left out without saturating the pixel.
+    * Every map is masked where no sample within ``velocity_range`` is unmasked and not NaN, or
+      saturated.
     * Uncertainties are propagated to first order, treating an `~astropy.nddata.UnknownUncertainty`
       as a standard deviation. They are NaN where undefined: the intensity error where no sample is
       left, the centroid and velocity errors where fewer than two are left, and the width and velocity
@@ -89,6 +92,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
     wavelengths = cube.axis_world_coords(wavelength_axis)[0].to(u.nm)
     data = np.asarray(cube.data)
     mask = None if cube.mask is None else np.asarray(cube.mask, dtype=bool)
+    clipped = _saturated_samples(cube)
     sigma = standard_deviation(cube)
     if velocity_range is not None:
         if rest_wavelength is None:
@@ -104,6 +108,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
         slicer = [slice(None)] * data.ndim
         slicer[wavelength_axis] = crop_indices
         data = data[tuple(slicer)]
+        clipped = clipped[tuple(slicer)]
         if mask is not None:
             mask = mask[tuple(slicer)]
         if sigma is not None:
@@ -111,10 +116,9 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
         wavelengths = wavelengths[crop_indices]
     data = np.array(data, dtype=float, copy=True)
     unmasked = True if mask is None else ~mask
-    # Masked samples are left out of the moments, so they do not saturate them either
-    saturated = np.any(np.isposinf(data) & unmasked, axis=wavelength_axis)
-    # The template is masked where all of cube is, the maps also where no sample is used
-    used_mask = ~np.any(~np.isnan(data) & unmasked, axis=wavelength_axis)
+    saturated = np.any(clipped, axis=wavelength_axis)
+    # The template is masked where all of cube is, the maps also where no sample is used or saturated
+    used_mask = ~np.any((~np.isnan(data) & unmasked) | clipped, axis=wavelength_axis)
     dropped = (data < 0) | ~np.isfinite(data) | (False if mask is None else mask)
     data[dropped] = 0
 
@@ -217,8 +221,7 @@ def average_window(cube, wavelength_range, *, method="mean"):
     Notes
     -----
     * Masked and NaN samples are left out, so a sum over a partly masked window is low. Pixels with
-      no sample left are NaN and masked, as are pixels with a +Inf sample, as the readers set clipped
-      ones.
+      no sample left are NaN and masked, as are pixels with a saturated sample (see `calculate_moments`).
     * Uncertainties are propagated taking the samples as independent, treating an
       `~astropy.nddata.UnknownUncertainty` as a standard deviation, as in `calculate_moments`.
     * For :math:`\int I(\lambda) \, d\lambda`, multiply a sum by the absolute wavelength step,
@@ -231,7 +234,8 @@ def average_window(cube, wavelength_range, *, method="mean"):
     wavelength_axis = cube.wavelength_axis
     window = _wavelength_indices(cube.axis_world_coords(wavelength_axis)[0], wavelength_range)
     data = np.take(cube.data, window, axis=wavelength_axis).astype(float)
-    dropped = np.isnan(data)  # +Inf, as the readers set clipped samples, makes the pixel NaN and masked
+    dropped = np.isnan(data)
+    saturated = np.any(np.take(_saturated_samples(cube), window, axis=wavelength_axis), axis=wavelength_axis)
     if cube.mask is not None:
         mask = np.broadcast_to(np.asarray(cube.mask, dtype=bool), cube.data.shape)
         dropped |= np.take(mask, window, axis=wavelength_axis)
@@ -239,7 +243,8 @@ def average_window(cube, wavelength_range, *, method="mean"):
     uncertainty = None if sigma is None else StdDevUncertainty(np.take(sigma, window, axis=wavelength_axis))
     reduction = getattr(NDDataArray(data, uncertainty=uncertainty, mask=dropped), method)
     result = reduction(axis=wavelength_axis, operation_ignores_mask=True)
-    values = np.where(result.mask, np.nan, result.data)
-    uncertainty = None if sigma is None else StdDevUncertainty(np.where(result.mask, np.nan, result.uncertainty.array))
+    blank = result.mask | saturated
+    values = np.where(blank, np.nan, result.data)
+    uncertainty = None if sigma is None else StdDevUncertainty(np.where(blank, np.nan, result.uncertainty.array))
     template = make_spatial_template(cube, wavelength_axis)
     return make_map_cube(template, values, cube.unit, mask_invalid=True, uncertainty=uncertainty)

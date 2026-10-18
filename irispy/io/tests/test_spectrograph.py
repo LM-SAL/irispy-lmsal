@@ -354,15 +354,19 @@ def test_memmap_unit_is_unscaled(window, band, raster_sg_file):
     assert read_spectrograph_lvl2(raster_sg_file, memmap=True)["C II 1336"][0].unit == DN_UNIT["FUV"]
 
 
-def test_read_spectrograph_sets_clipped_samples_to_inf(tmp_path, sns_sg_file):
+def test_read_spectrograph_masks_clipped_samples(tmp_path, sns_sg_file):
     with fits.open(sns_sg_file) as hdul:
         window = hdul[0].header["TDESC1"]
         data = hdul[1].data.astype("float32")
         data.flat[7] = SATURATION_LIMIT.value
         hdul[1].data = data
         hdul.writeto(tmp_path / "clipped.fits")
-    cube = read_spectrograph_lvl2(tmp_path / "clipped.fits", uncertainty=True)[window][0]
-    clipped = np.isposinf(cube.data)
-    assert clipped.sum() == 1
-    assert not cube.mask[clipped].any()
-    assert np.isposinf(cube.uncertainty.array[clipped]).all()
+    raster = read_spectrograph_lvl2(tmp_path / "clipped.fits", uncertainty=True)
+    cube = raster[window][0]
+    # The clipped sample keeps its value, masked and marked saturated
+    assert np.flatnonzero(cube.meta["saturated"]).tolist() == [7]
+    assert cube.data.flat[7] == SATURATION_LIMIT.value
+    assert cube.mask.flat[7]
+    assert np.isfinite(cube.uncertainty.array.flat[7])
+    # Windows without clipped samples have no saturated meta
+    assert not any("saturated" in sequence[0].meta for name, sequence in raster.items() if name != window)

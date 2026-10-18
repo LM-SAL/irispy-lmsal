@@ -13,13 +13,14 @@ from irispy.data.test import get_test_filepath
 from irispy.io.sji import read_sji_lvl2
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.spectrograph import SpectrogramCubeSequence
+from irispy.tests.helpers import mark_saturated
 from irispy.utils.bursts import (
     find_bright_image_events,
     find_bright_spectral_events,
     find_si_iv_bursts,
     find_sji_bursts,
 )
-from irispy.utils.constants import DN_UNIT
+from irispy.utils.constants import DN_UNIT, SATURATION_LIMIT
 
 IRISPY_DATA = "https://github.com/LM-SAL/irispy-data/releases/download/v1"
 SJI_SUMMARY = get_test_filepath("bursts/iris_sji_burst_check_4000255147_summary.ecsv")
@@ -134,6 +135,18 @@ def test_bright_spectral_events_match_si_iv_bursts(si_iv_cube):
     assert events.pformat(max_lines=-1, max_width=-1) == bursts.pformat(max_lines=-1, max_width=-1)
 
 
+def test_bright_spectral_events_average_saturated_samples(si_iv_cube):
+    saturated = np.zeros(si_iv_cube.data.shape, dtype=bool)
+    saturated[5, 100, 20] = True
+    si_iv_cube.data[saturated] = SATURATION_LIMIT.value
+    unmasked = copy.deepcopy(si_iv_cube)
+    mark_saturated(si_iv_cube, saturated)  # as the readers mark clipped samples: masked, but averaged at their value
+    _, events = find_bright_spectral_events(si_iv_cube, 40, median_factor=None)
+    _, expected = find_bright_spectral_events(unmasked, 40, median_factor=None)
+    assert list(events[events["step"] == 5]["y"]) == [100]
+    assert events.pformat(max_lines=-1, max_width=-1) == expected.pformat(max_lines=-1, max_width=-1)
+
+
 def test_bright_spectral_events_nuv():
     mg_ii = read_spectrograph_lvl2(
         get_test_filepath("sns/iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits"),
@@ -190,9 +203,13 @@ def test_sji_edge_and_small_events(bursts_sjicube_1400):
 def test_sji_frames_without_valid_pixels(bursts_sjicube_1400):
     sji = copy.deepcopy(bursts_sjicube_1400)
     sji.mask[1] = True
+    sji.meta["saturated"][1] = False  # nor saturated ones, which count at their value though masked
     _, events = find_sji_bursts(sji)
     assert 1 not in events["frame"]
-    sji.data[0, 100, 100:102] = np.inf  # clipped, as the readers set them: bright, and out of the statistics
+    saturated = np.zeros(sji.data.shape, dtype=bool)
+    saturated[0, 100, 100:102] = True
+    sji.data[saturated] = SATURATION_LIMIT.value
+    mark_saturated(sji, saturated)  # as the readers mark clipped pixels: masked, but bright at their value
     labels, events = find_sji_bursts(sji)
     assert np.isfinite(events["threshold"]).all()
     assert labels.data[0, 100, 100] == labels.data[0, 100, 101] > 0

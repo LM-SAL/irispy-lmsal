@@ -148,7 +148,7 @@ def _line_shifts(cube, wavelength, rest, fit_range, min_intensity, sign):
     if bins.size < 4:  # fewer bins than Gaussian parameters
         return shifts
     # The fit bins in DN, which memmap=True leaves as the FITS integers, averaged along the slit
-    # with bad, masked, clipped (+Inf) and negative pixels as zero, as in IDL
+    # with bad, masked, +Inf and negative pixels as zero, as in IDL
     data = cube.data[..., bins]
     if np.issubdtype(data.dtype, np.integer):
         data = data.astype(np.float32) * cube.meta["BSCALE"] + cube.meta["BZERO"]
