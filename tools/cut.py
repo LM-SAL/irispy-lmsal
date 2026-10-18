@@ -2,7 +2,7 @@ r"""
 Cut real IRIS level 2 FITS files down to the exposures, windows and pixels a test needs.
 
 Unlike ``compress.py``, which keeps every tenth pixel, this keeps index ranges, so the
-kept values and their neighbours are exactly those of the whole file:
+kept values and their neighbors are exactly those of the whole file:
 
 - The data values are unchanged, raw integers with their BSCALE/BZERO.
 - The auxiliary table and the level 1 filename table keep the rows of the kept
@@ -17,11 +17,11 @@ kept values and their neighbours are exactly those of the whole file:
 - The filename table of an AIA cube declares A0 columns, which astropy cannot read, so it
     is dropped, as the SOT fixtures do; irispy does not read it.
 
-Examples, run from this directory::
+Examples, run from the repository root with the whole files in it::
 
-    python cut.py iris_l2_20130902_163935_4000255147_SJI_1400_t000.fits \
+    python tools/cut.py iris_l2_20130902_163935_4000255147_SJI_1400_t000.fits \
         bursts/iris_l2_20130902_163935_4000255147_SJI_1400_t000_test.fits --exposures 0,69,227
-    python cut.py iris_l2_20130902_182935_4000005156_raster_t000_r00000.fits \
+    python tools/cut.py iris_l2_20130902_182935_4000005156_raster_t000_r00000.fits \
         bursts/iris_l2_20130902_182935_4000005156_raster_t000_r00000_si_iv_test.fits \
         --rows 385:576 --window "Si IV 1403" 262:305
     python cut.py aia_l2_20170305_164021_3620106076_1700.fits \

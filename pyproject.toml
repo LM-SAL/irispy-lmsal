@@ -102,6 +102,10 @@ include = [ "irispy*" ]
 exclude = [ "irispy._dev*" ]
 namespaces = false
 
+# The IDL scripts that made the test references stay beside the data in the source tree, out of the wheel.
+[tool.setuptools.exclude-package-data]
+"irispy.data.test" = [ "*.pro", "*/*.pro" ]
+
 [tool.setuptools_scm]
 version_file = "irispy/_version.py"
 

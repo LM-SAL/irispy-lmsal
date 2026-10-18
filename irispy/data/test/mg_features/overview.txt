@@ -17,7 +17,7 @@ Kept:   raster steps 13, 32 and 57 (of 64) and all 771 slit rows of the Mg II k 
 Header: NWIN = 2 and NEXP = NRASTERP = 3. Both windows copy the keywords of window 8,
         except TDESC2 = 'Mg II h 2803' and TWAVE2 = 2803.53 (h, so meta.rest_wavelength
         is h). NAXIS1/3, CRPIX1 and TWMIN/TWMAX describe the cut. The filename table
-        declares TFIELDS = 9 for its 9 columns (the whole file says 7, see ../compress.py).
+        declares TFIELDS = 9 for its 9 columns (the whole file says 7, see tools/compress.py).
         TSR/TER/TSC/TEC, the statistics keywords (DATA*, TD*) and CRPIX3/CDELT3 still
         describe the whole window or file, so the WCS solar x of the three steps is wrong.
 
