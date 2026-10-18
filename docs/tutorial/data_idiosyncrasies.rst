@@ -169,9 +169,6 @@ There is no Python code to automatically determine the best scaling for a given 
 Cleaning Up
 -----------
 
-The slit-jaw CCD contains some particles that cause dark regions of order up to a few arcseconds in size in the slit.
-These features are marked as bad pixels and set to zero values (0) in ``iris_prep.pro`` so they can be easily recognized during data analysis.
-The particles are stable in position and do not let any light through - they are completely dark.
-They are most prominent in the FUV images (1400 Å and 1330 Å) and much less visible in the NUV images (2796 Å and 2830 Å).
-
-These dust spots can be cosmetically corrected in slit-jaw images and movies but there is currently no routine to do this in ``irispy``.
+The dust spots described in `Particles on slit-jaw images`_ can be cosmetically corrected in slit-jaw images and movies with `irispy.sji.SJICube.remove_dust`, which replaces them with values from neighboring frames or, failing that, a local median.
+`irispy.sji.SJICube.apply_dust_mask` only masks them.
+See :ref:`sphx_glr_generated_gallery_calibration_04_remove_dust.py`.
