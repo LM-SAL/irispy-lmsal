@@ -8,7 +8,6 @@ In this example, we will showcase how to open, crop and plot IRIS spectrograph d
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pooch
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord, SpectralCoord
@@ -17,23 +16,18 @@ from astropy.wcs.utils import wcs_to_celestial_frame
 
 from sunpy.coordinates.frames import Helioprojective
 
+from irispy.data import sample
 from irispy.io import read_files
 from irispy.utils.moments import average_window
 
 quantity_support()
 
 ###############################################################################
-# `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20180102_153155_3610108077_2018-01-02T15%3A31%3A552018-01-02T15%3A31%3A55.xml>`__.
-#
-# In this case, we will use ``pooch`` to keep this example self-contained
-# but you can download the data manually using your browser as well.
-#
-# You will need to update the path to the data in the next section if you do that.
+# We start with the raster sample file, which ``irispy.data.sample`` downloads on first use.
+# To use your own data, pass the path of a Level 2 raster tarball from the
+# `IRIS data archive <https://www.lmsal.com/hek/hcr>`__ to ``read_files`` instead.
 
-raster_filename = pooch.retrieve(
-    "https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2018/01/02/20180102_153155_3610108077/iris_l2_20180102_153155_3610108077_raster.tar.gz",
-    known_hash="8949562149cfa5fba067b5b102e8434b14cea3c3416dd79c06b7f6e211c61a39",
-)
+raster_filename = sample.RASTER_TAR
 
 ###############################################################################
 # We will now open the data using a helper function which is designed to read
@@ -60,7 +54,7 @@ print(mg_ii)
 ###############################################################################
 # This is an `irispy.spectrograph.SpectrogramCubeSequence` which contains each
 # complete raster as one individual `irispy.spectrograph.SpectrogramCube` object.
-# In this case, there was only one complete raster, so the first axis is only length 1.
+# In this case, there were five complete rasters, so the first axis has length 5.
 #
 # So we will index to get the first raster and work with that.
 
@@ -87,10 +81,10 @@ raster_animation = mg_ii.plot(fig=fig).get_animation()
 
 mg_ii_k_line = mg_ii.crop([SpectralCoord(279.4, unit=u.nm), None], [SpectralCoord(279.9, unit=u.nm), None])
 fig = plt.figure()
-wavelength_animation = mg_ii_k_line.plot(fig=fig, plot_axes=["x", "y", None], vmin=0, vmax=500).get_animation()
+wavelength_animation = mg_ii_k_line.plot(fig=fig, plot_axes=["x", "y", None], vmin=0, vmax=100).get_animation()
 
 ###############################################################################
-# We can plot a spectrum at raster step 120 and slit pixel 200 using the data directly.
+# We can plot a spectrum at raster step 8 and slit pixel 200 using the data directly.
 # We read the wavelengths of the Mg window by calling
 # `ndcube.NDCube.axis_world_coords` for "wl" (wavelength).
 
@@ -98,7 +92,7 @@ wavelength_animation = mg_ii_k_line.plot(fig=fig, plot_axes=["x", "y", None], vm
 
 fig, ax = plt.subplots()
 # The array still holds the fill values (-200) that the cube masks, so we hide them as well.
-ax.plot(mg_wave.to("AA"), np.where(mg_ii.mask[120, 200], np.nan, mg_ii.data[120, 200]))
+ax.plot(mg_wave.to("AA"), np.where(mg_ii.mask[8, 200], np.nan, mg_ii.data[8, 200]))
 ax.set_xlabel("Wavelength [Å]")
 ax.set_ylabel(f"Intensity [{mg_ii.unit}]")
 
@@ -146,11 +140,11 @@ ax = fig.add_subplot(111, projection=mg_ii_k_map.wcs)
 mg_ii_k_map.plot(axes=ax, plot_axes=["x", "y"])
 
 ###############################################################################
-# Imagine there's a really cool feature at (-338", 275"), how can you plot
+# Imagine there's a really cool feature at (-320", 400"), how can you plot
 # the spectrum at that location?
 
-lower_corner = [None, SkyCoord(-338 * u.arcsec, 275 * u.arcsec, frame=iris_frame)]
-upper_corner = [None, SkyCoord(-338 * u.arcsec, 275 * u.arcsec, frame=iris_frame)]
+lower_corner = [None, SkyCoord(-320 * u.arcsec, 400 * u.arcsec, frame=iris_frame)]
+upper_corner = [None, SkyCoord(-320 * u.arcsec, 400 * u.arcsec, frame=iris_frame)]
 mg_ii_cut = mg_ii.crop(lower_corner, upper_corner)
 
 fig = plt.figure()
