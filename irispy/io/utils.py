@@ -6,6 +6,7 @@ from pathlib import Path
 
 from filelock import FileLock
 
+from astropy.config.paths import get_cache_dir
 from astropy.io import fits
 from astropy.table import Table
 
@@ -52,45 +53,53 @@ def _get_simple_metadata(header):
     return instrume, describe
 
 
-def _extract_tarfile(filenames):
+def _extract_tarfile(filenames, extract_dir=None):
     """
-    Extracts a tar file to the same location as the tar file.
+    Extracts tar files, each into a folder named after it under ``extract_dir``.
 
     A complete earlier extraction of the same tar file (same size and modification
-    time) is reused while all of its files still exist.
+    time) is reused while all of its files still exist with their full sizes.
     Concurrent callers wait for extraction to finish before reusing its files.
 
     Parameters
     ----------
     filenames : `list of str`
         The filenames of the tar files to extract.
+    extract_dir : `str` or `pathlib.Path`, optional
+        The folder to extract into. Defaults to the ``irispy`` cache folder,
+        ``astropy.config.paths.get_cache_dir("irispy")``, so the archive's own folder
+        stays untouched and can be read-only.
     """
+    root = Path(get_cache_dir("irispy") if extract_dir is None else extract_dir)
     expanded_files = []
     for fname in filenames:
         filename = Path(fname)
         if tarfile.is_tarfile(filename):
-            extract_dir = filename.with_suffix("").with_suffix("")  # removes .tar.gz or .tar
-            extract_dir.mkdir(parents=True, exist_ok=True)
+            target = root / filename.with_suffix("").with_suffix("").name  # removes .tar.gz or .tar
+            target.mkdir(parents=True, exist_ok=True)
             # The cache check must share the lock with extraction: a waiting caller can then reuse the files.
-            with FileLock(extract_dir / ".irispy-extracted.lock"):
-                # Written only after a complete extraction: the tar file it came from and the extracted files.
-                marker = extract_dir / ".irispy-extracted.json"
+            with FileLock(target / ".irispy-extracted.lock"):
+                # Written only after a complete extraction: the tar file it came from and the
+                # extracted files with their sizes, so a truncated file is extracted again.
+                marker = target / ".irispy-extracted.json"
                 source = [filename.stat().st_size, filename.stat().st_mtime_ns]
-                names = []
+                files = {}
                 if marker.is_file():
                     try:
                         extracted = json.loads(marker.read_text())
                     except ValueError:
                         extracted = {}
-                    if extracted.get("source") == source:
-                        names = extracted.get("files", [])
-                if not names or not all((extract_dir / name).is_file() for name in names):
+                    if extracted.get("source") == source and isinstance(extracted.get("files"), dict):
+                        files = extracted["files"]
+                if not files or not all(
+                    (target / name).is_file() and (target / name).stat().st_size == size for name, size in files.items()
+                ):
                     marker.unlink(missing_ok=True)
                     with tarfile.open(filename, "r") as tar:
-                        tar.extractall(extract_dir, filter="data")
-                        names = [member.name for member in tar.getmembers() if member.isfile()]
-                    marker.write_text(json.dumps({"source": source, "files": names}))
-            expanded_files.extend(extract_dir / name for name in names)
+                        tar.extractall(target, filter="data")
+                        files = {member.name: member.size for member in tar.getmembers() if member.isfile()}
+                    marker.write_text(json.dumps({"source": source, "files": files}))
+            expanded_files.extend(target / name for name in files)
         else:
             expanded_files.append(filename)
     return expanded_files
@@ -179,7 +188,14 @@ def fits_info(filename: str) -> None:
 
 
 def read_files(
-    filenames, *, spectral_windows=None, uncertainty=False, memmap=False, allow_errors=False, revert_v34=False
+    filenames,
+    *,
+    spectral_windows=None,
+    uncertainty=False,
+    memmap=False,
+    allow_errors=False,
+    revert_v34=False,
+    extract_dir=None,
 ):
     """
     Read raster, SJI, AIA, or Hinode/SOT data supplied with IRIS observations.
@@ -212,6 +228,11 @@ def read_files(
         Will undo the flipping of the raster step axis made to V34 observations.
         Passed to `irispy.io.spectrograph.read_spectrograph_lvl2` only; slit-jaw, AIA and SOT files are not affected.
         Defaults to `False`.
+    extract_dir : `str` or `pathlib.Path`, optional
+        The folder that tar files are extracted into, each in a subfolder named after it.
+        Defaults to the ``irispy`` cache folder, ``astropy.config.paths.get_cache_dir("irispy")``
+        (``~/.cache/irispy`` unless ``XDG_CACHE_HOME`` is set), so the archive's own folder
+        can be read-only. An archive extracted there before is not extracted again.
 
     Returns
     -------
@@ -232,7 +253,11 @@ def read_files(
             raster_tarfile = filename.name.endswith("_raster.tar.gz")
             # The members of a tarball are classified like loose files, so the rasters of several
             # tarballs are grouped by observation instead of overwriting each other by first window.
-            files = sorted(_extract_tarfile([filename])) if sji_tarfile or raster_tarfile else [filename]
+            files = (
+                sorted(_extract_tarfile([filename], extract_dir=extract_dir))
+                if sji_tarfile or raster_tarfile
+                else [filename]
+            )
             for file in files:
                 if not file.name.endswith((".fits", ".fits.gz")):
                     log.warning(f"File {file} is not a FITS file and was not loaded")

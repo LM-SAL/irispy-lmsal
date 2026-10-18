@@ -10,6 +10,7 @@ from collections import Counter
 import numpy as np
 import pytest
 
+from astropy.config.paths import temporary_cache_dir_path
 from astropy.io import fits
 from astropy.io.fits import file as fits_file
 
@@ -239,10 +240,11 @@ def test_read_files_sot(tmp_path, sot_fg_file, sot_mg_file, sot_sp_file):
         tar.add(sot_sp_file, arcname="sotsp_a.fits")
         tar.add(sot_sp_file, arcname="sotsp_b.fits")
 
-    returns = read_files([sot_fg_file, sot_mg_file, str(tar_path)])
+    returns = read_files([sot_fg_file, sot_mg_file, str(tar_path)], extract_dir=tmp_path / "extracted")
 
     assert set(returns.keys()) == {"G band 4305", "TF Na I 5896", "6302A B_LOS", "6302A B_LOS (sotsp_b)"}
     assert all(isinstance(cube, SOTCube) for cube in returns.values())
+    assert (tmp_path / "extracted" / "iris_l2_20160108_191211_3680100932_SOTSP" / "sotsp_b.fits").is_file()
 
 
 @pytest.mark.parametrize("source", ["files", "archive"], ids=["same-stem-files", "same-stem-members"])
@@ -291,16 +293,20 @@ def test_extract_tarfile_reuses_complete_extraction(tmp_path):
             info.size = 3
             tar.addfile(info, io.BytesIO(b"abc"))
     extract_dir = tmp_path / "obs_raster"
-    first = _extract_tarfile([tar_path])
+    first = _extract_tarfile([tar_path], extract_dir=tmp_path)
     assert first == [extract_dir / "a.fits", extract_dir / "b.fits"]
     # A second call must not extract again, or it would restore "abc".
     (extract_dir / "a.fits").write_bytes(b"new")
-    assert _extract_tarfile([tar_path]) == first
+    assert _extract_tarfile([tar_path], extract_dir=tmp_path) == first
     assert (extract_dir / "a.fits").read_bytes() == b"new"
     # A missing file means the extraction is incomplete, so it is extracted again.
     (extract_dir / "b.fits").unlink()
-    assert _extract_tarfile([tar_path]) == first
+    assert _extract_tarfile([tar_path], extract_dir=tmp_path) == first
     assert (extract_dir / "a.fits").read_bytes() == b"abc"
+    # So does a truncated file.
+    (extract_dir / "b.fits").write_bytes(b"ab")
+    assert _extract_tarfile([tar_path], extract_dir=tmp_path) == first
+    assert (extract_dir / "b.fits").read_bytes() == b"abc"
     # A replaced tar file is extracted again, even if its modification time is older.
     old_mtime_ns = tar_path.stat().st_mtime_ns - 10**9
     with tarfile.open(tar_path, "w:gz") as tar:
@@ -308,8 +314,28 @@ def test_extract_tarfile_reuses_complete_extraction(tmp_path):
         info.size = 4
         tar.addfile(info, io.BytesIO(b"abcd"))
     os.utime(tar_path, ns=(old_mtime_ns, old_mtime_ns))
-    assert _extract_tarfile([tar_path]) == [extract_dir / "a.fits"]
+    assert _extract_tarfile([tar_path], extract_dir=tmp_path) == [extract_dir / "a.fits"]
     assert (extract_dir / "a.fits").read_bytes() == b"abcd"
+
+
+def test_extract_tarfile_defaults_to_the_irispy_cache(tmp_path):
+    # The archive's folder can be read-only, such as a download folder on a shared mount.
+    archive_dir = tmp_path / "downloads"
+    archive_dir.mkdir()
+    tar_path = archive_dir / "obs_raster.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tar:
+        info = tarfile.TarInfo("a.fits")
+        info.size = 3
+        tar.addfile(info, io.BytesIO(b"abc"))
+    archive_dir.chmod(0o555)
+    try:
+        with temporary_cache_dir_path(tmp_path, namespace="irispy") as cache:
+            files = _extract_tarfile([tar_path])
+            assert files == [cache / "obs_raster" / "a.fits"]
+            assert files[0].read_bytes() == b"abc"
+    finally:
+        archive_dir.chmod(0o755)
+    assert list(archive_dir.iterdir()) == [tar_path]
 
 
 def test_extract_tarfile_serializes_concurrent_callers(tmp_path, monkeypatch):
@@ -329,7 +355,10 @@ def test_extract_tarfile_serializes_concurrent_callers(tmp_path, monkeypatch):
 
     monkeypatch.setattr(tarfile.TarFile, "extractall", paused_extractall)
     results = []
-    threads = [threading.Thread(target=lambda: results.append(_extract_tarfile([tar_path]))) for _ in range(2)]
+    threads = [
+        threading.Thread(target=lambda: results.append(_extract_tarfile([tar_path], extract_dir=tmp_path)))
+        for _ in range(2)
+    ]
     try:
         threads[0].start()
         assert extracting.acquire(timeout=10), "First caller did not start extracting"
