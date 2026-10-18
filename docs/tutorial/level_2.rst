@@ -82,9 +82,11 @@ Their content is only useful for reproducing the exact steps of the data calibra
 Exposure timestamps
 -------------------
 
-For slit-jaw data, ``STARTOBS`` plus the auxiliary ``TIME`` value is the exposure start.
+The time coordinate of the cubes is the midpoint of each exposure, not its start.
+For slit-jaw data, ``STARTOBS`` plus the auxiliary ``TIME`` value is the exposure start :cite:p:`is0211`, and the midpoint adds half of the exposure time.
 For spectrograph data, the shared auxiliary ``TIME`` follows the FUV exposure start and is retained as ``meta["auxiliary times"]``.
 The NUV exposure starts at a different time and is calculated from its source-filename midpoint minus half its NUV exposure duration.
+The time coordinate of the FUV windows is the auxiliary ``TIME`` plus half the FUV exposure time, and that of the NUV windows is the source-filename midpoint.
 
 Full-disk mosaics
 -----------------
@@ -157,7 +159,7 @@ Let us retrieve the header of the raster file and display the description of the
 .. note::
     By default, this will load the data into memory.
     You can pass ``memmap=True`` to avoid this; the data array will be a `numpy.memmap` instead.
-    In this case, the data are not loaded into system memory, but written to a temporary file.
+    In this case, the data stay in the FITS file and are read from the disk when a slice of the cube is used.
     Memmapped data are the raw, unscaled integers stored in the file, not data numbers (DN).
 
 We can print the ``raster`` object to get some basic information about the raster file: what spectral windows were observed, the size of the cube, and the wavelength keys.
@@ -319,14 +321,15 @@ For example, we can access the description of the observation from the primary h
     >>> iris_sji.meta["OBS_DESC"]  # doctest: +REMOTE_DATA
     'Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2'
 
-The time when the observation sequence started onboard IRIS is given by the keyword ``STARTOBS``:
+The time when the observation sequence started onboard IRIS is given by the keyword ``STARTOBS`` :cite:p:`is0211`:
 
 .. code-block:: python
 
     >>> iris_sji.meta['STARTOBS']   # doctest: +REMOTE_DATA
     '2021-10-01T06:09:24.920'
 
-The exposure times are calculated from the auxiliary metadata, are given in seconds, and are therefore a property of the metadata object rather than a header key:
+The exposure time of each exposure is read from the auxiliary metadata and is a property of the cube, ``cube.exposure_time``, in seconds.
+``cube.meta.exposure_time`` is a different quantity, the mean exposure time of the observation from the header keyword ``EXPTIME``:
 
 .. code-block:: python
 

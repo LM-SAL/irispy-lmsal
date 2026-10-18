@@ -1,0 +1,1 @@
+The Level 2 tutorial no longer says memory-mapped data are written to a temporary file, separates the exposure time of the cube from that of its metadata, states that the time coordinate is the exposure midpoint and cites the keyword document for ``STARTOBS`` and ``TIME``.

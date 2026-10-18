@@ -218,7 +218,7 @@ def fits_info(filename: str) -> None:
             table.add_row(list(map(str, hdu_info[idx])))
 
     sys.stdout.write("\n".join(results) + "\n")
-    table.pprint()
+    table.pprint(max_width=-1)
     sys.stdout.flush()
 
 
