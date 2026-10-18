@@ -5,6 +5,7 @@ import pytest
 
 import astropy.units as u
 from astropy import constants
+from astropy.modeling import models
 from astropy.modeling.fitting import LevMarLSQFitter, TRFLSQFitter, parallel_fit_dask
 from astropy.nddata import StdDevUncertainty
 from astropy.time import Time
@@ -22,6 +23,7 @@ from irispy.utils.fitting import (
     non_thermal_velocity,
     profiles_on_background,
     si_iv_1403_model,
+    starts_from_model,
 )
 
 SHAPE = (20, 20)
@@ -267,6 +269,177 @@ def test_presets_reject_other_windows(function, start, match):
     cube = make_test_spectrogram_cube(np.ones((2, 3, 140)), wavelength)
     with pytest.raises(ValueError, match=match):
         function(cube)
+
+
+def _line_cube(rng, *, amplitudes=(100, 300), background="constant", background_level=5, profile="gaussian"):
+    """
+    A cube of one noiseless line on a background, its center, amplitude and width
+    different in every spectrum.
+    """
+    truth = profiles_on_background(
+        (1402.77 + rng.normal(0, 0.02, SHAPE))[np.newaxis] * u.AA,
+        amplitudes=rng.uniform(*amplitudes, (1, *SHAPE)) * u.DN,
+        widths=rng.uniform(0.05, 0.09, (1, *SHAPE)) * u.AA,
+        background=background,
+        background_level=rng.uniform(background_level, 2 * background_level, SHAPE) * u.DN,
+        profile=profile,
+    )
+    data = np.moveaxis(truth(WAVELENGTH[:, np.newaxis, np.newaxis]).to_value(u.DN), 0, -1)
+    return truth, make_test_spectrogram_cube(data, WAVELENGTH)
+
+
+@pytest.mark.parametrize("profile", ["gaussian", "lorentzian"])
+@pytest.mark.parametrize("background", ["constant", "linear"])
+def test_starts_from_model_follows_each_spectrum(profile, background):
+    truth, cube = _line_cube(np.random.default_rng(5), background=background, profile=profile)
+    model = profiles_on_background(
+        [1402.75] * u.AA,
+        amplitudes=[150] * u.DN,
+        widths=[0.06] * u.AA,
+        background=background,
+        background_level=5 * u.DN,
+        profile=profile,
+    )
+    if background == "linear":
+        model.slope_0 = 0.5 * u.DN / u.AA
+    starts = starts_from_model(model, cube)
+    assert starts.param_names == model.param_names
+    assert all(getattr(starts, name).shape == SHAPE for name in starts.param_names)
+    # The background passes through each spectrum's 10th percentile in the middle of the window.
+    level = np.percentile(cube.data, 10, axis=-1)
+    if background == "constant":
+        np.testing.assert_allclose(starts.amplitude_0.value, level)
+    else:
+        np.testing.assert_allclose(starts.slope_0.value, 0.5)
+        np.testing.assert_allclose(starts.intercept_0.value + starts.slope_0.value * WAVELENGTH.mean().value, level)
+    # Each line starts at its brightest sample, the nearest to its center, with the model's width.
+    center, width = truth.param_names[-2:]
+    spacing = np.diff(WAVELENGTH.value)[0]
+    assert np.all(np.abs(getattr(starts, center).value - getattr(truth, center).value) < spacing / 2)
+    np.testing.assert_allclose(starts.amplitude_1.value, cube.data.max(axis=-1) - level)
+    np.testing.assert_array_equal(getattr(starts, width).value, getattr(model, width).value)
+
+
+def test_starts_from_model_keeps_absorption():
+    truth, cube = _line_cube(np.random.default_rng(6), amplitudes=(-60, -20), background_level=100)
+    model = profiles_on_background(
+        [1402.75] * u.AA, amplitudes=[-40] * u.DN, widths=[0.06] * u.AA, background_level=100 * u.DN
+    )
+    starts = starts_from_model(model, cube)
+    assert np.all(np.abs(starts.mean_1.value - truth.mean_1.value) < np.diff(WAVELENGTH.value)[0] / 2)
+    np.testing.assert_allclose(starts.amplitude_1.value, cube.data.min(axis=-1) - np.percentile(cube.data, 10, axis=-1))
+    assert np.all(starts.amplitude_1.value < 0)
+
+
+def test_starts_from_model_keeps_constraints():
+    _, cube = _line_cube(np.random.default_rng(7))
+    model = profiles_on_background(
+        [1402.77, 1403.2] * u.AA,
+        amplitudes=[150, 20] * u.DN,
+        widths=[0.06, 0.06] * u.AA,
+        background_level=5 * u.DN,
+        bounds={"mean_1": (1402.76, 1402.78) * u.AA, "amplitude_1": (0, 200) * u.DN},
+    )
+    model.amplitude_0.fixed = True
+    model.mean_2.tied = lambda model: model.mean_1 + 0.43
+    starts = starts_from_model(model, cube)
+    assert starts.fixed == model.fixed
+    assert starts.tied == model.tied
+    assert starts.bounds == model.bounds
+    np.testing.assert_array_equal(starts.amplitude_0.value, 5)
+    np.testing.assert_array_equal(starts.mean_2.value, 1403.2)
+    for name in ("mean_1", "amplitude_1"):
+        lower, upper = model.bounds[name]
+        values = getattr(starts, name).value
+        assert np.all((values >= lower) & (values <= upper)), name
+        assert np.any(values == upper), name
+    assert np.any(starts.mean_1.value == 1402.76)
+
+
+def test_starts_from_model_leaves_out_missing_samples():
+    _, cube = _line_cube(np.random.default_rng(8))
+    # Without units, the model is in Å and the unit of the cube.
+    model = models.Const1D(5) + models.Gaussian1D(150, 1402.77, 0.06)
+    expected = starts_from_model(model, cube)
+    peak = np.argmax(cube.data[0, 1])
+    cube.mask = np.zeros(cube.data.shape, dtype=bool)
+    cube.mask[0, 0] = True
+    cube.mask[0, 1, peak] = True
+    cube.data[0, 2, 25:40] = np.nan
+    cube.data[0, 3, np.argmax(cube.data[0, 3])] = np.inf
+    starts = starts_from_model(model, cube)
+    assert starts.amplitude_0.unit is None
+    # A fully masked spectrum keeps the line of the model on a NaN background, which parallel_fit_dask leaves out.
+    assert np.isnan(starts.amplitude_0.value[0, 0])
+    assert (starts.mean_1.value[0, 0], starts.amplitude_1.value[0, 0]) == (1402.77, 150)
+    # A masked peak moves the start to the brightest sample left, beside it, and so does a non-finite one.
+    for index in ((0, 1), (0, 3)):
+        shift = np.abs(starts.mean_1.value[index] - expected.mean_1.value[index])
+        np.testing.assert_allclose(shift, np.diff(WAVELENGTH.value)[0])
+        np.testing.assert_allclose(starts.amplitude_0.value[index], expected.amplitude_0.value[index], rtol=0.1)
+    # No samples left within two widths of the line.
+    assert (starts.mean_1.value[0, 2], starts.amplitude_1.value[0, 2]) == (1402.77, 150)
+    for name in model.param_names:
+        np.testing.assert_array_equal(getattr(starts, name).value[1:], getattr(expected, name).value[1:])
+
+
+def test_starts_from_model_units():
+    _, cube = _line_cube(np.random.default_rng(9))
+    in_angstrom = profiles_on_background(
+        [1402.75] * u.AA, amplitudes=[150] * u.DN, widths=[0.06] * u.AA, background_level=5 * u.DN
+    )
+    in_nm = profiles_on_background(
+        [140.275] * u.nm, amplitudes=[150] * u.DN, widths=[0.006] * u.nm, background_level=5 * u.DN
+    )
+    expected, starts = starts_from_model(in_angstrom, cube), starts_from_model(in_nm, cube)
+    assert starts.mean_1.unit == u.nm
+    for name in in_nm.param_names:
+        assert u.allclose(getattr(starts, name).quantity, getattr(expected, name).quantity), name
+    with pytest.raises(ValueError, match="array parameters"):
+        starts_from_model(si_iv_1403_model(cube), cube)
+
+
+def test_starts_from_model_starts_blended_lines_at_their_own_peaks():
+    raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
+    cube = raster["Mg II k 2796"][0]
+    wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
+    start = profiles_on_background(
+        [2796.20, 2796.50] * u.AA,
+        amplitudes=[100, 100] * cube.unit,
+        widths=[0.08, 0.08] * u.AA,
+        background_level=10 * cube.unit,
+    )
+    mean = np.nanmean(np.where(cube.mask, np.nan, cube.data), axis=(0, 1))
+    starts = starts_from_model(TRFLSQFitter()(start, wavelength, mean * cube.unit), cube)
+    # The k2v and k2r Gaussians lie within two widths of each other, and would otherwise share the brighter peak.
+    assert np.all(starts.mean_1.value < starts.mean_2.value)
+
+
+def test_starts_from_model_on_level_2_data():
+    raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
+    cube = raster["Mg II k 2796"][0][:, 700:740]  # Rows 731 to 739 are masked in full.
+    wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
+    data = np.where(cube.mask, np.nan, cube.data)
+    start = profiles_on_background(
+        [2796.20, 2796.50] * u.AA,
+        amplitudes=[100, 100] * cube.unit,
+        widths=[0.08, 0.08] * u.AA,
+        background_level=10 * cube.unit,
+    )
+    # A model fitted to one spectrum, then to every spectrum with its masked samples left out.
+    model = TRFLSQFitter()(start, wavelength, data[1, 0] * cube.unit)
+    fitted, fitter = _fit(
+        starts_from_model(model, cube),
+        data,
+        cube.uncertainty.array,
+        wavelength,
+        cube.unit,
+        fitter_kwargs={"filter_non_finite": True},
+    )
+    quality = maps_from_fit(fitted, cube, fitter=fitter)["quality"].data
+    masked = np.all(cube.mask, axis=-1)
+    assert np.all(quality[masked] == FitQualityFlag.NO_FIT)
+    assert np.mean(quality[~masked] == FitQualityFlag.OK) > 0.8
 
 
 def _si_iv_cube(rng, profile="gaussian"):

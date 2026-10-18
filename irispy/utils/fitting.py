@@ -26,6 +26,7 @@ __all__ = [
     "non_thermal_velocity",
     "profiles_on_background",
     "si_iv_1403_model",
+    "starts_from_model",
 ]
 
 _PROFILES = {"gaussian": (models.Gaussian1D, "mean", "stddev"), "lorentzian": (models.Lorentz1D, "x_0", "fwhm")}
@@ -358,6 +359,103 @@ def mg_ii_model(cube, *, velocity_range=(-40, 40) * u.km / u.s):
             "amplitude_2": (0, None),
         },
     )
+
+
+def starts_from_model(model, cube):
+    """
+    A model fitted to one spectrum, with a start for every spectrum of ``cube``.
+
+    Parameters
+    ----------
+    model : `~astropy.modeling.Model`
+        A model with one value per parameter, such as one fitted to a spectrum of ``cube``.
+        Parameters without units are taken in Å and the unit of ``cube``.
+    cube : `~irispy.spectrograph.SpectrogramCube`
+        The cube to fit, read with ``memmap=False`` and cropped to the wavelengths to fit.
+
+    Returns
+    -------
+    `~astropy.modeling.Model`
+        A copy of ``model`` for `astropy.modeling.fitting.parallel_fit_dask`, with parameters
+        shaped like the spatial axes of ``cube`` and its fixed parameters, ties and bounds.
+
+    Notes
+    -----
+    Each spectrum is started from its own data, as ``scale_guess`` in EISPAC does for EIS fits.
+    A `~astropy.modeling.functional_models.Const1D` background starts at the spectrum's 10th
+    percentile, and a `~astropy.modeling.functional_models.Linear1D` one passes through it at
+    the middle of the wavelengths, with the slope of ``model``. A Gaussian or Lorentzian line
+    starts at the spectrum's peak above that background within two widths of the center of
+    ``model``, its center at the peak's wavelength and its amplitude at the peak's height, below
+    the background for a line with a negative amplitude. Its width is that of ``model``. In a
+    blend, such as the Mg II k2v and k2r peaks, each line searches only the samples nearer its own
+    center in ``model`` than any other line's, so the lines start at their own peaks.
+
+    Fixed and tied parameters and those of other components keep the values of ``model``, and the
+    others are clipped to their bounds. Masked and non-finite samples are left out of the starts.
+    A line with no samples left within two widths keeps the center and amplitude of ``model``,
+    and a spectrum with none at all gets a NaN background.
+    """
+    check_scaled(cube)
+    if any(np.ndim(getattr(model, name).value) for name in model.param_names):
+        msg = "model has array parameters; pass one with a value per parameter, such as one fitted to one spectrum."
+        raise ValueError(msg)
+    wavelength = _wavelength(cube).value
+    spectra = _spectra(cube)
+    background = _background_level(spectra)
+
+    def fitted(name, unit):
+        """
+        The value of parameter ``name`` of ``model`` in ``unit``, which a parameter
+        without units is taken to be in.
+        """
+        parameter = getattr(model, name)
+        return parameter.value if parameter.unit is None else parameter.quantity.to_value(unit)
+
+    starts = {}
+    compound = model.n_submodels > 1
+    leaves = [model[index] for index in range(model.n_submodels)] if compound else [model]
+    lines = (models.Gaussian1D, models.Lorentz1D)
+    centers = [
+        fitted(leaf.param_names[1] + (f"_{index}" if compound else ""), u.AA)
+        for index, leaf in enumerate(leaves)
+        if isinstance(leaf, lines)
+    ]
+    for index, leaf in enumerate(leaves):
+        names = [name + (f"_{index}" if compound else "") for name in leaf.param_names]
+        if isinstance(leaf, models.Const1D):
+            starts[names[0]] = background * cube.unit
+        elif isinstance(leaf, models.Linear1D):
+            slope, intercept = names
+            starts[intercept] = (background - fitted(slope, cube.unit / u.AA) * wavelength.mean()) * cube.unit
+        elif isinstance(leaf, lines):
+            amplitude, center, width = names
+            sign = np.sign(getattr(model, amplitude).value) or 1  # Negative for an absorption line.
+            distance = np.abs(wavelength - fitted(center, u.AA))
+            # In a blend, each line searches only the samples nearer its own center than any other's.
+            near = (distance <= 2 * fitted(width, u.AA)) & np.all(
+                [distance <= np.abs(wavelength - other) for other in centers], axis=0
+            )
+            excess = np.where(near & ~np.isnan(spectra), sign * (spectra - background[..., np.newaxis]), -np.inf)
+            peak = np.argmax(excess, axis=-1)
+            height = np.take_along_axis(excess, peak[..., np.newaxis], axis=-1)[..., 0]
+            found = np.isfinite(height)
+            starts[center] = np.where(found, wavelength[peak], fitted(center, u.AA)) * u.AA
+            starts[amplitude] = np.where(found, sign * height, fitted(amplitude, cube.unit)) * cube.unit
+    values = {}
+    for name in model.param_names:
+        parameter = getattr(model, name)
+        value = parameter.value
+        if name in starts and not (model.fixed[name] or model.tied[name]):
+            value = starts[name].value if parameter.unit is None else starts[name].to_value(parameter.unit)
+            lower, upper = model.bounds[name]
+            value = np.clip(value, -np.inf if lower is None else lower, np.inf if upper is None else upper)
+        value = np.broadcast_to(value, background.shape)
+        values[name] = value if parameter.unit is None else value * parameter.unit
+    seeded = model.copy()
+    # As parallel_fit_dask itself gives a model one spectrum's parameters, keeping its constraints.
+    seeded._reset_parameters(**values)
+    return seeded
 
 
 class FitQualityFlag(_QualityFlag):

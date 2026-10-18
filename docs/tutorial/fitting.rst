@@ -10,6 +10,7 @@ What ``irispy`` adds, in `irispy.utils.fitting`, are starting models for IRIS li
 * `~irispy.utils.fitting.profiles_on_background`: any number of Gaussian or Lorentzian lines on a constant or linear background, from user inputs.
 * `~irispy.utils.fitting.si_iv_1403_model`: one line for Si IV 140.277 nm, started for every spectrum from the data.
 * `~irispy.utils.fitting.mg_ii_model`: two Gaussians for the emission peaks of the Mg II k or h line core, started from `~irispy.utils.mg_features.calculate_mg_features`.
+* `~irispy.utils.fitting.starts_from_model`: any model fitted to one spectrum, started for every spectrum from its own background and peaks.
 
 Every starting parameter can be an array over the spatial axes of a cube, so each spectrum gets its own starting values.
 
