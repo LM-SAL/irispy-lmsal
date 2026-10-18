@@ -55,8 +55,14 @@ def test_fits_info(capsys, request, file_fixture):
     assert filename in capsys.readouterr().out
 
 
-def test_read_files_with_mix(sns_sg_file, sns_sji_1330_file):
-    returns = read_files([sns_sg_file, sns_sji_1330_file])
+@pytest.mark.parametrize(
+    "kwargs",
+    [{}, {"revert_v34": True}, {"revert_v34": True, "allow_errors": True}],
+    ids=["defaults", "revert-v34", "revert-v34-allow-errors"],
+)
+def test_read_files_with_mix(sns_sg_file, sns_sji_1330_file, kwargs):
+    # revert_v34 goes to the raster reader only; the slit-jaw reader does not take it
+    returns = read_files([sns_sg_file, sns_sji_1330_file], **kwargs)
     assert len(returns) == 2
 
 

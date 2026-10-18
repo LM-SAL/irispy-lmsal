@@ -166,7 +166,9 @@ def fits_info(filename: str) -> None:
     sys.stdout.flush()
 
 
-def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=False, allow_errors=False, **kwargs):
+def read_files(
+    filenames, *, spectral_windows=None, uncertainty=False, memmap=False, allow_errors=False, revert_v34=False
+):
     """
     Read raster, SJI, AIA, or Hinode/SOT data supplied with IRIS observations.
 
@@ -194,8 +196,10 @@ def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=Fa
     allow_errors : `bool`, optional
         Will continue loading the files if one fails to load.
         Defaults to `False`.
-    kwargs : `dict`, optional
-        Additional keyword arguments to pass to the reader functions.
+    revert_v34 : `bool`, optional
+        Will undo the flipping of the raster step axis made to V34 observations.
+        Passed to `irispy.io.read_spectrograph_lvl2` only; slit-jaw, AIA and SOT files are not affected.
+        Defaults to `False`.
 
     Returns
     -------
@@ -234,7 +238,7 @@ def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=Fa
                         while key in returns:
                             key = f"{describe} ({file.stem}, {suffix})"
                             suffix += 1
-                        returns[key] = read_sji_lvl2(hdulist, memmap=memmap, uncertainty=uncertainty, **kwargs)
+                        returns[key] = read_sji_lvl2(hdulist, memmap=memmap, uncertainty=uncertainty)
                     elif instrume == "SPEC":
                         # Keep the first file's description, so the group needs no second header read.
                         group_key = _get_spec_group_key(file, hdulist[0].header)
@@ -250,7 +254,11 @@ def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=Fa
         try:
             key = _get_spec_return_key(group_key, describe, returns)
             returns[key] = read_spectrograph_lvl2(
-                file_group, spectral_windows=spectral_windows, memmap=memmap, uncertainty=uncertainty, **kwargs
+                file_group,
+                spectral_windows=spectral_windows,
+                memmap=memmap,
+                uncertainty=uncertainty,
+                revert_v34=revert_v34,
             )
         except Exception as e:
             if allow_errors:
