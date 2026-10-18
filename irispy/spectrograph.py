@@ -264,7 +264,8 @@ class SpectrogramCubeSequence(SpecSeq):
 
     def __init__(self, data_list, meta=None, common_axis=0, **kwargs) -> None:
         # Check that all spectrograms are from same spectral window and OBS ID.
-        if len(np.unique([cube.meta["OBSID"] for cube in data_list])) != 1:
+        # NDCubeSequence slices into an empty sequence first.
+        if data_list and len(np.unique([cube.meta["OBSID"] for cube in data_list])) != 1:
             msg = "Constituent SpectrogramCube objects must have same value of 'OBSID' in its meta."
             raise ValueError(msg)
         super().__init__(data_list, meta=meta, common_axis=common_axis, **kwargs)
