@@ -5,6 +5,7 @@ import numpy as np
 import astropy.units as u
 
 from ndcube import NDCollection
+from ndcube.utils.wcs import pixel_axis_to_physical_types
 from ndcube.visualization import PlotterDescriptor
 from ndcube.wcs.tools import unwrap_wcs_to_fitswcs
 from sunraster import SpectrogramCube as SpecCube
@@ -80,12 +81,23 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
             Obs Description:    {self.meta.get("OBS_DESC")}
             Obs Date:           {instance_start} -- {instance_end}
             Data shape:         {self.shape}
-            Axis Types:         {self.array_axis_physical_types}
+            Axis Types:         {self._wcs_array_axis_physical_types}
             Roll:               {self.meta.get("SAT_ROT")}
             """,
         )
 
     remove_cosmic_rays = remove_cosmic_rays
+
+    @property
+    def _wcs_array_axis_physical_types(self):
+        """
+        `~ndcube.NDCube.array_axis_physical_types` from the main WCS alone.
+
+        The combined WCS, with the extra coordinates, raises on a length-1 step axis
+        (ndcube: mismatched pixel bounds), such as ``cube[0:1]`` or a one-exposure file.
+        """
+        wcs = self.wcs.low_level_wcs
+        return [tuple(pixel_axis_to_physical_types(axis, wcs).tolist()) for axis in reversed(range(wcs.pixel_n_dim))]
 
     @property
     def _fits_wcs(self):
@@ -130,7 +142,7 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
         try:
             return next(
                 axis
-                for axis, physical_types in enumerate(self.array_axis_physical_types)
+                for axis, physical_types in enumerate(self._wcs_array_axis_physical_types)
                 if physical_types and "em.wl" in physical_types
             )
         except StopIteration:

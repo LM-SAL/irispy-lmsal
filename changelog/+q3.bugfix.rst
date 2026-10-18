@@ -1,0 +1,1 @@
+``SpectrogramCube.wavelength_axis`` and printing the cube now work on a cube with a length-1 step axis, such as ``cube[0:1]`` or a one-exposure file; the printed axis types come from the main WCS, without the extra coordinates.

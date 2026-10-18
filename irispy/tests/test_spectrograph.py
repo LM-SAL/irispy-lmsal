@@ -120,6 +120,13 @@ def test_wavelength_axis():
     assert cube.wavelength_axis == 2
 
 
+def test_length_one_step_axis(sns_sg_file):
+    # The combined WCS of a length-1 step axis raises in ndcube
+    cube = read_spectrograph_lvl2(sns_sg_file)["C II 1336"][0][0:1]
+    assert cube.wavelength_axis == 2
+    assert "('em.wl',)" in str(cube)
+
+
 @pytest.mark.parametrize(
     ("property_name", "message"),
     [("wavelength_axis", "wavelength axis"), ("spectral_dispersion", "no WAVE ctype")],
