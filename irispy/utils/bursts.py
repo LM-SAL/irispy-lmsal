@@ -4,6 +4,7 @@ images.
 """
 
 import warnings
+from copy import deepcopy
 
 import numpy as np
 from scipy import ndimage
@@ -303,7 +304,9 @@ def find_bright_image_events(cube, *, sigma_factor=10, min_pixels=2):
             "intensity": data[frame, y, x] * cube.unit,
         }
     )
-    return type(cube)(labels, cube.wcs, unit=u.one, meta=cube.meta, extra_coords=cube.extra_coords), events
+    # Coordinates point back to their cube; copy them without copying its data.
+    extra_coords = deepcopy(cube.extra_coords, {id(cube): None})
+    return type(cube)(labels, cube.wcs, unit=u.one, meta=cube.meta, extra_coords=extra_coords), events
 
 
 def _events(values, labels, count):
