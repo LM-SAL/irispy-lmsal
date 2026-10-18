@@ -44,29 +44,51 @@ def get_latest_response(
 
     Parameters
     ----------
-    observation_time: `astropy.time.Time`, optional
-        Observation times of the datapoints.
-        Must be in a parsable time format.
+    observation_time : `astropy.time.Time`, optional
+        Observation time or times of the datapoints.
         If not provided, the current time is used.
 
     Returns
     -------
-    `dict`
-        Various parameters regarding IRIS response or effective area structure.
+    `dict` or `list` of `dict`
+        One dictionary for a single ``observation_time``, a list with one dictionary for each time otherwise.
+        The keys are the names of the IDL response structure, in upper case:
 
-        Includes the following keys:
+        ``DATE_OBS`` : `str`
+            The observation time, in ISO format.
+        ``LAMBDA`` : `astropy.units.Quantity`
+            Wavelength grid of the effective areas, shape ``(3601,)``.
+        ``AREA_SG``, ``AREA_SJI`` : `astropy.units.Quantity`
+            Effective areas in square centimeters at the observation time, shape ``(2, 3601)`` for the
+            spectrograph (FUV, NUV) and ``(4, 3601)`` for the slit-jaw channels.
+        ``NAME_SG``, ``NAME_SJI`` : `numpy.ndarray`
+            Names of the spectrograph and slit-jaw channels.
+        ``DN2PHOT_SG``, ``DN2PHOT_SJI`` : `numpy.ndarray`
+            Photons per DN for each of those channels.
+        ``COEFFS_FUV``, ``COEFFS_NUV``, ``COEFFS_SJI`` : `numpy.ndarray`
+            Coefficients of the best-fit throughput function of time, one set per interval of
+            ``C_F_TIME``, ``C_N_TIME`` and ``C_S_TIME`` (`astropy.time.Time`) and, for the spectrograph, per
+            wavelength ``C_F_LAMBDA`` and ``C_N_LAMBDA`` (`astropy.units.Quantity`).
+        ``GEOM_AREA`` : `astropy.units.Quantity`
+            Geometric collecting area.
+        ``ELEMENTS``, ``INDEX_EL_SG``, ``INDEX_EL_SJI`` : `numpy.recarray`, `numpy.ndarray`
+            The optical elements and which of them each channel uses.
+        ``COMMENT`` : `bytes`
+            Comment of the response file.
+        ``VERSION`` : `int`
+            Version of the response file.
+        ``VERSION_DATE`` : `astropy.time.Time`
+            Date of that version.
 
-        date_obs : `astropy.time.Time`
-        lambda : `astropy.units.Quantity`
-        area_sg : `astropy.units.Quantity`
-        name_sg : `str`
-        dn2phot_sg : `tuple` of length 2
-        area_sji : `astropy.units.Quantity`
-        name_sji : `str`
-        dn2phot_sji : `tuple` of length 4
-        comment : `str`
-        version : `int`
-        version_date : `astropy.time.Time`
+    Examples
+    --------
+    >>> from sunpy.time import parse_time
+    >>> from irispy.utils.response import get_latest_response
+    >>> response = get_latest_response(parse_time("2020-01-01"))
+    >>> response["AREA_SG"].shape
+    (2, 3601)
+    >>> response["VERSION"]
+    9
     """
     # Avoid circular imports
     from irispy.utils import record_to_dict  # NOQA: PLC0415

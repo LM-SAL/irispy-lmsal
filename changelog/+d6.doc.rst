@@ -1,0 +1,1 @@
+The docstrings of ``read_files`` (parameter name, return types, errors, example), ``get_latest_response`` (the keys of the response) and the metadata classes (the properties) now describe what the code does.
