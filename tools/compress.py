@@ -60,18 +60,17 @@ def _time_indices(hdus, sg, sns):
 
 
 def compress(files: list) -> None:
-    from tqdm import tqdm  # NOQA: PLC0415
-
-    for file in tqdm(files):
+    for file in files:
+        print(file)
         with fits.open(file, memmap=False) as hdus:
             header = hdus[0].header
             if "INSTRUME" not in header or "NRASTERP" not in header:
-                tqdm.write(f"Skipping {file}: not an IRIS level 2 file")
+                print(f"Skipping {file}: not an IRIS level 2 file")
                 continue
             # The layout this script relies on: the auxiliary per-exposure
             # table second-to-last, the source-filename table last
             if not isinstance(hdus[-1], (fits.TableHDU, fits.BinTableHDU)) or "PZTX" not in hdus[-2].header:
-                tqdm.write(f"Skipping {file}: unexpected HDU layout")
+                print(f"Skipping {file}: unexpected HDU layout")
                 continue
 
             # Repair understated TFIELDS before the table is first parsed -
@@ -120,10 +119,7 @@ def main():
     parser.add_argument("folder", type=Path, help="Folder of .fits/.fits.gz files to shrink")
     args = parser.parse_args()
     files = sorted(
-        file
-        for pattern in ("*.fits", "*.fits.gz")
-        for file in args.folder.glob(pattern)
-        if "_test" not in file.name
+        file for pattern in ("*.fits", "*.fits.gz") for file in args.folder.glob(pattern) if "_test" not in file.name
     )
     if not files:
         parser.error(f"no .fits or .fits.gz files found in {args.folder}")

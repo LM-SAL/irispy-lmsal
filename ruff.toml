@@ -5,7 +5,6 @@ line-length = 120
 extend-exclude=[
     "__pycache__",
     "build",
-    "tools/**",
 ]
 lint.extend-select = [
     "ALL",
@@ -67,6 +66,10 @@ lint.ignore = [
 "test_*.py" = [
     "N806", # in function should be lowercase
     "S101", # Use of `assert` detected
+]
+"tools/*.py" = [
+    "INP001", # Scripts, not a package
+    "T201", # Scripts print their progress
 ]
 "**/io/**" = [
     "A005", # Module `io` shadows a Python standard-library module
