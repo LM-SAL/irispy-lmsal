@@ -1,0 +1,1 @@
+Figure tests now draw a slit-jaw frame and a spectrogram through ``cube.plot``, and a slider update of the slit-jaw animation is tested.
