@@ -76,7 +76,7 @@ jobs:
         apt:
           - ffmpeg
       envs: |
-        - windows: py313
+        - windows: py314
         - macos: py313
         - linux: py313-oldestdeps
         - linux: py314-devdeps
