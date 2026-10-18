@@ -59,6 +59,19 @@ def test_sgmeta_detector_band_sji():
     assert meta.detector_band == "SJI"
 
 
+@pytest.mark.parametrize(
+    ("spectral_window", "message"),
+    [("Mg II k 2796", "Spectral window not found"), ("Si IV", "Spectral window must be unique")],
+    ids=["missing", "ambiguous"],
+)
+def test_sgmeta_rejects_missing_or_ambiguous_window(spectral_window, message):
+    header = _make_sg_header()
+    header["NWIN"] = 2
+    header["TDESC2"] = "Si IV 1394"
+    with pytest.raises(ValueError, match=message):
+        SGMeta(header, spectral_window)
+
+
 def test_sgmeta_observer_uses_campaign_start_when_date_obs_is_blank():
     header = _make_sg_header()
     header["DATE_OBS"] = ""

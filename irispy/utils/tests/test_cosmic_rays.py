@@ -213,6 +213,11 @@ def test_remove_cosmic_rays_rsliding_rejects_dask_cube(sns_sjicube_1330):
         remove_cosmic_rays(cube, method="rsliding")
 
 
+def test_remove_cosmic_rays_rejects_unknown_method(sns_sjicube_1330):
+    with pytest.raises(ValueError, match=r"Unsupported method 'median'.*\['astroscrappy', 'rsliding'\]"):
+        remove_cosmic_rays(sns_sjicube_1330[0, :3, :3], method="median")
+
+
 @pytest.mark.parametrize("method", ["rsliding", "astroscrappy"])
 def test_remove_cosmic_rays_missing_optional_dependency(sns_sjicube_1330, monkeypatch, method):
     def missing_module(module_name):

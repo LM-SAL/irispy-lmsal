@@ -466,6 +466,57 @@ def test_calculate_red_blue_asymmetry_rest_wavelength_required_without_meta():
         calculate_red_blue_asymmetry(cube, spline_degree=1)
 
 
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"rest_wavelength": [140, 141] * u.nm}, "rest_wavelength must be a positive finite scalar"),
+        ({"rest_wavelength": np.nan * u.nm}, "rest_wavelength must be a positive finite scalar"),
+        ({"rest_wavelength": -140 * u.nm}, "rest_wavelength must be a positive finite scalar"),
+        ({"velocity_range": [50] * u.km / u.s}, "velocity_range must contain two velocities"),
+        ({"velocity_range": [-50, 150] * u.km / u.s}, "velocity_range must be positive and increasing"),
+        ({"velocity_range": [150, 50] * u.km / u.s}, "velocity_range must be positive and increasing"),
+        ({"dv": 0 * u.km / u.s}, "dv must be positive"),
+        ({"spline_degree": -1}, "spline_degree must be a non-negative integer"),
+    ],
+    ids=["rest-vector", "rest-nan", "rest-negative", "range-one", "range-negative", "range-decreasing", "dv", "degree"],
+)
+def test_calculate_red_blue_asymmetry_rejects_bad_arguments(kwargs, message):
+    velocity = np.arange(-200, 201, 10) * u.km / u.s
+    cube = make_test_spectrogram_cube(
+        _flat_wing_profile(velocity).reshape(1, 1, -1), _wavelengths_from_velocity(velocity)
+    )
+
+    with pytest.raises(ValueError, match=message):
+        calculate_red_blue_asymmetry(cube, **{"rest_wavelength": REST_WAVELENGTH, **kwargs})
+
+
+@pytest.mark.parametrize(
+    ("kind", "flag"),
+    [
+        ("rising", RBAQualityFlag.PEAK_AT_EDGE),
+        ("two-samples", RBAQualityFlag.TOO_FEW_POINTS),
+        ("zero", RBAQualityFlag.PEAK_IS_ZERO),
+    ],
+)
+def test_calculate_red_blue_asymmetry_flags_unusable_profiles(kind, flag):
+    velocity = np.arange(-200, 201, 10) * u.km / u.s
+    center = velocity.size // 2
+    if kind == "rising":
+        profile = np.linspace(1, 10, velocity.size)  # the peak is the last sample
+    elif kind == "two-samples":
+        profile = np.full(velocity.size, np.nan)
+        profile[center], profile[center + 1] = 10, 1  # fewer than the cubic spline's four points
+    else:
+        profile = np.zeros(velocity.size)
+        profile[center] = 1e-9  # a peak within np.isclose of zero
+    cube = make_test_spectrogram_cube(profile.reshape(1, 1, -1), _wavelengths_from_velocity(velocity))
+
+    result = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH)
+
+    assert RBAQualityFlag(result["quality"].data[0, 0]) is flag
+    assert np.isnan(result["red_blue_asymmetry"].data[0, 0])
+
+
 def test_calculate_red_blue_asymmetry_explicit_rest_wavelength():
     velocity = np.arange(-200, 201, 10) * u.km / u.s
     wavelengths = _wavelengths_from_velocity(velocity)
