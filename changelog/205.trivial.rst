@@ -1,1 +1,0 @@
-Removed pandas as a direct dependency of irispy.
