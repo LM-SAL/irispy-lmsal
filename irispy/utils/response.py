@@ -18,7 +18,7 @@ from sunpy.time import parse_time
 
 from irispy.data import ROOTDIR
 
-__all__ = ["_fit_xput_lite", "get_interpolated_effective_area", "get_latest_response"]
+__all__ = ["get_interpolated_effective_area", "get_latest_response"]
 
 
 def get_latest_response(

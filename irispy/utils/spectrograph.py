@@ -19,7 +19,6 @@ __all__ = [
     "convert_photons_per_sec_to_radiance",
     "radiation_temperature",
     "radiometric_calibration",
-    "reshape_1d_wavelength_dimensions_for_broadcast",
     "subtract_background",
 ]
 

@@ -13,3 +13,6 @@ API Reference
    sji
    spectrograph
    utils
+   obsid
+   visualization
+   sample
