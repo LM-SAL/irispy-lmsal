@@ -24,7 +24,7 @@ Examples, run from the repository root with the whole files in it::
     python tools/cut.py iris_l2_20130902_182935_4000005156_raster_t000_r00000.fits \
         bursts/iris_l2_20130902_182935_4000005156_raster_t000_r00000_si_iv_test.fits \
         --rows 385:576 --window "Si IV 1403" 262:305
-    python cut.py aia_l2_20170305_164021_3620106076_1700.fits \
+    python tools/cut.py aia_l2_20170305_164021_3620106076_1700.fits \
         aia/aia_l2_20170305_164021_3620106076_1700_test.fits --exposures 263:266 --columns 119:439
 """
 
