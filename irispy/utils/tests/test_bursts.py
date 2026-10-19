@@ -232,6 +232,12 @@ def test_bright_image_events_any_band(sns_sjicube_1330):
     assert list(events[events["frame"] == 0]["npix"]) == [9]
 
 
+def test_bright_image_events_labels_do_not_share_coordinates(sns_sjicube_1330):
+    labels, _ = find_bright_image_events(sns_sjicube_1330)
+    labels.extra_coords.add("sequence", 0, np.arange(len(labels.data)) * u.one)
+    assert "sequence" not in tuple(sns_sjicube_1330.extra_coords.keys())
+
+
 @pytest.mark.remote_data
 def test_si_iv_whole_file_matches_idl(idl_si_iv):
     # Only the Si IV 1403 window of the raster

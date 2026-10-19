@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+import matplotlib as mpl
 from mpl_animators import ArrayAnimatorWCS
 
 import astropy.units as u
@@ -6,7 +6,6 @@ import astropy.units as u
 import sunpy.visualization.colormaps as cm  # NOQA: F401
 from ndcube.visualization.mpl_plotter import MatplotlibPlotter
 from ndcube.visualization.mpl_sequence_plotter import MatplotlibSequencePlotter, SequenceAnimator
-from sunpy import log as logger
 
 __all__ = ["IRISArrayAnimatorWCS", "IRISPlotter", "IRISSequencePlotter", "SJIPlotter", "SpectrogramPlotter"]
 
@@ -96,31 +95,34 @@ class IRISSequenceAnimator(Plot2DMixin, SequenceAnimator):
         super().__init__(*args, **kwargs)
 
 
+def _registered_colormap(name):
+    """
+    ``name`` when matplotlib knows that colormap, viridis otherwise.
+    """
+    return name if name in mpl.colormaps else "viridis"
+
+
 class _IRISPlotMixin:
     """
     Shared IRIS plot behavior for cube and sequence plotters.
     """
 
     def _default_cmap_name(self):
-        return f"irissji{int(self._ndcube.meta.detector[:3])}"
+        # sunpy registers the IRIS spectrograph color tables as irissjiFUV and irissjiNUV
+        return _registered_colormap(f"irissji{getattr(self._ndcube.meta, 'detector_band', '')}")
 
     def plot(self, *args, **kwargs):
         """
         Plot the cube with IRIS defaults.
 
-        If ``cmap`` is falsey, it is replaced with a default IRIS colormap derived from
-        the cube metadata (falling back to viridis). For one-dimensional cubes ``cmap``
-        is dropped entirely, even when given. IRIS axis styling is applied to the
-        result; all other arguments are passed to the parent plotter's ``plot``.
+        If ``cmap`` is falsey, the IRIS color table of the data is used: the passband
+        table for slit-jaw images and the FUV or NUV table for spectrograms, with
+        viridis for data without one (AIA and Hinode/SOT cubes). For one-dimensional
+        cubes ``cmap`` is dropped entirely, even when given. IRIS axis styling is
+        applied to the result; all other arguments are passed to the parent plotter's
+        ``plot``.
         """
-        cmap = kwargs.get("cmap")
-        if not cmap:
-            try:
-                cmap = plt.get_cmap(name=self._default_cmap_name())
-            except Exception as e:  # NOQA: BLE001
-                logger.debug(e)
-                cmap = "viridis"
-        kwargs["cmap"] = cmap
+        kwargs["cmap"] = kwargs.get("cmap") or self._default_cmap_name()
         if len(self._ndcube.shape) == 1:
             kwargs.pop("cmap")
         ax = super().plot(*args, **kwargs)
@@ -168,7 +170,9 @@ class SpectrogramPlotter(IRISPlotter):
 
 class SJIPlotter(IRISPlotter):
     def _default_cmap_name(self):
-        return f"irissji{int(self._ndcube.meta['TWAVE1'])}"
+        # Hinode/SOT cubes have TWAVE1 = 0, and a cube built by hand may have none
+        twave = self._ndcube.meta.get("TWAVE1")
+        return _registered_colormap(f"irissji{int(twave)}") if twave else "viridis"
 
 
 class IRISSequencePlotter(_IRISPlotMixin, MatplotlibSequencePlotter):

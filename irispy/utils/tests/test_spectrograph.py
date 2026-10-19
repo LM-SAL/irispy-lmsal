@@ -169,6 +169,16 @@ def test_radiometric_calibration_keeps_a_standard_deviation(sns_sg_file):
     assert new_cube.uncertainty.array.shape == cube.data.shape
 
 
+def test_radiometric_calibration_does_not_share_coordinates_or_mask(sns_sg_file):
+    cube = read_files(sns_sg_file)["C II 1336"][0]
+    mask = cube.mask.copy()
+    new_cube = radiometric_calibration(cube)
+    new_cube.extra_coords.add("sequence", 0, np.arange(len(new_cube.data)) * u.one)
+    new_cube.mask[...] = ~new_cube.mask
+    assert "sequence" not in tuple(cube.extra_coords.keys())
+    np.testing.assert_array_equal(cube.mask, mask)
+
+
 WAVELENGTHS = (2796 + np.arange(4)) * u.AA
 
 

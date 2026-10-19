@@ -5,6 +5,7 @@ import dask.array as da
 import numpy as np
 import pytest
 
+from irispy.io.sji import read_sji_lvl2
 from irispy.tests.helpers import mark_saturated
 from irispy.utils.constants import SATURATION_LIMIT
 from irispy.utils.cosmic_rays import remove_cosmic_rays
@@ -197,6 +198,11 @@ def test_remove_cosmic_rays_astroscrappy_inmask_combined(sns_sjicube_1330, monke
     assert len(calls) == 2
     np.testing.assert_array_equal(calls, mask | np.broadcast_to(inmask, cube.shape))
     assert method_kwargs["inmask"] is inmask
+
+
+def test_remove_cosmic_rays_rejects_unscaled_data(sns_sji_1330_file):
+    with pytest.raises(ValueError, match="unscaled"):
+        remove_cosmic_rays(read_sji_lvl2(sns_sji_1330_file, memmap=True))
 
 
 def test_remove_cosmic_rays_rsliding_rejects_dask_cube(sns_sjicube_1330):

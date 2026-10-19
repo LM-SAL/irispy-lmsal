@@ -17,8 +17,9 @@ def test_generate_wobble_movie(sns_sji_2832_file, tmp_path, trim, fill):
     header = fits.getheader(sns_sji_2832_file)
     header["CUNIT3"] = "s"
     header["CDELT3"] = 180
-    data = np.full((3, 8, 8), fill, dtype=float)
-    data[:, 1:-1, 1:-1] = np.arange(108).reshape(3, 6, 6) + 1
+    # Fill around 6 rows by 9 columns of data, offset so that swapped axes would show
+    data = np.full((3, 9, 12), fill, dtype=float)
+    data[:, 1:-2, 2:-1] = np.arange(3 * 6 * 9).reshape(3, 6, 9) + 1
     filename = tmp_path / "sji.fits"
     fits.PrimaryHDU(data=data, header=header).writeto(filename)
 
@@ -52,8 +53,7 @@ def test_generate_wobble_movie(sns_sji_2832_file, tmp_path, trim, fill):
     fig = plt.gcf()
     rendered = fig.axes[0].images[0].get_array()
     if trim:
-        assert rendered.shape[0] < data.shape[1]
-        assert rendered.shape[1] < data.shape[2]
+        assert rendered.shape == (6, 9)
         assert np.all(rendered > max(BAD_PIXEL_VALUES_SCALED))
     else:
         np.testing.assert_array_equal(rendered, data[-1])
