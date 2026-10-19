@@ -37,6 +37,13 @@ def test_apply_dust_mask_rejects_unscaled_data(sns_sji_1330_file):
         cube.apply_dust_mask()
 
 
+def test_to_maps_rejects_unscaled_data(sns_sji_1330_file):
+    # The frame headers say DN, which the raw integers of a memmap read are not
+    with pytest.raises(ValueError, match=r"unscaled.*memmap=False"):
+        read_files(sns_sji_1330_file, memmap=True).to_maps(0)
+    assert read_files(sns_sji_1330_file).to_maps(0).unit == u.DN
+
+
 AXIS = [
     (
         "custom:pos.helioprojective.lon",

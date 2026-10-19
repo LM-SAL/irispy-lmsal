@@ -222,6 +222,8 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         """
         from sunpy.map import Map  # NOQA: PLC0415
 
+        # The frame headers say DN, which the raw integers of a memmap read are not
+        check_scaled(self)
         if self._frame_headers is None:
             msg = "This cube has no FITS WCS (for example, it was rebinned), so it cannot be converted to maps."
             raise ValueError(msg)
