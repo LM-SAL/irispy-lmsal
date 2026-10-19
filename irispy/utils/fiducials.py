@@ -7,7 +7,6 @@ from scipy import ndimage, signal
 
 import astropy.units as u
 
-from irispy.spectrograph import SpectrogramCubeSequence
 from irispy.utils._spectral import check_scaled
 from irispy.utils.constants import SLIT_WIDTH
 from irispy.utils.utils import _boolean_mask
@@ -22,27 +21,21 @@ _ROWS = 21
 _SEPARATION = 89.7 * u.arcsec
 
 
-def _cubes(cube_or_sequence):
-    return cube_or_sequence.data if isinstance(cube_or_sequence, SpectrogramCubeSequence) else [cube_or_sequence]
-
-
 def _plate_scale(cube):
     # The solid angle of a pixel is the slit width times the pixel scale along the slit
     return (cube.solid_angle / SLIT_WIDTH).to(u.arcsec) / u.pix
 
 
-def _candidates(cube_or_sequence, min_depth):
+def _candidates(cube, min_depth):
     """
     Dark rows along the slit: their positions, depths and significance.
     """
-    sums = counts = 0
-    for cube in _cubes(cube_or_sequence):
-        check_scaled(cube)
-        data = np.ma.masked_array(cube.data, mask=_boolean_mask(cube) | ~np.isfinite(cube.data))
-        # Level 2 arrays are (..., slit, wavelength)
-        axes = tuple(axis for axis in range(data.ndim) if axis != cube.wavelength_axis - 1)
-        sums = sums + data.sum(axis=axes, dtype=float).filled(0)
-        counts = counts + data.count(axis=axes)
+    check_scaled(cube)
+    data = np.ma.masked_array(cube.data, mask=_boolean_mask(cube) | ~np.isfinite(cube.data))
+    # Level 2 arrays are (..., slit, wavelength)
+    axes = tuple(axis for axis in range(data.ndim) if axis != cube.wavelength_axis - 1)
+    sums = data.sum(axis=axes, dtype=float).filled(0)
+    counts = data.count(axis=axes)
     with np.errstate(invalid="ignore", divide="ignore"):
         profile = sums / counts
     valid = np.isfinite(profile)
@@ -70,21 +63,21 @@ def _candidates(cube_or_sequence, min_depth):
         return positions, depths, depths / scatter
 
 
-def find_fiducials(cube_or_sequence, *, min_depth=0.5):
+def find_fiducials(cube, *, min_depth=0.5):
     """
     Find the fiducial marks along the slit of a spectral window.
 
     The fiducial marks are two short gaps in the slit, one in each half, that let no light into the
     spectrograph, so they show up as dark rows across the whole spectrum :cite:p:`depontieu2014`.
-    The slit profile is the mean of the data over raster steps and wavelengths, and over the cubes
-    of a sequence, leaving out masked and non-finite values. It is divided by its running median
+    The slit profile is the mean of the data over rasters, raster steps and wavelengths, leaving
+    out masked and non-finite values. It is divided by its running median
     over 21 rows, and the marks are the dips in this ratio. Each dip is placed to a fraction of a
     pixel at the center of the Gaussian through its deepest row and the rows either side, as the
     IRIS team measures the marks (:cite:t:`depontieu2014`, Section 7.6.1).
 
     Parameters
     ----------
-    cube_or_sequence : `~irispy.spectrograph.SpectrogramCube` or `~irispy.spectrograph.SpectrogramCubeSequence`
+    cube : `~irispy.spectrograph.SpectrogramCube`
         One spectral window, read with ``memmap=False``. The slit axis is the axis before the
         wavelength axis, as in the cubes from `irispy.io.read_files`.
     min_depth : `float`, optional
@@ -122,10 +115,10 @@ def find_fiducials(cube_or_sequence, *, min_depth=0.5):
     FUV windows show a dark row that is not a mark about 61 rows below the lower mark; when in
     doubt, compare with the NUV windows, where the marks are clear.
     """
-    positions, depths, significance = _candidates(cube_or_sequence, min_depth)
+    positions, depths, significance = _candidates(cube, min_depth)
     if positions.size < 2:
         return positions, depths
-    separation = (_SEPARATION / _plate_scale(_cubes(cube_or_sequence)[0])).to_value(u.pix)
+    separation = (_SEPARATION / _plate_scale(cube)).to_value(u.pix)
     first, second = np.nonzero(np.abs(positions - positions[:, np.newaxis] - separation) < 2)
     if first.size:
         best = np.argmax(significance[first] + significance[second])
