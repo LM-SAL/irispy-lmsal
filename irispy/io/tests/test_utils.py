@@ -162,12 +162,16 @@ def test_read_files_accepts_mixed_types_and_reads_duplicates_once(
 
 
 def test_read_files_folder(tmp_path, sns_sg_file, sns_sji_1330_file, sns_sji_1400_file):
-    for filename in (sns_sg_file, sns_sji_1330_file, sns_sji_1400_file):
-        (tmp_path / Path(filename).name).symlink_to(filename)
+    folder = tmp_path / "obs"
+    folder.mkdir()
+    with tarfile.open(folder / "iris_l2_20210905_001833_3620258102_raster.tar.gz", "w:gz", compresslevel=1) as tar:
+        tar.add(sns_sg_file, arcname=Path(sns_sg_file).name)
+    for filename in (sns_sji_1330_file, sns_sji_1400_file):
+        (folder / Path(filename).name).symlink_to(filename)
     # An archive download folder also holds the quick-look movies
-    (tmp_path / "iris_l2_20210905_001833_3620258102_movies.tar").touch()
+    (folder / "iris_l2_20210905_001833_3620258102_movies.tar").touch()
 
-    returns = read_files(tmp_path)
+    returns = read_files(folder, extract_dir=tmp_path / "extracted")
 
     assert set(returns.keys()) == {"C II 1336", "SJI_1330", "SJI_1400"}
 
