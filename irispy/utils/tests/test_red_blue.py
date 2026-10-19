@@ -379,9 +379,11 @@ def test_calculate_red_blue_asymmetry_flags_saturated():
     assert RBAQualityFlag(result["quality"].data[0, 1]) is RBAQualityFlag.OK
 
 
-def test_calculate_red_blue_asymmetry_pixels_are_independent():
-    # Profiles without gaps share one spline per peak sample and those with gaps get their own,
-    # so each pixel must come out as it does alone.
+def _varied_cube():
+    """
+    Six noisy Gaussians at different velocities, with gaps, a masked sample and a
+    missing error.
+    """
     velocity = np.arange(-200, 201, 10) * u.km / u.s
     rng = np.random.default_rng(1)
     centers = rng.normal(0, 30, (2, 3, 1))
@@ -392,10 +394,15 @@ def test_calculate_red_blue_asymmetry_pixels_are_independent():
     errors[1, 0, 5] = np.nan
     mask = np.zeros(data.shape, dtype=bool)
     mask[1, 1, 7] = True
-    cube = make_test_spectrogram_cube(
+    return make_test_spectrogram_cube(
         data, _wavelengths_from_velocity(velocity), uncertainty=StdDevUncertainty(errors), mask=mask
     )
 
+
+def test_calculate_red_blue_asymmetry_pixels_are_independent():
+    # Profiles without gaps share one spline per peak sample and those with gaps get their own,
+    # so each pixel must come out as it does alone.
+    cube = _varied_cube()
     result = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH)
     assert set(np.unique(result["quality"].data)) == {RBAQualityFlag.OK}
     for i, j in np.ndindex(2, 3):
@@ -407,6 +414,25 @@ def test_calculate_red_blue_asymmetry_pixels_are_independent():
             alone["interpolated_profile"].uncertainty.array[0, 0],
             rtol=1e-12,
         )
+
+
+@pytest.mark.parametrize("return_profiles", [True, False])
+def test_calculate_red_blue_asymmetry_chunks_give_the_same_results(monkeypatch, return_profiles):
+    cube = _varied_cube()
+    # A peak at 120 km/s has no full red wing (fixture check below), so one pixel is flagged in its chunk
+    cube.data[0, 2] = 100 * np.exp(-(((np.arange(-200, 201, 10) - 120) / 25) ** 2)) + 1
+    kwargs = {"rest_wavelength": REST_WAVELENGTH, "return_profiles": return_profiles}
+    expected = calculate_red_blue_asymmetry(cube, **kwargs)
+    assert RBAQualityFlag(expected["quality"].data[0, 2]) is RBAQualityFlag.INCOMPLETE_WINGS
+    monkeypatch.setattr(red_blue_module, "_CHUNK_ROWS", 4)
+    result = calculate_red_blue_asymmetry(cube, **kwargs)
+    assert list(result) == list(expected)
+    for name in expected:
+        np.testing.assert_array_equal(result[name].data, expected[name].data, err_msg=name)
+        if expected[name].uncertainty is not None:
+            np.testing.assert_array_equal(
+                result[name].uncertainty.array, expected[name].uncertainty.array, err_msg=name
+            )
 
 
 def test_calculate_red_blue_asymmetry_real_cube_shape_and_coords(sns_sg_file):
