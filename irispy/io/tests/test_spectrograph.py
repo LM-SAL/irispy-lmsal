@@ -1036,3 +1036,21 @@ def test_read_spectrograph_masks_clipped_samples(tmp_path, sns_sg_file):
     assert np.isfinite(cube.uncertainty.array.flat[7])
     # Windows without clipped samples have no saturated meta
     assert not any("saturated" in other.meta for name, other in raster.items() if name != window)
+
+
+def test_combined_rasters_mark_clipped_samples(tmp_path, raster_sg_files):
+    # Only the second file has a clipped sample
+    clipped = tmp_path / "clipped.fits"
+    with _edited_copy(raster_sg_files[1], clipped) as hdulist:
+        ext = _window_ext(hdulist, "Si IV 1403")
+        data = hdulist[ext].data.astype("float32")
+        data[2, 50, 10] = SATURATION_LIMIT.value
+        hdulist[ext].data = data
+
+    cube = read_spectrograph_lvl2([raster_sg_files[0], clipped], spectral_windows="Si IV 1403")["Si IV 1403"]
+
+    expected = np.zeros(cube.shape, dtype=bool)
+    expected[1, 2, 50, 10] = True
+    np.testing.assert_array_equal(cube.meta["saturated"], expected)
+    assert cube.mask[1, 2, 50, 10]
+    np.testing.assert_array_equal(cube.raster_slice(1).meta["saturated"], expected[1])

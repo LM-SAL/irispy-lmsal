@@ -383,6 +383,8 @@ def test_read_sot_cube(kind, unit, date, memmap, request):
 
     assert isinstance(cube, SOTCube)
     assert "SOTCube" in str(cube)
+    # One FITS WCS per frame
+    assert [wcs.wcs.ctype[0] for wcs in cube.fits_wcs] == [header["CTYPE1"]] * cube.shape[0]
     assert cube.unit == unit
     assert cube.meta["scaled"]
     # The floats are unscaled and NaN marks missing pixels, with or without memmap
