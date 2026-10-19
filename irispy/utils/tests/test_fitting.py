@@ -8,6 +8,7 @@ from astropy import constants
 from astropy.modeling import models
 from astropy.modeling.fitting import LevMarLSQFitter, LMLSQFitter, TRFLSQFitter, parallel_fit_dask
 from astropy.nddata import StdDevUncertainty
+from astropy.table import QTable
 from astropy.time import Time
 
 from irispy.data.test import get_test_filepath
@@ -883,3 +884,34 @@ def test_non_thermal_velocity_temperature_from_the_catalog():
     from_catalog = non_thermal_velocity(widths, 1402.77 * u.AA, ion="Si IV")
     explicit = non_thermal_velocity(widths, 1402.77 * u.AA, ion="Si IV", temperature=10**4.9 * u.K)
     np.testing.assert_allclose(from_catalog["non_thermal_velocity"].data, explicit["non_thermal_velocity"].data)
+
+
+@pytest.mark.parametrize(
+    ("table", "temperature", "tolerance"),
+    [
+        # Explicit instrumental widths and temperatures. IDL's c of 2.9979e5 km/s and its older masses and
+        # Boltzmann constant change the velocities by about 1e-5.
+        ("formula", "log_t", {"rtol": 3e-5}),
+        # IDL's default temperatures and the instrumental widths of its header, passed to irispy.
+        # eis_width2velocity.dat rounds its thermal speeds to 0.01 km/s.
+        ("defaults", "log_t_max", {"atol": 0.005}),
+    ],
+)
+def test_non_thermal_velocity_matches_iris_nonthermalwidth(table, temperature, tolerance):
+    idl = QTable.read(get_test_filepath(f"nonthermal_width/iris_nonthermalwidth_{table}.ecsv"))
+    for row in idl:
+        result = non_thermal_velocity(
+            _width_map([[row["fwhm"].to_value(u.AA) / (2 * np.sqrt(2 * np.log(2)))]]),
+            row["wavelength"],
+            instrumental_fwhm=row["instrumental_fwhm"],
+            temperature=10 ** row[temperature] * u.K,
+            ion=row["ion"],
+        )
+        # IDL returns -1 where the observed width is too narrow.
+        velocity = row["velocity"].to_value(u.km / u.s)
+        np.testing.assert_allclose(
+            result["non_thermal_velocity"].data[0, 0],
+            np.nan if velocity == -1 else velocity,
+            err_msg=f"{row['ion']}, FWHM {row['fwhm']}",
+            **tolerance,
+        )

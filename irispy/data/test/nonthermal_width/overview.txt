@@ -1,0 +1,18 @@
+IDL references for the non_thermal_velocity tests in irispy/utils/tests/test_fitting.py.
+There is no observation here: the widths are synthetic.
+
+make_idl_references.pro (IDL 9.2, SolarSoft of 2026-09-28) writes both tables; see its header
+for the setup. iris_nonthermalwidth (iris/idl/sao/util/tian) takes the observed 1/e width in
+km/s, so the script converts each FWHM with the routine's own c = 2.9979e5 km/s. It returns -1
+where the observed width is not above the instrumental and thermal widths.
+
+iris_nonthermalwidth_formula.ecsv
+        Si IV 1402.77, O IV 1401.16, C II 1335.71, Fe XII 1349.40, Fe XXI 1354.08 and
+        Mg II k 2796.35 A, four FWHM each, with irispy's INSTRUMENTAL_FWHM and the line
+        catalog's log_t_max passed as instr_fwhm and ti_use.
+iris_nonthermalwidth_defaults.ecsv
+        The same lines at one FWHM each, without ti_use: log_t_max and thermal_speed are the
+        routine's defaults from eis_width2velocity.dat (hinode/eis/idl/atest/hwarren), which
+        uses the Mazzotta et al. (1998) ionization equilibrium and rounds both to two decimals.
+        instrumental_fwhm is the value its header gives, 31.8 mA for FUV2 and 28.6 mA for FUV1;
+        it has none for the NUV, so Mg II has irispy's 53 mA.
