@@ -1,0 +1,1 @@
+`~irispy.utils.density.density_diagnostic` now raises an ``ImportError`` that names the installed fiasco version and the development install it needs when fiasco has no ``line_ratio`` (no release ships it yet), instead of an ``AttributeError``.

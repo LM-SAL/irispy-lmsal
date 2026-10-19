@@ -37,6 +37,13 @@ def test_apply_dust_mask_rejects_unscaled_data(sns_sji_1330_file):
         cube.apply_dust_mask()
 
 
+def test_to_maps_rejects_unscaled_data(sns_sji_1330_file):
+    # The frame headers say DN, which the raw integers of a memmap read are not
+    with pytest.raises(ValueError, match=r"unscaled.*memmap=False"):
+        read_files(sns_sji_1330_file, memmap=True).to_maps(0)
+    assert read_files(sns_sji_1330_file).to_maps(0).unit == u.DN
+
+
 AXIS = [
     (
         "custom:pos.helioprojective.lon",
@@ -69,6 +76,22 @@ def test_world_axis_physical_types_sjicube(request, cube_fixture, n_frames):
 
 def test_sji_plotter_does_not_expose_plot_rgb(sns_sjicube_1400):
     assert not hasattr(sns_sjicube_1400.plotter, "plot_rgb")
+
+
+def test_to_maps_are_sji_maps_with_the_frame_metadata(sns_sjicube_1330):
+    # Maps were built from the WCS alone: GenericMap, no unit, the file-level EXPTIME in every frame
+    exposure_times = sns_sjicube_1330.axis_world_coords(wcs=sns_sjicube_1330.extra_coords["exposure time"])[0]
+    sji_map = sns_sjicube_1330.to_maps(2)
+    assert isinstance(sji_map, sunpy.map.sources.SJIMap)
+    assert sji_map.unit == u.DN
+    assert sji_map.exposure_time == exposure_times[2]
+    assert (sji_map.observatory, sji_map.instrument) == ("IRIS", "SJI")
+    assert sji_map.date.utc.isot == sns_sjicube_1330.wcs.pixel_to_world(0, 0, 2)[-1].utc.isot
+    assert sji_map.plot_settings["cmap"] == "irissji1330"
+    sliced_map = sns_sjicube_1330[2, 10:, 20:].to_maps()
+    assert isinstance(sliced_map, sunpy.map.sources.SJIMap)
+    assert sliced_map.data.shape == (30, 17)
+    assert sliced_map.wcs.pixel_to_world(0, 0).separation(sji_map.wcs.pixel_to_world(20, 10)) < 1e-6 * u.arcsec
 
 
 def test_to_map(sns_sjicube_1330):
@@ -158,11 +181,64 @@ def test_spatial_slice_fits_wcs_describes_sliced_pixels(sns_sjicube_1330):
     assert sliced.separation(full) < 1e-6 * u.arcsec
 
 
+def test_integer_spatial_index_gives_the_sliced_fits_wcs(sns_sjicube_1330):
+    # No header describes a 1-D image: fits_wcs raised AttributeError, with no map to build
+    row = sns_sjicube_1330[:, 0, :]
+    assert len(row.fits_wcs) == sns_sjicube_1330.shape[0]
+    from_frame, from_cube = row.fits_wcs[3].pixel_to_world(5), row.wcs.pixel_to_world(5, 3)[0]
+    assert u.allclose((from_frame.Tx, from_frame.Ty), (from_cube.Tx, from_cube.Ty), atol=1e-6 * u.arcsec)
+    assert sns_sjicube_1330[3, 0, :].fits_wcs.pixel_n_dim == 1
+    with pytest.raises(ValueError, match="no FITS WCS"):
+        row.to_maps()
+
+
+def test_sliced_frame_headers_keep_the_file_units(sns_sjicube_1330):
+    rows, columns = sns_sjicube_1330.data.shape[1:]
+    original = sns_sjicube_1330._frame_headers[0]
+    sliced = sns_sjicube_1330[:, 2 : rows - 3, 4 : columns - 5]._frame_headers[0]
+    assert sliced["cunit1"] == sliced["cunit2"] == original["cunit1"] == "arcsec"
+    assert sliced["crpix1"] == pytest.approx(original["crpix1"] - 4)
+    assert sliced["crpix2"] == pytest.approx(original["crpix2"] - 2)
+    assert (sliced["naxis1"], sliced["naxis2"]) == (columns - 9, rows - 5)
+    # to_header writes 14 significant digits
+    assert sliced["cdelt1"] == pytest.approx(original["cdelt1"], rel=1e-12)
+    assert sliced["crval1"] == pytest.approx(original["crval1"], rel=1e-12)
+
+
+@pytest.mark.parametrize(
+    "file_fixture",
+    [
+        "sns_sji_1330_file",
+        "sns_sji_1400_file",
+        "sns_sji_2796_file",
+        "sns_sji_2832_file",
+        "raster_sji_1400_file",
+        "raster_sji_2796_file",
+        "raster_sji_2832_file",
+        "bursts_sji_1400_file",
+    ],
+)
+def test_to_maps_wcs_matches_the_cube_wcs(request, file_fixture):
+    # The frame headers put the pointing at the array center; these files' CRPIX is off it by up to a pixel
+    cube = read_files(request.getfixturevalue(file_fixture))
+    n_frames, ny, nx = cube.shape
+    x = np.array([0, nx - 1, 0, nx - 1, (nx - 1) / 2])
+    y = np.array([0, 0, ny - 1, ny - 1, (ny - 1) / 2])
+    for frame in (0, n_frames - 1):
+        from_map = cube.to_maps(frame).wcs.pixel_to_world(x, y)
+        from_cube = cube.wcs.pixel_to_world(x, y, frame)[0]
+        np.testing.assert_allclose(from_map.Tx.to_value(u.arcsec), from_cube.Tx.to_value(u.arcsec), atol=1e-6)
+        np.testing.assert_allclose(from_map.Ty.to_value(u.arcsec), from_cube.Ty.to_value(u.arcsec), atol=1e-6)
+
+
 def test_to_maps_negative_index(sns_sjicube_1330):
     last = sns_sjicube_1330.shape[0] - 1
     assert sns_sjicube_1330.to_maps(-1).meta["DATE-OBS"] == sns_sjicube_1330.to_maps(last).meta["DATE-OBS"]
-    dates = [m.meta["DATE-OBS"] for m in sns_sjicube_1330.to_maps([-1, 0])]
-    assert dates == [sns_sjicube_1330.to_maps(i).meta["DATE-OBS"] for i in (last, 0)]
+    maps = sns_sjicube_1330.to_maps([-1, 0])
+    # The frames come in the requested order; the sequence used to sort them by date but label them in request order
+    assert [m.meta["DATE-OBS"] for m in maps] == [sns_sjicube_1330.to_maps(i).meta["DATE-OBS"] for i in (last, 0)]
+    for m, i in zip(maps, (last, 0), strict=True):
+        np.testing.assert_array_equal(m.data, sns_sjicube_1330.data[i])
 
 
 def test_to_maps_accepts_numpy_integers(sns_sjicube_1330):

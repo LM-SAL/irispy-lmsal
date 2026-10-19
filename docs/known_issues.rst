@@ -54,7 +54,7 @@ For example, reading every spectral window of a 630 MB raster file holds about 1
 To use less memory:
 
 * Read only the spectral windows you need with ``spectral_windows``; the memory goes down in proportion.
-* Leave ``uncertainty=False`` (the default); ``uncertainty=True`` adds a 64-bit array, twice the size of the data.
+* Leave ``uncertainty=False`` (the default); ``uncertainty=True`` adds an array of the data's type and size.
 * Pass ``memmap=True``, which maps the raw, unscaled integers instead of allocating scaled data numbers (DN).
   A lazy Dask mask marks both fill values without reading the mapped data at open.
   Only the mask slices that are used read data; computing the entire mask takes one byte per pixel.
