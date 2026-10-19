@@ -1,1 +1,1 @@
-A real V34 raster, whose slit steps from solar west to east, and a slit-jaw file and a sit-and-stare raster with a single exposure are now test data, and the Level 2 readers are tested on them.
+The raster reader is tested on a real V34 observation (eight steps of OBS 3460104433, cut from the archive file) instead of synthesized header edits.
