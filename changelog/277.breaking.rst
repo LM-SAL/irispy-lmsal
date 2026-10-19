@@ -1,2 +1,2 @@
-`~irispy.utils.wobble.generate_wobble_movie` now takes an `~irispy.sji.SJICube` instead of FITS files and returns the path of its movie; it takes the frame times from `~irispy.sji.SJICube.time`, so the frames, timestamps and trimmed solar coordinates it shows match the data, and ``trim=True`` raises a `ValueError` when no pixel has data in every frame.
-Removed ``irispy.utils.image_clipping``; use `astropy.visualization.AsymmetricPercentileInterval` instead.
+``irispy.utils.wobble.generate_wobble_movie`` now takes an ``irispy.sji.SJICube`` instead of FITS files and returns the path of its movie; it takes the frame times from ``SJICube.time``, so the frames, timestamps and trimmed solar coordinates it shows match the data, and ``trim=True`` raises a ``ValueError`` when no pixel has data in every frame.
+Removed ``irispy.utils.image_clipping``; use ``astropy.visualization.AsymmetricPercentileInterval`` instead.
