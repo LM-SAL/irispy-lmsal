@@ -16,7 +16,7 @@ Run by hand when a new pair of files appears on the server:
 """
 
 import argparse
-import datetime
+import datetime as dt
 import tempfile
 import urllib.request
 from pathlib import Path
@@ -109,7 +109,7 @@ def write(sets, output, badpix_name, flat_name):
     primary.header["DETNY"] = (DETECTOR_ROWS, "detector rows")
     primary.header["L2CDELT"] = (LEVEL2_CDELT, "level 2 plate scale, arcsec per unsummed pixel")
     primary.header["PDBVER"] = (11, "iris_mk_pointdb.pro version of POINTING")
-    primary.header["DATE"] = (datetime.datetime.now(tz=datetime.UTC).date().isoformat(), "conversion date")
+    primary.header["DATE"] = (dt.datetime.now(tz=dt.UTC).date().isoformat(), "conversion date")
     pixels = [_pixel_hdu(c, sets[c]) for c in channels]
     fits.HDUList([primary, pointing, *pixels]).writeto(output, overwrite=True)
 

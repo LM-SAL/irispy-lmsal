@@ -266,3 +266,7 @@ package.json
 
 # Examples data
 examples/**/*.fits
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+graft/
+.ignore

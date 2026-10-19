@@ -35,13 +35,17 @@ We use the Si IV 1394 window of the sample raster, which is the sample data of t
 The starting models of `~irispy.utils.fitting` describe the lines of a few documented windows and no other: `~irispy.utils.fitting.si_iv_1403_model` is for the Si IV 1403 window, which this sample does not have.
 For any other line, `~irispy.utils.fitting.profiles_on_background` builds the model from starting values that you choose.
 The model also describes one line, so the cube has to be cropped to it.
-The Si IV 1394 window holds Fe II, Ni II and O IV lines as well as Si IV 139.376 nm.
-Here we keep the wavelengths halfway to the Ni II line at 139.333 nm and the O IV line at 139.978 nm:
+The Si IV 1394 window holds Fe II, Ni II and O IV lines as well as Si IV 139.376 nm; the :doc:`line catalog </line_database>` lists them.
+Here we keep the wavelengths halfway to the Ni II and O IV lines on either side of Si IV:
 
 .. code-block:: python
 
-    >>> si_iv = 1393.76 * u.AA
-    >>> window = [(1393.330 * u.AA + si_iv) / 2, (si_iv + 1399.776 * u.AA) / 2]
+    >>> from irispy.utils.lines import get_lines
+    >>> lines = get_lines([1390, 1400] * u.AA, main_only=True)
+    >>> print(", ".join(lines["ion"]))
+    Fe II, Ni II, Si IV, O IV
+    >>> ni_ii, si_iv, o_iv = lines["wavelength"][1:]
+    >>> window = [(ni_ii + si_iv) / 2, (si_iv + o_iv) / 2]
     >>> cube = cube.crop([SpectralCoord(window[0]), None], [SpectralCoord(window[1]), None])  # doctest: +REMOTE_DATA
     >>> cube = cube[:, 410:470]  # doctest: +REMOTE_DATA
 

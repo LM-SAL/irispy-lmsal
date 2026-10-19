@@ -17,6 +17,7 @@ _SUBMODULES = (
     "dust",
     "fiducials",
     "fitting",
+    "lines",
     "mg_features",
     "moments",
     "red_blue",

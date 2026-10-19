@@ -28,6 +28,7 @@ from sunpy.coordinates.frames import Helioprojective
 
 from irispy.io import read_files
 from irispy.utils.fitting import maps_from_fit, non_thermal_velocity, si_iv_1403_model
+from irispy.utils.lines import get_lines
 
 ###############################################################################
 # `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20180102_153155_3610108077_2018-01-02T15%3A31%3A552018-01-02T15%3A31%3A55.xml>`__.
@@ -70,9 +71,9 @@ si_iv_1403 = si_iv_1403[:ny, :nx].rebin((2, 2, 1), propagate_uncertainties=True)
 
 ###############################################################################
 # The model describes Si IV alone, so we keep the wavelengths halfway to the
-# neighboring O IV lines at 1401.157 and 1404.806 Å :cite:p:`depontieu2014,polito2016`.
+# neighboring O IV lines, which we take from the line catalog.
 
-blue, si_iv_core, red = [1401.157, 1402.77, 1404.806] * u.AA
+blue, si_iv_core, red = get_lines([1401, 1405] * u.AA, main_only=True)["wavelength"][:3]
 lower_corner = [SpectralCoord((blue + si_iv_core) / 2), None]
 upper_corner = [SpectralCoord((si_iv_core + red) / 2), None]
 si_iv_1403 = si_iv_1403.crop(lower_corner, upper_corner)
