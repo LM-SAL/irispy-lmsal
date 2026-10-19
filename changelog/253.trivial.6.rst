@@ -1,0 +1,1 @@
+The wheel no longer ships the scripts that make the test data: ``compress.py`` and ``cut.py`` moved to ``tools/`` and the IDL scripts stay beside the data in the source tree only.

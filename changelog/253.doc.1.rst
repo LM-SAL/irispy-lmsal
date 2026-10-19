@@ -1,0 +1,1 @@
+The contributing guide documents the release process, from ``towncrier build`` and the ``vX.Y.Z`` tag that CI publishes to PyPI to the GitHub release, Zenodo, Read the Docs and conda-forge checks.

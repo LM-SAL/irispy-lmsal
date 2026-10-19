@@ -1,0 +1,1 @@
+The package metadata now declares the license as the SPDX expression ``BSD-3-Clause`` (PEP 639) and the development status as beta, and the copyright year is current.

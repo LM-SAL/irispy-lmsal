@@ -21,9 +21,9 @@ Kept:   the C II 1336 window (extension 1) and the Mg II k 2796 window (extensio
         along the steps. No exposure was dropped.
 Header: NWIN = 2 and the window keywords of C II 1336 and Mg II k 2796 are numbered 1
         and 2. NAXIS2 and CRPIX2 describe the cut. The filename table declares
-        TFIELDS = 9 for its 9 columns (the whole file says 7, see ../compress.py).
+        TFIELDS = 9 for its 9 columns (the whole file says 7, see tools/compress.py).
         TSR/TER/TSC/TEC and the statistics keywords (DATA*, TD*) still describe the
         whole window or file.
-Made:   python ../cut.py iris_l2_20260206_210853_3460104433_raster_t000_r00000.fits \
+Made:   python tools/cut.py iris_l2_20260206_210853_3460104433_raster_t000_r00000.fits \
             iris_l2_20260206_210853_3460104433_raster_t000_r00000_test.fits \
             --rows 146:242 --window "C II 1336" --window "Mg II k 2796"

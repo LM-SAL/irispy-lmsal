@@ -1,0 +1,1 @@
+Removed duplicate raster files from the packaged test data, which makes the package about 12 MB smaller.

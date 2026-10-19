@@ -19,10 +19,10 @@ Kept:   steps 0, 57, ..., 399 (every 57th, 8 of 400), all 1095 slit rows and thr
         these steps span 34 mA.
 Header: NWIN = 3 and the kept windows' keywords are numbered 1-3 in file order. NAXIS1/3,
         CRPIX1 and TWMINn/TWMAXn describe the cut, and CDELT3/CRPIX3 the stride of 57 steps,
-        as ../compress.py decimates. NEXP = NRASTERP = 8 and STEPS_AV/STEPT_AV are 57 times
+        as tools/compress.py decimates. NEXP = NRASTERP = 8 and STEPS_AV/STEPT_AV are 57 times
         the whole file's; DATE_OBS and DATE_END still hold, as the first and last steps are
         kept. The filename table declares TFIELDS = 9 for its 9 columns (the whole file says 7,
-        see ../compress.py). TSR/TER/TSC/TEC, STEPS_DV/STEPT_DV and the statistics keywords
+        see tools/compress.py). TSR/TER/TSC/TEC, STEPS_DV/STEPT_DV and the statistics keywords
         (DATA*, TD*n) still describe the whole windows or file.
 
 Remote file

@@ -1,0 +1,1 @@
+CI now tests Python 3.14 on Windows, so both supported Python versions run on more than one operating system.

@@ -1,7 +1,7 @@
 [build-system]
 build-backend = 'setuptools.build_meta'
 requires = [
-  "setuptools>=62.1",
+  "setuptools>=77.0.3",
   "setuptools_scm[toml]>=8.0.1",
 ]
 
@@ -10,16 +10,16 @@ name = "irispy-lmsal"
 description = "A Python package that provides the tools to read in and analyze data from the IRIS solar-observing satellite."
 readme = { file = "README.rst", content-type = "text/x-rst" }
 keywords = [ "iris", "lmsal", "NASA", "science", "solar", "solar physics", "spectra" ]
+license = "BSD-3-Clause"
 license-files = [ "licenses/LICENSE.rst" ]
 authors = [
-  { name = "IRIS Instrument Team  @ LMSAL" },
+  { name = "IRIS Instrument Team @ LMSAL" },
   { name = "Nabil Freij", email = "nabil.freij@gmail.com" },
 ]
 requires-python = ">=3.13"
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: BSD License",
   "Natural Language :: English",
   "Operating System :: OS Independent",
   "Programming Language :: Python",
@@ -75,7 +75,6 @@ optional-dependencies.docs = [
   "sunpy-sphinx-theme>=2.0.17",
 ]
 optional-dependencies.tests = [
-  "irispy-lmsal[all]",
   "pooch>=1.9.0",
   "pytest-astropy>=0.12.0",
   "pytest-mpl>=0.18.0",
@@ -96,6 +95,9 @@ provides = [ "irispy" ]
 include = [ "irispy*" ]
 exclude = [ "irispy._dev*" ]
 namespaces = false
+
+[tool.setuptools.exclude-package-data]
+"irispy.data.test" = [ "*.pro", "*/*.pro" ]
 
 [tool.setuptools_scm]
 version_file = "irispy/_version.py"

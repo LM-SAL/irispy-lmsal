@@ -1,0 +1,1 @@
+The VSO search in the data acquisition tutorial sorts its results so the doctest no longer depends on their order, and the online job uses the same reusable workflow version as the other jobs.
