@@ -158,7 +158,8 @@ The mean leaves out masked and missing samples, and its uncertainty at each wave
 
 ``region.rebin`` with ``propagate_uncertainties=True`` also averages with uncertainties, but its cost grows with the square of the number of pixels in a bin, so it gets slow for large regions.
 
-The model is a narrow core and a broad component on a constant background, with the width of the core bounded below 0.06 Å and that of the broad component above it, so that they cannot swap:
+The model is a narrow core and a broad component on a constant background.
+The fit may return them in either order, so the narrower one is the core:
 
 .. code-block:: python
 
@@ -168,10 +169,10 @@ The model is a narrow core and a broad component on a constant background, with 
     ...     amplitudes=[1, 1] * region.unit,
     ...     widths=[0.03, 0.1] * u.AA,
     ...     background_level=0.3 * region.unit,
-    ...     bounds={"stddev_1": (None, 0.06 * u.AA), "stddev_2": (0.06 * u.AA, None)},
     ... )
     >>> mean_fit = TRFLSQFitter()(core_and_broad, wavelength, spectrum * region.unit, weights=1 / spectrum_error)  # doctest: +REMOTE_DATA
-    >>> print(f"{mean_fit.stddev_1.quantity:.2f}, {mean_fit.stddev_2.quantity:.2f}")  # doctest: +REMOTE_DATA
+    >>> core, broad = sorted([1, 2], key=lambda i: mean_fit[i].stddev)  # doctest: +REMOTE_DATA
+    >>> print(f"{mean_fit[core].stddev.quantity:.2f}, {mean_fit[broad].stddev.quantity:.2f}")  # doctest: +REMOTE_DATA
     0.03 Angstrom, 0.10 Angstrom
 
 `~irispy.utils.fitting.starts_from_model` starts every spectrum of the cube from this fit.
@@ -191,7 +192,7 @@ These spectra are too faint to fit all seven parameters, so we fix the widths at
     ...     fitting_axes=2,
     ...     scheduler="single-threaded",
     ... )  # doctest: +REMOTE_DATA
-    >>> cube_fit.amplitude_2.shape  # doctest: +REMOTE_DATA
+    >>> cube_fit[core].amplitude.shape  # doctest: +REMOTE_DATA
     (16, 60)
 
 Non-thermal velocities
