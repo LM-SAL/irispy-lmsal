@@ -215,7 +215,7 @@ def test_read_spectrograph_lvl2_uses_auxiliary_pointing(raster_sg_file):
 
 
 def test_read_spectrograph_lvl2_reports_missing_spectral_window(sns_sg_file):
-    with pytest.raises(ValueError, match=r"Spectral windows \['NOPE'\] not in file .*, which has \['C II 1336', "):
+    with pytest.raises(ValueError, match=r"Spectral windows \['NOPE'\] not in .*, which has \['C II 1336', "):
         read_spectrograph_lvl2(sns_sg_file, spectral_windows=["C II 1336", "NOPE"])
 
 

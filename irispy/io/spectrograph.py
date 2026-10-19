@@ -224,7 +224,7 @@ def read_spectrograph_lvl2(
                     if not all(window_is_in_obs):
                         missing_windows = spectral_windows_req[~window_is_in_obs]
                         msg = (
-                            f"Spectral windows {missing_windows.tolist()} not in file {given}, "
+                            f"Spectral windows {missing_windows.tolist()} not in {given}, "
                             f"which has {windows_in_obs.tolist()}"
                         )
                         raise ValueError(msg)
