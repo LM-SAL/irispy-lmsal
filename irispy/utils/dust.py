@@ -84,17 +84,19 @@ def calculate_dust_mask(cube):
         slit_x = cube.axis_world_coords(wcs=cube.extra_coords["slit x position"])[0].to_value(u.pix)
         slit_y = cube.axis_world_coords(wcs=cube.extra_coords["slit y position"])[0].to_value(u.pix)
     ny, nx = cube.data.shape[-2:]
-    mask = np.zeros((len(slit_x), ny, nx), dtype=bool)
-    x = offset_x + slit_x[:, np.newaxis]
-    y = offset_y + slit_y[:, np.newaxis]
+    # One pixel of margin, so a bad pixel just outside a crop still dilates into it
+    mask = np.zeros((len(slit_x), ny + 2, nx + 2), dtype=bool)
+    x = offset_x + slit_x[:, np.newaxis] + 1
+    y = offset_y + slit_y[:, np.newaxis] + 1
     frame = np.broadcast_to(np.arange(len(slit_x))[:, np.newaxis], x.shape)
     # Floor and ceil in both axes, as the IDL routine does, so the mapped mask has no gaps
     for xi in (np.floor(x), np.ceil(x)):
         for yi in (np.floor(y), np.ceil(y)):
-            inside = (xi >= 0) & (xi < nx) & (yi >= 0) & (yi < ny)
+            inside = (xi >= 0) & (xi <= nx + 1) & (yi >= 0) & (yi <= ny + 1)
             mask[frame[inside], yi[inside].astype(int), xi[inside].astype(int)] = True
     # The list is one level 2 pixel tight on the images; IRIS_DUSTBUSTER smooths it over 5 detector pixels
-    mask = ndimage.binary_dilation(mask, structure=np.ones((1, 3, 3), dtype=bool)).reshape(cube.data.shape)
+    mask = ndimage.binary_dilation(mask, structure=np.ones((1, 3, 3), dtype=bool))[:, 1:-1, 1:-1]
+    mask = mask.reshape(cube.data.shape)
     # The dead columns of a record run through the frame's edge, which holds no values
     return mask & np.asarray(np.isfinite(cube.data))
 

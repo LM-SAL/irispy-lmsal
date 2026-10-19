@@ -3,7 +3,6 @@ from numbers import Integral
 from functools import cached_property
 
 import matplotlib as mpl
-import numpy as np
 
 import gwcs
 from astropy.wcs import WCS
@@ -112,6 +111,7 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         **kwargs,
     ) -> None:
         self.dust_masked = False
+        self._mask_before_dust = None
         super().__init__(
             data,
             wcs,
@@ -164,15 +164,16 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
             Default=False
         """
         check_scaled(self)
-        dust_mask = calculate_dust_mask(self)
         if undo:
-            if self.mask is not None:
-                self.mask = self.mask & ~dust_mask
+            # Restore the mask as it was, so pixels masked for other reasons under the dust stay masked
+            if self.dust_masked:
+                self.mask = self._mask_before_dust
             self.dust_masked = False
         else:
-            if self.mask is None:
-                self.mask = np.zeros(self.shape, dtype=bool)
-            self.mask = self.mask | dust_mask
+            if not self.dust_masked:
+                self._mask_before_dust = self.mask
+            dust_mask = calculate_dust_mask(self)
+            self.mask = dust_mask if self.mask is None else self.mask | dust_mask
             self.dust_masked = True
 
     remove_cosmic_rays = remove_cosmic_rays

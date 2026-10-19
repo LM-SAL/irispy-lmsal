@@ -311,6 +311,10 @@ def test_calculate_dust_mask_follows_slicing():
     assert dust_mask.any()
     np.testing.assert_array_equal(calculate_dust_mask(cube[2:5, 30:, 40:]), dust_mask[2:5, 30:, 40:])
     np.testing.assert_array_equal(calculate_dust_mask(cube[3]), dust_mask[3])
+    # A crop whose edge is next to a bad pixel still gets the dilation into it
+    rows, columns = np.nonzero(dust_mask[3])
+    y0, x0 = rows.min() + 1, columns.min() + 1
+    np.testing.assert_array_equal(calculate_dust_mask(cube[3, y0:, x0:]), dust_mask[3, y0:, x0:])
 
 
 def test_calculate_dust_mask_has_the_cube_shape(sns_sjicube_2832):
