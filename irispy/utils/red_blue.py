@@ -151,6 +151,12 @@ def calculate_red_blue_asymmetry(
         peak-centered; the observed profile velocity axis is relative to
         ``rest_wavelength``.
 
+    Raises
+    ------
+    ValueError
+        If no velocity of the interpolated profile, which is spaced by ``dv``, falls in
+        ``velocity_range``, as when the range is narrower than ``dv``.
+
     Notes
     -----
     Pixels with a saturated sample, as the mask and ``cube.meta["saturated"]`` mark the samples the
@@ -197,16 +203,18 @@ def calculate_red_blue_asymmetry(
     interp_extent = velocity_high.to_value(u.km / u.s) + dv
     interp_velocity = np.arange(-interp_extent, interp_extent + dv, dv)
     velocity_range_kms = (velocity_low.to_value(u.km / u.s), velocity_high.to_value(u.km / u.s))
+    low, high = velocity_range_kms
+    red_mask = (interp_velocity >= low) & (interp_velocity <= high)
+    blue_mask = (interp_velocity >= -high) & (interp_velocity <= -low)
+    if not (red_mask.any() and blue_mask.any()):
+        msg = f"No velocity of the interpolated profile, spaced by dv={dv} km/s, falls in velocity_range=({low}, {high}) km/s"
+        raise ValueError(msg)
 
     data, errors = _prepare_data(cube, wavelength_axis)
     output_shape = data.shape[:-1]
     # One row per spatial pixel
     profiles = data.reshape(-1, data.shape[-1])
     profile_errors = None if errors is None else errors.reshape(profiles.shape)
-
-    low, high = velocity_range_kms
-    red_mask = (interp_velocity >= low) & (interp_velocity <= high)
-    blue_mask = (interp_velocity >= -high) & (interp_velocity <= -low)
 
     quality = np.full(len(profiles), RBAQualityFlag.OK, dtype=np.uint8)
     with warnings.catch_warnings():

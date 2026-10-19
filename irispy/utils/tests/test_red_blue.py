@@ -353,6 +353,18 @@ def test_calculate_red_blue_asymmetry_flags_incomplete_wings():
     assert np.isnan(result["red_blue_asymmetry"].data[0, 0])
 
 
+def test_calculate_red_blue_asymmetry_rejects_wings_without_samples():
+    # The interpolated grid starts at -(150 + 10) km/s, so no sample falls between 50 and 52 km/s
+    velocity = np.arange(-200, 201, 10) * u.km / u.s
+    cube = make_test_spectrogram_cube(
+        _flat_wing_profile(velocity).reshape(1, 1, -1), _wavelengths_from_velocity(velocity)
+    )
+    with pytest.raises(ValueError, match=r"dv=10\.0 km/s.*velocity_range=\(50\.0, 52\.0\) km/s"):
+        calculate_red_blue_asymmetry(
+            cube, rest_wavelength=REST_WAVELENGTH, velocity_range=(50, 52) * u.km / u.s, dv=10 * u.km / u.s
+        )
+
+
 def test_calculate_red_blue_asymmetry_flags_low_signal():
     velocity = np.arange(-200, 201, 10) * u.km / u.s
     wavelengths = _wavelengths_from_velocity(velocity)
