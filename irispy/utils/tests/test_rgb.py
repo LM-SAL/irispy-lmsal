@@ -157,7 +157,7 @@ def test_plot_rgb_options_update_image_and_colorbar(si_iv_cube, overrides):
     assert not np.allclose(colorbar, default_colorbar)
 
     fig, (ax, cax) = plt.subplots(ncols=2)
-    si_iv_cube.plotter.plot_rgb(ax=ax, cax=cax, **kwargs)
+    plot_rgb(si_iv_cube, ax=ax, cax=cax, **kwargs)
     np.testing.assert_allclose(ax.collections[0].get_array(), rgb)
     np.testing.assert_allclose(cax.collections[0].get_array(), colorbar)
     plt.close(fig)

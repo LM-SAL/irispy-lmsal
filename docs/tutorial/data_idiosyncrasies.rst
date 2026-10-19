@@ -98,8 +98,8 @@ Cosmic rays
 IRIS passes through the South Atlantic Anomaly (SAA) on a regular basis.
 The impact of energetic particles on the CCD camera causes bright hits/pixels.
 These can be removed with any of the multitude of cosmic ray removal procedures available in Python.
-``irispy`` includes ``remove_cosmic_rays`` methods on SJI and raster cubes.
-These methods support sliding sigma clipping via `rsliding <https://git.ias.u-psud.fr/avoyeux/rsliding>`__ and `astroscrappy <https://astroscrappy.readthedocs.io/>`__.
+``irispy`` includes `~irispy.utils.cosmic_rays.remove_cosmic_rays` for SJI and raster cubes.
+It supports sliding sigma clipping via `rsliding <https://git.ias.u-psud.fr/avoyeux/rsliding>`__ and `astroscrappy <https://astroscrappy.readthedocs.io/>`__.
 There are two examples: :ref:`sphx_glr_generated_gallery_calibration_01_remove_spikes_sg.py` showcases how to remove spikes from IRIS spectrogram data, and :ref:`sphx_glr_generated_gallery_calibration_02_remove_spikes_sji.py` details how to remove spikes from IRIS SJI data.
 Cosmic rays are **not removed** from the IRIS data during normal calibration/pipeline processing to avoid introducing artifacts.
 
@@ -169,6 +169,6 @@ There is no Python code to automatically determine the best scaling for a given 
 Cleaning Up
 -----------
 
-The dust spots described in `Particles on slit-jaw images`_ can be cosmetically corrected in slit-jaw images and movies with `irispy.sji.SJICube.remove_dust`, which takes their positions from the IRIS pipeline's bad-pixel table and replaces them with values from neighboring frames or, failing that, a local median.
-`irispy.sji.SJICube.apply_dust_mask` only masks them.
+The dust spots described in `Particles on slit-jaw images`_ can be cosmetically corrected in slit-jaw images and movies with `irispy.utils.dust.remove_dust`, which takes their positions from the IRIS pipeline's bad-pixel table and replaces them with values from neighboring frames or, failing that, a local median.
+With ``temporal_window=0`` and ``fallback=None`` it only masks them.
 See :ref:`sphx_glr_generated_gallery_calibration_04_remove_dust.py`.

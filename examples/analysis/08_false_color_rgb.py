@@ -25,6 +25,7 @@ import pooch
 import astropy.units as u
 
 from irispy.io import read_files
+from irispy.utils.rgb import plot_rgb
 
 ###############################################################################
 # `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20130902_182935_4000005156_2013-09-02T18%3A29%3A352013-09-02T18%3A29%3A35.xml>`__.
@@ -49,7 +50,7 @@ si_iv = read_files(raster_filename, spectral_windows="Si IV 1403")["Si IV 1403"]
 # wavelength and a mapping of +/-100 km/s to color, with the Doppler velocity
 # mapped linearly.
 
-si_iv.plotter.plot_rgb()
+plot_rgb(si_iv)
 
 ###############################################################################
 # If you want to override the range, pass the wavelength limits, here +/-200 km/s.
@@ -61,7 +62,8 @@ si_iv.plotter.plot_rgb()
 
 doppler = u.doppler_optical(si_iv.meta.rest_wavelength)
 wavelength_min, wavelength_max = ([-200, 200] * u.km / u.s).to(u.AA, equivalencies=doppler)
-si_iv.plotter.plot_rgb(
+plot_rgb(
+    si_iv,
     wavelength_min=wavelength_min,
     wavelength_max=wavelength_max,
     velocity_norm=lambda v: np.arcsinh(v.to_value(u.km / u.s) / 25),
@@ -83,6 +85,6 @@ sns_filename = pooch.retrieve(
 )
 sit_and_stare = read_files(sns_filename, spectral_windows="Si IV 1403")["Si IV 1403"][0]
 
-sit_and_stare.plotter.plot_rgb(coordinates="time")
+plot_rgb(sit_and_stare, coordinates="time")
 
 plt.show()

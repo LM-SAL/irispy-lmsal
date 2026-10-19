@@ -7,7 +7,7 @@ import sunpy.visualization.colormaps as cm  # NOQA: F401
 from ndcube.visualization.mpl_plotter import MatplotlibPlotter
 from ndcube.visualization.mpl_sequence_plotter import MatplotlibSequencePlotter, SequenceAnimator
 
-__all__ = ["IRISArrayAnimatorWCS", "IRISPlotter", "IRISSequencePlotter", "SJIPlotter", "SpectrogramPlotter"]
+__all__ = ["IRISArrayAnimatorWCS", "IRISPlotter", "IRISSequencePlotter", "SJIPlotter"]
 
 
 LAT_LABELS = [
@@ -160,19 +160,6 @@ class IRISPlotter(_IRISPlotMixin, MatplotlibPlotter):
             param["ticks"] = False
             ax.coord_params[hidden] = param
         return ax
-
-
-class SpectrogramPlotter(IRISPlotter):
-    def plot_rgb(self, **kwargs):
-        """
-        Plot the cube as a false-color image, coloring each pixel by its spectrum.
-
-        Keyword arguments and the return value are those of `irispy.utils.rgb.plot_rgb`,
-        which needs the optional ``colorsynth`` dependency.
-        """
-        from irispy.utils.rgb import plot_rgb  # NOQA: PLC0415
-
-        return plot_rgb(self._ndcube, **kwargs)
 
 
 class SJIPlotter(IRISPlotter):

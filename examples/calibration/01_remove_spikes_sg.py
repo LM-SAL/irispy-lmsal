@@ -16,6 +16,7 @@ import pooch
 from astropy.visualization import quantity_support
 
 from irispy.io import read_files
+from irispy.utils.cosmic_rays import remove_cosmic_rays
 
 quantity_support()
 
@@ -46,7 +47,7 @@ raster = read_files(raster_filename, spectral_windows="Si IV 1403")
 raster = raster["Si IV 1403"][0][4]
 
 ###############################################################################
-# Now we use ``remove_cosmic_rays`` with the ``rsliding`` backend, the default, which the
+# Now we use `~irispy.utils.cosmic_rays.remove_cosmic_rays` with the ``rsliding`` backend, the default, which the
 # SPICE team uses for their data. Its defaults are not tuned for IRIS and no single setting
 # suits every dataset, so read its documentation and experiment.
 #
@@ -58,7 +59,7 @@ raster = raster["Si IV 1403"][0][4]
 
 # These settings smooth more around each spike (thanks to Juraj).
 method_kwargs = {"kernel": 5, "center_choice": "median", "borders": "reflect"}
-raster_rsliding = raster.remove_cosmic_rays(method="rsliding", sigma=3, method_kwargs=method_kwargs)
+raster_rsliding = remove_cosmic_rays(raster, method="rsliding", sigma=3, method_kwargs=method_kwargs)
 
 ###############################################################################
 # One reason to always be cautious when removing cosmic rays is that you can

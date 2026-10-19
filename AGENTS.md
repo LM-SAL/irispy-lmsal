@@ -61,6 +61,8 @@ run `make clean` from `docs/`.
   the pull request.
 - No function that only wraps astropy, ndcube or sunpy; write a recipe in the docs instead. Quick-look and GUI
   tools belong in glue-solar.
+- A cleaning or analysis step is a function in `irispy/utils/` that returns a new cube, not a cube method, alias
+  or state flag. Add a method only when it needs the class.
 - Scientific constants, thresholds and line lists need a citation or a data file.
 - Releases are made by people. Agents do not tag, publish or edit release metadata.
 

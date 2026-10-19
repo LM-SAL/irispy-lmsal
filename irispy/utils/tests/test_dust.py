@@ -12,11 +12,10 @@ from irispy.tests.helpers import figure_test
 from irispy.utils.dust import _local_median_fill, calculate_dust_mask, remove_dust
 
 
-@pytest.mark.parametrize("method", [False, True])
-def test_remove_dust_rejects_unscaled_data(sns_sji_1330_file, method):
+def test_remove_dust_rejects_unscaled_data(sns_sji_1330_file):
     cube = read_files(sns_sji_1330_file, memmap=True)
     with pytest.raises(ValueError, match=r"unscaled.*memmap=False"):
-        cube.remove_dust() if method else remove_dust(cube)
+        remove_dust(cube)
 
 
 def test_remove_dust_repairs_pixels_from_neighboring_frames(sns_sjicube_1330):
@@ -191,7 +190,6 @@ def test_remove_dust_spatial_fallback_for_single_images(sns_sjicube_1330, fallba
 
     assert cleaned.data[1, 1] == expected
     np.testing.assert_array_equal(cleaned.mask, dust_mask if unfilled else np.zeros_like(dust_mask))
-    assert cleaned.dust_masked is unfilled
 
 
 def test_remove_dust_rejects_string_none_fallback(sns_sjicube_1330):
@@ -201,27 +199,6 @@ def test_remove_dust_rejects_string_none_fallback(sns_sjicube_1330):
 
     with pytest.raises(ValueError, match=r"fallback must be 'spatial' or None\."):
         remove_dust(cube, dust_mask=dust_mask, fallback="none")
-
-
-def test_sjicube_remove_dust_method_matches_function(sns_sjicube_1330):
-    cube = sns_sjicube_1330[:3, :3, :3]
-    cube.data[...] = np.array(
-        [
-            [[1, 1, 1], [1, 0, 1], [1, 1, 1]],
-            [[2, 2, 2], [2, 2, 2], [2, 2, 2]],
-            [[3, 3, 3], [3, 3, 3], [3, 3, 3]],
-        ],
-        dtype=float,
-    )
-    cube.mask = np.zeros_like(cube.data, dtype=bool)
-    dust_mask = np.zeros_like(cube.data, dtype=bool)
-    dust_mask[0, 1, 1] = True
-
-    cleaned_by_function = remove_dust(cube, dust_mask=dust_mask, temporal_window=1, exposure_normalize=False)
-    cleaned_by_method = cube.remove_dust(dust_mask=dust_mask, temporal_window=1, exposure_normalize=False)
-
-    np.testing.assert_allclose(cleaned_by_method.data, cleaned_by_function.data)
-    np.testing.assert_array_equal(cleaned_by_method.mask, cleaned_by_function.mask)
 
 
 @figure_test

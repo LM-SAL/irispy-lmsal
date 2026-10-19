@@ -1,1 +1,1 @@
-`~irispy.sji.SJICube.remove_dust`, `~irispy.utils.dust.remove_dust` and `~irispy.sji.SJICube.apply_dust_mask` now find dust with the IRIS pipeline's bad-pixel table, which ships with irispy (``tools/badpix.py`` converts a new SolarSoft table).
+`~irispy.utils.dust.remove_dust` now finds dust with the IRIS pipeline's bad-pixel table, which ships with irispy (``tools/badpix.py`` converts a new SolarSoft table).

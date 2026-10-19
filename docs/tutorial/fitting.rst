@@ -148,8 +148,9 @@ The mean leaves out masked and missing samples, and its uncertainty at each wave
 
 .. code-block:: python
 
+    >>> from irispy.utils.cosmic_rays import remove_cosmic_rays
     >>> region = raster["Si IV 1394"][0].crop([SpectralCoord(window[0]), None], [SpectralCoord(window[1]), None])  # doctest: +REMOTE_DATA
-    >>> region = region.remove_cosmic_rays()  # doctest: +REMOTE_DATA
+    >>> region = remove_cosmic_rays(region)  # doctest: +REMOTE_DATA
     >>> usable = np.isfinite(region.data) & ~region.mask  # doctest: +REMOTE_DATA
     >>> spectra = np.ma.masked_array(region.data, ~usable)  # doctest: +REMOTE_DATA
     >>> sigma = np.ma.masked_array(region.uncertainty.array, ~usable)  # doctest: +REMOTE_DATA
@@ -183,7 +184,7 @@ Those widths also hold the spread of Doppler shifts over the region, so they des
 
     >>> mean_fit.stddev_1.fixed = mean_fit.stddev_2.fixed = True  # doctest: +REMOTE_DATA
     >>> mean_fit.mean_2.tied = lambda model: model.mean_1  # doctest: +REMOTE_DATA
-    >>> clean_cube = cube.remove_cosmic_rays()  # doctest: +REMOTE_DATA
+    >>> clean_cube = remove_cosmic_rays(cube)  # doctest: +REMOTE_DATA
     >>> clean_good = np.isfinite(clean_cube.data) & ~clean_cube.mask  # doctest: +REMOTE_DATA
     >>> cube_fit = parallel_fit_dask(
     ...     model=starts_from_model(mean_fit, clean_cube),

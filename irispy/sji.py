@@ -14,9 +14,6 @@ from sunraster import SpectrogramCube
 
 from irispy._wcs import _celestial_frame_from_cube, _ResolveNegativeIndicesMixin
 from irispy.utils._spectral import check_scaled
-from irispy.utils.cosmic_rays import remove_cosmic_rays
-from irispy.utils.dust import calculate_dust_mask
-from irispy.utils.dust import remove_dust as _remove_dust
 from irispy.visualization import SJIPlotter
 
 __all__ = ["AIACube", "SJICube", "SOTCube"]
@@ -98,31 +95,6 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
 
     plotter = PlotterDescriptor(default_type=SJIPlotter)
 
-    def __init__(
-        self,
-        data,
-        wcs,
-        *,
-        uncertainty=None,
-        unit=None,
-        meta=None,
-        mask=None,
-        copy=False,
-        **kwargs,
-    ) -> None:
-        self.dust_masked = False
-        self._mask_before_dust = None
-        super().__init__(
-            data,
-            wcs,
-            uncertainty=uncertainty,
-            mask=mask,
-            meta=meta,
-            unit=unit,
-            copy=copy,
-            **kwargs,
-        )
-
     def __repr__(self) -> str:
         return f"{object.__repr__(self)}\n{self!s}"
 
@@ -149,35 +121,6 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
             Cube dimensions:       {self.shape}
             """,
         )
-
-    def apply_dust_mask(self, *, undo=False):
-        """
-        Applies or undoes an update of the mask with the dust particles positions.
-
-        Rewrite self.mask with/without the dust positions.
-
-        Parameters
-        ----------
-        undo: `bool`
-            If False, dust particles positions mask will be applied.
-            If True, dust particles positions mask will be removed.
-            Default=False
-        """
-        check_scaled(self)
-        if undo:
-            # Restore the mask as it was, so pixels masked for other reasons under the dust stay masked
-            if self.dust_masked:
-                self.mask = self._mask_before_dust
-            self.dust_masked = False
-        else:
-            if not self.dust_masked:
-                self._mask_before_dust = self.mask
-            dust_mask = calculate_dust_mask(self)
-            self.mask = dust_mask if self.mask is None else self.mask | dust_mask
-            self.dust_masked = True
-
-    remove_cosmic_rays = remove_cosmic_rays
-    remove_dust = _remove_dust
 
     def _get_axis_coord_index(self, axis_name, coord_loc):
         # The exposure time of a slit-jaw cube is an extra coordinate, whose axis sunraster
