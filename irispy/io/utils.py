@@ -105,7 +105,13 @@ def _extract_tarfile(filenames, extract_dir=None):
                     marker.unlink(missing_ok=True)
                     with tarfile.open(filename, "r") as tar:
                         tar.extractall(target, filter="data")
-                        files = {member.name: member.size for member in tar.getmembers() if member.isfile()}
+                        # The data filter extracts a member named "/a.fits" to "a.fits": the map must match it,
+                        # or the returned path would point outside the folder.
+                        files = {
+                            member.name.lstrip("/" + os.sep): member.size
+                            for member in tar.getmembers()
+                            if member.isfile()
+                        }
                     marker.write_text(json.dumps({"source": source, "files": files}))
             expanded_files.extend(target / name for name in files)
         else:

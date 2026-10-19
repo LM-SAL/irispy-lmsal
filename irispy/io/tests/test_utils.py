@@ -317,6 +317,25 @@ def test_extract_tarfile_reuses_complete_extraction(tmp_path):
     assert (extract_dir / "a.fits").read_bytes() == b"abcd"
 
 
+def test_extract_tarfile_strips_the_leading_slash_of_a_member_name(tmp_path):
+    tar_path = tmp_path / "obs_raster.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tar:
+        info = tarfile.TarInfo("/a.fits")
+        info.size = 3
+        tar.addfile(info, io.BytesIO(b"abc"))
+    extracted = _extract_target(tmp_path, tar_path) / "a.fits"
+
+    files = _extract_tarfile([tar_path], extract_dir=tmp_path)
+
+    # extractall(filter="data") strips the slash, so the file is in the folder, not at /a.fits
+    assert files == [extracted]
+    assert extracted.read_bytes() == b"abc"
+    # and the extraction is found complete and reused
+    extracted.write_bytes(b"new")
+    assert _extract_tarfile([tar_path], extract_dir=tmp_path) == [extracted]
+    assert extracted.read_bytes() == b"new"
+
+
 def test_extract_tarfile_keeps_same_named_archives_apart(tmp_path, raster_sg_file, sns_sg_file):
     # The same archive name in two folders, such as two downloads of one observation, with the same member name
     tarballs = []
