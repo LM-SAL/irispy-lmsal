@@ -773,6 +773,19 @@ def test_maps_from_fit_fixed_parameters_and_rest_wavelength():
         maps_from_fit(fitted, cube, fitter=TRFLSQFitter())
 
 
+def test_maps_from_fit_on_one_spectrum():
+    raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
+    cube = raster["Mg II k 2796"][0][1:2, 301:302]
+    wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
+    fitted, fitter = _fit(mg_ii_model(cube), cube.data, cube.uncertainty.array, wavelength, cube.unit)
+    for maps in (maps_from_fit(fitted, cube), maps_from_fit(fitted, cube, fitter=fitter)):
+        for name in fitted.param_names:
+            np.testing.assert_array_equal(maps[name].data, [[getattr(fitted, name).value]], strict=True)
+        assert maps["quality"].data.tolist() == [[FitQualityFlag.OK]]
+        assert maps["residual"].data.shape == cube.data.shape
+    np.testing.assert_allclose(maps["mean_1"].uncertainty.array, _errors(fitter)[..., 2], strict=True)
+
+
 def _width_map(sigmas, *, error=None, mask=None):
     """
     A map of Gaussian full widths at half maximum, in Å, from standard deviations.

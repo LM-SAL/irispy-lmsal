@@ -568,7 +568,8 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None, resi
     if unitless := [name for name, value in values.items() if value is None]:
         msg = f"{', '.join(unitless)} have no unit; fit the model with data_unit or start it with units."
         raise ValueError(msg)
-    shape = np.broadcast_shapes(*(value.shape for value in values.values()))
+    # Parameter.value is a scalar for one spectrum; Parameter.shape keeps the spatial axes.
+    shape = np.broadcast_shapes(*(getattr(fitted_model, name).shape for name in names))
     values = {name: np.broadcast_to(value, shape, subok=True) for name, value in values.items()}
     failed = np.any([np.isnan(value.value) for value in values.values()], axis=0)
     # The covariance covers the free parameters only, in the order of the model's.
