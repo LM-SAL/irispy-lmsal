@@ -692,6 +692,20 @@ def test_maps_from_fit_preserves_residual_coordinates():
     np.testing.assert_array_equal(residual.axis_world_coords("time", wcs=residual.extra_coords)[0], times)
 
 
+def test_maps_from_fit_without_residual():
+    _, cube = _si_iv_cube(np.random.default_rng(3))
+    fitted, fitter = _fit(si_iv_1403_model(cube), cube.data, cube.uncertainty.array, unit=cube.unit)
+    maps = maps_from_fit(fitted, cube, fitter=fitter)
+    without = maps_from_fit(fitted, cube, fitter=fitter, residual=False)
+    assert list(maps.keys()) == [*without.keys(), "residual"]
+    for name in without:
+        assert without.aligned_axes[name] == maps.aligned_axes[name]
+        assert without[name].unit == maps[name].unit
+        np.testing.assert_array_equal(without[name].data, maps[name].data)
+        if maps[name].uncertainty is not None:
+            np.testing.assert_array_equal(without[name].uncertainty.array, maps[name].uncertainty.array)
+
+
 def test_maps_from_fit_flags_masked_input():
     _, cube = _si_iv_cube(np.random.default_rng(3))
     fitted, _ = _fit(si_iv_1403_model(cube), cube.data, cube.uncertainty.array, unit=cube.unit)
