@@ -62,6 +62,31 @@ def test_readers_reject_other_products_and_levels(request, level3_file, reader, 
             reader(path)
 
 
+@pytest.mark.parametrize("kind", ["directory", "text file"])
+@pytest.mark.parametrize(
+    ("reader", "product"),
+    [(read_files, "file"), (read_sji_lvl2, "SJI file"), (read_spectrograph_lvl2, "raster file")],
+    ids=["read-files", "sji-reader", "spectrograph-reader"],
+)
+def test_readers_reject_what_is_not_fits_despite_its_suffix(tmp_path, sns_sg_file, reader, product, kind):
+    # Named like FITS, so it is opened before it is classified
+    path = tmp_path / "x.fits"
+    if kind == "directory":
+        path.mkdir()
+    else:
+        path.write_text("not a FITS file")
+    message = re.escape(f"{path} is not an IRIS level 2 {product}")
+
+    with pytest.raises(ValueError, match=message) as excinfo:
+        reader(path)
+    # The error from opening it is chained
+    assert isinstance(excinfo.value.__context__, (OSError, ValueError))
+    if reader is read_spectrograph_lvl2:
+        # Several files are opened first, to order them by DATE_OBS
+        with pytest.raises(ValueError, match=message):
+            reader([sns_sg_file, path])
+
+
 def test_read_spectrograph_lvl2_names_the_wrong_file_in_a_list(sns_sg_file, sns_sji_1330_file):
     with pytest.raises(ValueError, match=re.escape(f"{sns_sji_1330_file} is not an IRIS level 2 raster file")):
         read_spectrograph_lvl2([sns_sg_file, sns_sji_1330_file])

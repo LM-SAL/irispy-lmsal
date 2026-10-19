@@ -273,7 +273,11 @@ def read_files(
                 else [filename]
             )
             for file in files:
-                header = _primary_header(file) if file.name.endswith((".fits", ".fits.gz")) else None
+                try:
+                    header = _primary_header(file) if file.name.endswith((".fits", ".fits.gz")) else None
+                except (OSError, EOFError, ValueError, TypeError):
+                    # A directory or a file that is not FITS: raises the level 2 error, chained to this one
+                    _check_level2(file, None)
                 product = _check_level2(file, header)
                 _, describe = _get_simple_metadata(header)
                 log.debug(f"Processing file: {file} as {product}")
