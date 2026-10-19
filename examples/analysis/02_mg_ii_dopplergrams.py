@@ -20,9 +20,9 @@ from scipy.interpolate import make_interp_spline
 import astropy.units as u
 from astropy import constants
 from astropy.coordinates import SpectralCoord
+from astropy.visualization import AsymmetricPercentileInterval
 
 from irispy.io import read_files
-from irispy.utils import image_clipping
 from irispy.utils.constants import BAD_PIXEL_VALUE_UNSCALED
 from irispy.utils.wavelength_drift import calculate_wavelength_drift
 
@@ -175,7 +175,7 @@ doppler = wings[..., 0] - wings[..., 1]
 # And now we can plot this as before (intensity units are again arbitrary
 # because of the unscaled DNs).
 
-vmin, vmax = image_clipping(doppler[np.isfinite(doppler)])
+vmin, vmax = AsymmetricPercentileInterval(0.15, 99.85).get_limits(doppler)
 # A diverging color map needs limits centered on zero.
 limit = max(abs(vmin), abs(vmax))
 plt.figure()
