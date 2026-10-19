@@ -1,1 +1,1 @@
-The documentation now loads ``sphinxext-opengraph``, so the Open Graph settings it already carried take effect (link previews and search metadata); the unused extensions and sunpy-only nitpick exceptions are gone, and Read the Docs fails on warnings like CI.
+The documentation now loads ``sphinxext-opengraph``, so the Open Graph settings it already carried take effect (link previews and search metadata); the unused extensions and sunpy-only nitpick exceptions are gone.
