@@ -210,11 +210,14 @@ def read_spectrograph_lvl2(
                     window_fits_indices = range(1, len(hdulist) - 2)
                 else:
                     spectral_windows_req = [spectral_windows] if isinstance(spectral_windows, str) else spectral_windows
-                    spectral_windows_req = np.asarray(spectral_windows_req, dtype="U")
+                    spectral_windows_req = np.asarray(list(dict.fromkeys(spectral_windows_req)), dtype="U")
                     window_is_in_obs = np.asarray([window in windows_in_obs for window in spectral_windows_req])
                     if not all(window_is_in_obs):
                         missing_windows = spectral_windows_req[~window_is_in_obs]
-                        msg = f"Spectral windows {missing_windows.tolist()} not in file {filenames[0]}"
+                        msg = (
+                            f"Spectral windows {missing_windows.tolist()} not in file {filenames[0]}, "
+                            f"which has {windows_in_obs.tolist()}"
+                        )
                         raise ValueError(msg)
                     # Indices must follow the order of the requested windows, not the file order,
                     # since they are zipped with ``spectral_windows_req`` below.

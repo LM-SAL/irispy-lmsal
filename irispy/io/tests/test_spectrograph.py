@@ -215,8 +215,14 @@ def test_read_spectrograph_lvl2_uses_auxiliary_pointing(raster_sg_file):
 
 
 def test_read_spectrograph_lvl2_reports_missing_spectral_window(sns_sg_file):
-    with pytest.raises(ValueError, match=r"Spectral windows \['NOPE'\] not in file"):
+    with pytest.raises(ValueError, match=r"Spectral windows \['NOPE'\] not in file .*, which has \['C II 1336', "):
         read_spectrograph_lvl2(sns_sg_file, spectral_windows=["C II 1336", "NOPE"])
+
+
+def test_read_spectrograph_lvl2_reads_a_repeated_window_once(sns_sg_file):
+    raster = read_spectrograph_lvl2(sns_sg_file, spectral_windows=["C II 1336", "Si IV 1394", "C II 1336"])
+    assert list(raster) == ["C II 1336", "Si IV 1394"]
+    assert len(raster["C II 1336"]) == 1
 
 
 def test_nuv_times_reject_invalid_source_filename(raster_sg_file):
