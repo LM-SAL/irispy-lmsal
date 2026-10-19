@@ -153,11 +153,12 @@ def _line_shifts(cube, wavelength, rest, fit_range, min_intensity, sign):
     # The fit bins in DN, which memmap=True leaves as the FITS integers, averaged along the slit
     # with bad, masked, +Inf and negative pixels as zero, as in IDL
     data = cube.data[..., bins]
-    if np.issubdtype(data.dtype, np.integer):
+    unscaled = np.issubdtype(data.dtype, np.integer)
+    if unscaled:
         data = data.astype(np.float32) * cube.meta["BSCALE"] + cube.meta["BZERO"]
-    # The lazy mask of memmap=True spans the whole raster and marks the fill values only, which
-    # are negative, so the clip below zeroes them without computing it
-    if not isinstance(cube.mask, da.Array):
+    # The lazy mask of memmap=True, over the unscaled integers, spans the whole raster and marks
+    # the fill values only, which are negative, so the clip below zeroes them without computing it
+    if not (unscaled and isinstance(cube.mask, da.Array)):
         data[_boolean_mask(cube)[..., bins]] = 0
     profiles = np.clip(np.nan_to_num(data, copy=False, posinf=0), 0, None, out=data).mean(axis=1, dtype=float)
     offset = wavelength[bins] - rest

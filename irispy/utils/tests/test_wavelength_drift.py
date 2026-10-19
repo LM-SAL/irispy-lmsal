@@ -246,6 +246,24 @@ def test_memmap_mask_is_not_computed(monkeypatch):
     assert np.isfinite(_line_shifts(cube, _wavelengths(cube), *_LINES["Ni I"])).any()
 
 
+def test_dask_mask_on_scaled_data_is_applied():
+    # Only the lazy fill mask of memmap=True, over the unscaled integers, goes unread
+    wavelengths = 1355.05 + 0.05 * np.arange(30)
+    data = np.broadcast_to(50 * np.exp(-0.5 * ((wavelengths - 1355.62) / 0.04) ** 2), (2, 3, 30)).copy()
+    data[..., 17] += 20  # a positive spike at the end of the fit range
+    mask = np.zeros(data.shape, dtype=bool)
+    mask[..., 17] = True
+    cube = make_test_spectrogram_cube(data, wavelengths * u.AA)
+    wavelength = _wavelengths(cube)
+    unmasked = _line_shifts(cube, wavelength, *_LINES["O I"])
+    cube.mask = da.from_array(mask)
+    masked = _line_shifts(cube, wavelength, *_LINES["O I"])
+    np.testing.assert_allclose(masked, -0.02, atol=1e-6)
+    assert np.abs(masked - unmasked).min() > 1e-3
+    cube.mask = mask
+    np.testing.assert_array_equal(_line_shifts(cube, wavelength, *_LINES["O I"]), masked)
+
+
 def test_memmap_data_give_the_same_table():
     # memmap=True leaves the FITS integers, which are scaled to DN for the fit ranges only
     table = calculate_wavelength_drift(read_spectrograph_lvl2(CROP))
