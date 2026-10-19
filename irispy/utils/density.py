@@ -221,7 +221,15 @@ def density_diagnostic(
     numerator_indices = _transition_indices(ion.transitions, numerator)
     denominator_indices = _transition_indices(ion.transitions, denominator)
     contribution = ion.contribution_function(density_grid, **line_ratio_kwargs)
-    theoretical_ratio = contribution[..., numerator_indices].sum(-1) / contribution[..., denominator_indices].sum(-1)
+    numerator_contribution = contribution[..., numerator_indices].sum(-1).value
+    denominator_contribution = contribution[..., denominator_indices].sum(-1).value
+    # Both lines vanish where the ion has no population, such as O IV from 10^8.5 K in CHIANTI 11.0.2
+    theoretical_ratio = np.divide(
+        numerator_contribution,
+        denominator_contribution,
+        out=np.full(numerator_contribution.shape, np.nan),
+        where=denominator_contribution != 0.0,
+    )
     theoretical_ratio = u.Quantity(theoretical_ratio, u.dimensionless_unscaled).squeeze()
     if theoretical_ratio.ndim > 1:
         ion_temperature = u.Quantity(ion.temperature)
@@ -241,6 +249,8 @@ def density_diagnostic(
         ratio_temperature = ratio_temperature.flat[0]
 
         order = np.argsort(ion_temperature.to_value(u.K))
+        # Leave out the temperatures where the ion has no population
+        order = order[np.isfinite(theoretical_ratio.value[order]).all(axis=1)]
         temperature_grid = ion_temperature.to_value(u.K)[order]
         ratio_values = theoretical_ratio.value[order]
         interp = make_interp_spline(temperature_grid, ratio_values, k=1, axis=0)

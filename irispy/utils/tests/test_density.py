@@ -146,6 +146,31 @@ def test_density_diagnostic_error_bar_off_the_curve_gives_its_end():
     )
 
 
+def test_density_diagnostic_ignores_temperatures_without_the_ion():
+    # CHIANTI's O IV ionization fraction is 0 above 10^8.5 K, so both lines vanish there
+    ion = types.SimpleNamespace(
+        transitions=types.SimpleNamespace(
+            wavelength=[1399.776, 1401.163] * u.AA, is_bound_bound=np.array([True, True])
+        ),
+        contribution_function=lambda _density: (
+            [[[0.2, 1.0], [0.4, 1.0]], [[0.4, 1.0], [0.8, 1.0]], [[0, 0], [0, 0]]] * u.erg * u.cm**3 / u.s
+        ),
+        temperature=[1e5, 2e5, 1e9] * u.K,
+    )
+
+    result = density_diagnostic(
+        0.3,
+        1.0,
+        [1, 2] * u.cm**-3,
+        ion=ion,
+        numerator=1399.78 * u.angstrom,
+        denominator=1401.16 * u.angstrom,
+        temperature=1e5 * u.K,
+    )
+
+    np.testing.assert_allclose(result["theoretical_ratio"].value, [0.2, 0.4])
+
+
 @pytest.mark.parametrize(
     ("numerator", "expected"),
     [
