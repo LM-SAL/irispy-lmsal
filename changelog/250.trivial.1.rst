@@ -1,0 +1,1 @@
+Three frames of a real SDO/AIA 1700 Å cube co-aligned with IRIS are now test data, and ``read_sji_lvl2`` is tested on them for the class, unit, time axis, maps and slicing of an ``AIACube`` instead of on a relabelled slit-jaw file.

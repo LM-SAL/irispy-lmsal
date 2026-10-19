@@ -14,6 +14,8 @@ kept values and their neighbours are exactly those of the whole file:
     rest wavelength. Its other keywords, such as TSR/TER/TSC/TEC and the statistics,
     still describe the whole window.
 - The understated TFIELDS of the filename table is repaired, as in ``compress.py``.
+- The filename table of an AIA cube declares A0 columns, which astropy cannot read, so it
+    is dropped, as the SOT fixtures do; irispy does not read it.
 
 Examples, run from this directory::
 
@@ -22,6 +24,8 @@ Examples, run from this directory::
     python cut.py iris_l2_20130902_182935_4000005156_raster_t000_r00000.fits \
         bursts/iris_l2_20130902_182935_4000005156_raster_t000_r00000_si_iv_test.fits \
         --rows 385:576 --window "Si IV 1403" 262:305
+    python cut.py aia_l2_20170305_164021_3620106076_1700.fits \
+        aia/aia_l2_20170305_164021_3620106076_1700_test.fits --exposures 263:266 --columns 119:439
 """
 
 import re
@@ -63,9 +67,14 @@ def cut(source, output, *, exposures=None, rows=None, columns=None, windows=None
         # Repair understated TFIELDS before the table is first parsed - astropy caches the parse
         table_header = hdus[-1].header
         table_header["TFIELDS"] = sum(1 for key in table_header if key.startswith("TTYPE"))
+        if any(table_header[f"TFORM{i}"] == "A0" for i in range(1, table_header["TFIELDS"] + 1)):
+            # An AIA cube's filename table declares A0 columns, which astropy cannot read
+            del hdus[-1]
         primary = hdus[0].header
         spectrograph = "SPEC" in primary["INSTRUME"]
         images = list(hdus[1:-2]) if spectrograph else [hdus[0]]
+        # The per-exposure tables: the auxiliary table and, when astropy can read it, the filename table
+        tables = list(hdus[-2:]) if spectrograph else list(hdus[1:])
         if windows:
             start, stop, cards = _window_cards(primary)
             names = [primary[f"TDESC{number}"] for number in range(1, primary["NWIN"] + 1)]
@@ -102,7 +111,7 @@ def cut(source, output, *, exposures=None, rows=None, columns=None, windows=None
             for index, card in enumerate(block, start=start):
                 primary.insert(index, card)
             primary["NWIN"] = len(windows)
-            hdus = fits.HDUList([hdus[0], *kept, *hdus[-2:]])
+            hdus = fits.HDUList([hdus[0], *kept, *tables])
             images = kept
         if exposures is not None:
             step = np.diff(exposures)
@@ -113,7 +122,7 @@ def cut(source, output, *, exposures=None, rows=None, columns=None, windows=None
                 if even:
                     image.header["CDELT3"] *= stride
                     image.header["CRPIX3"] = (image.header["CRPIX3"] - 1 - exposures[0]) / stride + 1
-            for table in hdus[-2:]:
+            for table in tables:
                 table.data = table.data[exposures]
             primary = hdus[0].header
             primary["NEXP"] = len(exposures)
