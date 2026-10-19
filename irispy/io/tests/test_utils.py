@@ -2,6 +2,7 @@ import io
 import os
 import gzip
 import shutil
+import hashlib
 import tarfile
 import threading
 from pathlib import Path
@@ -21,6 +22,12 @@ from irispy.io.sji import read_sji_lvl2
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.io.utils import _extract_tarfile, _get_spec_group_key, fits_info, read_files
 from irispy.sji import SOTCube
+
+
+def _extract_target(root, tar_path):
+    # The folder a tar file is extracted into: its name and the first 8 hex digits of its path's SHA-1
+    digest = hashlib.sha1(os.fsencode(Path(tar_path).resolve()), usedforsecurity=False).hexdigest()[:8]
+    return Path(root) / f"{Path(tar_path).with_suffix('').with_suffix('').name}-{digest}"
 
 
 @pytest.mark.parametrize("memmap", [False, True])
@@ -244,7 +251,7 @@ def test_read_files_sot(tmp_path, sot_fg_file, sot_mg_file, sot_sp_file):
 
     assert set(returns.keys()) == {"G band 4305", "TF Na I 5896", "6302A B_LOS", "6302A B_LOS (sotsp_b)"}
     assert all(isinstance(cube, SOTCube) for cube in returns.values())
-    assert (tmp_path / "extracted" / "iris_l2_20160108_191211_3680100932_SOTSP" / "sotsp_b.fits").is_file()
+    assert (_extract_target(tmp_path / "extracted", tar_path) / "sotsp_b.fits").is_file()
 
 
 @pytest.mark.parametrize("source", ["files", "archive"], ids=["same-stem-files", "same-stem-members"])
@@ -284,7 +291,7 @@ def test_extract_tarfile_reuses_complete_extraction(tmp_path):
             info = tarfile.TarInfo(name)
             info.size = 3
             tar.addfile(info, io.BytesIO(b"abc"))
-    extract_dir = tmp_path / "obs_raster"
+    extract_dir = _extract_target(tmp_path, tar_path)
     first = _extract_tarfile([tar_path], extract_dir=tmp_path)
     assert first == [extract_dir / "a.fits", extract_dir / "b.fits"]
     # A second call must not extract again, or it would restore "abc".
@@ -310,6 +317,24 @@ def test_extract_tarfile_reuses_complete_extraction(tmp_path):
     assert (extract_dir / "a.fits").read_bytes() == b"abcd"
 
 
+def test_extract_tarfile_keeps_same_named_archives_apart(tmp_path, raster_sg_file, sns_sg_file):
+    # The same archive name in two folders, such as two downloads of one observation, with the same member name
+    tarballs = []
+    for folder, filename in zip(("first", "second"), (raster_sg_file, sns_sg_file), strict=True):
+        (tmp_path / folder).mkdir()
+        tarballs.append(tmp_path / folder / "obs_raster.tar.gz")
+        with tarfile.open(tarballs[-1], "w:gz") as tar:
+            tar.add(filename, arcname="raster.fits")
+    expected = {fits.getheader(raster_sg_file)["OBSID"], fits.getheader(sns_sg_file)["OBSID"]}
+
+    extracted = _extract_tarfile(tarballs, extract_dir=tmp_path / "extracted")
+    returns = read_files(tarballs, extract_dir=tmp_path / "extracted")
+
+    assert [file.parent for file in extracted] == [_extract_target(tmp_path / "extracted", tar) for tar in tarballs]
+    assert len(returns) == 2
+    assert {raster["C II 1336"][0].meta["OBSID"] for raster in returns.values()} == expected
+
+
 def test_extract_tarfile_defaults_to_the_irispy_cache(tmp_path):
     # The archive's folder can be read-only, such as a download folder on a shared mount.
     archive_dir = tmp_path / "downloads"
@@ -323,7 +348,7 @@ def test_extract_tarfile_defaults_to_the_irispy_cache(tmp_path):
     try:
         with temporary_cache_dir_path(tmp_path, namespace="irispy") as cache:
             files = _extract_tarfile([tar_path])
-            assert files == [cache / "obs_raster" / "a.fits"]
+            assert files == [_extract_target(cache, tar_path) / "a.fits"]
             assert files[0].read_bytes() == b"abc"
     finally:
         archive_dir.chmod(0o755)
@@ -364,5 +389,5 @@ def test_extract_tarfile_serializes_concurrent_callers(tmp_path, monkeypatch):
 
     # The second caller reused the finished extraction instead of extracting again.
     assert not extracting.acquire(blocking=False)
-    assert results == [[tmp_path / "obs_raster" / "a.fits"]] * 2
-    assert (tmp_path / "obs_raster" / "a.fits").read_bytes() == b"abc"
+    assert results == [[_extract_target(tmp_path, tar_path) / "a.fits"]] * 2
+    assert (_extract_target(tmp_path, tar_path) / "a.fits").read_bytes() == b"abc"

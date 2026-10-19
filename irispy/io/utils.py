@@ -1,6 +1,8 @@
+import os
 import sys
 import gzip
 import json
+import hashlib
 import tarfile
 from pathlib import Path
 
@@ -56,7 +58,10 @@ def _get_simple_metadata(header):
 
 def _extract_tarfile(filenames, extract_dir=None):
     """
-    Extracts tar files, each into a folder named after it under ``extract_dir``.
+    Extracts tar files, each into its own folder under ``extract_dir``.
+
+    The folder is named after the tar file with a suffix from its absolute path, so two
+    archives with the same name in different folders never share one.
 
     A complete earlier extraction of the same tar file (same size and modification
     time) is reused while all of its files still exist with their full sizes.
@@ -76,7 +81,9 @@ def _extract_tarfile(filenames, extract_dir=None):
     for fname in filenames:
         filename = Path(fname)
         if tarfile.is_tarfile(filename):
-            target = root / filename.with_suffix("").with_suffix("").name  # removes .tar.gz or .tar
+            stem = filename.with_suffix("").with_suffix("").name  # removes .tar.gz or .tar
+            digest = hashlib.sha1(os.fsencode(filename.resolve()), usedforsecurity=False).hexdigest()[:8]
+            target = root / f"{stem}-{digest}"
             target.mkdir(parents=True, exist_ok=True)
             # The cache check must share the lock with extraction: a waiting caller can then reuse the files.
             with FileLock(target / ".irispy-extracted.lock"):
@@ -230,7 +237,7 @@ def read_files(
         Passed to `irispy.io.spectrograph.read_spectrograph_lvl2` only; slit-jaw, AIA and SOT files are not affected.
         Defaults to `False`.
     extract_dir : `str` or `pathlib.Path`, optional
-        The folder that tar files are extracted into, each in a subfolder named after it.
+        The folder that tar files are extracted into, each in a subfolder named after it and its path.
         Defaults to the ``irispy`` cache folder, ``astropy.config.paths.get_cache_dir("irispy")``
         (``~/.cache/irispy`` unless ``XDG_CACHE_HOME`` is set), so the archive's own folder
         can be read-only. An archive extracted there before is not extracted again.
