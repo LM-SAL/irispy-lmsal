@@ -1,0 +1,1 @@
+``SJICube.celestial_frame`` now works after an integer index on a spatial axis; it is the frame of the first exposure whatever the slice, as documented.

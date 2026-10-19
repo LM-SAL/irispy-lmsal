@@ -14,7 +14,7 @@ import numpy as np
 
 import astropy.units as u
 
-from irispy.utils.utils import _import_optional
+from irispy.utils.utils import _boolean_mask, _import_optional
 from irispy.visualization import LAT_AXIS_LABEL, LON_AXIS_LABEL
 
 __all__ = ["asinh_velocity", "calculate_rgb", "linear_velocity", "plot_rgb"]
@@ -133,9 +133,7 @@ def calculate_rgb(
         msg = f"A false-color image needs a three dimensional cube, got shape {cube.shape}"
         raise ValueError(msg)
     axis_wavelength = cube.wavelength_axis
-    # The mask may cover only some axes.
-    mask = None if cube.mask is None else np.broadcast_to(np.asarray(cube.mask, dtype=bool), np.shape(cube.data))
-    data = np.ma.filled(np.ma.MaskedArray(cube.data, mask=mask, dtype=float), np.nan)
+    data = np.ma.filled(np.ma.MaskedArray(cube.data, mask=_boolean_mask(cube), dtype=float), np.nan)
     data[np.isinf(data)] = np.nan  # blank like a masked sample
     wavelength = u.Quantity(cube.spectral_axis).to(u.AA)
     if wavelength.ndim != 1:

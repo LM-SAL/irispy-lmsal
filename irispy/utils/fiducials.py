@@ -10,6 +10,7 @@ import astropy.units as u
 from irispy.spectrograph import SpectrogramCubeSequence
 from irispy.utils._spectral import check_scaled
 from irispy.utils.constants import SLIT_WIDTH
+from irispy.utils.utils import _boolean_mask
 
 __all__ = ["find_fiducials"]
 
@@ -37,8 +38,7 @@ def _candidates(cube_or_sequence, min_depth):
     sums = counts = 0
     for cube in _cubes(cube_or_sequence):
         check_scaled(cube)
-        mask = np.broadcast_to(False if cube.mask is None else np.asarray(cube.mask, dtype=bool), cube.data.shape)
-        data = np.ma.masked_array(cube.data, mask=mask | ~np.isfinite(cube.data))
+        data = np.ma.masked_array(cube.data, mask=_boolean_mask(cube) | ~np.isfinite(cube.data))
         # Level 2 arrays are (..., slit, wavelength)
         axes = tuple(axis for axis in range(data.ndim) if axis != cube.wavelength_axis - 1)
         sums = sums + data.sum(axis=axes, dtype=float).filled(0)

@@ -119,6 +119,25 @@ def test_negative_slices(sns_sjicube_1330):
     assert len(sns_sjicube_1330[:-2].fits_wcs) == 50
 
 
+def test_apply_exposure_time_correction(sns_sjicube_1330):
+    # The exposure time of a slit-jaw cube is an extra coordinate, which raised in sunraster
+    corrected = sns_sjicube_1330.apply_exposure_time_correction()
+    exposure_time = sns_sjicube_1330.exposure_time.to_value(u.s)[:, np.newaxis, np.newaxis]
+    assert corrected.unit == sns_sjicube_1330.unit / u.s
+    np.testing.assert_allclose(corrected.data, sns_sjicube_1330.data / exposure_time)
+    undone = corrected.apply_exposure_time_correction(undo=True)
+    assert undone.unit == sns_sjicube_1330.unit
+    np.testing.assert_allclose(undone.data, sns_sjicube_1330.data)
+
+
+def test_array_index_raises_index_error(sns_sjicube_1330):
+    # As ndcube: a list reads as a tuple of indices, an array is rejected
+    assert sns_sjicube_1330[[0, 1]].shape == sns_sjicube_1330[0, 1].shape
+    for item in (np.array([0, 1]), (slice(None), np.array([0, 1]))):
+        with pytest.raises(IndexError, match="only integer or range slices"):
+            sns_sjicube_1330[item]
+
+
 def test_rebinned_cube_has_no_fits_wcs(sns_sjicube_1330):
     rebinned = sns_sjicube_1330[:, :, :36].rebin((1, 2, 2))
 
@@ -126,6 +145,11 @@ def test_rebinned_cube_has_no_fits_wcs(sns_sjicube_1330):
     assert rebinned.celestial_frame == sns_sjicube_1330.celestial_frame
     with pytest.raises(ValueError, match="no FITS WCS"):
         rebinned.to_maps(0)
+
+
+@pytest.mark.parametrize("item", [np.s_[5], np.s_[:, 0], np.s_[:, 0, 0]])
+def test_celestial_frame_does_not_depend_on_slicing(sns_sjicube_1330, item):
+    assert sns_sjicube_1330[item].celestial_frame == sns_sjicube_1330.celestial_frame
 
 
 def test_spatial_slice_fits_wcs_describes_sliced_pixels(sns_sjicube_1330):

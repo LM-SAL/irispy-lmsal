@@ -8,7 +8,7 @@ from collections.abc import Mapping
 import dask.array as da
 import numpy as np
 
-from irispy.utils.utils import _import_optional, _saturated_samples
+from irispy.utils.utils import _boolean_mask, _import_optional, _saturated_samples
 
 __all__ = ["remove_cosmic_rays"]
 
@@ -127,7 +127,7 @@ def remove_cosmic_rays(
 
     working_mask = cube.mask
     if not dask_backed:
-        working_mask = np.zeros(cube.data.shape, dtype=bool) if cube.mask is None else np.asarray(cube.mask, dtype=bool)
+        working_mask = _boolean_mask(cube)
         if np.issubdtype(cube.data.dtype, np.floating):
             working_mask = working_mask | ~np.isfinite(cube.data)
     backends = {

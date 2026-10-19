@@ -686,6 +686,24 @@ def test_average_window_mask_representations(mask):
     np.testing.assert_array_equal(cube.data, original_data)
 
 
+@pytest.mark.parametrize(
+    "mask",
+    [
+        np.zeros((), dtype=bool),
+        np.array([False, False, True]),
+        np.broadcast_to([0, 0, 1], (2, 2, 3)).astype(np.uint8),
+    ],
+)
+def test_calculate_moments_mask_representations(mask):
+    # A velocity range slices the mask, which raised for a scalar or trailing-axes mask
+    data = np.broadcast_to([1.0, 2.0, 4.0], (2, 2, 3)).copy()
+    cube = make_test_spectrogram_cube(data, [500, 501, 502] * u.nm, mask=mask)
+    # The range keeps 501 and 502 nm
+    moments = calculate_moments(cube, rest_wavelength=501 * u.nm, velocity_range=[-400, 700] * u.km / u.s)
+    np.testing.assert_allclose(moments["intensity"].data, np.full((2, 2), 2.0 if mask.any() else 6.0))
+    assert cube.mask is mask
+
+
 def test_average_window_real_data(sns_sg_file):
     cube = read_files(sns_sg_file, uncertainty=True)["C II 1336"][0]
     window = average_window(cube, [1335.2, 1336.2] * u.AA)

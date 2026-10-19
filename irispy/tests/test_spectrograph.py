@@ -8,9 +8,11 @@ import astropy.units as u
 from astropy.io import fits
 from astropy.wcs import WCS
 
+from ndcube import NDCubeSequence
+
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.io.utils import read_files
-from irispy.spectrograph import SpectrogramCube
+from irispy.spectrograph import SpectrogramCube, SpectrogramCubeSequence
 from irispy.tests.helpers import make_test_spectrogram_cube
 from irispy.utils.constants import SLIT_WIDTH
 
@@ -118,6 +120,27 @@ def test_wavelength_axis():
     wavelengths = np.arange(10) * 0.02 * u.nm + 140 * u.nm
     cube = make_test_spectrogram_cube(np.ones((1, 1, 10)), wavelengths)
     assert cube.wavelength_axis == 2
+
+
+def test_spectrogram_sequence_slices_as_ndcube_sequence(sns_sg_file):
+    # Any slice but an integer raised the OBSID check on the empty sequence ndcube starts from
+    cube = read_spectrograph_lvl2(sns_sg_file)["C II 1336"][0]
+    sequence = SpectrogramCubeSequence([cube, cube], common_axis=0)
+    reference = NDCubeSequence([cube, cube], common_axis=0)
+    for sliced, expected in (
+        (sequence[0:2], reference[0:2]),
+        (sequence[:, 0:5], reference[:, 0:5]),
+        (sequence.index_as_cube[3:9], reference.index_as_cube[3:9]),
+    ):
+        assert isinstance(sliced, SpectrogramCubeSequence)
+        assert [c.shape for c in sliced.data] == [c.shape for c in expected.data]
+
+
+def test_length_one_step_axis(sns_sg_file):
+    # The combined WCS of a length-1 step axis raises in ndcube
+    cube = read_spectrograph_lvl2(sns_sg_file)["C II 1336"][0][0:1]
+    assert cube.wavelength_axis == 2
+    assert "('em.wl',)" in str(cube)
 
 
 @pytest.mark.parametrize(

@@ -20,12 +20,14 @@ def _celestial_frame_from_cube(cube):
     if observer is not None:
         return Helioprojective(observer=observer, obstime=observer.obstime)
 
-    fits_wcs = cube.fits_wcs
-    if fits_wcs is None:
-        fits_wcs = cube.meta.get("fits_wcs")
-    if fits_wcs is None and cube.meta.get("frame_wcs_headers") is not None:
-        # A rebinned SJI cube has no fits_wcs, but binning does not change the frame.
-        fits_wcs = WCS(cube.meta["frame_wcs_headers"][0])
+    headers = cube.meta.get("frame_wcs_headers")
+    if headers is not None:
+        # The first frame, whatever the slice: fits_wcs follows an integer index and a rebinned cube has none.
+        fits_wcs = WCS(headers[0])
+    else:
+        fits_wcs = cube.fits_wcs
+        if fits_wcs is None:
+            fits_wcs = cube.meta.get("fits_wcs")
     if isinstance(fits_wcs, list):
         fits_wcs = fits_wcs[0] if fits_wcs else None
     if fits_wcs is None or not hasattr(fits_wcs, "celestial"):
@@ -48,6 +50,10 @@ class _ResolveNegativeIndicesMixin:
     """
 
     def __getitem__(self, item):
+        if any(np.iterable(index) for index in (item if isinstance(item, tuple | list) else (item,))):
+            # As ndcube, where sanitize_slices rejects an array index, which simplify_basic_index trips over
+            msg = "This slice is invalid, only integer or range slices are supported."
+            raise IndexError(msg)
         # Against the shape, as since astropy 8.0.2 sanitize_slices rejects negative indices without it
         try:
             item = simplify_basic_index(item, shape=self.shape)

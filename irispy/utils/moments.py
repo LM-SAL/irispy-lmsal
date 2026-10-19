@@ -10,7 +10,7 @@ from astropy.nddata import NDDataArray, StdDevUncertainty
 
 from irispy.spectrograph import RasterCollection, _wavelength_indices
 from irispy.utils._spectral import check_scaled, make_map_cube, make_spatial_template, standard_deviation
-from irispy.utils.utils import _saturated_samples
+from irispy.utils.utils import _boolean_mask, _saturated_samples
 
 __all__ = ["average_window", "calculate_moments"]
 
@@ -91,7 +91,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
     wavelength_axis = cube.wavelength_axis
     wavelengths = cube.axis_world_coords(wavelength_axis)[0].to(u.nm)
     data = np.asarray(cube.data)
-    mask = None if cube.mask is None else np.asarray(cube.mask, dtype=bool)
+    mask = _boolean_mask(cube)
     clipped = _saturated_samples(cube)
     sigma = standard_deviation(cube)
     if velocity_range is not None:
@@ -109,17 +109,15 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
         slicer[wavelength_axis] = crop_indices
         data = data[tuple(slicer)]
         clipped = clipped[tuple(slicer)]
-        if mask is not None:
-            mask = mask[tuple(slicer)]
+        mask = mask[tuple(slicer)]
         if sigma is not None:
             sigma = sigma[tuple(slicer)]
         wavelengths = wavelengths[crop_indices]
     data = np.array(data, dtype=float, copy=True)
-    unmasked = True if mask is None else ~mask
     saturated = np.any(clipped, axis=wavelength_axis)
     # The template is masked where all of cube is, the maps also where no sample is used or saturated
-    used_mask = ~np.any((~np.isnan(data) & unmasked) | clipped, axis=wavelength_axis)
-    dropped = (data < 0) | ~np.isfinite(data) | (False if mask is None else mask)
+    used_mask = ~np.any((~np.isnan(data) & ~mask) | clipped, axis=wavelength_axis)
+    dropped = (data < 0) | ~np.isfinite(data) | mask
     data[dropped] = 0
 
     dwvl = np.abs(np.mean(np.diff(wavelengths)))
@@ -236,9 +234,7 @@ def average_window(cube, wavelength_range, *, method="mean"):
     data = np.take(cube.data, window, axis=wavelength_axis).astype(float)
     dropped = np.isnan(data)
     saturated = np.any(np.take(_saturated_samples(cube), window, axis=wavelength_axis), axis=wavelength_axis)
-    if cube.mask is not None:
-        mask = np.broadcast_to(np.asarray(cube.mask, dtype=bool), cube.data.shape)
-        dropped |= np.take(mask, window, axis=wavelength_axis)
+    dropped |= np.take(_boolean_mask(cube), window, axis=wavelength_axis)
     sigma = standard_deviation(cube)
     uncertainty = None if sigma is None else StdDevUncertainty(np.take(sigma, window, axis=wavelength_axis))
     reduction = getattr(NDDataArray(data, uncertainty=uncertainty, mask=dropped), method)

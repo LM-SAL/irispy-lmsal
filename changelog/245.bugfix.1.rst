@@ -1,0 +1,1 @@
+Indexing an ``SJICube`` or ``SpectrogramCube`` with a numpy array now raises the ``IndexError`` of `ndcube` instead of a ``ValueError`` about an ambiguous truth value.

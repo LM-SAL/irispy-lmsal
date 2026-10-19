@@ -141,6 +141,15 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
     remove_cosmic_rays = remove_cosmic_rays
     remove_dust = _remove_dust
 
+    def _get_axis_coord_index(self, axis_name, coord_loc):
+        # The exposure time of a slit-jaw cube is an extra coordinate, whose axis sunraster
+        # gives as a pixel axis int, where apply_exposure_time_correction unpacks a tuple
+        # of array axes, as for a coordinate in the meta.
+        index = super()._get_axis_coord_index(axis_name, coord_loc)
+        if coord_loc == "extra_coords":
+            return (self.data.ndim - 1 - index,)
+        return index
+
     celestial_frame = property(_celestial_frame_from_cube)
 
     @cached_property

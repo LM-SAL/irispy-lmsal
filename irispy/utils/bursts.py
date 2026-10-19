@@ -17,7 +17,7 @@ from irispy.spectrograph import SpectrogramCubeSequence
 from irispy.utils._spectral import check_scaled, make_map_cube, make_spatial_template
 from irispy.utils.constants import DN_UNIT
 from irispy.utils.response import get_interpolated_effective_area, get_latest_response
-from irispy.utils.utils import _saturated_samples
+from irispy.utils.utils import _boolean_mask, _saturated_samples
 
 __all__ = ["find_bright_image_events", "find_bright_spectral_events", "find_si_iv_bursts", "find_sji_bursts"]
 
@@ -158,7 +158,7 @@ def find_bright_spectral_events(
         data = np.ma.masked_where(~(data >= -10), data)
         if cube.mask is not None:
             # Saturated samples are masked, but count at their value, as in IDL
-            left_out = np.broadcast_to(np.asarray(cube.mask, dtype=bool), cube.data.shape) & ~_saturated_samples(cube)
+            left_out = _boolean_mask(cube) & ~_saturated_samples(cube)
             data[left_out[..., bins]] = np.ma.masked
         mean = data.mean(axis=-1, dtype=float)
         intensity = (mean / cube.meta["exposure time"].to_value(u.s)[:, np.newaxis]).filled(np.nan)
@@ -276,7 +276,7 @@ def find_bright_image_events(cube, *, sigma_factor=10, min_pixels=2):
     # Saturated pixels are masked, but count at their value, as in IDL
     data = cube.data
     if cube.mask is not None:
-        data = np.where(np.asarray(cube.mask, dtype=bool) & ~_saturated_samples(cube), np.nan, data)
+        data = np.where(_boolean_mask(cube) & ~_saturated_samples(cube), np.nan, data)
     frames = data.reshape(len(data), -1)
     with warnings.catch_warnings():
         # Frames without valid pixels, or with only one
