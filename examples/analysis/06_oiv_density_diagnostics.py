@@ -10,8 +10,7 @@ they are often used to diagnose conditions in the solar transition region.
 
 .. warning::
 
-    This example requires the optional density dependencies, including a version
-    of `fiasco` that provides ``fiasco.line_ratio``.
+    This example requires the optional density dependencies.
 """
 
 import fiasco
@@ -38,7 +37,7 @@ ion = fiasco.Ion("O IV", temperature_samples, ask_before=False)
 o4_models = list(zip(line_styles, temperature_labels, temperature_samples, strict=True))
 
 ratio_definitions = [
-    ("O IV 1401.16 / 1404.78 Å", 1401.157 * u.angstrom, 1404.806 * u.angstrom),
+    ("O IV 1401.16 / 1404.78 Å", 1401.163 * u.angstrom, 1404.806 * u.angstrom),
     ("O IV 1404.78 / 1399.77 Å", 1404.806 * u.angstrom, 1399.780 * u.angstrom),
 ]
 

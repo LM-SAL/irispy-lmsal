@@ -1,7 +1,7 @@
-import sys
 import types
 
 import numpy as np
+import pooch
 import pytest
 
 import astropy.units as u
@@ -9,20 +9,19 @@ import astropy.units as u
 from irispy.utils.density import density_diagnostic, map_ratio_to_quantity
 
 
-def _install_fake_fiasco(monkeypatch, ratio):
+def _fake_ion(ratio, **attributes):
+    # Contribution functions of two transitions in the ratio ``ratio``
     calls = {}
 
-    def line_ratio(ion, numerator, denominator, density_grid, **kwargs):
-        calls["ion"] = ion
-        calls["numerator"] = numerator
-        calls["denominator"] = denominator
-        calls["density_grid"] = density_grid
-        calls["line_ratio_kwargs"] = kwargs
-        return u.Quantity(ratio, u.dimensionless_unscaled)
+    def contribution_function(density, **kwargs):
+        calls["density"] = density
+        calls["kwargs"] = kwargs
+        return np.stack([ratio, np.ones_like(ratio)], axis=-1) * u.erg * u.cm**3 / u.s
 
-    fake_fiasco = types.SimpleNamespace(line_ratio=line_ratio)
-    monkeypatch.setitem(sys.modules, "fiasco", fake_fiasco)
-    return calls
+    transitions = types.SimpleNamespace(wavelength=[1399.776, 1401.163] * u.AA, is_bound_bound=np.array([True, True]))
+    return types.SimpleNamespace(
+        transitions=transitions, contribution_function=contribution_function, calls=calls, **attributes
+    )
 
 
 def test_map_ratio_to_quantity():
@@ -63,12 +62,8 @@ def test_map_ratio_to_quantity_rejects_bad_curves(observed_ratio, theoretical_ra
 
 
 @pytest.mark.parametrize("shape", [(), (2,), (1, 2)])
-def test_density_diagnostic(monkeypatch, shape):
-    _install_fake_fiasco(monkeypatch, [0.5, 1.0])
-    fake_ion = types.SimpleNamespace(
-        temperature=[1e5, 2e5] * u.K,
-        formation_temperature=2e5 * u.K,
-    )
+def test_density_diagnostic(shape):
+    fake_ion = _fake_ion([0.5, 1.0], temperature=[1e5, 2e5] * u.K, formation_temperature=2e5 * u.K)
 
     result = density_diagnostic(
         np.resize([1.2, 1.5], shape) * u.ct,
@@ -94,16 +89,13 @@ def test_density_diagnostic(monkeypatch, shape):
         assert result[key].shape == shape
 
 
-def test_density_diagnostic_builds_theoretical_ratio_with_fiasco(monkeypatch):
-    calls = _install_fake_fiasco(
-        monkeypatch,
+def test_density_diagnostic_builds_theoretical_ratio_from_the_ion():
+    fake_ion = _fake_ion(
         [
             [0.1, 0.2, 0.3],
             [0.2, 0.4, 0.6],
             [0.3, 0.6, 0.9],
         ],
-    )
-    fake_ion = types.SimpleNamespace(
         temperature=[1e5, 2e5, 3e5] * u.K,
         formation_temperature=2e5 * u.K,
     )
@@ -119,27 +111,82 @@ def test_density_diagnostic_builds_theoretical_ratio_with_fiasco(monkeypatch):
         line_ratio_kwargs={"use_two_ion_model": False},
     )
 
-    assert calls["ion"] is fake_ion
-    assert calls["numerator"] == 1399.78 * u.angstrom
-    assert calls["denominator"] == 1401.16 * u.angstrom
-    assert u.allclose(calls["density_grid"], density_grid)
-    assert calls["line_ratio_kwargs"] == {"use_two_ion_model": False}
+    assert u.allclose(fake_ion.calls["density"], density_grid)
+    assert fake_ion.calls["kwargs"] == {"use_two_ion_model": False}
     np.testing.assert_allclose(result["theoretical_ratio"].value, [0.2, 0.4, 0.6])
     assert u.allclose(result["density"], [2] * u.cm**-3)
 
 
-def test_density_diagnostic_names_the_fiasco_without_line_ratio(monkeypatch):
-    # Every fiasco release up to 0.8.2 lacks line_ratio; the error must say so instead of an AttributeError
-    monkeypatch.setitem(sys.modules, "fiasco", types.SimpleNamespace(__version__="0.8.2"))
-    with pytest.raises(ImportError, match=r"fiasco 0\.8\.2 has no line_ratio.*wtbarnes/fiasco"):
+def test_density_diagnostic_error_bar_off_the_curve_gives_its_end():
+    # The O IV 1399.78 / 1401.16 Å curve of SolarSoft's iris_ne_oiv.pro; 0.375 + 0.078 lies above it
+    oiv_ratio = [
+        0.16710843, 0.1670735, 0.16709631, 0.16718450, 0.16736760, 0.16770638, 0.16831132, 0.16937367, 0.17121214,
+        0.17433385, 0.17949909, 0.18777250, 0.20053728, 0.2193597, 0.24536467, 0.2779118, 0.3135369, 0.34697879,
+        0.3740375, 0.39339120, 0.40603911, 0.41382271, 0.4184366, 0.42111109, 0.42264118,
+    ]  # fmt: skip
+
+    result = density_diagnostic(
+        0.375,
+        1.0,
+        np.logspace(7, 13, 25) * u.cm**-3,
+        ion=_fake_ion(oiv_ratio),
+        numerator=1399.78 * u.angstrom,
+        denominator=1401.16 * u.angstrom,
+        intensity_numerator_uncertainty=0.078,
+        intensity_denominator_uncertainty=0.0,
+    )
+
+    assert result["density_upper"] == 1e13 * u.cm**-3
+    # iris_ne_oiv.pro gives log densities 11.523 and 10.889 from the nearest of 200 points, 0.03 dex apart,
+    # on a spline of its curve
+    np.testing.assert_allclose(
+        np.log10(u.Quantity([result["density"], result["density_lower"]]).to_value(u.cm**-3)),
+        [11.523, 10.889],
+        atol=0.02,
+    )
+
+
+@pytest.mark.parametrize("wavelength", [1401.15, 1401.155])
+def test_density_diagnostic_rejects_wavelength_near_two_transitions(wavelength):
+    # CHIANTI's O IV 1401.149 Å line is over 1e5 times weaker than its 1401.163 Å line
+    transitions = types.SimpleNamespace(
+        wavelength=[1399.776, 1401.163, 1401.149] * u.AA, is_bound_bound=np.array([True, True, True])
+    )
+
+    with pytest.raises(ValueError, match=r"within 0\.02 Å of the transitions at 1401\.149, 1401\.163 Å"):
         density_diagnostic(
-            [4, 8] * u.ct,
-            [2, 4] * u.ct,
+            1.0,
+            1.0,
             [1e10, 1e11] * u.cm**-3,
-            ion=types.SimpleNamespace(),
-            numerator=1399.78 * u.angstrom,
-            denominator=1401.16 * u.angstrom,
+            ion=types.SimpleNamespace(transitions=transitions),
+            numerator=1399.776 * u.angstrom,
+            denominator=wavelength * u.angstrom,
         )
+
+
+@pytest.mark.remote_data
+def test_density_diagnostic_oiv_curve_from_fiasco():
+    fiasco = pytest.importorskip("fiasco")
+    # The CHIANTI database of the documentation, with O IV only
+    database = pooch.retrieve(
+        "https://github.com/LM-SAL/irispy-data/releases/download/v1/chianti_dbase_o4.h5",
+        known_hash="7a7a6eb1bfd043695b6f52c641b663d71f8a33a836da35469f54151af57d014d",
+    )
+    ion = fiasco.Ion("O IV", 10**5.15 * u.K, hdf5_dbase_root=database)
+
+    result = density_diagnostic(
+        1.0,
+        1.0,
+        np.logspace(9, 12, 7) * u.cm**-3,
+        ion=ion,
+        numerator=1399.776 * u.angstrom,
+        denominator=1401.163 * u.angstrom,
+        line_ratio_kwargs={"use_two_ion_model": False},
+    )
+
+    # fiasco.line_ratio of fiasco 0.9.dev4 with this database; fiasco 0.8.2 gives up to 0.006% less
+    expected = [0.1720966712, 0.1803760573, 0.2014207069, 0.2462971264, 0.3144246782, 0.3746880696, 0.4064822117]
+    np.testing.assert_allclose(result["theoretical_ratio"].value, expected, rtol=1e-4)
 
 
 def test_density_diagnostic_requires_ion():
@@ -154,12 +201,8 @@ def test_density_diagnostic_requires_ion():
         )
 
 
-def test_density_diagnostic_selects_monotonic_branch(monkeypatch):
-    _install_fake_fiasco(monkeypatch, [0.1, 0.2, 0.3, 0.25, 0.2])
-    fake_ion = types.SimpleNamespace(
-        temperature=[1e5, 2e5] * u.K,
-        formation_temperature=2e5 * u.K,
-    )
+def test_density_diagnostic_selects_monotonic_branch():
+    fake_ion = _fake_ion([0.1, 0.2, 0.3, 0.25, 0.2], temperature=[1e5, 2e5] * u.K, formation_temperature=2e5 * u.K)
 
     result = density_diagnostic(
         [2.4, 2.8],
@@ -174,12 +217,8 @@ def test_density_diagnostic_selects_monotonic_branch(monkeypatch):
     np.testing.assert_allclose(result["density_grid"].value, [1, 2, 3])
 
 
-def test_density_diagnostic_zero_denominator(monkeypatch):
-    _install_fake_fiasco(monkeypatch, [0.5, 1.0])
-    fake_ion = types.SimpleNamespace(
-        temperature=[1e5, 2e5] * u.K,
-        formation_temperature=2e5 * u.K,
-    )
+def test_density_diagnostic_zero_denominator():
+    fake_ion = _fake_ion([0.5, 1.0], temperature=[1e5, 2e5] * u.K, formation_temperature=2e5 * u.K)
 
     result = density_diagnostic(
         [1.0, 1.5] * u.ct,
@@ -209,20 +248,17 @@ def test_density_diagnostic_partial_uncertainty_raises():
         )
 
 
-def test_density_diagnostic_explicit_temperature(monkeypatch):
+def test_density_diagnostic_explicit_temperature():
     """
     Regression: explicit scalar temperature must not be clobbered by
     formation_temperature.
     """
-    _install_fake_fiasco(
-        monkeypatch,
+    fake_ion = _fake_ion(
         [
             [0.1, 0.2, 0.3],
             [0.2, 0.4, 0.6],
             [0.3, 0.6, 0.9],
         ],
-    )
-    fake_ion = types.SimpleNamespace(
         temperature=[1e5, 2e5, 3e5] * u.K,
         formation_temperature=1e5 * u.K,
     )
@@ -243,16 +279,13 @@ def test_density_diagnostic_explicit_temperature(monkeypatch):
     assert u.allclose(result["density"], [2] * u.cm**-3)
 
 
-def test_density_diagnostic_rejects_vector_temperature(monkeypatch):
-    _install_fake_fiasco(
-        monkeypatch,
+def test_density_diagnostic_rejects_vector_temperature():
+    fake_ion = _fake_ion(
         [
             [0.1, 0.2, 0.3],
             [0.2, 0.4, 0.6],
             [0.3, 0.6, 0.9],
         ],
-    )
-    fake_ion = types.SimpleNamespace(
         temperature=[1e5, 2e5, 3e5] * u.K,
         formation_temperature=1e5 * u.K,
     )
@@ -269,12 +302,8 @@ def test_density_diagnostic_rejects_vector_temperature(monkeypatch):
         )
 
 
-def test_density_diagnostic_uncertainty_shape_mismatch(monkeypatch):
-    _install_fake_fiasco(monkeypatch, [0.5, 1.0])
-    fake_ion = types.SimpleNamespace(
-        temperature=[1e5, 2e5] * u.K,
-        formation_temperature=2e5 * u.K,
-    )
+def test_density_diagnostic_uncertainty_shape_mismatch():
+    fake_ion = _fake_ion([0.5, 1.0], temperature=[1e5, 2e5] * u.K, formation_temperature=2e5 * u.K)
 
     with pytest.raises(ValueError, match="Uncertainty shapes"):
         density_diagnostic(
@@ -289,10 +318,11 @@ def test_density_diagnostic_uncertainty_shape_mismatch(monkeypatch):
         )
 
 
-def test_density_diagnostic_rejects_ratio_with_other_temperatures(monkeypatch):
+def test_density_diagnostic_rejects_ratio_with_other_temperatures():
     # Three temperature rows from fiasco for an ion with two temperatures
-    _install_fake_fiasco(monkeypatch, [[0.1, 0.2], [0.2, 0.4], [0.3, 0.6]])
-    fake_ion = types.SimpleNamespace(temperature=[1e5, 2e5] * u.K, formation_temperature=2e5 * u.K)
+    fake_ion = _fake_ion(
+        [[0.1, 0.2], [0.2, 0.4], [0.3, 0.6]], temperature=[1e5, 2e5] * u.K, formation_temperature=2e5 * u.K
+    )
 
     with pytest.raises(ValueError, match=r"temperature axis does not match ion\.temperature"):
         density_diagnostic(

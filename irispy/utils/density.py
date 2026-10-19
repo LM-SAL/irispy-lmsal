@@ -7,8 +7,6 @@ from scipy.interpolate import make_interp_spline
 
 import astropy.units as u
 
-from irispy.utils.utils import _import_optional
-
 __all__ = ["density_diagnostic", "map_ratio_to_quantity"]
 
 
@@ -96,6 +94,22 @@ def map_ratio_to_quantity(observed_ratio, quantity, theoretical_ratio, *, bounds
     )
 
 
+def _transition_index(transitions, wavelength):
+    """
+    Index of the bound-bound transition nearest ``wavelength``.
+    """
+    wavelengths = transitions.wavelength[transitions.is_bound_bound]
+    distance = np.abs(wavelengths - wavelength).to_value(u.AA)
+    # The IRIS line catalog and CHIANTI differ by up to 0.006 Å for O IV 1401 and the literature rounds
+    # IRIS lines to 0.01 Å, so a wavelength cannot tell apart transitions within 0.02 Å of it
+    candidates = np.flatnonzero(distance <= 0.02)
+    if candidates.size > 1 and not np.isclose(distance.min(), 0):
+        lines = ", ".join(f"{value:.3f}" for value in np.sort(wavelengths[candidates].to_value(u.AA)))
+        msg = f"{wavelength} is within 0.02 Å of the transitions at {lines} Å. Pass one of these wavelengths."
+        raise ValueError(msg)
+    return np.argmin(distance)
+
+
 def density_diagnostic(
     intensity_numerator,
     intensity_denominator,
@@ -124,19 +138,25 @@ def density_diagnostic(
         Ion used to compute the theoretical ratio curve.
     numerator, denominator : `~astropy.units.Quantity`
         Required wavelengths of the numerator and denominator transitions.
+        Each selects the nearest bound-bound transition of ``ion``. A wavelength
+        within 0.02 Å of more than one transition raises a `ValueError` unless it
+        is the CHIANTI wavelength of one of them.
     intensity_numerator_uncertainty, intensity_denominator_uncertainty :
         array-like or `~astropy.units.Quantity`, optional
-        Uncertainties on the measured integrated intensities.
+        Uncertainties on the measured integrated intensities. They give the
+        ``"density_lower"`` and ``"density_upper"`` bounds. A bound at an end of the
+        returned ``"density_grid"`` means the ratio plus or minus its uncertainty
+        lies off the theoretical curve.
     temperature : `~astropy.units.Quantity`, optional
         Temperature at which to evaluate the theoretical ratio curve from
         ``ion``. If omitted and scalar, uses the ion temperature; if omitted
         and non-scalar, falls back to ``ion.formation_temperature``.
     bounds_error : `bool`, optional
-        Passed through to `map_ratio_to_quantity`.
+        Passed through to `map_ratio_to_quantity` for the observed ratio.
     fill_value : scalar or `~astropy.units.Quantity`, optional
-        Passed through to `map_ratio_to_quantity`.
+        Passed through to `map_ratio_to_quantity` for the observed ratio.
     line_ratio_kwargs : `dict`, optional
-        Extra keyword arguments forwarded to ``fiasco.line_ratio``.
+        Extra keyword arguments forwarded to `fiasco.Ion.contribution_function`.
     """
     if (intensity_numerator_uncertainty is None) != (intensity_denominator_uncertainty is None):
         msg = "Both numerator and denominator uncertainties must be provided together."
@@ -144,16 +164,6 @@ def density_diagnostic(
     if any(value is None for value in (ion, numerator, denominator)):
         msg = "ion, numerator, and denominator are required."
         raise ValueError(msg)
-
-    fiasco = _import_optional("fiasco", reason="IRIS density diagnostics", extra="density")
-    # No fiasco release ships line_ratio yet (0.8.2 is the latest); it is on fiasco's main branch
-    if not hasattr(fiasco, "line_ratio"):
-        msg = (
-            f"fiasco {fiasco.__version__} has no line_ratio, which IRIS density diagnostics need. "
-            "Install fiasco's development version with "
-            "`pip install git+https://github.com/wtbarnes/fiasco.git`."
-        )
-        raise ImportError(msg)
 
     if line_ratio_kwargs is None:
         line_ratio_kwargs = {}
@@ -204,13 +214,10 @@ def density_diagnostic(
             raise ValueError(msg) from exc
         ratio_uncertainty = u.Quantity(ratio_uncertainty, ratio.unit)
 
-    theoretical_ratio = fiasco.line_ratio(
-        ion,
-        numerator,
-        denominator,
-        density_grid,
-        **line_ratio_kwargs,
-    )
+    numerator_index = _transition_index(ion.transitions, numerator)
+    denominator_index = _transition_index(ion.transitions, denominator)
+    contribution = ion.contribution_function(density_grid, **line_ratio_kwargs)
+    theoretical_ratio = contribution[..., numerator_index] / contribution[..., denominator_index]
     theoretical_ratio = u.Quantity(theoretical_ratio, u.dimensionless_unscaled).squeeze()
     if theoretical_ratio.ndim > 1:
         ion_temperature = u.Quantity(ion.temperature)
@@ -284,19 +291,22 @@ def density_diagnostic(
                 density_grid, theoretical_ratio = segment
                 best_score = score
 
-    ratios = [ratio] if ratio_uncertainty is None else [ratio, ratio - ratio_uncertainty, ratio + ratio_uncertainty]
-    densities = map_ratio_to_quantity(
-        u.Quantity(ratios),
+    density = map_ratio_to_quantity(
+        ratio,
         density_grid,
         theoretical_ratio,
         bounds_error=bounds_error,
         fill_value=fill_value,
     )
-
-    density = densities[0]
     density_lower = density_upper = None
     if ratio_uncertainty is not None:
-        density_minus, density_plus = densities[1:]
+        # A side of the error bar off the curve gives the curve's end, as in iris_ne_oiv.pro
+        error_bar = np.clip(
+            u.Quantity([ratio - ratio_uncertainty, ratio + ratio_uncertainty]),
+            theoretical_ratio.min(),
+            theoretical_ratio.max(),
+        )
+        density_minus, density_plus = map_ratio_to_quantity(error_bar, density_grid, theoretical_ratio)
         density_lower = np.fmin(density_minus, density_plus)
         density_upper = np.fmax(density_minus, density_plus)
 
