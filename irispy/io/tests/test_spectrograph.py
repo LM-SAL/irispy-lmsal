@@ -24,6 +24,15 @@ def test_spectral_windows_order_read_spectrograph_lvl2(sns_sg_file):
         np.testing.assert_array_equal(subset[key][0].data, all_windows[key][0].data)
 
 
+def test_read_spectrograph_orders_files_by_date_obs(raster_sg_files):
+    ordered = read_spectrograph_lvl2(raster_sg_files, spectral_windows="C II 1336")["C II 1336"]
+    unordered = read_spectrograph_lvl2(raster_sg_files[::-1], spectral_windows="C II 1336")["C II 1336"]
+    assert [cube.meta["DATE_OBS"] for cube in unordered] == sorted(cube.meta["DATE_OBS"] for cube in ordered)
+    for cube, reference in zip(unordered, ordered, strict=True):
+        np.testing.assert_array_equal(cube.data, reference.data)
+        assert cube._fits_wcs.dateobs == reference._fits_wcs.dateobs
+
+
 def test_sns_read_spectrograph_lvl2(sns_sg_file):
     raster_collection = read_spectrograph_lvl2(sns_sg_file)
     assert list(raster_collection.keys()) == [

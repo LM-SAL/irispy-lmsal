@@ -1,8 +1,8 @@
 import sys
+import gzip
 import json
 import tarfile
 from pathlib import Path
-from contextlib import nullcontext
 
 from filelock import FileLock
 
@@ -18,26 +18,32 @@ from irispy.io.spectrograph import read_spectrograph_lvl2
 __all__ = ["fits_info", "read_files"]
 
 
-def _get_simple_metadata(file):
+def _primary_header(file):
     """
-    Get simple metadata from a FITS file.
+    Read the primary header, and nothing else, of a FITS file that may be gzipped.
+
+    `astropy.io.fits.getheader` seeks past the primary data, which inflates a gzipped
+    slit-jaw cube in full just to classify it.
+    """
+    opener = gzip.open if file.suffix == ".gz" else open
+    with opener(file, "rb") as fileobj:
+        return fits.Header.fromfile(fileobj)
+
+
+def _get_simple_metadata(header):
+    """
+    Get simple metadata from a primary FITS header.
 
     Parameters
     ----------
-    file : `pathlib.Path` or `astropy.io.fits.HDUList`
-        The FITS file or open HDU list to inspect.
+    header : `astropy.io.fits.Header`
+        The primary header to inspect.
 
     Returns
     -------
     `tuple`
         A tuple containing the instrument name and description.
     """
-    if isinstance(file, fits.HDUList):
-        header = file[0].header
-    else:
-        if not file.name.endswith((".fits", ".fits.gz")):
-            return "", ""
-        header = fits.getheader(file)
     instrume = header.get("INSTRUME", "")
     describe = header.get("TDESC1", "")
     if instrume == "SOT-SP":
@@ -149,11 +155,6 @@ def fits_info(filename: str) -> None:
             return f"{header[f'TDESC{idx + idx_mod}'].replace('_', ' ')} ({header[f'TWMIN{idx + idx_mod}']:.0f} - {header[f'TWMAX{idx + idx_mod}']:.0f} AA{text_modifier})"
         return "Auxiliary data"
 
-    results = [
-        f"Filename: {Path(filename).absolute()}",
-        f"Observation: {fits.getval(filename, 'OBS_DESC')}",
-        f"OBS ID: {fits.getval(filename, 'OBSID')}",
-    ]
     table = Table(
         names=("No.", "Name", "Ver", "Type", "Cards", "Dimensions", "Format", "Description"),
         dtype=("S8", "S32", "S8", "S16", "S8", "S40", "S16", "U200"),
@@ -161,6 +162,11 @@ def fits_info(filename: str) -> None:
     with fits.open(filename) as hdulist:
         hdu_info = hdulist.info(output=False)
         header = hdulist[0].header
+        results = [
+            f"Filename: {Path(filename).absolute()}",
+            f"Observation: {header['OBS_DESC']}",
+            f"OBS ID: {header['OBSID']}",
+        ]
         num_extensions = len(hdulist)
         for idx in range(num_extensions):
             description = get_description(idx, 0 if "SPEC" in header["INSTRUME"] else 1)
@@ -172,7 +178,9 @@ def fits_info(filename: str) -> None:
     sys.stdout.flush()
 
 
-def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=False, allow_errors=False, **kwargs):
+def read_files(
+    filenames, *, spectral_windows=None, uncertainty=False, memmap=False, allow_errors=False, revert_v34=False
+):
     """
     Read raster, SJI, AIA, or Hinode/SOT data supplied with IRIS observations.
 
@@ -182,7 +190,7 @@ def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=Fa
     Parameters
     ----------
     filename : `list` of `str`, `str`, `pathlib.Path`
-        Filename(s) to load.
+        Filename(s) to load. A file given more than once, by any path or symlink, is read once.
     spectral_windows: iterable of `str` or `str`
         Spectral windows to extract from files. Default=None, implies, extract all
         spectral windows.
@@ -200,8 +208,10 @@ def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=Fa
     allow_errors : `bool`, optional
         Will continue loading the files if one fails to load.
         Defaults to `False`.
-    kwargs : `dict`, optional
-        Additional keyword arguments to pass to the reader functions.
+    revert_v34 : `bool`, optional
+        Will undo the flipping of the raster step axis made to V34 observations.
+        Passed to `irispy.io.spectrograph.read_spectrograph_lvl2` only; slit-jaw, AIA and SOT files are not affected.
+        Defaults to `False`.
 
     Returns
     -------
@@ -210,8 +220,7 @@ def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=Fa
     """
     if isinstance(filenames, (str, Path)):
         filenames = [filenames]
-    filenames = sorted(filenames)
-    filenames = [Path(f) for f in filenames]
+    filenames = sorted({Path(f).resolve() for f in filenames})
     returns = {}
     spec_groups = {}
     for filename in filenames:
@@ -220,44 +229,31 @@ def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=Fa
             raise ValueError(msg)
         try:
             sji_tarfile = filename.name.endswith(("SDO.tar.gz", "SOTFG.tar.gz", "SOTSP.tar.gz"))
-            raster_tarfile = bool(filename.name.endswith("_raster.tar.gz"))
-            context = (
-                fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
-                if filename.name.endswith((".fits", ".fits.gz"))
-                else nullcontext()
-            )
-            with context as hdulist:
-                instrume, describe = _get_simple_metadata(hdulist if hdulist is not None else filename)
-                log.debug(f"Processing file: {filename} with instrume: {instrume}")
+            raster_tarfile = filename.name.endswith("_raster.tar.gz")
+            # The members of a tarball are classified like loose files, so the rasters of several
+            # tarballs are grouped by observation instead of overwriting each other by first window.
+            files = sorted(_extract_tarfile([filename])) if sji_tarfile or raster_tarfile else [filename]
+            for file in files:
+                if not file.name.endswith((".fits", ".fits.gz")):
+                    log.warning(f"File {file} is not a FITS file and was not loaded")
+                    continue
+                header = _primary_header(file)
+                instrume, describe = _get_simple_metadata(header)
+                log.debug(f"Processing file: {file} with instrume: {instrume}")
                 if sji_tarfile or instrume in ["IRIS", "SJI"] or instrume.startswith(("AIA", "SOT")):
-                    file = _extract_tarfile([filename]) if sji_tarfile else [filename]
-                    for f in sorted(file):
-                        sji_context = (
-                            fits.open(f, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
-                            if sji_tarfile
-                            else nullcontext(hdulist)
-                        )
-                        with sji_context as sji_hdulist:
-                            instrume, describe = _get_simple_metadata(sji_hdulist)
-                            # SOT-SP archives may contain multiple observations of the same quantity.
-                            key = describe if describe not in returns else f"{describe} ({f.stem})"
-                            suffix = 2
-                            while key in returns:
-                                key = f"{describe} ({f.stem}, {suffix})"
-                                suffix += 1
-                            returns[key] = read_sji_lvl2(sji_hdulist, memmap=memmap, uncertainty=uncertainty, **kwargs)
-                elif raster_tarfile:
-                    file = _extract_tarfile([filename]) if raster_tarfile else [filename]
-                    instrume, describe = _get_simple_metadata(file[0])
-                    returns[f"{describe}"] = read_spectrograph_lvl2(
-                        file, spectral_windows=spectral_windows, memmap=memmap, uncertainty=uncertainty, **kwargs
-                    )
+                    # SOT-SP archives may contain multiple observations of the same quantity.
+                    key = describe if describe not in returns else f"{describe} ({file.stem})"
+                    suffix = 2
+                    while key in returns:
+                        key = f"{describe} ({file.stem}, {suffix})"
+                        suffix += 1
+                    returns[key] = read_sji_lvl2(file, memmap=memmap, uncertainty=uncertainty)
                 elif instrume == "SPEC":
                     # Keep the first file's description, so the group needs no second header read.
-                    group_key = _get_spec_group_key(filename, hdulist[0].header)
-                    spec_groups.setdefault(group_key, (describe, []))[1].append(filename)
+                    group_key = _get_spec_group_key(file, header)
+                    spec_groups.setdefault(group_key, (describe, []))[1].append(file)
                 else:
-                    log.warning(f"File {filename} has unrecognized INSTRUME={instrume!r} and was not loaded")
+                    log.warning(f"File {file} has unrecognized INSTRUME={instrume!r} and was not loaded")
         except Exception as e:
             if allow_errors:
                 log.warning(f"File {filename} failed to load with {e}")
@@ -267,7 +263,11 @@ def read_files(filenames, *, spectral_windows=None, uncertainty=False, memmap=Fa
         try:
             key = _get_spec_return_key(group_key, describe, returns)
             returns[key] = read_spectrograph_lvl2(
-                file_group, spectral_windows=spectral_windows, memmap=memmap, uncertainty=uncertainty, **kwargs
+                file_group,
+                spectral_windows=spectral_windows,
+                memmap=memmap,
+                uncertainty=uncertainty,
+                revert_v34=revert_v34,
             )
         except Exception as e:
             if allow_errors:

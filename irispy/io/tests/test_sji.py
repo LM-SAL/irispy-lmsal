@@ -127,6 +127,16 @@ def test_read_sji_lvl2_masks_explicit_float_bad_pixels(tmp_path, sns_sji_1330_fi
     assert cube.data.flat[2] == -198
 
 
+def test_read_sji_lvl2_keeps_the_image_of_a_supplied_hdulist(bursts_sji_1400_file):
+    with fits.open(bursts_sji_1400_file) as hdulist:
+        original = hdulist[0].data.copy()
+        cube = read_sji_lvl2(hdulist)
+        np.testing.assert_array_equal(hdulist[0].data, original)
+    # The fill values were replaced in the returned cube only
+    assert np.isnan(cube.data).any()
+    assert not np.isnan(original).any()
+
+
 @pytest.mark.parametrize("memmap", [False, True])
 def test_read_sji_lvl2_masks_both_fill_values_without_changing_raw_data(memmap):
     filename = get_test_filepath("bursts/iris_l2_20130902_163935_4000255147_SJI_1400_t000_test.fits")
