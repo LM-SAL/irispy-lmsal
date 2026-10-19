@@ -30,7 +30,7 @@ We use the Si IV 1394 window of the sample raster, which is the sample data of t
     >>> from irispy.utils.fitting import profiles_on_background
 
     >>> raster = read_files(sample_data.RASTER_FITS, spectral_windows="Si IV 1394", uncertainty=True)  # doctest: +REMOTE_DATA
-    >>> cube = raster["Si IV 1394"][0]  # doctest: +REMOTE_DATA
+    >>> cube = raster["Si IV 1394"]  # doctest: +REMOTE_DATA
 
 The starting models of `~irispy.utils.fitting` describe the lines of a few documented windows and no other: `~irispy.utils.fitting.si_iv_1403_model` is for the Si IV 1403 window, which this sample does not have.
 For any other line, `~irispy.utils.fitting.profiles_on_background` builds the model from starting values that you choose.
@@ -46,7 +46,9 @@ Here we keep the wavelengths halfway to the Ni II and O IV lines on either side 
     Fe II, Ni II, Si IV, O IV
     >>> ni_ii, si_iv, o_iv = lines["wavelength"][1:]
     >>> window = [(ni_ii + si_iv) / 2, (si_iv + o_iv) / 2]
-    >>> cube = cube.crop([SpectralCoord(window[0]), None], [SpectralCoord(window[1]), None])  # doctest: +REMOTE_DATA
+    >>> cube = cube.crop(  # doctest: +REMOTE_DATA
+    ...     [SpectralCoord(window[0]), None, None, None], [SpectralCoord(window[1]), None, None, None]
+    ... )
     >>> cube = cube[:, 410:470]  # doctest: +REMOTE_DATA
 
 The line is faint in this quiet part of the sample, a few DN above the background, so the starting values are small.

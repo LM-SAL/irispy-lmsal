@@ -172,12 +172,9 @@ length one.
 Memmap reads
 ============
 
-As before, cubes read with ``memmap=True`` have ``mask=None``.
-Derive the bad-pixel mask from the unscaled data when needed:
-
-.. code-block:: python
-
-    bad = cube.data == irispy.utils.constants.BAD_PIXEL_VALUE_UNSCALED
+Cubes read with ``memmap=True`` hold the unscaled integers of the file, in
+``DN_IRIS_FUV_UNSCALED`` or ``DN_IRIS_NUV_UNSCALED``, with the window's ``BSCALE`` and ``BZERO``
+in ``meta``. Their fill mask is a lazy Dask array, computed only for the slices that are used.
 
 A multi-file raster read with ``memmap=True`` is one dask-backed cube that reads
 each file on demand, which works only when all files have the same number of

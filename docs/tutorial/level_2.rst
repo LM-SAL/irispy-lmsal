@@ -354,7 +354,7 @@ The position on the disk is often given as μ, the cosine of the angle between t
 
     >>> iris_sji.meta.mu  # doctest: +REMOTE_DATA
     np.float64(0.8493051077033886)
-    >>> raster["C II 1336"][0].meta.exposure_mu[:4]  # doctest: +REMOTE_DATA
+    >>> raster["C II 1336"].raster_slice(0).meta.exposure_mu[:4]  # doctest: +REMOTE_DATA
     array([0.84655326, 0.84697703, 0.84739929, 0.84782021])
 
 Specific coordinates are also provided as part of the cube instead of the metadata.
@@ -521,7 +521,7 @@ Slicing a raster down to one dimension gives a single spectrum, here raster step
 
     import matplotlib.pyplot as plt
 
-    raster["Mg II k 2796"][0][0, 274].plot()
+    raster["Mg II k 2796"][0, 0, 274].plot()
 
     plt.show()
 
