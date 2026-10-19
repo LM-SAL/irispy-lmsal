@@ -17,6 +17,7 @@ import pooch
 from astropy.visualization import quantity_support
 
 from irispy.io import read_files
+from irispy.utils.cosmic_rays import remove_cosmic_rays
 
 quantity_support()
 
@@ -45,7 +46,7 @@ sji_frame = sji_2832[5]
 del sji_2832
 
 ###############################################################################
-# Now we use `~irispy.SJICube.remove_cosmic_rays` with the ``astroscrappy`` backend, a
+# Now we use `~irispy.utils.cosmic_rays.remove_cosmic_rays` with the ``astroscrappy`` backend, a
 # general-purpose algorithm widely used for imaging data; it is not the default. As with
 # ``rsliding``, its defaults are not tuned for IRIS, so read its documentation and experiment.
 # On spectra, it does not remove the small negative dips that often flank positive spikes,
@@ -53,7 +54,7 @@ del sji_2832
 
 # These settings were found to work well for SJI data (thanks to Juraj).
 method_kwargs = {"sigclip": 3, "objlim": 5, "readnoise": 3.1, "satlevel": np.inf, "cleantype": "medmask"}
-sji_astroscrappy = sji_frame.remove_cosmic_rays(method="astroscrappy", method_kwargs=method_kwargs)
+sji_astroscrappy = remove_cosmic_rays(sji_frame, method="astroscrappy", method_kwargs=method_kwargs)
 
 ###############################################################################
 # Be cautious: an aggressive setting also removes real features.

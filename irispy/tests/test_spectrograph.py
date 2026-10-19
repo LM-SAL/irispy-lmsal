@@ -66,43 +66,6 @@ def test_spectrogram_cube_negative_indices(sns_sg_file):
             cube[item]
 
 
-def test_spectrogram_cube_remove_cosmic_rays(sns_sg_file, monkeypatch):
-    captured = {}
-
-    def fake_remove_cosmic_rays(data, mask, *, sigma, max_iters, method_kwargs):
-        captured["mask"] = mask.copy()
-        captured["sigma"] = sigma
-        captured["max_iters"] = max_iters
-        captured["method_kwargs"] = method_kwargs
-        return data + 2
-
-    monkeypatch.setattr("irispy.utils.cosmic_rays._remove_cosmic_rays_astroscrappy", fake_remove_cosmic_rays)
-
-    raster = read_spectrograph_lvl2(sns_sg_file)
-    key = next(iter(raster.keys()))
-    cube = raster[key][0]
-    cleaned_cube = cube.remove_cosmic_rays(
-        method="astroscrappy",
-        sigma=5.0,
-        max_iters=5,
-        method_kwargs={"batch_size": 16},
-    )
-
-    np.testing.assert_array_equal(cleaned_cube.data, cube.data + 2)
-    np.testing.assert_array_equal(cleaned_cube.mask, cube.mask)
-    assert list(cleaned_cube.extra_coords.keys()) == list(cube.extra_coords.keys())
-    assert captured["sigma"] == 5.0
-    assert captured["max_iters"] == 5
-    assert captured["method_kwargs"]["batch_size"] == 16
-    np.testing.assert_array_equal(captured["mask"], cube.mask)
-    # WCS is deep-copied, so check equivalence not identity
-    assert dict(cleaned_cube.wcs.to_header()) == dict(cube.wcs.to_header())
-    assert list(cleaned_cube.global_coords) == list(cube.global_coords)
-    assert cleaned_cube.unit == cube.unit
-    # meta is an NDMeta subclass that may contain arrays; compare keys only
-    assert set(cleaned_cube.meta.keys()) == set(cube.meta.keys())
-
-
 def test_spectral_dispersion():
     wavelengths = np.arange(10) * 0.02 * u.nm + 140 * u.nm
     cube = make_test_spectrogram_cube(np.ones((1, 1, 10)), wavelengths)

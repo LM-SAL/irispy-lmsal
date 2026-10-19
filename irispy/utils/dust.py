@@ -273,14 +273,6 @@ def remove_dust(
     output_mask = original_mask.copy()
     output_mask[dust_mask] = True
     output_mask[filled_mask] = False
-    cleaned_cube_kwargs = {
-        "data": clean_data,
-        "mask": output_mask,
-        "nddata_type": type(cube),
-        "extra_coords": "copy",
-        "global_coords": "copy",
-    }
-    cleaned_cube = cube.to_nddata(**cleaned_cube_kwargs)
-    if hasattr(cleaned_cube, "dust_masked"):
-        cleaned_cube.dust_masked = bool(np.any(output_mask & dust_mask))
-    return cleaned_cube
+    return cube.to_nddata(
+        data=clean_data, mask=output_mask, nddata_type=type(cube), extra_coords="copy", global_coords="copy"
+    )

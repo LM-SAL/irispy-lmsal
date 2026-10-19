@@ -12,7 +12,7 @@ import numpy as np
 
 from irispy.data import sample
 from irispy.io import read_files
-from irispy.utils.dust import calculate_dust_mask
+from irispy.utils.dust import calculate_dust_mask, remove_dust
 
 ###############################################################################
 # We start with the SJI 2832 sample file, which ``irispy.data.sample`` downloads on first use.
@@ -22,16 +22,17 @@ from irispy.utils.dust import calculate_dust_mask
 sji_2832 = read_files(sample.SJI_2832)
 
 ###############################################################################
-# `~irispy.sji.SJICube.remove_dust` knows where the dust is for each channel.
+# `~irispy.utils.dust.remove_dust` knows where the dust is for each channel.
 # It replaces those pixels with the values of the neighboring images or,
 # when the dust covers them too, with a local median.
 
-clean_2832 = sji_2832.remove_dust()
+clean_2832 = remove_dust(sji_2832)
 
 ###############################################################################
-# To only mark the dust pixels instead, use `~irispy.sji.SJICube.apply_dust_mask`,
+# To only mask the dust pixels and keep their values, turn off both replacements,
 # and `~irispy.utils.dust.calculate_dust_mask` gives the mask itself.
 
+masked_2832 = remove_dust(sji_2832, temporal_window=0, fallback=None)
 dust_mask = calculate_dust_mask(sji_2832)
 print(f"{dust_mask[0].sum()} dust pixels in the first image")
 

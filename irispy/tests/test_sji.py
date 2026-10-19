@@ -1,4 +1,3 @@
-import dask.array as da
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -9,30 +8,7 @@ import sunpy.map
 
 from irispy.io.utils import read_files
 from irispy.tests.helpers import figure_test
-from irispy.utils.dust import calculate_dust_mask
 from irispy.visualization import LAT_AXIS_LABEL, LON_AXIS_LABEL
-
-
-def test_apply_dust_mask_with_lazy_mask(sns_sjicube_1330):
-    cube = sns_sjicube_1330
-    original_mask = np.asarray(cube.mask).copy()
-    cube.mask = da.from_array(original_mask, chunks=(1, *original_mask.shape[1:]))
-
-    cube.apply_dust_mask()
-    assert isinstance(cube.mask, da.Array)
-    np.testing.assert_array_equal(cube.mask.compute(), original_mask | calculate_dust_mask(cube))
-    assert cube.dust_masked
-
-    cube.apply_dust_mask(undo=True)
-    assert isinstance(cube.mask, da.Array)
-    np.testing.assert_array_equal(cube.mask.compute(), original_mask)
-    assert not cube.dust_masked
-
-
-def test_apply_dust_mask_rejects_unscaled_data(sns_sji_1330_file):
-    cube = read_files(sns_sji_1330_file, memmap=True)
-    with pytest.raises(ValueError, match=r"unscaled.*memmap=False"):
-        cube.apply_dust_mask()
 
 
 def test_to_maps_rejects_unscaled_data(sns_sji_1330_file):
@@ -70,10 +46,6 @@ def test_world_axis_physical_types_sjicube(request, cube_fixture, n_frames):
     cube = request.getfixturevalue(cube_fixture)
     assert cube.shape == (n_frames, 40, 37)
     assert cube.array_axis_physical_types == AXIS
-
-
-def test_sji_plotter_does_not_expose_plot_rgb(sns_sjicube_1400):
-    assert not hasattr(sns_sjicube_1400.plotter, "plot_rgb")
 
 
 def test_to_maps_are_sji_maps_with_the_frame_metadata(sns_sjicube_1330):

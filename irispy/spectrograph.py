@@ -13,8 +13,7 @@ from sunraster import SpectrogramSequence as SpecSeq
 
 from irispy._wcs import _ResolveNegativeIndicesMixin
 from irispy.utils.constants import SLIT_WIDTH
-from irispy.utils.cosmic_rays import remove_cosmic_rays
-from irispy.visualization import IRISSequencePlotter, SpectrogramPlotter
+from irispy.visualization import IRISPlotter, IRISSequencePlotter
 
 __all__ = ["MosaicCube", "RasterCollection", "SpectrogramCube", "SpectrogramCubeSequence"]
 
@@ -76,7 +75,7 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
     (187, 10, 5)
     """
 
-    plotter = PlotterDescriptor(default_type=SpectrogramPlotter)
+    plotter = PlotterDescriptor(default_type=IRISPlotter)
 
     def __init__(self, data, wcs, uncertainty=None, unit=None, meta=None, *, mask=None, copy=False, **kwargs) -> None:
         super().__init__(data, wcs, unit=unit, uncertainty=uncertainty, mask=mask, meta=meta, copy=copy, **kwargs)
@@ -105,8 +104,6 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
             Roll:               {self.meta.get("SAT_ROT")}
             """,
         )
-
-    remove_cosmic_rays = remove_cosmic_rays
 
     @property
     def _wcs_array_axis_physical_types(self):

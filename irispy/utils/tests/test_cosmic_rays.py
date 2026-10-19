@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from irispy.io.sji import read_sji_lvl2
+from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.tests.helpers import mark_saturated
 from irispy.utils.constants import SATURATION_LIMIT
 from irispy.utils.cosmic_rays import remove_cosmic_rays
@@ -18,7 +19,6 @@ def test_remove_cosmic_rays_rsliding(sns_sjicube_1330):
     mask = np.array([[False, False, False], [False, False, False], [True, False, False]])
     cube.data[...] = data
     cube.mask = mask.copy()
-    original_dust_masked = cube.dust_masked
 
     cleaned_cube = remove_cosmic_rays(
         cube,
@@ -29,7 +29,6 @@ def test_remove_cosmic_rays_rsliding(sns_sjicube_1330):
 
     np.testing.assert_allclose(cleaned_cube.data[1, 1], 5.0, atol=2.0)
     np.testing.assert_array_equal(cleaned_cube.mask, mask)
-    assert cleaned_cube.dust_masked == original_dust_masked
 
 
 def test_remove_cosmic_rays_astroscrappy(sns_sjicube_1330):
@@ -41,7 +40,6 @@ def test_remove_cosmic_rays_astroscrappy(sns_sjicube_1330):
     mask[0, 0] = True
     cube.data[...] = data
     cube.mask = mask.copy()
-    original_dust_masked = cube.dust_masked
 
     cleaned_cube = remove_cosmic_rays(
         cube,
@@ -54,7 +52,6 @@ def test_remove_cosmic_rays_astroscrappy(sns_sjicube_1330):
     assert not np.isclose(cleaned_cube.data[5, 5], 500.0)
     np.testing.assert_allclose(cleaned_cube.data[5, 5], 10.0, atol=1.0)
     np.testing.assert_array_equal(cleaned_cube.mask, mask)
-    assert cleaned_cube.dust_masked == original_dust_masked
 
 
 def test_remove_cosmic_rays_rsliding_kwargs_forwarded(sns_sjicube_1330, monkeypatch):
@@ -149,7 +146,6 @@ def test_remove_cosmic_rays_astroscrappy_backend(sns_sjicube_1330, monkeypatch, 
             extra_coords="copy",
             global_coords="copy",
         )
-    cube.dust_masked = True
 
     cleaned = remove_cosmic_rays(cube, method="astroscrappy")
 
@@ -164,7 +160,6 @@ def test_remove_cosmic_rays_astroscrappy_backend(sns_sjicube_1330, monkeypatch, 
     assert isinstance(cleaned.data, np.ndarray)
     np.testing.assert_array_equal(cleaned.data, expected_frames - 1)
     np.testing.assert_array_equal(cleaned.mask, mask)
-    assert cleaned.dust_masked is True
     assert cleaned.unit == cube.unit
     assert cleaned.meta["scaled"] == cube.meta["scaled"]
     assert list(cleaned.extra_coords.keys()) == list(cube.extra_coords.keys())
@@ -256,3 +251,41 @@ def test_remove_cosmic_rays_keeps_clipped_pixels(sns_sjicube_1330, method, kwarg
     assert cleaned.data[7, 7] == SATURATION_LIMIT.value
     np.testing.assert_allclose(cleaned.data[5, 5], 10.0, atol=2.0)
     assert np.isfinite(np.delete(cleaned.data, 22)).all()
+
+
+def test_remove_cosmic_rays_spectrogram_cube(sns_sg_file, monkeypatch):
+    captured = {}
+
+    def fake_remove_cosmic_rays(data, mask, *, sigma, max_iters, method_kwargs):
+        captured["mask"] = mask.copy()
+        captured["sigma"] = sigma
+        captured["max_iters"] = max_iters
+        captured["method_kwargs"] = method_kwargs
+        return data + 2
+
+    monkeypatch.setattr("irispy.utils.cosmic_rays._remove_cosmic_rays_astroscrappy", fake_remove_cosmic_rays)
+
+    raster = read_spectrograph_lvl2(sns_sg_file)
+    key = next(iter(raster.keys()))
+    cube = raster[key][0]
+    cleaned_cube = remove_cosmic_rays(
+        cube,
+        method="astroscrappy",
+        sigma=5.0,
+        max_iters=5,
+        method_kwargs={"batch_size": 16},
+    )
+
+    np.testing.assert_array_equal(cleaned_cube.data, cube.data + 2)
+    np.testing.assert_array_equal(cleaned_cube.mask, cube.mask)
+    assert list(cleaned_cube.extra_coords.keys()) == list(cube.extra_coords.keys())
+    assert captured["sigma"] == 5.0
+    assert captured["max_iters"] == 5
+    assert captured["method_kwargs"]["batch_size"] == 16
+    np.testing.assert_array_equal(captured["mask"], cube.mask)
+    # WCS is deep-copied, so check equivalence not identity
+    assert dict(cleaned_cube.wcs.to_header()) == dict(cube.wcs.to_header())
+    assert list(cleaned_cube.global_coords) == list(cube.global_coords)
+    assert cleaned_cube.unit == cube.unit
+    # meta is an NDMeta subclass that may contain arrays; compare keys only
+    assert set(cleaned_cube.meta.keys()) == set(cube.meta.keys())

@@ -171,7 +171,7 @@ Not every package is available on conda-forge; the ``rsliding`` package, the def
      - What it unlocks
    * - ``cosmic-rays``
      - ``rsliding``, ``astroscrappy``
-     - ``remove_cosmic_rays`` of the SJI and raster cubes, with the ``"rsliding"`` (default) or ``"astroscrappy"`` method
+     - `~irispy.utils.cosmic_rays.remove_cosmic_rays` with the ``"rsliding"`` (default) or ``"astroscrappy"`` method
    * - ``density``
      - ``fiasco``
      - The density diagnostics in `irispy.utils.density`
