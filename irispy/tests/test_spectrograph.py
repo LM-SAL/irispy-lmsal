@@ -11,7 +11,6 @@ from astropy.io import fits
 from astropy.tests.helper import assert_quantity_allclose
 from astropy.wcs import WCS
 
-import irispy.io._raster_combine as raster_combine
 from irispy.io._raster_combine import _lazy_raster_scan_chunk_rows
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.io.utils import read_files
@@ -132,13 +131,13 @@ def test_memmap_raster_reads_raw_fits_one_scan_chunk_at_a_time(raster_sg_files, 
     np.testing.assert_array_equal(raster0[3, 50, :].data.compute(), expected[3, 50])
 
     open_calls = []
-    real_open = raster_combine.fits.open
+    real_open = fits.open
 
     def count_open(*args, **kwargs):
         open_calls.append(args[0])
         return real_open(*args, **kwargs)
 
-    monkeypatch.setattr(raster_combine, "fits", SimpleNamespace(open=count_open))
+    monkeypatch.setattr("irispy.io._raster_combine.fits", SimpleNamespace(open=count_open))
     np.testing.assert_array_equal(cube.data[0, 0, 0].compute(), expected[0, 0])
     assert open_calls == [raster_sg_files[0]]
 

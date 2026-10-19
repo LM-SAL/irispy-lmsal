@@ -16,7 +16,6 @@ from astropy.wcs.utils import wcs_to_celestial_frame
 from ndcube import NDCube
 from sunpy.coordinates import HeliographicStonyhurst, Helioprojective
 
-import irispy.io.spectrograph as spectrograph_io
 from irispy._spectrograph_wcs import (
     _create_raster_gwcs,
     _raster_wcs_bad_row_mask,
@@ -375,10 +374,10 @@ def test_read_spectrograph_lvl2_raises_when_a_window_wcs_fails(sns_sg_file, monk
         msg = "bad test WCS"
         raise ValueError(msg)
 
-    monkeypatch.setattr(spectrograph_io, "_create_raster_gwcs", fail)
+    monkeypatch.setattr("irispy.io.spectrograph._create_raster_gwcs", fail)
 
     with pytest.raises(ValueError, match="bad test WCS") as excinfo:
-        spectrograph_io.read_spectrograph_lvl2(sns_sg_file, spectral_windows=["C II 1336", "Fe XII 1349"])
+        read_spectrograph_lvl2(sns_sg_file, spectral_windows=["C II 1336", "Fe XII 1349"])
     assert excinfo.value.__notes__ == [f"While building the WCS of spectral window 'C II 1336' in {sns_sg_file}."]
 
 
