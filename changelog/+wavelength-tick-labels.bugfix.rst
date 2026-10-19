@@ -1,0 +1,1 @@
+Wavelength axes of spectrograph plots now label ticks to 0.01 nm, so a window a few ångströms wide, such as Fe XII 1349 or 2832, gets four to seven ticks instead of one or two; labels that would overlap on a narrow plot are left out.

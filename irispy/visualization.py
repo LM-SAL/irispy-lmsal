@@ -53,7 +53,9 @@ def set_axis_properties(ax):
     for axis in ax.coords:
         if axis.default_label.lower() in WAVELENGTH_LABELS:
             axis.set_format_unit(u.nm)
-            axis.set_major_formatter("x.x")
+            axis.set_major_formatter("x.xx")
+            # A narrow window drawn with equal aspect has no room to label every tick
+            axis.set_ticklabel(exclude_overlapping=True)
             axis.set_axislabel("Wavelength [$\\mathrm{nm}$]")
         elif axis.default_label.lower() in LAT_LABELS:
             _set_axis_properties(axis, LAT_AXIS_LABEL, "red")

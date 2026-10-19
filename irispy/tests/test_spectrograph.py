@@ -222,6 +222,16 @@ def test_spectrogram_cube_plot_defaults(sns_sg_file):
     plt.close(ax.figure)
 
 
+def test_spectrogram_plot_labels_narrow_window(sns_sg_file):
+    # The 2832 window spans 0.23 nm
+    cube = read_files(sns_sg_file)["2832"][0][0]
+    ax = cube.plot()
+    wavelength = ax.coords["em.wl"]
+    ticks, spacing = wavelength.locator(*cube.axis_world_coords("em.wl")[0][[0, -1]].to_value(wavelength.coord_unit))
+    assert wavelength.formatter(ticks, spacing) == ["283.20", "283.25", "283.30", "283.35"]
+    plt.close(ax.figure)
+
+
 def test_default_colormap_falls_back_to_viridis():
     assert _registered_colormap("irissjiNUV") == "irissjiNUV"
     assert _registered_colormap("irissji1700") == "viridis"
