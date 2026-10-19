@@ -1,0 +1,1 @@
+AGENTS.md records the project's scope and review rules for contributors and agents.
