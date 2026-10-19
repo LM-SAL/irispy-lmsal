@@ -184,7 +184,7 @@ automodapi_inheritance_diagram = False
 # the docs. For more options, see:
 # https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html#confval-autoclass_content
 autoclass_content = "both"
-# Render callable defaults by name, e.g. ``velocity_norm=linear_velocity``, not by memory address.
+# Render defaults as written in the source, e.g. ``fill_value=np.nan``, not by their evaluated value.
 autodoc_preserve_defaults = True
 
 # -- Other options ------------------------------------------------------------

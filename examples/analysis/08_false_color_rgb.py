@@ -25,7 +25,6 @@ import pooch
 import astropy.units as u
 
 from irispy.io import read_files
-from irispy.utils.rgb import asinh_velocity
 
 ###############################################################################
 # `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20130902_182935_4000005156_2013-09-02T18%3A29%3A352013-09-02T18%3A29%3A35.xml>`__.
@@ -54,17 +53,18 @@ si_iv.plotter.plot_rgb()
 
 ###############################################################################
 # If you want to override the range, pass the wavelength limits, here +/-200 km/s.
-# ``velocity_norm`` replaces the default linear mapping, here with
-# `~irispy.utils.rgb.asinh_velocity` (``arcsinh(v / 25 km/s)``), which emphasizes
-# small shifts. A square-root intensity stretch brightens faint signal, and
-# wavelengths outside the limits contribute no color.
+# ``velocity_norm`` replaces the default linear mapping of the velocity. Here an
+# arcsinh with a 25 km/s scale gives small shifts more of the color range and
+# compresses large ones; the scale is a display choice, not a physical one.
+# A square-root intensity stretch brightens faint signal, and wavelengths
+# outside the limits contribute no color.
 
 doppler = u.doppler_optical(si_iv.meta.rest_wavelength)
 wavelength_min, wavelength_max = ([-200, 200] * u.km / u.s).to(u.AA, equivalencies=doppler)
 si_iv.plotter.plot_rgb(
     wavelength_min=wavelength_min,
     wavelength_max=wavelength_max,
-    velocity_norm=asinh_velocity,
+    velocity_norm=lambda v: np.arcsinh(v.to_value(u.km / u.s) / 25),
     stretch=np.sqrt,
 )
 
