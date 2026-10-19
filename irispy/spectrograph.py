@@ -69,7 +69,7 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
     >>> cube.shape, cube.unit, cube.wavelength_axis
     ((187, 40, 29), Unit("DN_IRIS_FUV"), 2)
     >>> cube.meta.spectral_window, cube.meta.rest_wavelength
-    ('Si IV 1403', <Quantity 140.27700195 nm>)
+    ('Si IV 1403', <Quantity 140.277 nm>)
     >>> cube.spectral_dispersion.to("pm")
     <Quantity 25.44 pm>
     >>> cube[:, 10:20, 5:10].shape

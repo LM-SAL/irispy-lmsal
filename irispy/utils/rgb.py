@@ -227,7 +227,7 @@ def plot_rgb(
         coordinates and ``"auto"`` for time; use ``"auto"`` for a raster with few steps too.
     rest_wavelength : `astropy.units.Quantity` or `False`, optional
         Rest wavelength for the color mapping and the optical Doppler velocity axis,
-        as in `calculate_rgb`. Defaults to ``TWAVE`` from the metadata. `False` hides
+        as in `calculate_rgb`. Defaults to ``cube.meta.rest_wavelength``. `False` hides
         the velocity axis while retaining the metadata color mapping.
     cbar_fraction : `float`, optional
         Fraction of ``ax`` given to the colorbar when ``cax`` is not given.
