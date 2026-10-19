@@ -160,7 +160,7 @@ def read_spectrograph_lvl2(
     Examples
     --------
     >>> from irispy.data.test import get_test_filepath
-    >>> from irispy.io.spectrograph import read_spectrograph_lvl2
+    >>> from irispy.io import read_spectrograph_lvl2
     >>> filename = get_test_filepath(
     ...     "sns/iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits"
     ... )

@@ -264,7 +264,7 @@ def read_files(
         Defaults to `False`.
     revert_v34 : `bool`, optional
         Will undo the flipping of the raster step axis made to V34 observations.
-        Passed to `irispy.io.spectrograph.read_spectrograph_lvl2` only; slit-jaw, AIA and SOT files are not affected.
+        Passed to `irispy.io.read_spectrograph_lvl2` only; slit-jaw, AIA and SOT files are not affected.
         Defaults to `False`.
     extract_dir : `str` or `pathlib.Path`, optional
         The folder that tar files are extracted into, each in a subfolder named after it and its path.
@@ -333,7 +333,7 @@ def read_files(
     returns = {}
     spec_groups = {}
     for filename in filenames:
-        if filename.name.startswith("IRISMosaic_"):
+        if "IRISMosaic_" in filename.name:
             msg = f"{filename} is a full-disk mosaic; read it with irispy.io.read_mosaic"
             raise ValueError(msg)
         sji_tarfile = filename.name.endswith(("SDO.tar.gz", "SOTFG.tar.gz", "SOTSP.tar.gz"))
