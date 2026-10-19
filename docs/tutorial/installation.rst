@@ -199,6 +199,7 @@ To work on the code, fork `the repository <https://github.com/LM-SAL/irispy>`__ 
     $ conda create --name irispy-dev python=3.14 pip
     $ conda activate irispy-dev
     $ python -m pip install -e ".[dev]"
+    $ python -m pip install pre-commit tox
 
 The ``dev`` extra installs the test and documentation dependencies and all optional dependencies.
 Run the tests with ``pytest``, the style checks with ``pre-commit run --all-files`` and the documentation build with ``tox -e build_docs``, and add a changelog entry in ``changelog/`` for a user-visible change.
