@@ -169,6 +169,6 @@ There is no Python code to automatically determine the best scaling for a given 
 Cleaning Up
 -----------
 
-The dust spots described in `Particles on slit-jaw images`_ can be cosmetically corrected in slit-jaw images and movies with `irispy.sji.SJICube.remove_dust`, which replaces them with values from neighboring frames or, failing that, a local median.
+The dust spots described in `Particles on slit-jaw images`_ can be cosmetically corrected in slit-jaw images and movies with `irispy.sji.SJICube.remove_dust`, which takes their positions from the IRIS pipeline's bad-pixel table and replaces them with values from neighboring frames or, failing that, a local median.
 `irispy.sji.SJICube.apply_dust_mask` only masks them.
 See :ref:`sphx_glr_generated_gallery_calibration_04_remove_dust.py`.

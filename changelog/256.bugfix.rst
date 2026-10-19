@@ -1,0 +1,1 @@
+`~irispy.utils.dust.remove_dust` no longer fills pixels without a value (the fill value of a frame's edges), which painted over them.

@@ -26,13 +26,17 @@ _SUBMODULES = (
     "wavelength_drift",
     "wobble",
 )
-__all__ = [*_SUBMODULES, *_utils_all]  # NOQA: PLE0604
+__all__ = [*_SUBMODULES, *_utils_all, "calculate_dust_mask"]  # NOQA: PLE0604, F405
 
 
 # See PEP 562 (https://peps.python.org/pep-0562/) for module-level __getattr__() and __dir__()
 def __getattr__(name):
     if name in _SUBMODULES:
         return import_module(f"{__name__}.{name}")
+    if name == "calculate_dust_mask":
+        from .dust import calculate_dust_mask  # NOQA: PLC0415
+
+        return calculate_dust_mask
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)
 
