@@ -86,6 +86,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinxcontrib.bibtex",
+    "sphinxext.opengraph",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -317,3 +318,13 @@ else:
 def setup(app):
     # Handles the templating for the jinja pages in our docs
     app.connect("source-read", jinja_to_rst)
+
+
+# -- Options for sphinxext-opengraph ------------------------------------------
+
+# Read the Docs supplies the canonical URL of each build; this is the fallback elsewhere
+ogp_site_url = "https://irispy.readthedocs.io/en/stable/"
+ogp_image = "https://lmsal.com/images/lmsal_logo_highres_small.png"
+ogp_use_first_image = True
+ogp_description_length = 160
+ogp_custom_meta_tags = ('<meta property="og:ignore_canonical" content="true" />',)
