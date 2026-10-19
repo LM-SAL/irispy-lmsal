@@ -138,6 +138,62 @@ There is no universal threshold: choose one for your science case, and keep the 
 A reduced chi-square near 1 means that the model describes the spectrum within its uncertainties, which a fit to pure noise does as well, so it is a check of the model and of the uncertainties and not of the presence of the line.
 Values well above 1 point to a profile that the model does not describe, such as a blend or a second component, or to uncertainties that are too small.
 
+Fitting the mean spectrum of a region
+=====================================
+
+A line too faint to fit in each spectrum can be fitted in the mean spectrum of a region, as ``iris_sum_spec`` and ``dgf_1lp`` do in IDL, and that fit can start the fits of every spectrum.
+Here the region is the whole raster.
+Cosmic rays are not removed from Level 2 data and a mean takes them in, so we remove them first with `~irispy.utils.cosmic_rays.remove_cosmic_rays`.
+The mean leaves out masked and missing samples, and its uncertainty at each wavelength is :math:`\sqrt{\sum \sigma^2} / n` for the :math:`n` samples averaged:
+
+.. code-block:: python
+
+    >>> region = raster["Si IV 1394"][0].crop([SpectralCoord(window[0]), None], [SpectralCoord(window[1]), None])  # doctest: +REMOTE_DATA
+    >>> region = region.remove_cosmic_rays()  # doctest: +REMOTE_DATA
+    >>> usable = np.isfinite(region.data) & ~region.mask  # doctest: +REMOTE_DATA
+    >>> spectra = np.ma.masked_array(region.data, ~usable)  # doctest: +REMOTE_DATA
+    >>> sigma = np.ma.masked_array(region.uncertainty.array, ~usable)  # doctest: +REMOTE_DATA
+    >>> spectrum = spectra.mean(axis=(0, 1))  # doctest: +REMOTE_DATA
+    >>> spectrum_error = np.sqrt(np.sum(sigma**2, axis=(0, 1))) / spectra.count(axis=(0, 1))  # doctest: +REMOTE_DATA
+
+``region.rebin`` with ``propagate_uncertainties=True`` also averages with uncertainties, but its cost grows with the square of the number of pixels in a bin, so it gets slow for large regions.
+
+The model is a narrow core and a broad component on a constant background, with the width of the core bounded below 0.06 Å and that of the broad component above it, so that they cannot swap:
+
+.. code-block:: python
+
+    >>> from irispy.utils.fitting import starts_from_model
+    >>> core_and_broad = profiles_on_background(  # doctest: +REMOTE_DATA
+    ...     [si_iv, si_iv],
+    ...     amplitudes=[1, 1] * region.unit,
+    ...     widths=[0.03, 0.1] * u.AA,
+    ...     background_level=0.3 * region.unit,
+    ...     bounds={"stddev_1": (None, 0.06 * u.AA), "stddev_2": (0.06 * u.AA, None)},
+    ... )
+    >>> mean_fit = TRFLSQFitter()(core_and_broad, wavelength, spectrum * region.unit, weights=1 / spectrum_error)  # doctest: +REMOTE_DATA
+    >>> print(f"{mean_fit.stddev_1.quantity:.2f}, {mean_fit.stddev_2.quantity:.2f}")  # doctest: +REMOTE_DATA
+    0.03 Angstrom, 0.10 Angstrom
+
+`~irispy.utils.fitting.starts_from_model` starts every spectrum of the cube from this fit.
+These spectra are too faint to fit all seven parameters, so we fix the widths at those of the mean spectrum and give both components one center:
+
+.. code-block:: python
+
+    >>> mean_fit.stddev_1.fixed = mean_fit.stddev_2.fixed = True  # doctest: +REMOTE_DATA
+    >>> mean_fit.mean_2.tied = lambda model: model.mean_1  # doctest: +REMOTE_DATA
+    >>> cube_fit = parallel_fit_dask(
+    ...     model=starts_from_model(mean_fit, cube),
+    ...     fitter=TRFLSQFitter(),
+    ...     data=np.where(good, cube.data, 0),
+    ...     data_unit=cube.unit,
+    ...     weights=np.where(good, 1 / cube.uncertainty.array, 0),
+    ...     world=(wavelength,),
+    ...     fitting_axes=2,
+    ...     scheduler="single-threaded",
+    ... )  # doctest: +REMOTE_DATA
+    >>> cube_fit.amplitude_2.shape  # doctest: +REMOTE_DATA
+    (16, 60)
+
 Non-thermal velocities
 ======================
 
