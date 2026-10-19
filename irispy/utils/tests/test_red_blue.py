@@ -117,14 +117,16 @@ def test_calculate_red_blue_asymmetry_with_uncertainty():
         rest_wavelength=REST_WAVELENGTH,
         spline_degree=1,
     )
-    assert "red_blue_asymmetry_error" in result
-    assert result["red_blue_asymmetry_error"].unit == u.one
+    assert set(result) == {"red_blue_asymmetry", "quality", "observed_profile", "interpolated_profile"}
+    assert isinstance(result["red_blue_asymmetry"].uncertainty, StdDevUncertainty)
     numerator = 2
     peak = 10
     n_wing_bins = int((150 - 50) / 10) + 1
     wing_error = np.sqrt(np.sum(np.full(n_wing_bins, 0.1) ** 2)) / n_wing_bins
     expected_propagated_error = np.sqrt((np.sqrt(2) * wing_error / peak) ** 2 + (numerator * 0.1 / peak**2) ** 2)
-    assert_quantity_allclose(result["red_blue_asymmetry_error"].data[0, 0] * u.one, expected_propagated_error * u.one)
+    assert_quantity_allclose(
+        result["red_blue_asymmetry"].uncertainty.array[0, 0] * u.one, expected_propagated_error * u.one
+    )
     assert result["red_blue_asymmetry"].meta["rba_rest_wavelength"] == 140.277
     assert result["red_blue_asymmetry"].meta["rba_spline_degree"] == 1
 
@@ -141,7 +143,7 @@ def test_calculate_red_blue_asymmetry_with_uncertainty():
     expected_zero_error = np.sqrt(2) * wing_error / 10
     assert_quantity_allclose(symmetric_result["red_blue_asymmetry"].data[0, 0] * u.one, 0 * u.one)
     assert_quantity_allclose(
-        symmetric_result["red_blue_asymmetry_error"].data[0, 0] * u.one, expected_zero_error * u.one
+        symmetric_result["red_blue_asymmetry"].uncertainty.array[0, 0] * u.one, expected_zero_error * u.one
     )
 
 
@@ -156,10 +158,10 @@ def test_calculate_red_blue_asymmetry_error_from_other_uncertainties(uncertainty
         _wavelengths_from_velocity(velocity),
         uncertainty=StdDevUncertainty(np.full((1, 1, velocity.size), 0.1)),
     )
-    expected = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH)["red_blue_asymmetry_error"]
+    expected = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH)["red_blue_asymmetry"]
     cube.uncertainty = uncertainty
-    result = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH)["red_blue_asymmetry_error"]
-    np.testing.assert_allclose(result.data, expected.data)
+    result = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH)["red_blue_asymmetry"]
+    np.testing.assert_allclose(result.uncertainty.array, expected.uncertainty.array)
 
 
 def test_calculate_red_blue_asymmetry_flags_error_interpolation_failure(monkeypatch):
@@ -463,7 +465,7 @@ def test_calculate_red_blue_asymmetry_chunks_give_the_same_results(monkeypatch, 
 
 
 def test_calculate_red_blue_asymmetry_real_cube_shape_and_coords(sns_sg_file):
-    raster = read_files(sns_sg_file)
+    raster = read_files(sns_sg_file, uncertainty=True)
     cube = raster["C II 1336"][0]
     result = calculate_red_blue_asymmetry(
         cube,
@@ -473,6 +475,13 @@ def test_calculate_red_blue_asymmetry_real_cube_shape_and_coords(sns_sg_file):
     )
     assert result["red_blue_asymmetry"].shape == cube.shape[:-1]
     assert "time" in tuple(result["red_blue_asymmetry"].extra_coords.keys())
+    # The "red_blue_asymmetry_error" map this uncertainty replaced had these values
+    error = result["red_blue_asymmetry"].uncertainty.array
+    assert np.isfinite(error).sum() == 5922
+    np.testing.assert_allclose(np.nanmean(error), 0.24545979335051332)
+    for item in (np.s_[0:3], np.s_[:, 10:20]):
+        for name, sliced in result[item].items():
+            np.testing.assert_array_equal(sliced.data, result[name].data[item], err_msg=name)
 
 
 def test_calculate_red_blue_asymmetry_rest_wavelength_required_without_meta():
