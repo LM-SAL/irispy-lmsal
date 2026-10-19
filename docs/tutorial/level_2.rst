@@ -246,6 +246,8 @@ We use the same command to read and load the data from a SJI level 2 file:
     Cube dimensions:       (20, 548, 555)
     <BLANKLINE>
 
+`~irispy.io.read_files` also takes a folder and reads the IRIS files in it, such as all the files of a downloaded observation: ``read_files("20211001_060925_3683602040/")``.
+
 Before we continue, we can check the structure of the FITS file using the `astropy.io.fits` module
 but there is a `~irispy.io.fits_info` function within ``irispy``:
 
