@@ -1,0 +1,1 @@
+The effective-area fit is tested against IDL's ``fit_iris_xput`` at a time between two calibration intervals.

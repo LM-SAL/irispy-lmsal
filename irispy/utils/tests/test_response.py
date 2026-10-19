@@ -19,9 +19,11 @@ from irispy.utils.response import _fit_xput_lite, get_interpolated_effective_are
 @pytest.mark.parametrize(
     ("observation_time", "idl_output"),
     [
-        ("2025-08-05T22:25:04.723", "fit_iris_xput_output.sav"),
+        ("2025-08-25T20:44:06.066", "fit_iris_xput_output.sav"),
         # IDL 9.2 fit_iris_xput with the same coefficients, in an interval before the last one
         ("2013-10-22T21:00", "fit_iris_xput_output_20131022.sav"),
+        # In the gap between two calibration intervals; see make_fit_iris_xput_output.pro
+        ("2020-11-15T00:00", "fit_iris_xput_output_20201115.sav"),
     ],
 )
 def test_fit_xput_lite_idl(observation_time, idl_output):
