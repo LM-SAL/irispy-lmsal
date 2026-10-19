@@ -175,19 +175,21 @@ The fit may return them in either order, so the narrower one is the core:
     >>> print(f"{mean_fit[core].stddev.quantity:.2f}, {mean_fit[broad].stddev.quantity:.2f}")  # doctest: +REMOTE_DATA
     0.03 Angstrom, 0.10 Angstrom
 
-`~irispy.utils.fitting.starts_from_model` starts every spectrum of the cube from this fit.
+We remove the cosmic rays from the cube as well, and `~irispy.utils.fitting.starts_from_model` starts each of its spectra from this fit.
 These spectra are too faint to fit all seven parameters, so we fix the widths at those of the mean spectrum and give both components one center:
 
 .. code-block:: python
 
     >>> mean_fit.stddev_1.fixed = mean_fit.stddev_2.fixed = True  # doctest: +REMOTE_DATA
     >>> mean_fit.mean_2.tied = lambda model: model.mean_1  # doctest: +REMOTE_DATA
+    >>> clean_cube = cube.remove_cosmic_rays()  # doctest: +REMOTE_DATA
+    >>> clean_good = np.isfinite(clean_cube.data) & ~clean_cube.mask  # doctest: +REMOTE_DATA
     >>> cube_fit = parallel_fit_dask(
-    ...     model=starts_from_model(mean_fit, cube),
+    ...     model=starts_from_model(mean_fit, clean_cube),
     ...     fitter=TRFLSQFitter(),
-    ...     data=np.where(good, cube.data, 0),
-    ...     data_unit=cube.unit,
-    ...     weights=np.where(good, 1 / cube.uncertainty.array, 0),
+    ...     data=np.where(clean_good, clean_cube.data, 0),
+    ...     data_unit=clean_cube.unit,
+    ...     weights=np.where(clean_good, 1 / clean_cube.uncertainty.array, 0),
     ...     world=(wavelength,),
     ...     fitting_axes=2,
     ...     scheduler="single-threaded",
