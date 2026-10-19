@@ -1,0 +1,29 @@
+Test data for a V34 raster, whose slit steps from solar west to east (STEPS_AV < 0), so
+irispy reads it flipped along the step axis unless revert_v34=True. The whole level 2
+files are in https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2026/02/06/
+
+Observation is https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20260206_210853_3460104433_2026-02-06T21%3A08%3A532026-02-06T21%3A08%3A53.xml
+
+OBS 3460104433: Large coarse 8-step raster 14x120 8s, Steps 8x-2", Step Cad 3.1s,
+Raster Cad 25s, 162 ras, Linelist v34_03, spatial summing 2. Taken during a South
+Atlantic Anomaly passage, like the SJI 2832 file of examples/calibration/02_remove_spikes_sji.py.
+
+iris_l2_20260206_210853_3460104433_raster_t000_r00000_test.fits
+---------------------------------------------------------------
+
+Cut from iris_l2_20260206_210853_3460104433_raster_t000_r00000.fits (in
+20260206_210853_3460104433/iris_l2_20260206_210853_3460104433_raster.tar.gz).
+
+Kept:   the C II 1336 window (extension 1) and the Mg II k 2796 window (extension 9),
+        whole in wavelength, all 8 steps and slit rows 146-241 (of 388). Indices are
+        0-based. The data values, the auxiliary table and the level 1 filename table
+        (8 rows) are unchanged: STEPS_AV = -1.995 and XCENIX falls from 428.8" to 414.8"
+        along the steps. No exposure was dropped.
+Header: NWIN = 2 and the window keywords of C II 1336 and Mg II k 2796 are numbered 1
+        and 2. NAXIS2 and CRPIX2 describe the cut. The filename table declares
+        TFIELDS = 9 for its 9 columns (the whole file says 7, see ../compress.py).
+        TSR/TER/TSC/TEC and the statistics keywords (DATA*, TD*) still describe the
+        whole window or file.
+Made:   python ../cut.py iris_l2_20260206_210853_3460104433_raster_t000_r00000.fits \
+            iris_l2_20260206_210853_3460104433_raster_t000_r00000_test.fits \
+            --rows 146:242 --window "C II 1336" --window "Mg II k 2796"

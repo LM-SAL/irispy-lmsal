@@ -1,0 +1,1 @@
+The raster reader is tested on a real V34 observation (eight steps of OBS 3460104433, cut from the archive file) instead of synthesized header edits.
