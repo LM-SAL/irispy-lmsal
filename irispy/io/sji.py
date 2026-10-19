@@ -333,10 +333,14 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
                 # Level 2 clips at the ceiling, where iris_prep's +Inf saturation flags were lost
                 saturated = data_nan_masked >= SATURATION_LIMIT.value
                 mask |= saturated
-                # The passband, e.g. SJI_1400, sets the photons per DN
+                # The passband, e.g. SJI_1400, sets the photons per DN; only the four main passbands have one
+                # published (Wülser et al. 2018, Table 1), so the others, such as SJI_5000W, stay in DN
                 passband = hdulist[0].header["TDESC1"]
-                unit = DN_UNIT[passband]
+                unit = DN_UNIT.get(passband, u.DN)
                 if uncertainty:
+                    if passband not in READOUT_NOISE:
+                        msg = f"No photons per DN is published for {passband}; read it with uncertainty=False"
+                        raise ValueError(msg)
                     out_uncertainty = StdDevUncertainty(
                         calculate_uncertainty(data_nan_masked, READOUT_NOISE[passband], unit)
                     )
