@@ -190,7 +190,7 @@ def read_files(
     Parameters
     ----------
     filename : `list` of `str`, `str`, `pathlib.Path`
-        Filename(s) to load. A file given more than once is read once.
+        Filename(s) to load. A file given more than once, by any path or symlink, is read once.
     spectral_windows: iterable of `str` or `str`
         Spectral windows to extract from files. Default=None, implies, extract all
         spectral windows.
@@ -220,7 +220,7 @@ def read_files(
     """
     if isinstance(filenames, (str, Path)):
         filenames = [filenames]
-    filenames = sorted({Path(f) for f in filenames})
+    filenames = sorted({Path(f).resolve() for f in filenames})
     returns = {}
     spec_groups = {}
     for filename in filenames:

@@ -96,10 +96,30 @@ def test_fits_info(capsys, request, monkeypatch, file_fixture):
     [{}, {"revert_v34": True}, {"revert_v34": True, "allow_errors": True}],
     ids=["defaults", "revert-v34", "revert-v34-allow-errors"],
 )
-def test_read_files_with_mix(sns_sg_file, sns_sji_1330_file, kwargs):
-    # revert_v34 goes to the raster reader only; the slit-jaw reader does not take it
-    returns = read_files([sns_sg_file, sns_sji_1330_file], **kwargs)
-    assert len(returns) == 2
+def test_read_files_with_mix(tmp_path, sns_sg_file, sns_sji_1330_file, kwargs):
+    # No test raster is a V34 observation (STEPS_AV < -0.01), so mark a copy as one.
+    sg_file = tmp_path / "v34_raster.fits"
+    with fits.open(sns_sg_file, memmap=False) as hdulist:
+        hdulist[0].header["STEPS_AV"] = -1.0
+        hdulist.writeto(sg_file)
+
+    returns = read_files([sg_file, sns_sji_1330_file], spectral_windows="C II 1336", **kwargs)
+
+    assert set(returns.keys()) == {"C II 1336", "SJI_1330"}
+    # revert_v34 goes to the raster reader only; the slit-jaw reader does not take it.
+    revert_v34 = kwargs.get("revert_v34", False)
+    cube = returns["C II 1336"]["C II 1336"][0]  # the raster is keyed by its first window
+    reference = read_spectrograph_lvl2(sg_file, spectral_windows="C II 1336", revert_v34=revert_v34)["C II 1336"][0]
+    other = read_spectrograph_lvl2(sg_file, spectral_windows="C II 1336", revert_v34=not revert_v34)["C II 1336"][0]
+
+    def step_times(cube):
+        return cube.axis_world_coords("time", wcs=cube.extra_coords)[0].jd
+
+    np.testing.assert_array_equal(cube.data, reference.data)
+    np.testing.assert_array_equal(step_times(cube), step_times(reference))
+    assert not np.array_equal(cube.data, other.data)
+    np.testing.assert_array_equal(cube.data, other.data[::-1])
+    np.testing.assert_array_equal(step_times(cube), step_times(other)[::-1])
 
 
 @pytest.mark.parametrize(
@@ -111,8 +131,17 @@ def test_read_files_single_file(request, file_fixture, as_list):
     assert read_files([filename] if as_list else filename)
 
 
-def test_read_files_accepts_mixed_types_and_reads_duplicates_once(sns_sji_1330_file, sns_sji_1400_file):
-    returns = read_files([Path(sns_sji_1330_file), sns_sji_1330_file, sns_sji_1400_file])
+def test_read_files_accepts_mixed_types_and_reads_duplicates_once(
+    tmp_path, monkeypatch, sns_sji_1330_file, sns_sji_1400_file
+):
+    # The same file as a str, a Path, a relative path and a symlink is read once.
+    link = tmp_path / "link.fits"
+    link.symlink_to(sns_sji_1330_file)
+    monkeypatch.chdir(Path(sns_sji_1330_file).parent)
+    filenames = [Path(sns_sji_1330_file), sns_sji_1330_file, Path(sns_sji_1330_file).name, link, sns_sji_1400_file]
+
+    returns = read_files(filenames)
+
     assert set(returns.keys()) == {"SJI_1330", "SJI_1400"}
 
 
