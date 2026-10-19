@@ -17,27 +17,19 @@ per unit wavelength, hence the extra :math:`Å^{-1}` in the units. See
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pooch
 
 import astropy.units as u
 
+from irispy.data import sample
 from irispy.io import read_files
 from irispy.utils.spectrograph import radiometric_calibration
 
 ###############################################################################
-# `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20260308_051050_3893012099_2026-03-08T05%3A10%3A502026-03-08T05%3A10%3A50.xml>`__.
-# The full observation is available as a `Level 2 raster tarball <https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2026/03/08/20260308_051050_3893012099/iris_l2_20260308_051050_3893012099_raster.tar.gz>`__.
-# To keep the download small, we use a cutout of it that only has the Mg II k 2796 and Si IV 1394 windows.
-#
-# In this case, we will use ``pooch`` to keep this example self-contained
-# but you can download the data manually using your browser as well.
-#
-# You will need to update the path to the data in the next section if you do that.
+# We start with the raster sample file, which ``irispy.data.sample`` downloads on first use.
+# To use your own data, pass the path of a Level 2 raster tarball from the
+# `IRIS data archive <https://www.lmsal.com/hek/hcr>`__ to ``read_files`` instead.
 
-raster_filename = pooch.retrieve(
-    "https://github.com/LM-SAL/irispy-data/releases/download/v1/iris_l2_20260308_051050_3893012099_cutout_raster.tar.gz",
-    known_hash="16e7152b5525e16d78df93e8679c870dcbd9f5f78283c91e7631cbe417575987",
-)
+raster_filename = sample.RASTER_TAR
 
 ###############################################################################
 # We will now open the data using a helper function which is designed to read
@@ -50,7 +42,7 @@ raster = read_files(raster_filename, spectral_windows=["Mg II k 2796", "Si IV 13
 # can select using a key. Then we will just plot a spectral line selected at
 # random in space.
 
-# There is only one complete scan, so we index that away.
+# We take the first of the complete scans.
 # We also only take the first raster step (slit position) to reduce memory usage for
 # the online documentation build.
 mg_ii_k_2796 = raster["Mg II k 2796"][0][0]
