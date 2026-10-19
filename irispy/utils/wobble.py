@@ -86,8 +86,11 @@ def generate_wobble_movie(
         cube = cube[:, rows[0] : rows[-1] + 1, columns[0] : columns[-1] + 1]
     times = cube.time
     # Downsample in time to accentuate the wobble
-    cadence = np.median((times[1:] - times[:-1]).to_value("s"))
-    frames = range(0, len(times), max(1, int(wobble_cadence // cadence)))
+    step = 1
+    if len(times) > 1:
+        cadence = np.median((times[1:] - times[:-1]).to_value("s"))
+        step = max(1, int(wobble_cadence // cadence))
+    frames = range(0, len(times), step)
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1, projection=cube[0].wcs)

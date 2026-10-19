@@ -47,6 +47,12 @@ def test_generate_wobble_movie(sns_sjicube_2832, tmp_path, trim, spatial):
     plt.close("all")
 
 
+def test_generate_wobble_movie_one_frame(sns_sjicube_2832, tmp_path):
+    assert generate_wobble_movie(sns_sjicube_2832[:1], outdir=tmp_path).exists()
+    np.testing.assert_array_equal(plt.gcf().axes[0].images[0].get_array(), sns_sjicube_2832[0].data)
+    plt.close("all")
+
+
 def test_generate_wobble_movie_trim_without_common_data(sns_sjicube_2832, tmp_path):
     # A frame without data leaves no pixel with data in every frame
     sns_sjicube_2832.mask[0] = True
