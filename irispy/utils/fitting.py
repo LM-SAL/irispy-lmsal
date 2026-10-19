@@ -520,7 +520,7 @@ def _fit_property(fit_info, name, fill):
     return np.reshape(np.asarray(values, dtype=float), fit_info.shape + template.shape)
 
 
-def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None):
+def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None, residual=True):
     r"""
     Maps of the parameters of a model fitted to every spectrum of a cube.
 
@@ -540,6 +540,9 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None):
     rest_wavelength : `~astropy.units.Quantity`, optional
         The rest wavelength for the Doppler velocities. Defaults to the one documented line that
         the cube covers.
+    residual : `bool`, optional
+        Whether to return the ``"residual"`` cube. `False` leaves it out, which saves memory and
+        time when only the maps are needed. Defaults to `True`.
 
     Returns
     -------
@@ -552,8 +555,8 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None):
           that width in km/s, and ``"integrated_intensity_i"``, its integral in the unit of ``cube``
           times Å;
         * ``"quality"``, a `FitQualityFlag` for each spectrum, the most severe that applies;
-        * ``"residual"``, ``cube`` minus the fitted model, retaining its WCS, uncertainty, mask
-          and coordinates.
+        * ``"residual"``, unless ``residual`` is `False`, ``cube`` minus the fitted model,
+          retaining its WCS, uncertainty, mask and coordinates.
 
     Notes
     -----
@@ -689,15 +692,17 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None):
         for name, value, error in maps
     ]
     cubes.append(("quality", make_map_cube(template, quality, u.dimensionless_unscaled)))
+    map_axes = tuple(range(len(shape)))
+    if not residual:
+        return RasterCollection(cubes, aligned_axes=(map_axes,) * len(cubes))
     model_values = np.moveaxis(fitted_model(wavelength.reshape((-1,) + (1,) * len(shape))), 0, cube.wavelength_axis)
-    residual = np.asarray(cube.data) - model_values.to_value(cube.unit)
     # Coordinates point back to their cube; copy them without copying its data.
     coordinate_memo = {id(cube): None}
     cubes.append(
         (
             "residual",
             SpectrogramCube(
-                residual,
+                np.asarray(cube.data) - model_values.to_value(cube.unit),
                 cube.wcs,
                 cube.uncertainty,
                 cube.unit,
@@ -708,7 +713,6 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None):
             ),
         )
     )
-    map_axes = tuple(range(len(shape)))
     residual_axes = tuple(axis for axis in range(cube.data.ndim) if axis != cube.wavelength_axis)
     return RasterCollection(cubes, aligned_axes=(map_axes,) * (len(cubes) - 1) + (residual_axes,))
 
