@@ -8,9 +8,10 @@ import astropy.units as u
 from astropy import constants
 from astropy.nddata import StdDevUncertainty
 
+from irispy.sji import SJICube
 from irispy.spectrograph import SpectrogramCube, SpectrogramCubeSequence
 from irispy.utils._spectral import _fit_background, check_scaled, make_map_cube, standard_deviation
-from irispy.utils.constants import RADIANCE_UNIT, RADIANCE_UNIT_PER_HZ
+from irispy.utils.constants import DN_UNIT, RADIANCE_UNIT, RADIANCE_UNIT_PER_HZ
 from irispy.utils.response import get_interpolated_effective_area, get_latest_response
 from irispy.utils.utils import _saturated_samples
 
@@ -24,8 +25,10 @@ __all__ = [
 
 
 def radiometric_calibration(
-    cube: SpectrogramCube | SpectrogramCubeSequence,
-) -> SpectrogramCube | SpectrogramCubeSequence:
+    cube: SpectrogramCube | SpectrogramCubeSequence | SJICube,
+    *,
+    line=None,
+) -> SpectrogramCube | SpectrogramCubeSequence | SJICube:
     """
     Performs radiometric calibration on the input cube or cube sequence.
 
@@ -40,13 +43,24 @@ def radiometric_calibration(
 
     Parameters
     ----------
-    cube : `irispy.spectrograph.SpectrogramCube` | `irispy.spectrograph.SpectrogramCubeSequence`
+    cube : `irispy.spectrograph.SpectrogramCube` | `irispy.spectrograph.SpectrogramCubeSequence` | `irispy.sji.SJICube`
         The input cube to be calibrated.
+    line : `astropy.units.Quantity`, optional
+        Slit-jaw cubes only: the wavelength of the one line all the counts come from, which gives the
+        line intensity in :math:`erg s^{-1} sr^{-1} cm^{-2}`. Defaults to `None`, a continuum flat across
+        the passband, which gives :math:`erg s^{-1} sr^{-1} cm^{-2} Å^{-1}`.
+        :ref:`irispy-tutorial-calibration` says when each holds.
 
     Returns
     -------
-    `irispy.spectrograph.SpectrogramCube` or `irispy.spectrograph.SpectrogramCubeSequence`
+    `irispy.spectrograph.SpectrogramCube`, `irispy.spectrograph.SpectrogramCubeSequence` or `irispy.sji.SJICube`
         New cube in new units.
+
+    Raises
+    ------
+    ValueError
+        If ``line`` is given for a spectrograph cube, or if the cube is not from an IRIS slit-jaw
+        passband, such as an AIA cube.
 
     Notes
     -----
@@ -67,8 +81,13 @@ def radiometric_calibration(
     what was already flagged as bad in the level 2 data.
     """
     if isinstance(cube, SpectrogramCubeSequence):
-        return SpectrogramCubeSequence([radiometric_calibration(c) for c in cube])
+        return SpectrogramCubeSequence([radiometric_calibration(c, line=line) for c in cube])
     check_scaled(cube)
+    if isinstance(cube, SJICube):
+        return _calibrate_sji(cube, line)
+    if line is not None:
+        msg = "line is for slit-jaw cubes; spectra are calibrated at each of their wavelengths"
+        raise ValueError(msg)
     detector_type = cube.meta.detector_band
     spectral_dispersion_per_pixel = cube.spectral_dispersion
     solid_angle = cube.solid_angle
@@ -96,6 +115,29 @@ def radiometric_calibration(
     new_data = new_data_quantities[0].value
     new_uncertainty = StdDevUncertainty(new_data_quantities[1].value) if len(new_data_quantities) > 1 else None
     return make_map_cube(cube, new_data, new_data_quantities[0].unit, uncertainty=new_uncertainty)
+
+
+def _calibrate_sji(cube, line):
+    response = get_latest_response(cube.meta.date_reference)
+    # NAME_SJI holds the first three digits of each passband, "133" to "283"
+    names = [name.decode() for name in response["NAME_SJI"]]
+    if cube.meta.spectral_window[:3] not in names:
+        msg = f"There is no IRIS slit-jaw response for {cube.meta.spectral_window}"
+        raise ValueError(msg)
+    band = names.index(cube.meta.spectral_window[:3])
+    area, wavelength = response["AREA_SJI"][band], response["LAMBDA"]
+    # The intensity times t Ω, per photon counted
+    if line is None:
+        # DN2PHOT DN = t Ω ∫ A(λ) I_λ λ / (hc) dλ, solved for a constant I_λ
+        per_photon = constants.h * constants.c / np.trapezoid(area * wavelength, wavelength)
+        unit = RADIANCE_UNIT
+    else:
+        per_photon = constants.h * constants.c / line / np.interp(line, wavelength, area)
+        unit = RADIANCE_UNIT * u.AA
+    # DN_UNIT["SJI"] holds the NUV gain for all passbands; DN2PHOT_SJI has the gain of each
+    photons_per_dn = response["DN2PHOT_SJI"][band] / DN_UNIT["SJI"]
+    solid_angle = cube.meta["CDELT1"] * cube.meta["CDELT2"] * u.arcsec**2
+    return (cube.apply_exposure_time_correction() * (photons_per_dn * per_photon / solid_angle)).to(unit)
 
 
 def radiation_temperature(

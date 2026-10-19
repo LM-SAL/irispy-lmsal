@@ -72,6 +72,44 @@ A detailed discussion of the radiometric calibration steps for IRIS and how to u
 
 The routine that converts DN to physical units is described in this example :ref:`sphx_glr_generated_gallery_calibration_03_radiometric_calibration.py`; IRIS Technical Note 26 :cite:p:`itn26` describes the calibration process it follows.
 
+Slit-jaw images
+---------------
+
+`~irispy.utils.spectrograph.radiometric_calibration` also calibrates a `~irispy.sji.SJICube`.
+A slit-jaw pixel counts the photons of a whole passband, so you choose what spectrum to assume within it:
+
+* ``line=wavelength`` assumes that all counts come from one line at that wavelength and gives its intensity in erg s\ :sup:`-1` sr\ :sup:`-1` cm\ :sup:`-2`,
+
+  .. math::
+
+     I = \mathrm{DN} \frac{\mathrm{DN2PHOT\_SJI} \cdot h c / \lambda}{A_\mathrm{eff}(\lambda) \cdot \Omega \cdot t_\mathrm{exp}}.
+
+* ``line=None``, the default, assumes a continuum flat across the passband and gives erg s\ :sup:`-1` sr\ :sup:`-1` cm\ :sup:`-2` Å\ :sup:`-1`,
+
+  .. math::
+
+     I_\lambda = \mathrm{DN} \frac{\mathrm{DN2PHOT\_SJI} \cdot h c}{\Omega \cdot t_\mathrm{exp} \int A_\mathrm{eff}(\lambda) \, \lambda \, d\lambda}.
+
+Here :math:`A_\mathrm{eff}` is the passband's effective area (``response["AREA_SJI"]``) at the observation date, :math:`\Omega` is the solid angle of a pixel, ``CDELT1`` times ``CDELT2``, and :math:`t_\mathrm{exp}` is the exposure time of each frame.
+
+.. code-block:: python
+
+   >>> import astropy.units as u
+
+   >>> import irispy.data.sample as sample_data  # doctest: +REMOTE_DATA
+   >>> from irispy.io import read_files
+   >>> from irispy.utils.lines import get_lines
+   >>> from irispy.utils.spectrograph import radiometric_calibration
+
+   >>> sji = read_files(sample_data.SJI_2796)  # doctest: +REMOTE_DATA
+   >>> mg_ii_k = get_lines([2796, 2797] * u.AA, main_only=True)["wavelength"][0]
+   >>> radiometric_calibration(sji, line=mg_ii_k).unit  # doctest: +REMOTE_DATA
+   Unit("erg / (s sr cm2)")
+
+Neither assumption holds exactly; the 2796 passband, for one, also takes in the wings of Mg II k.
+The FUV passbands overlap, so a single-line intensity from a FUV image is approximate: in late 2021 the 1330 passband responds at 33% and 48% of its peak at Si IV 1394 and 1403 Å.
+`~irispy.utils.response.get_latest_response` gives the response of each passband at any date.
+
 Radiation Temperature
 =====================
 
