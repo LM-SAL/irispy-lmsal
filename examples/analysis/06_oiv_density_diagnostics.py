@@ -10,8 +10,7 @@ they are often used to diagnose conditions in the solar transition region.
 
 .. warning::
 
-    This example requires the optional density dependencies, including a version
-    of `fiasco` that provides ``fiasco.line_ratio``.
+    This example requires the optional density dependencies.
 """
 
 import fiasco
