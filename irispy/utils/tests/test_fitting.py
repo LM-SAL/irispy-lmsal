@@ -775,7 +775,7 @@ def test_maps_from_fit_fixed_parameters_and_rest_wavelength():
 
 def test_maps_from_fit_on_one_spectrum():
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
-    cube = raster["Mg II k 2796"][0][1:2, 301:302]
+    cube = raster["Mg II k 2796"][1:2, 301:302]
     wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
     fitted, fitter = _fit(mg_ii_model(cube), cube.data, cube.uncertainty.array, wavelength, cube.unit)
     for maps in (maps_from_fit(fitted, cube), maps_from_fit(fitted, cube, fitter=fitter)):
