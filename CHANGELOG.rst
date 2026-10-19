@@ -161,7 +161,7 @@ Documentation
 New Features
 ------------
 
-- Added `irispy.utils.dust.remove_dust` and ``irispy.sji.SJICube.remove_dust`` to repair dust-darkened pixels in IRIS slit-jaw images. (`#111 <https://github.com/LM-SAL/irispy/pull/111>`__)
+- Added `irispy.utils.dust.remove_dust` and `irispy.sji.SJICube.remove_dust` to repair dust-darkened pixels in IRIS slit-jaw images. (`#111 <https://github.com/LM-SAL/irispy/pull/111>`__)
 - Added ``remove_cosmic_rays`` methods both for SJI and raster cubes, with two possible backends: ``rsliding`` and ``astroscrappy``. (`#113 <https://github.com/LM-SAL/irispy/pull/113>`__)
 - Added a way to calculate the moments for a SpectrumCube with an example: :ref:`sphx_glr_generated_gallery_analysis_04_spectral_moments.py`. (`#124 <https://github.com/LM-SAL/irispy/pull/124>`__)
 - Added utilities and examples to calculate moments and red-blue asymmetry maps for `~irispy.spectrograph.SpectrogramCube`. (`#125 <https://github.com/LM-SAL/irispy/pull/125>`__)
@@ -184,7 +184,7 @@ Documentation
 
 - Added a tutorial mirroring how ITN26 is written. (`#106 <https://github.com/LM-SAL/irispy/pull/106>`__)
 - Added an example of using `astroscrappy` to remove cosmic rays from IRIS data: :ref:`sphx_glr_generated_gallery_calibration_01_remove_spikes_sg.py`. (`#106 <https://github.com/LM-SAL/irispy/pull/106>`__)
-- Added a how-to example showing how to remove dust from IRIS slit-jaw images with ``irispy.sji.SJICube.remove_dust``: :ref:`sphx_glr_generated_gallery_calibration_04_remove_dust.py`. (`#111 <https://github.com/LM-SAL/irispy/pull/111>`__)
+- Added a how-to example showing how to remove dust from IRIS slit-jaw images with `irispy.sji.SJICube.remove_dust`: :ref:`sphx_glr_generated_gallery_calibration_04_remove_dust.py`. (`#111 <https://github.com/LM-SAL/irispy/pull/111>`__)
 - Added a double Gaussian Mg II k spectral fitting example: :ref:`sphx_glr_generated_gallery_analysis_07_mg_ii_two_gaussian_fitting.py`. (`#130 <https://github.com/LM-SAL/irispy/pull/130>`__)
 
 
