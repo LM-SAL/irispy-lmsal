@@ -47,9 +47,10 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
         (step, slit) maps, (raster, step, slit) for several rasters, keyed ``"{feature}_velocity"``
         (km/s) and ``"{feature}_intensity"`` (the unit of ``cube``) for the blue peak, line center
         and red peak of each measured line: ``"k2v"``, ``"k3"``, ``"k2r"`` and ``"h2v"``, ``"h3"``,
-        ``"h2r"``. Features that are not found are NaN and masked. ``"{line}_saturated"`` is `True` where a sample searched over
-        (``velocity_range`` widened by 3 km/s) is saturated, as the mask and ``cube.meta["saturated"]``
-        mark the samples the readers find at the level 2 ceiling; such a line has no features either.
+        ``"h2r"``. Features that are not found are NaN and masked. ``"{line}_saturated"`` is `True`
+        where a sample searched over (``velocity_range`` widened by 3 km/s) is saturated, as the mask
+        and ``cube.meta["saturated"]`` mark the samples the readers find at the level 2 ceiling; such a
+        line has no features either.
 
     Notes
     -----
