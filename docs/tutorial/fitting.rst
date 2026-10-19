@@ -143,7 +143,7 @@ Fitting the mean spectrum of a region
 
 A line too faint to fit in each spectrum can be fitted in the mean spectrum of a region, as ``iris_sum_spec`` and ``dgf_1lp`` do in IDL, and that fit can start the fits of every spectrum.
 Here the region is the whole raster.
-Cosmic rays are not removed from Level 2 data and a mean takes them in, so we remove them first with `~irispy.utils.cosmic_rays.remove_cosmic_rays`.
+Cosmic rays are not removed from Level 2 data and a mean takes them in, so we remove them first with `~irispy.utils.cosmic_rays.remove_cosmic_rays`, which needs the ``cosmic-rays`` extra (see :ref:`irispy-install-extras`).
 The mean leaves out masked and missing samples, and its uncertainty at each wavelength is :math:`\sqrt{\sum \sigma^2} / n` for the :math:`n` samples averaged:
 
 .. code-block:: python
