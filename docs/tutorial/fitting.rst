@@ -176,7 +176,8 @@ The fit may return them in either order, so the narrower one is the core:
     0.03 Angstrom, 0.10 Angstrom
 
 We remove the cosmic rays from the cube as well, and `~irispy.utils.fitting.starts_from_model` starts each of its spectra from this fit.
-These spectra are too faint to fit all seven parameters, so we fix the widths at those of the mean spectrum and give both components one center:
+These spectra are too faint to fit all seven parameters, so we fix the widths at those of the mean spectrum and give both components one center.
+Those widths also hold the spread of Doppler shifts over the region, so they describe the region and not each spectrum:
 
 .. code-block:: python
 
