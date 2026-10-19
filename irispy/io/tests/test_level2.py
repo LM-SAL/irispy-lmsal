@@ -62,6 +62,15 @@ def test_readers_reject_other_products_and_levels(request, level3_file, reader, 
             reader(path)
 
 
+@pytest.mark.parametrize("kind", ["bytes", "HDUList"])
+def test_read_sji_lvl2_names_the_data_it_rejects_without_a_filename(level3_file, kind):
+    content = level3_file.read_bytes()
+    data = content if kind == "bytes" else fits.HDUList.fromstring(content)
+
+    with pytest.raises(ValueError, match=re.escape(f"The data given ({kind}) is not an IRIS level 2 SJI file")):
+        read_sji_lvl2(data)
+
+
 @pytest.mark.parametrize("kind", ["directory", "text file"])
 @pytest.mark.parametrize(
     ("reader", "product"),
