@@ -3,24 +3,7 @@ import numpy.testing as np_test
 import pytest
 
 from irispy import utils
-from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, DN_UNIT, READOUT_NOISE
-
-data_dust = np.array(
-    [
-        [[-1, 2, -3, 4], [2, BAD_PIXEL_VALUE_SCALED, 5, 3], [0, 1, 2, -300]],
-        [[2, BAD_PIXEL_VALUE_SCALED, 5, 1], [10, -5, 2, 2], [10, -3, 3, 0]],
-    ],
-)
-dust_mask_expected = np.array(
-    [
-        [
-            [True, True, True, True],
-            [True, True, True, True],
-            [True, True, False, False],
-        ],
-        [[True, True, True, False], [True, True, True, True], [True, True, True, True]],
-    ],
-)
+from irispy.utils.constants import DN_UNIT, READOUT_NOISE
 
 
 @pytest.mark.parametrize(
@@ -43,26 +26,6 @@ def test_image_clipping(dtype, expected):
     image = np.array([0, 0, 0, 1, 2, 3, 4, 9], dtype=dtype)
 
     np_test.assert_allclose(utils.image_clipping(image, cutoff=0.2, gamma=2), expected)
-
-
-@pytest.mark.parametrize(("input_array", "expected_array"), [(data_dust, dust_mask_expected)])
-def test_calculate_dust_mask(input_array, expected_array):
-    np_test.assert_array_equal(utils.calculate_dust_mask(input_array), expected_array)
-
-
-def test_calculate_dust_mask_2d():
-    data = np.ones((3, 3))
-    data[1, 1] = 0
-
-    np_test.assert_array_equal(utils.calculate_dust_mask(data), np.ones((3, 3), dtype=bool))
-
-
-@pytest.mark.parametrize("fill", [-200, -199])
-@pytest.mark.parametrize("shape", [(5, 5), (2, 5, 5)])
-def test_calculate_dust_mask_ignores_fill(fill, shape):
-    data = np.full(shape, 10.0)
-    data[..., 2, 2] = fill
-    assert not utils.calculate_dust_mask(data).any()
 
 
 def test_import_optional_missing_module_names_the_extra():

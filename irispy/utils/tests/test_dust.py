@@ -7,14 +7,13 @@ from scipy import ndimage
 
 from astropy import units as u
 
+from irispy.io import read_files
 from irispy.tests.helpers import figure_test
-from irispy.utils.dust import _local_median_fill, remove_dust
+from irispy.utils.dust import _local_median_fill, calculate_dust_mask, remove_dust
 
 
 @pytest.mark.parametrize("method", [False, True])
 def test_remove_dust_rejects_unscaled_data(sns_sji_1330_file, method):
-    from irispy.io import read_files  # NOQA: PLC0415
-
     cube = read_files(sns_sji_1330_file, memmap=True)
     with pytest.raises(ValueError, match=r"unscaled.*memmap=False"):
         cube.remove_dust() if method else remove_dust(cube)
@@ -276,3 +275,72 @@ def test_local_median_fill_matches_generic_filter(spatial_box):
     result = _local_median_fill(frame, invalid, spatial_box, target)
     np.testing.assert_array_equal(result[target], expected[target])
     assert np.isnan(result[~target]).all()
+
+
+def _dark_fraction(frame, where):
+    """
+    The share of the pixels at ``where`` darker than half their 15 by 15 neighborhood.
+    """
+    frame = np.asarray(frame, dtype=float)
+    local = ndimage.median_filter(np.nan_to_num(frame, nan=np.nanmedian(frame)), 15)
+    return float(((frame / np.maximum(local, 1)) < 0.5)[where].mean())
+
+
+@pytest.mark.remote_data
+@pytest.mark.parametrize("channel", ["SJI_1330", "SJI_1400", "SJI_2796", "SJI_2832"])
+def test_remove_dust_repairs_the_dust_of_each_channel(channel):
+    from irispy.data import sample  # NOQA: PLC0415
+
+    cube = read_files(str(getattr(sample, channel)))
+    dust_mask = calculate_dust_mask(cube)
+    cleaned = remove_dust(cube)
+
+    core = ndimage.binary_erosion(dust_mask[0], np.ones((3, 3)))
+    elsewhere = ~dust_mask[0] & np.isfinite(np.asarray(cube.data[0]))
+    assert _dark_fraction(cube.data[0], core) > _dark_fraction(cube.data[0], elsewhere) + 0.2
+    assert _dark_fraction(cleaned.data[0], core) < _dark_fraction(cube.data[0], elsewhere) + 0.05
+
+
+@pytest.mark.remote_data
+def test_calculate_dust_mask_follows_slicing():
+    from irispy.data import sample  # NOQA: PLC0415
+
+    cube = read_files(str(sample.SJI_2832))
+    dust_mask = calculate_dust_mask(cube)
+    assert dust_mask.shape == cube.shape
+    assert dust_mask.any()
+    np.testing.assert_array_equal(calculate_dust_mask(cube[2:5, 30:, 40:]), dust_mask[2:5, 30:, 40:])
+    np.testing.assert_array_equal(calculate_dust_mask(cube[3]), dust_mask[3])
+    # A crop whose edge is next to a bad pixel still gets the dilation into it
+    rows, columns = np.nonzero(dust_mask[3])
+    y0, x0 = rows.min() + 1, columns.min() + 1
+    np.testing.assert_array_equal(calculate_dust_mask(cube[3, y0:, x0:]), dust_mask[3, y0:, x0:])
+
+
+def test_calculate_dust_mask_has_the_cube_shape(sns_sjicube_2832):
+    dust_mask = calculate_dust_mask(sns_sjicube_2832)
+    assert dust_mask.shape == sns_sjicube_2832.shape
+    assert dust_mask.dtype == bool
+    assert not dust_mask[np.isnan(np.asarray(sns_sjicube_2832.data))].any()
+
+
+def test_calculate_dust_mask_rejects_other_instruments(aia_1700_file):
+    with pytest.raises(ValueError, match="No bad-pixel table"):
+        calculate_dust_mask(read_files(aia_1700_file))
+
+
+def test_remove_dust_leaves_pixels_without_values(sns_sjicube_1330):
+    cube = sns_sjicube_1330[:3, :4, :4]
+    cube.data[...] = 10.0
+    cube.data[1, 1, 1] = np.nan
+    cube.mask = np.isnan(cube.data)
+    dust_mask = np.zeros(cube.shape, dtype=bool)
+    dust_mask[1, 1, 1] = True
+    dust_mask[1, 2, 2] = True
+
+    cleaned = remove_dust(cube, dust_mask=dust_mask, exposure_normalize=False)
+
+    assert np.isnan(cleaned.data[1, 1, 1])
+    assert cleaned.mask[1, 1, 1]
+    assert cleaned.data[1, 2, 2] == 10
+    assert not cleaned.mask[1, 2, 2]

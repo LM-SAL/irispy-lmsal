@@ -9,7 +9,6 @@ from astropy.wcs import WCS
 from ndcube.meta import NDMeta
 
 from irispy import SJICube, utils
-from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED
 
 TIMES = Time(["2014-12-11T19:39:00.48", "2014-12-11T19:43:07.6"])
 
@@ -73,46 +72,6 @@ def cube():
 def cube_2d():
     data = np.array([[1, 2, 3, 4], [2, 4, 5, 3]])
     return _fake_sji_cube(data, uncertainty=np.sqrt(data), mask=data >= 0)
-
-
-@pytest.fixture
-def dust_cube():
-    data = np.array(
-        [
-            [[-1, 2, -3, 4], [2, BAD_PIXEL_VALUE_SCALED, 5, 3], [0, 1, 2, -300]],
-            [[2, BAD_PIXEL_VALUE_SCALED, 5, 1], [10, -5, 2, 2], [10, -3, 3, 0]],
-        ],
-    )
-    return _fake_sji_cube(data, uncertainty=1, mask=data == BAD_PIXEL_VALUE_SCALED, OBSID=1)
-
-
-def test_sjicube_apply_dust_mask(dust_cube):
-    # TODO: The expected values are not correct.
-    dust_mask_expected = np.array(
-        [
-            [[True, True, True, True], [True, True, True, True], [True, True, False, False]],
-            [[True, True, True, False], [True, True, True, True], [True, True, True, True]],
-        ]
-    )
-    dust_cube.apply_dust_mask()
-    np.testing.assert_array_equal(dust_cube.mask, dust_mask_expected)
-    dust_cube.apply_dust_mask(undo=True)
-    before_mask = np.array(
-        [
-            [[False, False, False, False], [False, False, False, False], [False, False, False, False]],
-            [[False, False, False, False], [False, False, False, False], [False, False, False, False]],
-        ]
-    )
-    np.testing.assert_array_equal(dust_cube.mask, before_mask)
-
-
-def test_sjicube_apply_dust_mask_initializes_missing_mask(dust_cube):
-    dust_cube.mask = None
-
-    dust_cube.apply_dust_mask()
-
-    assert dust_cube.mask is not None
-    assert dust_cube.mask.any()
 
 
 @pytest.mark.parametrize(

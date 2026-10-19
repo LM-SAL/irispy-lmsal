@@ -6,14 +6,10 @@ import numbers
 from importlib import import_module
 
 import numpy as np
-from scipy import ndimage
 
 import astropy.units as u
 
-from .constants import BAD_PIXEL_VALUES_SCALED
-
 __all__ = [
-    "calculate_dust_mask",
     "calculate_uncertainty",
     "get_detector_type",
     "image_clipping",
@@ -144,37 +140,6 @@ def get_detector_type(meta):
         Detector type.
     """
     return "FUV" if "FUV" in meta["detector type"] else meta["detector type"]
-
-
-def calculate_dust_mask(data_array):
-    """
-    Calculate a mask with the dust positions in a given array.
-
-    Parameters
-    ----------
-    data_array : `numpy.ndarray`
-        This array contains some dust position that will be calculated. The array
-        must have scaled values.
-
-    Returns
-    -------
-    `numpy.ndarray` of `bool`
-        This array has the same shape than data_array and contains the dust positions
-        when the value is True.
-    """
-    # Creating a mask with the same shape than the inputted data array.
-    mask = np.zeros_like(data_array, dtype=bool)
-    # Set the pixel value to True is the pixel is recognized as a dust pixel.
-    mask[(data_array < 0.5) & (data_array > max(BAD_PIXEL_VALUES_SCALED))] = True
-    # Extending the mask to avoid the neighbors pixel influenced by the dust pixels.
-    if mask.ndim == 2:
-        struct = np.ones((3, 3), dtype=bool)
-    elif mask.ndim == 3:
-        struct = np.array([np.zeros((3, 3)), np.ones((3, 3)), np.zeros((3, 3))], dtype=bool)
-    else:
-        msg = "data_array must be 2D or 3D."
-        raise ValueError(msg)
-    return ndimage.binary_dilation(mask, structure=struct).astype(mask.dtype)
 
 
 def calculate_uncertainty(data: np.ndarray, readout_noise: u.Quantity, unit: u.Quantity) -> np.ndarray:
