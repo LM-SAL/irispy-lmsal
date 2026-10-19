@@ -7,18 +7,6 @@ from irispy.utils.constants import DN_UNIT, READOUT_NOISE
 
 
 @pytest.mark.parametrize(
-    ("test_input", "expected_output"),
-    [
-        ({"detector type": "FUV1"}, "FUV"),
-        ({"detector type": "NUV"}, "NUV"),
-        ({"detector type": "SJI"}, "SJI"),
-    ],
-)
-def test_get_detector_type(test_input, expected_output):
-    assert utils.get_detector_type(test_input) == expected_output
-
-
-@pytest.mark.parametrize(
     ("dtype", "expected"),
     [(np.int16, (4.0, 16.0)), (np.float64, (3.99920004, 9.00360036))],
 )

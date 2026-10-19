@@ -11,7 +11,6 @@ import astropy.units as u
 
 __all__ = [
     "calculate_uncertainty",
-    "get_detector_type",
     "image_clipping",
     "record_to_dict",
 ]
@@ -121,25 +120,6 @@ def image_clipping(image, cutoff=1.5e-3, gamma=1.0):
     vmin = (np.max(np.where(h <= (cutoff + h[0]), bins[1:] - bins[0], 0)) / fak + hmin) ** gamma
     vmax = (np.min(np.where(h >= (1.0 - cutoff), bins[1:] - bins[0], nh - 2)) / fak + hmin) ** gamma
     return vmin, vmax
-
-
-def get_detector_type(meta):
-    """
-    Gets the IRIS detector type from a meta dictionary.
-
-    In this function, FUV1 and FUV2 are just assigned as FUV.
-
-    Parameters
-    ----------
-    meta: `dict`
-        Dictionary-like object containing entry for "detector type"
-
-    Returns
-    -------
-    `str`
-        Detector type.
-    """
-    return "FUV" if "FUV" in meta["detector type"] else meta["detector type"]
 
 
 def calculate_uncertainty(data: np.ndarray, readout_noise: u.Quantity, unit: u.Quantity) -> np.ndarray:
