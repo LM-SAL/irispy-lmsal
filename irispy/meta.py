@@ -94,7 +94,8 @@ class BaseMeta(NDMeta):
     @property
     def fits_header(self):
         """
-        The primary header of the file as an `astropy.io.fits.Header`.
+        The ``header`` it was made from: an `astropy.io.fits.Header` for the cubes from
+        `irispy.io.read_files`.
         """
         return self._fits_header
 
