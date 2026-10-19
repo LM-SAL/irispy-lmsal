@@ -14,6 +14,7 @@ Structure of IRIS level 2 FITS files
 
 The level 2 data are a combination of individual frames for the duration of a given observing sequence (defined by an OBSID number).
 There are two types of IRIS level 2 files: spectrograph and slit-jaw.
+The full-disk mosaics described below are derived from them.
 The internal structure is different for spectrograph and slit-jaw files, and file naming convention is the following:
 
 * Spectrograph: ``iris_l2_<day>_<time>_<OBSID>_raster_t000_r<raster number>.fits``, where ``<day>`` is YYYYMMDD, ``<time>`` is the starting time in HHMMSS, and the raster number starts at zero and up to the total number of raster scans (or repeats) minus one.
@@ -58,7 +59,7 @@ The tables below illustrate the HDU structure for slit-jaw and spectrograph file
     2       Table Extension  Technical metadata            [``nt``, 5]
     ======  ===============  ============================  =========================================
 
-`A description of the level 2 keywords, for primary and extension headers, is available for download. <https://www.lmsal.com/iris_science/doc?cmd=dcur&proj_num=IS0211&file_type=pdf>`__
+A description of the level 2 keywords, for primary and extension headers, is available for download :cite:p:`is0211`.
 
 The auxiliary metadata contain several quantities for each exposure.
 These are parameters that may vary for different exposures and are therefore stored here.
@@ -81,16 +82,55 @@ Their content is only useful for reproducing the exact steps of the data calibra
 Exposure timestamps
 -------------------
 
-For slit-jaw data, ``STARTOBS`` plus the auxiliary ``TIME`` value is the exposure start.
+The time coordinate of the cubes is the midpoint of each exposure, not its start.
+For slit-jaw data, ``STARTOBS`` plus the auxiliary ``TIME`` value is the exposure start :cite:p:`is0211`, and the midpoint adds half of the exposure time.
 For spectrograph data, the shared auxiliary ``TIME`` follows the FUV exposure start and is retained as ``meta["auxiliary times"]``.
 The NUV exposure starts at a different time and is calculated from its source-filename midpoint minus half its NUV exposure duration.
+The time coordinate of the FUV windows is the auxiliary ``TIME`` plus half the FUV exposure time, and that of the NUV windows is the source-filename midpoint.
+
+Full-disk mosaics
+-----------------
+
+About once a month IRIS rasters the whole disk, which takes about 18 hours, and the IRIS team rearranges the rasters into one cube per spectral window :cite:p:`irismosaics`.
+The `IRIS mosaic page <https://iris.lmsal.com/mosaic.html>`__ lists the mosaics.
+Each date has one ``IRISMosaic_<date>_<window>.fits.gz`` file for each of ``C1334``, ``C1335``, ``MgIIh``, ``MgIIk``, ``Si1393`` and ``Si1403``.
+
+.. table:: Structure of mosaic files. ``nx`` is 1002 positions at the raster step (about 2 arcsec), ``ny`` is 6011 slit pixels (about 1/3 arcsec), ``nwave`` is 41 for C II and Si IV and 101 for Mg II.
+
+    ======  ===============  ===================================================  ===========================
+    HDU #   HDU type         Contents                                             Data dimensions
+    ======  ===============  ===================================================  ===========================
+    0       Primary          Main header and data                                 [``nx``, ``ny``, ``nwave``]
+    1       Image Extension  Integrated spectrum (``REF_PROF``)                   [``nwave``]
+    2       Image Extension  Time of each position in seconds from ``DATE_OBS``   [``nx``, ``ny``]
+    3       Image Extension  Y coordinate in the Level 2 frame (``Y_MASK``)       [``nx``, ``ny``]
+    ======  ===============  ===================================================  ===========================
+
+The data are in DN.
+The header keeps only a few Level 2 keywords (``DATE_OBS``, ``DATE_END``, ``OBSID``, ``EXPTIME``, ``SUMSPAT``, ``SUMSPTRN``, ``SUMSPTRF``) and adds the rest wavelength of the window, ``LAMREF``.
+The axes are named ``'Solar X'``, ``'Solar Y'`` and ``'Wavelength'`` and there is no observer.
+Positions that no raster covered are 0 in the data, NaN in the time extension and -1 in ``Y_MASK``.
+
+`~irispy.io.read_mosaic` reads a mosaic into a `~irispy.spectrograph.MosaicCube`, masking those positions and putting the observer at Earth at ``DATE_OBS``, the start of the mosaic.
+The mosaic is not derotated, so ``meta["time"]`` gives the time of each position.
+`~irispy.spectrograph.MosaicCube.to_map` makes a `sunpy.map.Map` from it; see :ref:`sphx_glr_generated_gallery_how_to_skip_06_full_disk_mosaic.py`.
+
+``AllSDOMaps.tar.gz`` holds SDO pseudo-mosaics, AIA 171, 193, 304, 1600 and 1700 Å and an HMI magnetogram, sampled at the times IRIS observed each part of the disk.
+They are plain FITS images that `sunpy.map.Map` opens directly.
+
+Hinode/SOT data
+---------------
+
+`~irispy.io.read_files` reads the Hinode/SOT images and magnetic data supplied with IRIS observations :cite:p:`itn32`.
+The returned `~irispy.sji.SOTCube` supports the same slicing and plotting methods as `~irispy.sji.SJICube` and can be converted to SunPy maps with `~irispy.sji.SOTCube.to_maps`.
+The data retain their units, and missing pixels are masked.
 
 Reading Level 2 Data
 ====================
 
 ``irispy`` is designed to allow the user to easily read and access the data and keywords contained in IRIS level 2 FITS files.
 Currently, ``irispy`` does not provide a way to download the data from the `IRIS archive. <https://iris.lmsal.com/data.html>`__
-We recommend browsing the catalogue using your web browser.
+We recommend browsing the catalog using your web browser.
 
 The following examples in this section will showcase how to read the FITS file header, load an IRIS raster window (region) into memory, as well as locate important auxiliary information.
 
@@ -245,7 +285,7 @@ Metadata
 
 ``irispy`` provides easy access to the metadata contained in the FITS files but only for the primary header.
 For the extensions, some of that is used to create coordinates and some is stored in the ``meta`` attribute of the cube, but not all of it is available.
-The metadata is stored in the ``meta`` attribute of the cube, and is an object of type `irispy.meta.SJIMeta` for slit-jaw files and `irispy.meta.SGMeta` for spectrograph files.
+The metadata is stored in the ``meta`` attribute of the cube, and is an object of type `irispy.meta.SJIMeta` for slit-jaw files, `irispy.meta.SGMeta` for spectrograph files and `irispy.meta.MosaicMeta` for mosaics.
 
 .. code-block:: python
 
@@ -272,7 +312,7 @@ Contained within the metadata object are the FITS header keywords but also helpe
 .. code-block:: python
 
     >>> dir(iris_sji.meta)  # doctest: +REMOTE_DATA
-    [... 'add', 'automatic_exposure_control_enabled', 'axes', 'build_version', 'camera', 'clear', 'copy', 'data_max', 'data_mean', 'data_median', 'data_min', 'data_rms', 'data_shape', 'data_status', 'data_type', 'data_unit', 'date_end', 'date_reference', 'date_start', 'detector', 'detector_band', 'distance_to_sun', 'exposure_control_triggers_in_observation', 'exposure_control_triggers_in_raster', 'exposure_time', 'exposure_time_max', 'exposure_time_min', 'fits_header', 'fov_center', 'fromkeys', 'get', 'instrument', 'items', 'key_comments', 'keys', 'lut_id', 'number_of_exposures', 'number_of_exposures_observation', 'number_of_exposures_planned', 'number_of_raster_positions', 'number_of_saturated_pixels', 'number_of_spikes', 'number_of_unique_raster_positions', 'observation_includes_saa', 'observatory', 'observatory_at_high_latitude', 'observer_location', 'observer_radial_velocity', 'observing_campaign_end', 'observing_campaign_start', 'observing_label', 'observing_mode_description', 'observing_mode_id', 'observing_title', 'original_meta', 'percent_data', 'pop', 'popitem', 'processing_level', 'raster_fov_width_x', 'raster_fov_width_y', 'rebin', 'reformat_date', 'reformat_version', 'rest_wavelength', 'rsun_angular', 'rsun_meters', 'satellite_rotation', 'setdefault', 'slice', 'spatial_summing_factor', 'spectral_band', 'spectral_range', 'spectral_summing_factor', 'spectral_window', 'sun_angular_radius', 'temporal_cadence', 'tracking_mode_enabled', 'update', 'values', 'version']
+    [... 'add', 'automatic_exposure_control_enabled', 'axes', 'build_version', 'camera', 'clear', 'copy', 'data_max', 'data_mean', 'data_median', 'data_min', 'data_rms', 'data_shape', 'data_status', 'data_type', 'data_unit', 'date_end', 'date_reference', 'date_start', 'detector', 'detector_band', 'distance_to_sun', 'exposure_control_triggers_in_observation', 'exposure_control_triggers_in_raster', 'exposure_time', 'exposure_time_max', 'exposure_time_min', 'fits_header', 'fov_center', 'fromkeys', 'get', 'instrument', 'items', 'key_comments', 'keys', 'lut_id', 'mu', 'number_of_exposures', 'number_of_exposures_observation', 'number_of_exposures_planned', 'number_of_raster_positions', 'number_of_saturated_pixels', 'number_of_spikes', 'number_of_unique_raster_positions', 'observation_includes_saa', 'observatory', 'observatory_at_high_latitude', 'observer_location', 'observer_radial_velocity', 'observing_campaign_end', 'observing_campaign_start', 'observing_label', 'observing_mode_description', 'observing_mode_id', 'observing_title', 'original_meta', 'percent_data', 'pop', 'popitem', 'processing_level', 'raster_fov_width_x', 'raster_fov_width_y', 'rebin', 'reformat_date', 'reformat_version', 'rest_wavelength', 'rsun_angular', 'rsun_meters', 'satellite_rotation', 'setdefault', 'slice', 'spatial_summing_factor', 'spectral_band', 'spectral_range', 'spectral_summing_factor', 'spectral_window', 'sun_angular_radius', 'temporal_cadence', 'tracking_mode_enabled', 'update', 'values', 'version']
 
     >>> iris_sji.meta.keys()  # doctest: +REMOTE_DATA
     dict_keys(['SIMPLE', 'BITPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'NAXIS3', 'EXTEND', 'DATE', 'COMMENT', 'TELESCOP', 'INSTRUME', 'DATA_LEV', 'LVL_NUM', 'VER_RF2', 'DATE_RF2', 'DATA_SRC', 'ORIGIN', 'BLD_VERS', 'LUTID', 'OBSID', 'OBS_DESC', 'OBSLABEL', 'OBSTITLE', 'DATE_OBS', 'DATE_END', 'STARTOBS', 'ENDOBS', 'OBSREP', 'CAMERA', 'STATUS', 'BTYPE', 'BUNIT', 'HLZ', 'SAA', 'SAT_ROT', 'AECNOBS', 'AECNRAS', 'DSUN_OBS', 'IAECEVFL', 'IAECFLAG', 'IAECFLFL', 'TR_MODE', 'FOVY', 'FOVX', 'XCEN', 'YCEN', 'SUMSPTRL', 'SUMSPAT', 'EXPTIME', 'EXPMIN', 'EXPMAX', 'DATAMEAN', 'DATARMS', 'DATAMEDN', 'DATAMIN', 'DATAMAX', 'DATAVALS', 'MISSVALS', 'NSATPIX', 'NSPIKES', 'TOTVALS', 'PERCENTD', 'DATASKEW', 'DATAKURT', 'DATAP01', 'DATAP10', 'DATAP25', 'DATAP75', 'DATAP90', 'DATAP95', 'DATAP98', 'DATAP99', 'NEXP_PRP', 'NEXP', 'NEXPOBS', 'NRASTERP', 'RASTYPDX', 'RASTYPNX', 'RASRPT', 'RASNRPT', 'CADPL_AV', 'CADPL_DV', 'CADEX_AV', 'CADEX_DV', 'MISSOBS', 'MISSRAS', 'IPRPVER', 'IPRPPDBV', 'IPRPDVER', 'IPRPBVER', 'PC1_1', 'PC1_2', 'PC2_1', 'PC2_2', 'PC3_1', 'PC3_2', 'NWIN', 'TDET1', 'TDESC1', 'TWAVE1', 'TWMIN1', 'TWMAX1', 'TDMEAN1', 'TDRMS1', 'TDMEDN1', 'TDMIN1', 'TDMAX1', 'TDVALS1', 'TMISSV1', 'TSATPX1', 'TSPIKE1', 'TTOTV1', 'TPCTD1', 'TDSKEW1', 'TDKURT1', 'TDP01_1', 'TDP10_1', 'TDP25_1', 'TDP75_1', 'TDP90_1', 'TDP95_1', 'TDP98_1', 'TDP99_1', 'TSR1', 'TER1', 'TSC1', 'TEC1', 'IPRPFV1', 'IPRPGV1', 'IPRPPV1', 'CDELT1', 'CDELT2', 'CDELT3', 'CRPIX1', 'CRPIX2', 'CRPIX3', 'CRVAL1', 'CRVAL2', 'CRVAL3', 'CTYPE1', 'CTYPE2', 'CTYPE3', 'CUNIT1', 'CUNIT2', 'CUNIT3', 'KEYWDDOC', 'HISTORY', '', 'frame_wcs_headers', 'scaled'])
@@ -286,14 +326,15 @@ For example, we can access the description of the observation from the primary h
     >>> iris_sji.meta["OBS_DESC"]  # doctest: +REMOTE_DATA
     'Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2'
 
-The time when the observation sequence started onboard IRIS is given by the keyword ``STARTOBS``:
+The time when the observation sequence started onboard IRIS is given by the keyword ``STARTOBS`` :cite:p:`is0211`:
 
 .. code-block:: python
 
     >>> iris_sji.meta['STARTOBS']   # doctest: +REMOTE_DATA
     '2021-10-01T06:09:24.920'
 
-The exposure times are calculated from the auxiliary metadata, are given in seconds, and are therefore a property of the metadata object rather than a header key:
+The exposure time of each exposure is read from the auxiliary metadata and is a property of the cube, ``cube.exposure_time``, in seconds.
+``cube.meta.exposure_time`` is a different quantity, the mean exposure time of the observation from the header keyword ``EXPTIME``:
 
 .. code-block:: python
 
@@ -305,6 +346,16 @@ The exposure times are calculated from the auxiliary metadata, are given in seco
 
 In most cases, the exposure times are fixed for all scans in a raster.
 However, when automatic exposure compensation (AEC) is enabled and there is a very energetic event (e.g., a flare), IRIS will automatically use a lower exposure time to prevent detector saturation.
+
+The position on the disk is often given as μ, the cosine of the angle between the line of sight and the local vertical (1 at disk center, 0 at the limb, NaN off the disk).
+``meta.mu`` gives it at the center of the field of view, and for rasters ``meta.exposure_mu`` gives it at each raster step:
+
+.. code-block:: python
+
+    >>> iris_sji.meta.mu  # doctest: +REMOTE_DATA
+    np.float64(0.8493051077033886)
+    >>> raster["C II 1336"][0].meta.exposure_mu[:4]  # doctest: +REMOTE_DATA
+    array([0.84655326, 0.84697703, 0.84739929, 0.84782021])
 
 Specific coordinates are also provided as part of the cube instead of the metadata.
 These are called extra coordinates, and they are stored in the ``extra_coords`` attribute of the cube.
@@ -343,15 +394,15 @@ These are called extra coordinates, and they are stored in the ``extra_coords`` 
                0.67856681, 0.69553316, 0.6446346 , 0.66160059, 0.67856681,
                0.69553316, 0.6446346 , 0.66160059, 0.67856681, 0.69553316] arcsec>,
                 slit x position (0) None: QuantityTableCoordinate ['slit x position'] [None]:
-    <Quantity [258.75      , 270.74543085, 282.74086427, 294.73629541,
-               258.75      , 270.74543085, 282.74086427, 294.73629541,
-               258.75      , 270.74543085, 282.74086427, 294.73629541,
-               258.75      , 270.74543085, 282.74086427, 294.73629541,
-               258.75      , 270.74543085, 282.74086427, 294.73629541] pix>,
+    <Quantity [257.75      , 269.74543085, 281.74086427, 293.73629541,
+               257.75      , 269.74543085, 281.74086427, 293.73629541,
+               257.75      , 269.74543085, 281.74086427, 293.73629541,
+               257.75      , 269.74543085, 281.74086427, 293.73629541,
+               257.75      , 269.74543085, 281.74086427, 293.73629541] pix>,
                 slit y position (0) None: QuantityTableCoordinate ['slit y position'] [None]:
-    <Quantity [254.75, 254.75, 254.75, 254.75, 254.75, 254.75, 254.75, 254.75,
-               254.75, 254.75, 254.75, 254.75, 254.75, 254.75, 254.75, 254.75,
-               254.75, 254.75, 254.75, 254.75] pix>,
+    <Quantity [253.75, 253.75, 253.75, 253.75, 253.75, 253.75, 253.75, 253.75,
+               253.75, 253.75, 253.75, 253.75, 253.75, 253.75, 253.75, 253.75,
+               253.75, 253.75, 253.75, 253.75] pix>,
                 xcenix (0) None: QuantityTableCoordinate ['xcenix'] [None]:
     <Quantity [-321.64163621, -321.64154081, -321.64054553, -321.63951873,
                -321.5924215 , -321.59850309, -321.60135777, -321.56819773,
@@ -398,6 +449,25 @@ Both the raster and slit-jaw cubes can be visualized using the ``plot`` method.
 
     plt.show()
 
+A cube with a time axis is shown as an animation, and this is its first frame.
+The slider below the image selects the frame by its time.
+
+The default stretch of the colors runs linearly from the minimum to the maximum of the data, and a few hot pixels, in the thousands of DN, make the rest of the image look black.
+Pass ``clip_interval`` to let the stretch of each frame ignore the extremes:
+
+.. plot::
+    :include-source:
+    :context: close-figs
+
+    import matplotlib.pyplot as plt
+
+    iris_sji.plot(clip_interval=(1, 99.5) * u.percent)
+
+    plt.show()
+
+The colors now run from the 1st to the 99.5th percentile of each frame.
+The same argument works for the raster plot below, in place of ``vmax``.
+
 .. note::
 
     We imported `matplotlib.pyplot` in order to create the figure.
@@ -420,5 +490,39 @@ This only applies to the slit-jaw images, as the raster cubes do not have a sing
 Since they are both series of images, the plot method will automatically create a slider to scroll through the different time steps or raster steps.
 Use the ``slider_labels`` keyword to override the slider text, for example ``iris_sji.plot(slider_labels=["Frame"])``.
 Furthermore, the tick and axes labels have been automatically set based on the coordinate system of the cube and are colored according to the axis direction.
+
+The raster plot shows the spectrograms of the Mg II k window, one for each position of the slit.
+In a spectrogram the slit runs along the vertical axis, so the vertical axis is the solar Y coordinate, the helioprojective latitude, and the horizontal axis is the wavelength.
+The sliders step through the raster steps and the repeated scans of the raster, which move the slit along solar X.
+We set ``vmax=255`` because a few hot pixels reach 11,700 DN while 99.9% of the samples are below about 100 DN, so the default stretch, from the minimum to the maximum of the data, would show a nearly black image.
+The value is a choice for this data and not a property of the instrument.
+
+To plot a single image, slice the cube down to two dimensions, here the first frame:
+
+.. plot::
+    :include-source:
+    :context: close-figs
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    frame = iris_sji[0]
+    frame.plot(vmax=np.nanpercentile(frame.data, 99.5))
+
+    plt.show()
+
+A single image has no slider, so we set the upper limit of the stretch to the 99.5th percentile of the frame ourselves.
+
+Slicing a raster down to one dimension gives a single spectrum, here raster step 0 of the first scan at pixel 274 along the slit:
+
+.. plot::
+    :include-source:
+    :context: close-figs
+
+    import matplotlib.pyplot as plt
+
+    raster["Mg II k 2796"][0][0, 274].plot()
+
+    plt.show()
 
 Within the :ref:`irispy-example-index`, there are more examples of how to visualize the data and customize the plots.

@@ -1,0 +1,1 @@
+The figure hash library has entries for the slit-jaw frame and spectrogram figure tests, so the figure job passes again.

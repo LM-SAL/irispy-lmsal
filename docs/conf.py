@@ -5,7 +5,7 @@
 # http://www.sphinx-doc.org/en/master/config
 
 import configparser
-import datetime
+import datetime as dt
 import logging
 import os
 from pathlib import Path
@@ -44,7 +44,7 @@ is_release = not (_version.is_prerelease or _version.is_devrelease)
 
 project = "irispy"
 author = "IRIS Instrument Team @ LMSAL"
-copyright = f"{datetime.datetime.now(datetime.UTC).year}, {author}"  # NOQA: A001
+copyright = f"{dt.datetime.now(dt.UTC).year}, {author}"  # NOQA: A001
 
 # -- General configuration ----------------------------------------------------
 
@@ -80,13 +80,13 @@ extensions = [
     "sphinx_design",
     "sphinx_gallery.gen_gallery",
     "sphinx.ext.autodoc",
-    "sphinx.ext.coverage",
     "sphinx.ext.doctest",
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
-    "sphinx.ext.todo",
     "sphinx.ext.viewcode",
+    "sphinxcontrib.bibtex",
+    "sphinxext.opengraph",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -148,12 +148,11 @@ intersphinx_mapping = {
     "sunraster": ("https://docs.sunpy.org/projects/sunraster/en/latest/", None),
 }
 
-# -- Options for sphinxext-opengraph ------------------------------------------
-
-ogp_image = "https://raw.githubusercontent.com/sunpy/sunpy-logo/master/generated/sunpy_logo_word.png"
-ogp_use_first_image = True
-ogp_description_length = 160
-ogp_custom_meta_tags = ('<meta property="og:ignore_canonical" content="true" />',)
+# -- Options for sphinxcontrib-bibtex ------------------------------------------
+bibtex_bibfiles = ["references.bib"]
+bibtex_default_style = "plain"
+# Cite as "Pereira et al. [2013]" with :cite:t: and "[Pereira et al., 2013]" with :cite:p:
+bibtex_reference_style = "author_year"
 
 # -- Options for sphinx-copybutton ---------------------------------------------
 
@@ -191,7 +190,6 @@ autodoc_preserve_defaults = True
 # -- Other options ------------------------------------------------------------
 
 # Configuration for sphinx-gallery
-from sunpy_sphinx_theme import PNG_ICON
 from sphinx_gallery.sorting import ExplicitOrder
 
 # Enable extra Sphinx-Gallery runtime and memory reporting only for the
@@ -212,11 +210,11 @@ sphinx_gallery_conf = {
     ),
     "within_subsection_order": "FileNameSortKey",
     "gallery_dirs": str(Path("generated") / "gallery"),
-    "default_thumb_file": PNG_ICON,
+    "default_thumb_file": str(DOCS_DIR / "_static" / "images" / "lmsal_logo.png"),
     "abort_on_example_error": False,
     "plot_gallery": "True",
     "remove_config_comments": True,
-    "doc_module": ("sunpy"),
+    "doc_module": ("irispy",),
     "only_warn_on_example_error": True,
     "matplotlib_animations": (True, "html5"),
     "write_computation_times": profile_gallery,
@@ -320,3 +318,13 @@ else:
 def setup(app):
     # Handles the templating for the jinja pages in our docs
     app.connect("source-read", jinja_to_rst)
+
+
+# -- Options for sphinxext-opengraph ------------------------------------------
+
+# Read the Docs supplies the canonical URL of each build; this is the fallback elsewhere
+ogp_site_url = "https://irispy.readthedocs.io/en/stable/"
+ogp_image = "https://lmsal.com/images/lmsal_logo_highres_small.png"
+ogp_use_first_image = True
+ogp_description_length = 160
+ogp_custom_meta_tags = ('<meta property="og:ignore_canonical" content="true" />',)

@@ -44,15 +44,26 @@ def test_map_ratio_to_quantity_decreasing_curve():
     assert u.allclose(map_ratio_to_quantity(0.35, density, theoretical_ratio), 5.5e9 * u.cm**-3)
 
 
-def test_map_ratio_to_quantity_rejects_non_monotonic_curve():
+@pytest.mark.parametrize(
+    ("observed_ratio", "theoretical_ratio", "kwargs", "message"),
+    [
+        (0.35, [0.2, 0.8], {}, "must have the same shape"),
+        (0.35, [0.2, np.nan, np.nan], {}, "At least two finite samples"),
+        (0.35, [0.5, 0.5, 0.5], {}, "must vary over the provided quantity grid"),
+        (0.35, [0.2, 0.8, 0.5], {}, "must be monotonic"),
+        (1.5, [0.2, 0.5, 0.8], {"bounds_error": True}, "outside the theoretical ratio range"),
+    ],
+    ids=["shape", "finite-samples", "constant", "non-monotonic", "bounds"],
+)
+def test_map_ratio_to_quantity_rejects_bad_curves(observed_ratio, theoretical_ratio, kwargs, message):
     density = [1e8, 1e9, 1e10] * u.cm**-3
-    theoretical_ratio = [0.2, 0.8, 0.5] * u.dimensionless_unscaled
 
-    with pytest.raises(ValueError, match="must be monotonic"):
-        map_ratio_to_quantity(0.35, density, theoretical_ratio)
+    with pytest.raises(ValueError, match=message):
+        map_ratio_to_quantity(observed_ratio, density, theoretical_ratio * u.dimensionless_unscaled, **kwargs)
 
 
-def test_density_diagnostic(monkeypatch):
+@pytest.mark.parametrize("shape", [(), (2,), (1, 2)])
+def test_density_diagnostic(monkeypatch, shape):
     _install_fake_fiasco(monkeypatch, [0.5, 1.0])
     fake_ion = types.SimpleNamespace(
         temperature=[1e5, 2e5] * u.K,
@@ -60,21 +71,27 @@ def test_density_diagnostic(monkeypatch):
     )
 
     result = density_diagnostic(
-        [1.0, 1.5] * u.ct,
-        [2.0, 2.0] * u.ct,
+        np.resize([1.2, 1.5], shape) * u.ct,
+        np.full(shape, 2.0) * u.ct,
         [1e10, 1e11] * u.cm**-3,
         ion=fake_ion,
         numerator=1399.78 * u.angstrom,
         denominator=1401.16 * u.angstrom,
-        intensity_numerator_uncertainty=[0.1, 0.1] * u.ct,
-        intensity_denominator_uncertainty=[0.2, 0.2] * u.ct,
+        intensity_numerator_uncertainty=np.full(shape, 0.1) * u.ct,
+        intensity_denominator_uncertainty=np.full(shape, 0.2) * u.ct,
     )
 
-    np.testing.assert_allclose(result["ratio"].value, [0.5, 0.75])
-    assert result["ratio_uncertainty"] is not None
-    assert result["density_lower"] is not None
-    assert result["density_upper"] is not None
-    assert u.allclose(result["density"], [1e10, 5.5e10] * u.cm**-3)
+    np.testing.assert_allclose(result["ratio"].value, np.resize([0.6, 0.75], shape))
+    # Hand-calculated ratio variances; the linear density curve has slope 1.8e11 cm^-3.
+    ratio_error = np.sqrt(np.resize([0.0061, 0.008125], shape)) * u.one
+    expected_density = np.resize([2.8e10, 5.5e10], shape) * u.cm**-3
+    density_error = ratio_error.value * 1.8e11 * u.cm**-3
+    assert u.allclose(result["ratio_uncertainty"], ratio_error)
+    assert u.allclose(result["density"], expected_density)
+    assert u.allclose(result["density_lower"], expected_density - density_error)
+    assert u.allclose(result["density_upper"], expected_density + density_error)
+    for key in ("ratio", "ratio_uncertainty", "density", "density_lower", "density_upper"):
+        assert result[key].shape == shape
 
 
 def test_density_diagnostic_builds_theoretical_ratio_with_fiasco(monkeypatch):
@@ -103,10 +120,26 @@ def test_density_diagnostic_builds_theoretical_ratio_with_fiasco(monkeypatch):
     )
 
     assert calls["ion"] is fake_ion
+    assert calls["numerator"] == 1399.78 * u.angstrom
+    assert calls["denominator"] == 1401.16 * u.angstrom
     assert u.allclose(calls["density_grid"], density_grid)
     assert calls["line_ratio_kwargs"] == {"use_two_ion_model": False}
     np.testing.assert_allclose(result["theoretical_ratio"].value, [0.2, 0.4, 0.6])
     assert u.allclose(result["density"], [2] * u.cm**-3)
+
+
+def test_density_diagnostic_names_the_fiasco_without_line_ratio(monkeypatch):
+    # Every fiasco release up to 0.8.2 lacks line_ratio; the error must say so instead of an AttributeError
+    monkeypatch.setitem(sys.modules, "fiasco", types.SimpleNamespace(__version__="0.8.2"))
+    with pytest.raises(ImportError, match=r"fiasco 0\.8\.2 has no line_ratio.*wtbarnes/fiasco"):
+        density_diagnostic(
+            [4, 8] * u.ct,
+            [2, 4] * u.ct,
+            [1e10, 1e11] * u.cm**-3,
+            ion=types.SimpleNamespace(),
+            numerator=1399.78 * u.angstrom,
+            denominator=1401.16 * u.angstrom,
+        )
 
 
 def test_density_diagnostic_requires_ion():
@@ -253,4 +286,20 @@ def test_density_diagnostic_uncertainty_shape_mismatch(monkeypatch):
             denominator=1401.16 * u.angstrom,
             intensity_numerator_uncertainty=[[0.1], [0.1]] * u.ct,
             intensity_denominator_uncertainty=[[0.2], [0.2]] * u.ct,
+        )
+
+
+def test_density_diagnostic_rejects_ratio_with_other_temperatures(monkeypatch):
+    # Three temperature rows from fiasco for an ion with two temperatures
+    _install_fake_fiasco(monkeypatch, [[0.1, 0.2], [0.2, 0.4], [0.3, 0.6]])
+    fake_ion = types.SimpleNamespace(temperature=[1e5, 2e5] * u.K, formation_temperature=2e5 * u.K)
+
+    with pytest.raises(ValueError, match=r"temperature axis does not match ion\.temperature"):
+        density_diagnostic(
+            [0.4],
+            [1.0],
+            [1, 2] * u.cm**-3,
+            ion=fake_ion,
+            numerator=1399.78 * u.angstrom,
+            denominator=1401.16 * u.angstrom,
         )

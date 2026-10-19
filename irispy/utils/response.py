@@ -2,9 +2,12 @@
 This module provides general utility functions for IRIS Responses.
 """
 
+import warnings
+
 import numpy as np
 import scipy
 import scipy.io
+from erfa import ErfaWarning
 from scipy.interpolate import make_interp_spline
 
 import astropy.units as u
@@ -15,7 +18,7 @@ from sunpy.time import parse_time
 
 from irispy.data import ROOTDIR
 
-__all__ = ["_fit_xput_lite", "get_interpolated_effective_area", "get_latest_response"]
+__all__ = ["get_interpolated_effective_area", "get_latest_response"]
 
 
 def get_latest_response(
@@ -41,29 +44,51 @@ def get_latest_response(
 
     Parameters
     ----------
-    observation_time: `astropy.time.Time`, optional
-        Observation times of the datapoints.
-        Must be in a parsable time format.
+    observation_time : `astropy.time.Time`, optional
+        Observation time or times of the datapoints.
         If not provided, the current time is used.
 
     Returns
     -------
-    `dict`
-        Various parameters regarding IRIS response or effective area structure.
+    `dict` or `list` of `dict`
+        One dictionary for a single ``observation_time``, a list with one dictionary for each time otherwise.
+        The keys are the names of the IDL response structure, in upper case:
 
-        Includes the following keys:
+        ``DATE_OBS`` : `str`
+            The observation time, in ISO format.
+        ``LAMBDA`` : `astropy.units.Quantity`
+            Wavelength grid of the effective areas, shape ``(3601,)``.
+        ``AREA_SG``, ``AREA_SJI`` : `astropy.units.Quantity`
+            Effective areas in square centimeters at the observation time, shape ``(2, 3601)`` for the
+            spectrograph (FUV, NUV) and ``(4, 3601)`` for the slit-jaw channels.
+        ``NAME_SG``, ``NAME_SJI`` : `numpy.ndarray`
+            Names of the spectrograph and slit-jaw channels.
+        ``DN2PHOT_SG``, ``DN2PHOT_SJI`` : `numpy.ndarray`
+            Photons per DN for each of those channels.
+        ``COEFFS_FUV``, ``COEFFS_NUV``, ``COEFFS_SJI`` : `numpy.ndarray`
+            Coefficients of the best-fit throughput function of time, one set per interval of
+            ``C_F_TIME``, ``C_N_TIME`` and ``C_S_TIME`` (`astropy.time.Time`) and, for the spectrograph, per
+            wavelength ``C_F_LAMBDA`` and ``C_N_LAMBDA`` (`astropy.units.Quantity`).
+        ``GEOM_AREA`` : `astropy.units.Quantity`
+            Geometric collecting area.
+        ``ELEMENTS``, ``INDEX_EL_SG``, ``INDEX_EL_SJI`` : `numpy.recarray`, `numpy.ndarray`
+            The optical elements and which of them each channel uses.
+        ``COMMENT`` : `bytes`
+            Comment of the response file.
+        ``VERSION`` : `int`
+            Version of the response file.
+        ``VERSION_DATE`` : `astropy.time.Time`
+            Date of that version.
 
-        date_obs : `astropy.time.Time`
-        lambda : `astropy.units.Quantity`
-        area_sg : `astropy.units.Quantity`
-        name_sg : `str`
-        dn2phot_sg : `tuple` of length 2
-        area_sji : `astropy.units.Quantity`
-        name_sji : `str`
-        dn2phot_sji : `tuple` of length 4
-        comment : `str`
-        version : `int`
-        version_date : `astropy.time.Time`
+    Examples
+    --------
+    >>> from sunpy.time import parse_time
+    >>> from irispy.utils.response import get_latest_response
+    >>> response = get_latest_response(parse_time("2020-01-01"))
+    >>> response["AREA_SG"].shape
+    (2, 3601)
+    >>> response["VERSION"]
+    9
     """
     # Avoid circular imports
     from irispy.utils import record_to_dict  # NOQA: PLC0415
@@ -93,10 +118,12 @@ def get_latest_response(
     iris_response["C_S_TIME"] = Time(iris_response["C_S_TIME"], format="utime")
     iris_response["ELEMENTS"]["DATE"] = parse_time(iris_response["ELEMENTS"]["DATE"].astype(str).tolist())
     iris_response["VERSION_DATE"] = parse_time(iris_response["VERSION_DATE"])
-    iris_response["AREA_SG"] = np.zeros(iris_response["AREA_SG"].shape)
-    iris_response["AREA_SJI"] = np.zeros(iris_response["AREA_SJI"].shape)
-    # Handle multiple observation times by creating a list of responses
-    iris_response = [iris_response.copy() for _ in range(number_of_obs_times)]
+    # One response per observation time, each with its own effective area arrays to fill in
+    area_sg_shape, area_sji_shape = iris_response["AREA_SG"].shape, iris_response["AREA_SJI"].shape
+    iris_response = [
+        {**iris_response, "AREA_SG": np.zeros(area_sg_shape), "AREA_SJI": np.zeros(area_sji_shape)}
+        for _ in range(number_of_obs_times)
+    ]
     # Set DATE_OBS to the observation time.
     for i in range(number_of_obs_times):
         iris_response[i]["DATE_OBS"] = observation_time[i].isot
@@ -298,7 +325,10 @@ def _fit_xput_lite(observation_time, time_cal_coeffs, cal_coeffs):
         aux_cal_coeffs = np.zeros(2 * time_cal_coeffs.shape[0])
         # Looking for the closest time in the calibration time intervals.
         # Differences are given in years before passing to the next stage.
-        t_diff = t - time_cal_coeffs
+        # The last interval ends in 2049, past ERFA's leap-second table, which gives a "dubious year" warning.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ErfaWarning)
+            t_diff = t - time_cal_coeffs
         t_diff = t_diff.flatten()
         # To convert to an array, quantities need to be dimensionless, hence dividing out the unit.
         t_diff = np.array([x.to(u.year).value for x in t_diff])

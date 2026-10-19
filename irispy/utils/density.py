@@ -146,6 +146,14 @@ def density_diagnostic(
         raise ValueError(msg)
 
     fiasco = _import_optional("fiasco", reason="IRIS density diagnostics", extra="density")
+    # No fiasco release ships line_ratio yet (0.8.2 is the latest); it is on fiasco's main branch
+    if not hasattr(fiasco, "line_ratio"):
+        msg = (
+            f"fiasco {fiasco.__version__} has no line_ratio, which IRIS density diagnostics need. "
+            "Install fiasco's development version with "
+            "`pip install git+https://github.com/wtbarnes/fiasco.git`."
+        )
+        raise ImportError(msg)
 
     if line_ratio_kwargs is None:
         line_ratio_kwargs = {}
@@ -276,39 +284,21 @@ def density_diagnostic(
                 density_grid, theoretical_ratio = segment
                 best_score = score
 
-    density = map_ratio_to_quantity(
-        ratio,
+    ratios = [ratio] if ratio_uncertainty is None else [ratio, ratio - ratio_uncertainty, ratio + ratio_uncertainty]
+    densities = map_ratio_to_quantity(
+        u.Quantity(ratios),
         density_grid,
         theoretical_ratio,
         bounds_error=bounds_error,
         fill_value=fill_value,
     )
 
-    density_lower = None
-    density_upper = None
+    density = densities[0]
+    density_lower = density_upper = None
     if ratio_uncertainty is not None:
-        density_minus = map_ratio_to_quantity(
-            ratio - ratio_uncertainty,
-            density_grid,
-            theoretical_ratio,
-            bounds_error=bounds_error,
-            fill_value=fill_value,
-        )
-        density_plus = map_ratio_to_quantity(
-            ratio + ratio_uncertainty,
-            density_grid,
-            theoretical_ratio,
-            bounds_error=bounds_error,
-            fill_value=fill_value,
-        )
-        density_lower = u.Quantity(
-            np.fmin(density_minus.to_value(density.unit), density_plus.to_value(density.unit)),
-            density.unit,
-        )
-        density_upper = u.Quantity(
-            np.fmax(density_minus.to_value(density.unit), density_plus.to_value(density.unit)),
-            density.unit,
-        )
+        density_minus, density_plus = densities[1:]
+        density_lower = np.fmin(density_minus, density_plus)
+        density_upper = np.fmax(density_minus, density_plus)
 
     return {
         "ratio": ratio,

@@ -13,21 +13,17 @@ import pooch
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord
-from astropy.io import fits
 
 from irispy.io import read_files
 
 ###############################################################################
-# We will start by getting some data from the IRIS archive.
-#
-# In this case, we will use ``pooch`` to keep this example self-contained
-# but using your browser will also work.
-#
-# Using the url: https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20130902_182935_4000005156_2013-09-02T18%3A29%3A352013-09-02T18%3A29%3A35.xml
-# we are after the 2796 slit-jaw images and the raster sequence.
-#
+# `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20130902_182935_4000005156_2013-09-02T18%3A29%3A352013-09-02T18%3A29%3A35.xml>`__:
+# the 2796 slit-jaw images and the raster.
 # The full observation is available as a `Level 2 raster tarball <https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2013/09/02/20130902_182935_4000005156/iris_l2_20130902_182935_4000005156_raster.tar.gz>`__.
 # To keep the download small, we use a cutout of it that only has the first raster scan of the Si IV 1403, Mg II k 2796 and C II 1336 windows.
+#
+# In this case, we will use ``pooch`` to keep this example self-contained
+# but you can download the data manually using your browser as well.
 
 raster_filename = pooch.retrieve(
     "https://github.com/LM-SAL/irispy-data/releases/download/v1/iris_l2_20130902_182935_4000005156_cutout_raster.tar.gz",
@@ -48,6 +44,7 @@ sji_2796 = read_files(sji_filename)
 # Now we will find the closest SJI time to the 56th raster step.
 # The goal is to compare an NUV and an FUV spectrograph window, using the
 # NUV time to find the closest 2796 SJI exposure.
+
 mg_ii = raster["Mg II k 2796"].raster_slice(0)
 c_ii = raster["C II 1336"].raster_slice(0)
 
@@ -63,15 +60,11 @@ print(time_stamp_2796, "\n", time_target, "\n", time_idx_2796)
 
 ###############################################################################
 # We will require the slit location from the SJI auxiliary data later on.
-# ``SLTPX1IX`` and ``SLTPX2IX`` are 1-based FITS pixel positions (the Level 2
-# pipeline copies them from the Level 1 ``CRPIX``), so we subtract 1 to get the
-# 0-based pixels that ``pixel_to_world`` expects.
+# The cube carries it as the ``slit x position`` and ``slit y position`` extra
+# coordinates, in the 0-based pixels that ``pixel_to_world`` expects.
 
-with fits.open(sji_filename) as sji_hdulist:
-    sji_aux_header = sji_hdulist[-2].header
-    sji_aux_data = sji_hdulist[-2].data
-    sji_slit_location_pixel_x = sji_aux_data[time_idx_2796, sji_aux_header["SLTPX1IX"]] - 1
-    sji_slit_location_pixel_y = sji_aux_data[time_idx_2796, sji_aux_header["SLTPX2IX"]] - 1
+sji_slit_location_pixel_x = sji_2796.axis_world_coords(wcs=sji_2796.extra_coords["slit x position"])[0][time_idx_2796]
+sji_slit_location_pixel_y = sji_2796.axis_world_coords(wcs=sji_2796.extra_coords["slit y position"])[0][time_idx_2796]
 
 ###############################################################################
 # We can now get the slit locations from the raster WCSes.

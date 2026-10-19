@@ -1,0 +1,25 @@
+Test data for the SDO/AIA cubes co-aligned with IRIS (IRIS Technical Note 32,
+https://iris.lmsal.com/itn32/). The whole file is in the SDO tar file beside the IRIS
+level 2 data of the observation, which examples/coalign/04_aia_synthetic_raster.py uses:
+
+https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2017/03/05/20170305_164021_3620106076/iris_l2_20170305_164021_3620106076_SDO.tar.gz
+
+aia_l2_20170305_164021_3620106076_1700_test.fits
+------------------------------------------------
+
+Cut from aia_l2_20170305_164021_3620106076_1700.fits: INSTRUME = 'AIA_3', 1700 A,
+528 frames of 382x558 pixels of 0.6" every 24.2 s, from 10 minutes before OBS 3620106076
+(Large sit-and-stare with coarse 2832 rasters, 16:40-19:53 UT) to 10 minutes after it.
+
+Kept:   frames 263, 264 and 265 (0-based), at 18:16:29, 18:16:53 and 18:17:17 UT, all 382
+        rows and columns 119-438 (of 558), with the same rows of the auxiliary table;
+        NEXP = NAXIS3 = 3. The data values are unchanged: integers with BSCALE = 1 and
+        BZERO = 0, no -200 fill and no dropped exposure.
+Header: CRPIX1 = 161 and CRPIX3 = 2 follow the cut. Frame 264 is the reference frame of
+        the whole file (CRPIX3 = 265 at CRVAL3 = 5790.9 s after STARTOBS), so CDELT3 and
+        CRVAL3 are unchanged. The statistics keywords (DATA*, TD*1) and TSR1/TER1/TSC1/TEC1
+        still describe the whole file.
+Dropped: the level 1 filename table, whose A0 columns astropy cannot read (see tools/cut.py);
+        irispy does not read it.
+Made:   python tools/cut.py aia_l2_20170305_164021_3620106076_1700.fits \
+            aia_l2_20170305_164021_3620106076_1700_test.fits --exposures 263:266 --columns 119:439

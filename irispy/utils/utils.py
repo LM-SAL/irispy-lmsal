@@ -6,17 +6,11 @@ import numbers
 from importlib import import_module
 
 import numpy as np
-from scipy import ndimage
 
 import astropy.units as u
-from astropy.modeling.models import custom_model
-
-from .constants import BAD_PIXEL_VALUE_SCALED
 
 __all__ = [
-    "calculate_dust_mask",
     "calculate_uncertainty",
-    "gaussian1d_on_linear_bg",
     "get_detector_type",
     "image_clipping",
     "record_to_dict",
@@ -38,6 +32,35 @@ def _import_optional(module_name: str, *, reason: str, extra: str):
             f"`pip install 'irispy-lmsal[{extra}]'`."
         )
         raise ImportError(msg) from exc
+
+
+def _boolean_mask(cube):
+    """
+    The mask of ``cube`` as a read-only boolean array of its data's shape, `False`
+    everywhere without one.
+
+    A mask may be a scalar, cover only the trailing axes or be an integer array.
+    """
+    mask = False if cube.mask is None else np.asarray(cube.mask, dtype=bool)
+    return np.broadcast_to(mask, cube.data.shape)
+
+
+def _saturated_samples(cube):
+    """
+    `True` for the saturated samples of ``cube``: those its mask and
+    ``cube.meta["saturated"]`` mark.
+
+    The readers mask the samples at the level 2 ceiling,
+    ``irispy.utils.constants.SATURATION_LIMIT``, keeping their value, and mark them in
+    ``meta["saturated"]``, which follows the cube through slicing, exposure time
+    correction, calibration and `~irispy.utils.spectrograph.subtract_background`, but
+    not rebinning.
+    """
+    saturated = cube.meta.get("saturated")
+    # Rebinning leaves the mark at the old shape
+    if saturated is None or cube.mask is None or np.shape(saturated) != cube.data.shape:
+        return np.zeros(cube.data.shape, dtype=bool)
+    return _boolean_mask(cube) & np.asarray(saturated, dtype=bool)
 
 
 def record_to_dict(arr: np.ndarray):
@@ -82,13 +105,9 @@ def image_clipping(image, cutoff=1.5e-3, gamma=1.0):
         nbins = 10000
         fak = nbins / (hmax - hmin)
         hist = np.histogram((image - hmin) * fak, range=(0.0, float(nbins)), bins=nbins)
-    h = hist[0]
+    h = np.cumsum(hist[0])
     bins = hist[1]
     nh = np.size(h)
-    # Integrate the histogram so that h(i) holds the number of points
-    # with equal or lower intensity.
-    for i in range(1, nh - 1):
-        h[i] = h[i] + h[i - 1]
     h = h / float(h[nh - 2])
     h[nh - 1] = 1
     # As cutoff is in percent and h is normalized to unity,
@@ -102,18 +121,6 @@ def image_clipping(image, cutoff=1.5e-3, gamma=1.0):
     vmin = (np.max(np.where(h <= (cutoff + h[0]), bins[1:] - bins[0], 0)) / fak + hmin) ** gamma
     vmax = (np.min(np.where(h >= (1.0 - cutoff), bins[1:] - bins[0], nh - 2)) / fak + hmin) ** gamma
     return vmin, vmax
-
-
-@custom_model
-def gaussian1d_on_linear_bg(
-    x,
-    amplitude=None,
-    mean=None,
-    standard_deviation=None,
-    constant_term=None,
-    linear_term=None,
-):
-    return amplitude * np.exp(-(((x - mean) / standard_deviation) ** 2)) + constant_term + linear_term * x
 
 
 def get_detector_type(meta):
@@ -133,37 +140,6 @@ def get_detector_type(meta):
         Detector type.
     """
     return "FUV" if "FUV" in meta["detector type"] else meta["detector type"]
-
-
-def calculate_dust_mask(data_array):
-    """
-    Calculate a mask with the dust positions in a given array.
-
-    Parameters
-    ----------
-    data_array : `numpy.ndarray`
-        This array contains some dust position that will be calculated. The array
-        must have scaled values.
-
-    Returns
-    -------
-    `numpy.ndarray` of `bool`
-        This array has the same shape than data_array and contains the dust positions
-        when the value is True.
-    """
-    # Creating a mask with the same shape than the inputted data array.
-    mask = np.zeros_like(data_array, dtype=bool)
-    # Set the pixel value to True is the pixel is recognized as a dust pixel.
-    mask[(data_array < 0.5) & (data_array > BAD_PIXEL_VALUE_SCALED)] = True
-    # Extending the mask to avoid the neighbours pixel influenced by the dust pixels.
-    if mask.ndim == 2:
-        struct = np.ones((3, 3), dtype=bool)
-    elif mask.ndim == 3:
-        struct = np.array([np.zeros((3, 3)), np.ones((3, 3)), np.zeros((3, 3))], dtype=bool)
-    else:
-        msg = "data_array must be 2D or 3D."
-        raise ValueError(msg)
-    return ndimage.binary_dilation(mask, structure=struct).astype(mask.dtype)
 
 
 def calculate_uncertainty(data: np.ndarray, readout_noise: u.Quantity, unit: u.Quantity) -> np.ndarray:
@@ -187,11 +163,6 @@ def calculate_uncertainty(data: np.ndarray, readout_noise: u.Quantity, unit: u.Q
     """
     # Negative DN (dark-subtracted noise or the -200 fill) have no photon noise, only readout noise
     photons = np.clip((data * unit).to(u.photon).value, 0, None)
-    return (
-        u.Quantity(
-            np.sqrt(photons + readout_noise.to(u.photon).value ** 2),
-            unit=u.photon,
-        )
-        .to(unit)
-        .value
-    )
+    # A Python float keeps the data's dtype; a numpy scalar would promote float32 data to float64
+    readout_photons = float(readout_noise.to_value(u.photon))
+    return u.Quantity(np.sqrt(photons + readout_photons**2), unit=u.photon).to(unit).value

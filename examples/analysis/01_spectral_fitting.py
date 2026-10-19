@@ -3,32 +3,29 @@
 Fit Spectral Models to Spectra
 ==============================
 
-In this example, we are going to fit Si IV 1403 from IRIS with a single Gaussian.
-Then we will use the fitted values to calculate the Gaussian moments.
+In this example, we are going to fit Si IV 1403 from IRIS with a single Gaussian, starting
+from `~irispy.utils.fitting.si_iv_1403_model`. Then we will use the fitted values to make
+maps of the line's flux, Doppler shift, width and non-thermal velocity.
 
-This is in direct contrast to taking the spectral moments of the data cube, which is done in
-the following example, :ref:`sphx_glr_generated_gallery_analysis_04_spectral_moments.py`
-where we calculate the spectral moments of the data cube directly.
+:ref:`irispy-tutorial-fitting` explains the fitting call and what to watch out for.
+For a model-independent alternative, the spectral moments, see
+:ref:`sphx_glr_generated_gallery_analysis_04_spectral_moments.py`.
 
 If you want to see a similar example but with a double Gaussian fit to the Mg II k line,
 see :ref:`sphx_glr_generated_gallery_analysis_07_mg_ii_two_gaussian_fitting.py`.
 """
-
-import shutil
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pooch
 
 import astropy.units as u
-from astropy import constants
 from astropy.coordinates import SkyCoord, SpectralCoord
-from astropy.modeling import models as m
-from astropy.modeling.fitting import LMLSQFitter, TRFLSQFitter, parallel_fit_dask
+from astropy.modeling.fitting import TRFLSQFitter, parallel_fit_dask
 
 from irispy.io import read_files
-from irispy.spectrograph import SpectrogramCube
+from irispy.utils.fitting import maps_from_fit, non_thermal_velocity, si_iv_1403_model
+from irispy.utils.lines import get_lines
 
 ###############################################################################
 # `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20180102_153155_3610108077_2018-01-02T15%3A31%3A552018-01-02T15%3A31%3A55.xml>`__.
@@ -48,13 +45,13 @@ raster_filename = pooch.retrieve(
 ###############################################################################
 # We will now open the data using a helper function which is designed to read
 # all files from a single observation.
-# We read only the Si IV 1403 window.
+# We read only the Si IV 1403 window, with its uncertainties to weight the fit.
 
-raster = read_files(raster_filename, spectral_windows="Si IV 1403")
+raster = read_files(raster_filename, spectral_windows="Si IV 1403", uncertainty=True)
 si_iv_1403 = raster["Si IV 1403"]
 
 ###############################################################################
-# However, before we get to fitting, we will shrink the data cube to make it easier to work with.
+# Before we get to fitting, we will shrink the data cube to make it easier to work with.
 # This is done primarily to speed up the fitting process on the online documentation build.
 
 iris_frame = si_iv_1403.celestial_frame
@@ -67,215 +64,132 @@ si_iv_1403 = si_iv_1403.crop(
     si_iv_1403.wcs.array_index_to_world(bottom_step, bottom_slit_pixel, 0),
     si_iv_1403.wcs.array_index_to_world(top_step, top_slit_pixel, si_iv_1403.data.shape[-1] - 1),
 )
-# We also average 2x2 spatial pixels, after trimming both spatial axes to an even length.
-# This improves the signal-to-noise of the faint Si IV line and means 4x fewer fits.
+# We also average 2x2 spatial pixels, after trimming both spatial axes to an even length,
+# keeping the uncertainties. This improves the signal-to-noise of the faint Si IV line
+# and means 4x fewer fits.
 ny, nx = (n // 2 * 2 for n in si_iv_1403.data.shape[:2])
-si_iv_1403 = si_iv_1403[:ny, :nx].rebin((2, 2, 1))
+si_iv_1403 = si_iv_1403[:ny, :nx].rebin((2, 2, 1), propagate_uncertainties=True)
+
+###############################################################################
+# The model describes Si IV alone, so we keep the wavelengths halfway to the
+# neighboring O IV lines, which we take from the line catalog.
+
+blue, si_iv_core, red = get_lines([1401, 1405] * u.AA, main_only=True)["wavelength"][:3]
+lower_corner = [SpectralCoord((blue + si_iv_core) / 2), None]
+upper_corner = [SpectralCoord((si_iv_core + red) / 2), None]
+si_iv_1403 = si_iv_1403.crop(lower_corner, upper_corner)
 
 ###############################################################################
 # Let us just get the full field of view at the line core.
 
-si_iv_core = 140.277 * u.nm
-lower_corner = [SpectralCoord(si_iv_core), None, None, None]
-upper_corner = [SpectralCoord(si_iv_core), None, None, None]
-si_iv_spec_crop = si_iv_1403.crop(lower_corner, upper_corner)
-
-###############################################################################
-# We will want the spectrum averaged over all spatial pixels.
-
-spatial_mean = si_iv_1403.rebin((*si_iv_1403.data.shape[:-1], 1))[0, 0, :]
-wavelength_coords = spatial_mean.axis_world_coords("em.wl")[0].to(u.nm)
-
-###############################################################################
-# This example uses the non-radiometric calibrated data to fit a model to
-# the IRIS Si IV spectral line.
-#
-# There can be cases when the radiometric calibrated data gives
-# spurious values for regions that are not directly relevant around the
-# main spectral line.
-#
-# One way to address this is to do the following:
-
-si_iv_core_window = np.abs(wavelength_coords - si_iv_core) < 0.15 * u.nm  # Adjusting to half-width of the line width
-# We then use this window to define the initial model and change the amplitude to the 10th
-# percentile of the non-core window. This will give a better initial guess for the amplitude if
-# the core window contains spurious values.
-initial_model = m.Const1D(
-    amplitude=np.nanpercentile(spatial_mean.data[~si_iv_core_window], 10) * si_iv_1403.unit
-) + m.Gaussian1D(
-    amplitude=np.nanmax(spatial_mean.data[si_iv_core_window]) * si_iv_1403.unit, mean=si_iv_core, stddev=0.005 * u.nm
+si_iv_spec_crop = si_iv_1403.crop(
+    [SpectralCoord(si_iv_core), None, None, None], [SpectralCoord(si_iv_core), None, None, None]
 )
 
 ###############################################################################
-# To improve our initial conditions we now fit the initial model to the spatially averaged spectra.
-# For this we use ``wavelength_coords``, which we got above with the `ndcube.NDCube.axis_world_coords`
-# method. It returns all, or a subset of the world coordinates along however many array axes they are
-# correlated with. For the wavelength it returns a single `astropy.coordinates.SpectralCoord` object,
-# for the last array axis of the cube.
+# `~irispy.utils.fitting.si_iv_1403_model` starts every spectrum's Gaussian from the
+# data, on a constant background. We fit it to every spectrum with
+# `~astropy.modeling.fitting.parallel_fit_dask`, passing the wavelengths in Å and
+# giving the masked samples no weight.
 
+model = si_iv_1403_model(si_iv_1403)
+wavelength = si_iv_1403.axis_world_coords("em.wl")[0].to(u.AA)
+good = np.isfinite(si_iv_1403.data) & ~si_iv_1403.mask
 fitter = TRFLSQFitter()
-average_fit = fitter(
-    initial_model,
-    wavelength_coords,
-    spatial_mean.data * spatial_mean.unit,
+iris_model_fit = parallel_fit_dask(
+    model=model,
+    fitter=fitter,
+    data=np.where(good, si_iv_1403.data, 0),
+    data_unit=si_iv_1403.unit,
+    weights=np.where(good, 1 / si_iv_1403.uncertainty.array, 0),
+    world=(wavelength,),
+    fitting_axes=2,
+    fit_info=True,
+    scheduler="single-threaded",
 )
 
 ###############################################################################
-# Now we check, the initial model and the model fitted to the average spectra.
+# `~irispy.utils.fitting.maps_from_fit` turns the fitted parameters into maps with the
+# spatial coordinates of the cube and uncertainties from the fit. It also derives
+# the Doppler velocity, width and integrated intensity against the Si IV rest wavelength.
 
-fig = plt.figure()
-ax = spatial_mean.plot(label="Spatial average")
-ax.plot(initial_model(wavelength_coords), label="Initial model")
-ax.plot(average_fit(wavelength_coords), linestyle="--", label="Spatial average fit")
+maps = maps_from_fit(iris_model_fit, si_iv_1403, fitter=fitter)
+print(list(maps.keys()))
+
+###############################################################################
+# We compare the starting and fitted models for a bright spectrum, the one at the
+# 99th percentile of integrated intensity.
+
+intensity = maps["integrated_intensity_1"].data
+# The models' parameters are maps, so we evaluate them on wavelengths shaped to broadcast against them.
+bright = np.nanpercentile(intensity, 99)
+step, slit = np.unravel_index(np.nanargmin(np.abs(intensity - bright)), intensity.shape)
+plt.figure()
+ax = si_iv_1403[step, slit].plot(label="Spectrum")
+ax.plot(model(wavelength[:, np.newaxis, np.newaxis])[:, step, slit], label="Starting model")
+ax.plot(iris_model_fit(wavelength[:, np.newaxis, np.newaxis])[:, step, slit], linestyle="--", label="Fitted model")
+ax.set_title("Si IV 1403 profile")
 plt.legend()
 
 ###############################################################################
-# The function `~astropy.modeling.fitting.parallel_fit_dask` will map a model
-# to each element of a cube along one (or more) "fitting axes", in this case our
-# fitting axis is our wavelength axis (array axis -1). So we want to fit each
-# slice of the data array along the 3rd axis.
-#
-# The key arguments to the parallel_fit_dask function are:
-#
-# * A data array: This can be a numpy array or a dask array, or a NDData (or subclass like NDCube)
-#   object. If it's a NDData object then the data, wcs, mask, data_unit and uncertainty
-#   are all extracted from the NDData object and used in place of their respective keyword
-#   arguments.
-# * A model to fit
-# * A fitter instance.
-# * The fitting axis (or axes).
-#
-# What is returned from `~astropy.modeling.fitting.parallel_fit_dask` is a model with array
-# parameters with the shape of the non-fitting axes of the data.
+# Now we plot them next to the line-core image.
 
-# We want to do some basic data sanitization.
-# Remove negative values and set them to zero and remove non-finite values.
-filtered_data = np.where(si_iv_1403.data < 0, 0, si_iv_1403.data)
-filtered_data = np.where(np.isfinite(filtered_data), filtered_data, 0)
-
-###############################################################################
-# Before we fit the data cube, I want to briefly talk about errors during the
-# fitting process.
-#
-# It is possible that the fitting process will fail for some pixels.
-# This can be for a variety of reasons, but most commonly it is because the
-# fitting algorithm cannot converge to a solution. When this happens the
-# fitting algorithm will raise a warning/exception. However, when using
-# `~astropy.modeling.fitting.parallel_fit_dask`, these warnings/exceptions are caught and not raised.
-# Instead, the parameter values for that pixel are set to NaN.
-#
-# If you want to diagnose why, you can set the
-# ``diagnostics`` and ``diagnostics_path`` keyword arguments.
-
-diag_path = Path("./diag")
-shutil.rmtree(diag_path, ignore_errors=True)
-
-# We can therefore fit the cube
-iris_model_fit = parallel_fit_dask(
-    data=filtered_data,
-    data_unit=si_iv_1403.unit,
-    fitting_axes=2,
-    # We are fitting along the wavelength axis, so we need to provide the world coordinates
-    # along this axis. The input has to be a tuple of length equal to the number of fitting axes.
-    world=(wavelength_coords,),
-    model=average_fit,
-    # You can replace this with TRFLSQFitter, LMLSQFitter is faster in a single thread
-    # which is why we use it here in this example.
-    fitter=LMLSQFitter(),
-    scheduler="single-threaded",
-    # See above for the error handling discussion
-    diagnostics="error",
-    diagnostics_path=diag_path,
-)
-
-###############################################################################
-# Note that this example is done in a single thread. If you want to use multiple cores,
-# you can create a dask client and pass it to the parallel_fit_dask function.
-#
-# For example:
-#
-# .. code-block:: python
-#
-#     from dask.distributed import Client
-#
-#     client = Client()
-#
-# Then pass this to the parallel_fit_dask function by replacing the scheduler line above with:
-#
-# .. code-block:: python
-#
-#     scheduler=client,
-#
-# Now let us check if there were any errors during the fitting process.
-# If there were any, you would find them in the "diag" folder.
-
-errors = [p.read_text() for p in diag_path.rglob("error.log")]
-print(f"{len(errors)} errors occurred")
-if errors:
-    print("First error is:")
-    print(errors[0])
-
-###############################################################################
-# Let us see the fitted output. The model parameters are now 2D arrays with
-# the same shape as the spatial dimensions of the data cube.
-#
-# Below is a lot of custom code to make a decent looking plot.
-#
-# We also need to convert the fitted parameters into physical quantities.
-
-# The fitted parameters are plain arrays, so we wrap them in `~irispy.spectrograph.SpectrogramCube`
-# objects with the WCS of the line-core image; they then plot with the same orientation and coordinates.
 fig, ax_dict = plt.subplot_mosaic(
-    [["fov", "net_flux"], ["velocity", "sigma"]],
+    [["fov", "intensity"], ["velocity", "width"]],
     subplot_kw={"projection": si_iv_spec_crop.wcs},
     figsize=(12, 10),
 )
 
 si_iv_spec_crop.plot(axes=ax_dict["fov"], plot_axes=["x", "y"], vmin=0, vmax=200)
-ax_dict["fov"].set_title("Si IV 1402.77 Å")
+ax_dict["fov"].set_title(f"Si IV {si_iv_core.to_value(u.AA)} Å")
 fig.colorbar(ax_dict["fov"].images[0], ax=ax_dict["fov"], label="Intensity [DN]", shrink=0.8)
 
-# The fitter does not keep the Gaussian width positive, so a few fits return a negative one.
-# Only its size matters, so we use its absolute value.
-gaussian_width = np.abs(iris_model_fit.stddev_1.quantity)
-net_flux = (
-    np.sqrt(2 * np.pi)
-    * (iris_model_fit.amplitude_1)
-    * gaussian_width
-    / np.mean(si_iv_1403.axis_world_coords("wl")[0][1:] - si_iv_1403.axis_world_coords("wl")[0][:-1]).to(u.nm)
-)
-amp_max = np.nanpercentile(np.abs(net_flux.value), 99)
-SpectrogramCube(net_flux, si_iv_spec_crop.wcs).plot(
-    axes=ax_dict["net_flux"], plot_axes=["x", "y"], vmin=0, vmax=amp_max
-)
-cbar = fig.colorbar(ax_dict["net_flux"].images[0], ax=ax_dict["net_flux"])
-cbar.set_label(label=f"Intensity [{net_flux.unit.to_string()}]", fontsize=8)
-cbar.ax.tick_params(labelsize=8)
-ax_dict["net_flux"].set_title("Gaussian Net Flux")
+for key, name, label, symmetric in [
+    ("intensity", "integrated_intensity_1", "Integrated intensity", False),
+    ("velocity", "velocity_1", "Doppler shift", True),
+    ("width", "fwhm_velocity_1", "Line width (FWHM)", False),
+]:
+    limit = np.nanpercentile(np.abs(maps[name].data), 95)
+    maps[name].plot(
+        axes=ax_dict[key],
+        plot_axes=["x", "y"],
+        cmap="coolwarm" if symmetric else None,
+        vmin=-limit if symmetric else 0,
+        vmax=limit,
+    )
+    cbar = fig.colorbar(ax_dict[key].images[0], ax=ax_dict[key], extend="both" if symmetric else "max")
+    cbar.set_label(label=f"{label} [{maps[name].unit.to_string()}]", fontsize=8)
+    cbar.ax.tick_params(labelsize=8)
+    ax_dict[key].set_title(label)
 
-core_shift = ((iris_model_fit.mean_1.quantity.to(u.nm)) - si_iv_core) / si_iv_core * (constants.c.to(u.km / u.s))
-shift_max = np.nanpercentile(np.abs(core_shift.value), 95)
-SpectrogramCube(core_shift, si_iv_spec_crop.wcs).plot(
-    axes=ax_dict["velocity"], plot_axes=["x", "y"], cmap="coolwarm", vmin=-shift_max, vmax=shift_max
-)
-cbar = fig.colorbar(ax_dict["velocity"].images[0], ax=ax_dict["velocity"], extend="both")
-cbar.set_label(label=f"Doppler shift [{core_shift.unit.to_string()}]", fontsize=8)
-cbar.ax.tick_params(labelsize=8)
-ax_dict["velocity"].set_title("Velocity from Gaussian shift")
 
-sigma = gaussian_width.to(u.nm) / si_iv_core * (constants.c.to(u.km / u.s))
-line_max = np.nanpercentile(np.abs(sigma.value), 95)
-SpectrogramCube(sigma, si_iv_spec_crop.wcs).plot(axes=ax_dict["sigma"], plot_axes=["x", "y"], vmax=line_max)
-cbar = fig.colorbar(ax_dict["sigma"].images[0], ax=ax_dict["sigma"])
-cbar.set_label(label=f"Line Width [{sigma.unit.to_string()}]", fontsize=8)
-cbar.ax.tick_params(labelsize=8)
-ax_dict["sigma"].set_title("Gaussian Sigma")
-
-for ax in ax_dict.values():
+def label_axes(ax):
     # Longitude and latitude are already on the raster step and slit edges; just shrink their labels.
     for index in (0, 1):
         ax.coords[index].set_ticklabel(exclude_overlapping=True, fontsize=8)
+
+
+for ax in ax_dict.values():
+    label_axes(ax)
 fig.tight_layout()
+
+###############################################################################
+# The fitted width also holds the instrumental and thermal broadening of the line.
+# `~irispy.utils.fitting.non_thermal_velocity` removes both, taking the thermal width
+# at the temperature we give, here the peak of Si IV in CHIANTI's ionization
+# equilibrium, log T = 4.9 :cite:p:`dere2023`. Lines narrower than that have no
+# non-thermal velocity.
+
+non_thermal = non_thermal_velocity(maps["fwhm_1"], si_iv_core, ion="Si IV", temperature=10**4.9 * u.K)[
+    "non_thermal_velocity"
+]
+
+fig = plt.figure()
+ax = fig.add_subplot(projection=non_thermal.wcs)
+non_thermal.plot(axes=ax, plot_axes=["x", "y"], vmin=0, vmax=np.nanpercentile(non_thermal.data, 95))
+fig.colorbar(ax.images[0], ax=ax, extend="max", label=f"Non-thermal velocity [{non_thermal.unit.to_string()}]")
+ax.set_title("Si IV non-thermal velocity")
+label_axes(ax)
 
 plt.show()
 

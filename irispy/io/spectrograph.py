@@ -21,11 +21,13 @@ from irispy._spectrograph_wcs import (
     _sanitize_raster_wcs_tables,
     _validate_raster_wcs_inputs,
 )
+from irispy.io._level2 import _check_level2
+from irispy.io._mask import _memmap_fill_mask
 from irispy.io._raster_combine import _combine_raster_cubes, _lazy_window_data
 from irispy.meta import SGMeta
 from irispy.spectrograph import RasterCollection, SpectrogramCube
 from irispy.utils import calculate_uncertainty
-from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, DN_UNIT, READOUT_NOISE
+from irispy.utils.constants import BAD_PIXEL_VALUES_SCALED, DN_UNIT, READOUT_NOISE, SATURATION_LIMIT
 
 __all__ = ["read_spectrograph_lvl2"]
 
@@ -140,7 +142,8 @@ def read_spectrograph_lvl2(
     filenames: `list` of `str` or `str`
         Filename or list of filenames to be read. They must all be associated with the same
         OBS number; multi-file reads raise a `ValueError` if the OBSID or STARTOBS
-        values do not match across files.
+        values do not match across files. They are read in order of their ``DATE_OBS``,
+        whatever their order here.
     spectral_windows: iterable of `str` or `str`
         Spectral windows to extract from files. Default=None, implies, extract all
         spectral windows.
@@ -151,7 +154,12 @@ def read_spectrograph_lvl2(
         If `True` (not the default), will not load arrays into memory, and will only read from
         the file into memory when needed. This option is faster and uses a
         lot less memory. However, because FITS scaling is not done on-the-fly,
-        the data units will be unscaled, not the usual data numbers (DN).
+        integer data stay unscaled, in ``DN_IRIS_FUV_UNSCALED`` or ``DN_IRIS_NUV_UNSCALED``,
+        not the usual data numbers (DN).
+        The fill mask is a lazy Dask array, computed only for the slices that are used.
+        With ``memmap=False``, the samples at the level 2 ceiling,
+        ``irispy.utils.constants.SATURATION_LIMIT``, keep their value and are marked in the mask
+        and, if there are any, in ``meta["saturated"]``.
     revert_v34 : `bool`, optional.
         Will undo the flipping of the raster step axis made to V34 observations
         (data, mask, uncertainty, WCS, times and per-step metadata).
@@ -160,10 +168,35 @@ def read_spectrograph_lvl2(
     Returns
     -------
     `irispy.spectrograph.RasterCollection`
+
+    Examples
+    --------
+    >>> from irispy.data.test import get_test_filepath
+    >>> from irispy.io.spectrograph import read_spectrograph_lvl2
+    >>> filename = get_test_filepath(
+    ...     "sns/iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits"
+    ... )
+    >>> raster = read_spectrograph_lvl2(
+    ...     filename, spectral_windows=["Si IV 1403", "Mg II k 2796"]
+    ... )
+    >>> len(raster), raster["Si IV 1403"].shape, raster["Mg II k 2796"].shape
+    (2, (187, 40, 29), (187, 40, 52))
+    >>> raster["Si IV 1403"].unit, raster["Mg II k 2796"].unit
+    (Unit("DN_IRIS_FUV"), Unit("DN_IRIS_NUV"))
     """
     if isinstance(filenames, (str, Path)):
         filenames = [filenames]
     filenames = [str(f) for f in filenames]
+    if len(filenames) > 1:
+        # The sequence follows time whatever the order given, such as that of an unsorted glob.
+        date_obs = []
+        for filename in filenames:
+            try:
+                date_obs.append(fits.getheader(filename)["DATE_OBS"])
+            except (OSError, ValueError, TypeError):
+                # A directory or a file that is not FITS: raises the level 2 error, chained to this one
+                _check_level2(filename, None, "raster")
+        filenames = [filenames[i] for i in Time(date_obs).argsort()]
     defer_raster_gwcs = len(filenames) > 1
     if uncertainty and memmap:
         warnings.warn(
@@ -172,36 +205,47 @@ def read_spectrograph_lvl2(
             stacklevel=2,
         )
     compute_uncertainty = uncertainty and not memmap
-    with fits.open(filenames[0], memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
-        v34 = hdulist[0].header["STEPS_AV"] < -0.01
-        hdulist.verify("silentfix")
-        windows_in_obs = np.array(
-            [hdulist[0].header[f"TDESC{i}"] for i in range(1, hdulist[0].header["NWIN"] + 1)],
-        )
-        if not spectral_windows:
-            spectral_windows_req = windows_in_obs
-            window_fits_indices = range(1, len(hdulist) - 2)
-        else:
-            spectral_windows_req = [spectral_windows] if isinstance(spectral_windows, str) else spectral_windows
-            spectral_windows_req = np.asarray(spectral_windows_req, dtype="U")
-            window_is_in_obs = np.asarray([window in windows_in_obs for window in spectral_windows_req])
-            if not all(window_is_in_obs):
-                missing_windows = spectral_windows_req[~window_is_in_obs]
-                msg = f"Spectral windows {missing_windows.tolist()} not in file {filenames[0]}"
-                raise ValueError(msg)
-            # Indices must follow the order of the requested windows, not the file order,
-            # since they are zipped with ``spectral_windows_req`` below.
-            window_fits_indices = [
-                int(np.nonzero(windows_in_obs == window)[0][0]) + 1 for window in spectral_windows_req
-            ]
-        data_dict = {window_name: [] for window_name in spectral_windows_req}
-
-    flip = v34 and not revert_v34
-    # V34 rasters are flipped along the step axis: everything indexed by step must follow.
-    steps = slice(None, None, -1) if flip else slice(None)
-    for filename in filenames:
-        with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
-            hdulist.verify("silentfix")
+    for file_index, filename in enumerate(filenames):
+        try:
+            # The extensions are read out of order, which rewinds a gzip stream: inflate it once instead.
+            hdulist = fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
+        except (OSError, ValueError, TypeError):
+            # A directory or a file that is not FITS: raises the level 2 error, chained to this one
+            _check_level2(filename, None, "raster")
+        with hdulist:
+            _check_level2(filename, hdulist[0].header, "raster")
+            if file_index == 0:
+                # After a discussion with the IRIS team, it was decided that instead of the
+                # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.
+                v34 = hdulist[0].header["STEPS_AV"] < -0.01
+                flip = v34 and not revert_v34
+                # V34 rasters are flipped along the step axis: everything indexed by step must follow.
+                steps = slice(None, None, -1) if flip else slice(None)
+                windows_in_obs = np.array(
+                    [hdulist[0].header[f"TDESC{i}"] for i in range(1, hdulist[0].header["NWIN"] + 1)],
+                )
+                # If spectral_window is not set then get every window.
+                # Else take the appropriate windows
+                if not spectral_windows:
+                    spectral_windows_req = windows_in_obs
+                    window_fits_indices = range(1, len(hdulist) - 2)
+                else:
+                    spectral_windows_req = [spectral_windows] if isinstance(spectral_windows, str) else spectral_windows
+                    spectral_windows_req = np.asarray(list(dict.fromkeys(spectral_windows_req)), dtype="U")
+                    window_is_in_obs = np.asarray([window in windows_in_obs for window in spectral_windows_req])
+                    if not all(window_is_in_obs):
+                        missing_windows = spectral_windows_req[~window_is_in_obs]
+                        msg = (
+                            f"Spectral windows {missing_windows.tolist()} not in file {filenames[0]}, "
+                            f"which has {windows_in_obs.tolist()}"
+                        )
+                        raise ValueError(msg)
+                    # Indices must follow the order of the requested windows, not the file order,
+                    # since they are zipped with ``spectral_windows_req`` below.
+                    window_fits_indices = [
+                        int(np.nonzero(windows_in_obs == window)[0][0]) + 1 for window in spectral_windows_req
+                    ]
+                data_dict = {window_name: [] for window_name in spectral_windows_req}
             aux = hdulist[-2]
             aux_data = aux.data[steps]
             try:
@@ -296,6 +340,17 @@ def read_spectrograph_lvl2(
                     error.add_note(f"While building the WCS of spectral window '{window_name}' in {filename}.")
                     raise
 
+                if memmap:  # the data stay the FITS integers, which these scale to DN
+                    meta["BSCALE"], meta["BZERO"] = window_header.get("BSCALE", 1), window_header.get("BZERO", 0)
+                    mask = _memmap_fill_mask(data, window_header)
+                    if np.issubdtype(data.dtype, np.integer):  # the FITS integers, not DN
+                        dn_unit = DN_UNIT[f"{meta.detector_band}_UNSCALED"]
+                else:
+                    # Level 2 clips at the ceiling, where iris_prep's +Inf saturation flags were lost
+                    saturated = data >= SATURATION_LIMIT.value
+                    mask = np.isin(data, BAD_PIXEL_VALUES_SCALED) | saturated
+                    if saturated.any():
+                        meta.add("saturated", saturated, "Samples at the level 2 ceiling, also masked", (0, 1, 2))
                 cube = SpectrogramCube(
                     data,
                     wcs=cube_wcs,
@@ -304,7 +359,7 @@ def read_spectrograph_lvl2(
                     else None,
                     unit=dn_unit,
                     meta=meta,
-                    mask=None if memmap else data == BAD_PIXEL_VALUE_SCALED,
+                    mask=mask,
                 )
                 meta.add("fits_wcs", fits_wcs)
                 cube.extra_coords.add("time", 0, times, physical_types="time")

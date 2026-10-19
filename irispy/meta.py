@@ -6,27 +6,82 @@ import numpy as np
 import astropy.units as u
 from astropy.constants import R_sun as _R_SUN
 from astropy.coordinates import SkyCoord
-from astropy.time import Time
 
 from ndcube.meta import NDMeta
 from sunpy.coordinates import Helioprojective, get_earth
+from sunpy.time import parse_time
 from sunraster.meta import RemoteSensorMetaABC, SlitSpectrographMetaABC
 
 from irispy.utils.constants import SPECTRAL_BAND
+from irispy.utils.lines import get_lines
 
-__all__ = ["BaseMeta", "SGMeta", "SJIMeta"]
+__all__ = ["BaseMeta", "MosaicMeta", "SGMeta", "SJIMeta"]
+
+
+def _mu(center, sun_radius):
+    """
+    The `BaseMeta.mu` formula at the helioprojective ``center`` (scalar or array).
+    """
+    # sin^2(rho) / sin^2(R), with sin^2(rho) = 1 - cos^2(Tx) cos^2(Ty) = sin^2(Tx) + cos^2(Tx) sin^2(Ty)
+    ratio = (
+        (np.sin(center.Tx) ** 2 + (np.cos(center.Tx) * np.sin(center.Ty)) ** 2) / np.sin(sun_radius) ** 2
+    ).to_value(u.one)
+    return np.sqrt(np.where(ratio <= 1, 1 - ratio, np.nan))
 
 
 class BaseMeta(NDMeta):
+    """
+    Metadata of a Level 2 file, read from its primary FITS header.
+
+    This is a dictionary of the header keywords, with sliceable per-exposure entries
+    (see `ndcube.meta.NDMeta`), and a set of properties that give the common keywords
+    names, units and types. A property that reads one keyword is `None` when the header lacks it;
+    a property derived from a keyword needs that keyword.
+    You do not create it yourself: the cubes from `irispy.io.read_files` carry it as ``cube.meta``.
+
+    Parameters
+    ----------
+    header : `astropy.io.fits.Header` or `dict`
+        The primary header of the Level 2 file.
+    **kwargs
+        Passed to `ndcube.meta.NDMeta`.
+
+    Notes
+    -----
+    The properties are in these groups.
+
+    * The file: `fits_header`, `processing_level`, `data_type`, `data_unit`, `data_status`,
+      `build_version`, `reformat_version`, `reformat_date`.
+    * The instrument: `instrument`, `observatory`, `camera`, `detector`, `detector_band`,
+      `spectral_window`, `spectral_range`, `spectral_band`, `rest_wavelength`.
+    * The times: `date_reference`, `date_start`, `date_end`, `temporal_cadence`.
+    * The observing mode: `observing_mode_id`, `observing_mode_description`, `observing_label`,
+      `observing_title`, `observing_campaign_start`, `observing_campaign_end`, `lut_id`,
+      `automatic_exposure_control_enabled`, `tracking_mode_enabled`, `spatial_summing_factor`,
+      `spectral_summing_factor`, `exposure_time`, `exposure_time_min`, `exposure_time_max`.
+    * The pointing and the Sun: `fov_center`, `raster_fov_width_x`, `raster_fov_width_y`,
+      `sun_angular_radius`, `distance_to_sun`, `observer_radial_velocity`, `mu`,
+      `satellite_rotation`, `observatory_at_high_latitude`, `observation_includes_saa`.
+    * The raster: `number_of_raster_positions`, `number_of_unique_raster_positions`,
+      `number_of_exposures`, `number_of_exposures_planned`, `number_of_exposures_observation`,
+      `exposure_control_triggers_in_raster`, `exposure_control_triggers_in_observation`.
+    * Statistics of the data: `data_mean`, `data_rms`, `data_median`, `data_min`, `data_max`,
+      `percent_data`, `number_of_saturated_pixels`, `number_of_spikes`.
+    """
+
+    _iwin = 1
+
     def __init__(self, header, **kwargs) -> None:
         super().__init__(header, **kwargs)
+        self._fits_header = header
 
     def __repr__(self) -> str:
         return f"{object.__repr__(self)}\n{self!s}"
 
     def _construct_time(self, key):
         val = self.get(key)
-        return Time(val, format="fits", scale="utc") if val is not None and str(val).strip() else None
+        # SOT-SP dates can use SolarSoft's "8-Jan-2016 19:13:48.658" format.
+        return parse_time(val, scale="utc") if val is not None and str(val).strip() else None
 
     def _quantity(self, key, unit):
         """
@@ -76,10 +131,10 @@ class BaseMeta(NDMeta):
         rsun = self._quantity("RSUN_OBS", u.arcsec)
         if rsun is not None:
             return rsun
-        dsun = self._quantity("DSUN_OBS", u.m)
+        dsun = self.distance_to_sun
         if dsun is None:
             return None
-        return np.arctan(_R_SUN / dsun).to(u.arcsec)
+        return np.arcsin(_R_SUN / dsun).to(u.arcsec)
 
     @property
     def observer_radial_velocity(self):
@@ -98,8 +153,8 @@ class BaseMeta(NDMeta):
 
     @property
     def distance_to_sun(self):
-        dsun = self._quantity("DSUN_OBS", u.m)
-        return None if dsun is None else dsun.to(u.AU)
+        # SOT files use DSUN_OBS = 0 for an unknown distance.
+        return self._quantity("DSUN_OBS", u.m).to(u.AU) if self.get("DSUN_OBS") else None
 
     @property
     def date_reference(self):
@@ -223,6 +278,9 @@ class BaseMeta(NDMeta):
         `None` when the window has no usable ``TWAVE`` keyword.
         """
         twave = self.get(f"TWAVE{self._iwin}")
+        # SOT files use TWAVE1 = 0 for an unspecified wavelength.
+        if not twave:
+            return None
         try:
             return (float(twave) * u.AA).to(u.nm)
         except (TypeError, ValueError):
@@ -245,14 +303,34 @@ class BaseMeta(NDMeta):
     @property
     def fov_center(self):
         """
-        Location of the center of the field of view.
+        Location of the center of the field of view, `None` when the header lacks it.
         """
+        if self.get("XCEN") is None:
+            return None
         return SkyCoord(
             Tx=self.get("XCEN"),
             Ty=self.get("YCEN"),
             unit=u.arcsec,
             frame=Helioprojective,
         )
+
+    @property
+    def mu(self):
+        r"""
+        Cosine of the angle between the line of sight and the local vertical at
+        `fov_center`.
+
+        :math:`\mu = \sqrt{1 - (\sin\rho / \sin R)^2}`, where :math:`\rho` is the angular
+        distance of the field-of-view center from disk center,
+        :math:`\cos\rho = \cos T_x \cos T_y` :cite:p:`thompson2006`, and :math:`R` is
+        `sun_angular_radius`. It is 1 at disk center, 0 at the limb and NaN off the disk,
+        and agrees with `sunpy.coordinates.utils.get_heliocentric_angle`.
+
+        `None` when the header lacks the pointing or the solar distance.
+        """
+        if self.get("XCEN") is None or self.sun_angular_radius is None:
+            return None
+        return _mu(self.fov_center, self.sun_angular_radius)
 
     @property
     def automatic_exposure_control_enabled(self):
@@ -449,13 +527,18 @@ class BaseMeta(NDMeta):
 
 class SJIMeta(BaseMeta, RemoteSensorMetaABC):
     """
-    Metadata class for IRIS slit-jaw images.
-    """
+    Metadata of an IRIS slit-jaw image file (also AIA and Hinode/SOT files).
 
-    def __init__(self, header, **kwargs) -> None:
-        super().__init__(header, **kwargs)
-        self._iwin = 1
-        self._fits_header = header
+    It has the properties of `~irispy.meta.BaseMeta`; `spectral_window` is the channel
+    name without the ``SJI_`` prefix, e.g. ``"1330"``. Printing it gives a summary of the file.
+
+    Parameters
+    ----------
+    header : `astropy.io.fits.Header` or `dict`
+        The primary header of the file.
+    **kwargs
+        Passed to `ndcube.meta.NDMeta`.
+    """
 
     def __str__(self) -> str:
         return textwrap.dedent(
@@ -482,7 +565,33 @@ class SJIMeta(BaseMeta, RemoteSensorMetaABC):
 
 class SGMeta(BaseMeta, SlitSpectrographMetaABC):
     """
-    Metadata class for IRIS slit spectrograph data.
+    Metadata of one spectral window of an IRIS raster file.
+
+    It has the properties of `~irispy.meta.BaseMeta`, which refer to the selected window, and
+    those of the raster: `observer`, `exposure_mu`, `number_of_spectral_windows`,
+    `raster_repetition`, `raster_type_index`, `raster_type_total`, the average and standard
+    deviation of the step size, step time and planned and executed cadence
+    (`step_size_average`, `step_size_stddev`, `step_time_average`, `step_time_stddev`,
+    `cadence_planned_average`, `cadence_planned_stddev`, `cadence_executed_stddev`),
+    `number_of_missing_raster_files`, `number_of_missing_observation_files` and the statistics
+    of the window (`window_mean`, `window_rms`, `window_median`, `window_min`, `window_max`,
+    `window_saturated_pixels`, `window_spikes`).
+    Printing it gives a summary of the window.
+
+    Parameters
+    ----------
+    header : `astropy.io.fits.Header` or `dict`
+        The primary header of the file.
+    spectral_window : `str`
+        Name, or part of the name, of the spectral window, e.g. ``"Mg II k"``.
+        It must match exactly one window of the header.
+    **kwargs
+        Passed to `ndcube.meta.NDMeta`.
+
+    Raises
+    ------
+    ValueError
+        If ``spectral_window`` matches no window or more than one.
     """
 
     def __init__(self, header, spectral_window, **kwargs) -> None:
@@ -508,7 +617,24 @@ class SGMeta(BaseMeta, SlitSpectrographMetaABC):
                 msg,
             )
         self._iwin = np.arange(len(spectral_windows))[window_mask][0] + 1
-        self._fits_header = header
+
+    @property
+    def rest_wavelength(self):
+        """
+        Rest wavelength of the window's line from the IRIS line catalog.
+
+        The window center ``TWAVE`` for a continuum window such as ``'2832'``; `None`
+        when the window has no usable ``TWAVE`` keyword.
+        """
+        twave = super().rest_wavelength
+        if twave is None:
+            return None
+        # TWAVE is a rounded planning value. In real files it is at most 0.152 Å from its line (Mg II k), and a
+        # continuum window's TWAVE is at least 5.34 Å from a documented line (2786 to Mg II 2791.599).
+        lines = get_lines(twave + [-1, 1] * u.AA, main_only=True)["wavelength"]
+        if not len(lines):
+            return twave
+        return lines[np.argmin(np.abs(lines - twave))].to(u.nm)
 
     @cached_property
     def observer(self):
@@ -516,6 +642,20 @@ class SGMeta(BaseMeta, SlitSpectrographMetaABC):
         The IRIS observer location at the observation start, assumed to be at Earth.
         """
         return get_earth(self.date_reference or self.observing_campaign_start)
+
+    @property
+    def exposure_mu(self):
+        """
+        `~irispy.meta.BaseMeta.mu` at the field-of-view center of each exposure.
+
+        Computed from the per-exposure ``"exposure FOV center"`` entry, so it follows
+        slicing and V34 flipping of the raster step axis. `None` when that entry or the
+        solar distance is missing.
+        """
+        center = self.get("exposure FOV center")
+        if center is None or self.sun_angular_radius is None:
+            return None
+        return _mu(center, self.sun_angular_radius)
 
     @property
     def number_of_spectral_windows(self):
@@ -674,3 +814,47 @@ class SGMeta(BaseMeta, SlitSpectrographMetaABC):
                 OBS Description: {self.observing_mode_description}
                 """,
         )
+
+
+class MosaicMeta(BaseMeta, SlitSpectrographMetaABC):
+    """
+    Metadata of an IRIS full-disk mosaic.
+
+    It has the properties of `~irispy.meta.BaseMeta`, except that `rest_wavelength` and
+    `detector` come from the mosaic's wavelength. Printing it gives a summary of the mosaic.
+
+    Parameters
+    ----------
+    header : `astropy.io.fits.Header` or `dict`
+        The primary header of the mosaic file.
+    **kwargs
+        Passed to `ndcube.meta.NDMeta`.
+    """
+
+    def __str__(self) -> str:
+        return textwrap.dedent(
+            f"""
+                MosaicMeta
+                ----------
+                Detector:        {self.detector}
+                Rest wavelength: {self.rest_wavelength}
+                Dimensions:      {self.data_shape}
+                Date:            {self.date_start} -- {self.date_end}
+                OBS ID:          {self.observing_mode_id}
+                """,
+        )
+
+    @property
+    def rest_wavelength(self):
+        """
+        Rest wavelength of the mosaic window (``LAMREF``).
+        """
+        wavelength = self._quantity("LAMREF", u.AA)
+        return None if wavelength is None else wavelength.to(u.nm)
+
+    @property
+    def detector(self):
+        """
+        ``'FUV'`` or ``'NUV'``, from the rest wavelength.
+        """
+        return "NUV" if self.rest_wavelength > 200 * u.nm else "FUV"

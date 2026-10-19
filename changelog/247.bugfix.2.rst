@@ -1,0 +1,1 @@
+``uncertainty=True`` in the readers and `~irispy.utils.calculate_uncertainty` now compute the uncertainty in the data's dtype, so level 2 data get a 32-bit uncertainty the size of the data instead of a 64-bit one twice the size.

@@ -44,9 +44,17 @@ def _combine_raster_metas(metas, combined_shape):
     meta._data_shape = np.asarray(combined_shape, dtype=int)
     if (date_end := metas[-1].get("DATE_END")) is not None:
         meta["DATE_END"] = meta.fits_header["DATE_END"] = date_end
-    for key in metas[0].axes:
-        values = np.stack([_pad_axis0(source[key], combined_shape[1]) for source in metas])
-        meta.add(key, values, axes=(0, 1), overwrite=True)
+    for key in {key for source in metas for key in source.axes}:
+        axes = next(source.axes[key] for source in metas if key in source.axes)
+        if key == "saturated":
+            # Only the files with saturated samples carry them; the padded steps have none.
+            values = np.zeros(combined_shape, dtype=bool)
+            for index, source in enumerate(metas):
+                if key in source:
+                    values[index, : source[key].shape[0]] = source[key]
+        else:
+            values = np.stack([_pad_axis0(source[key], combined_shape[1]) for source in metas])
+        meta.add(key, values, axes=(0, *(axis + 1 for axis in axes)), overwrite=True)
     return meta
 
 
@@ -99,7 +107,7 @@ def _combine_raster_cubes(cubes, window_headers, pc_tables, crval_tables, *, mem
             stacklevel=3,
         )
     if memmap:
-        data, mask = da.stack([cube.data for cube in cubes]), None
+        data, mask = da.stack([cube.data for cube in cubes]), da.stack([cube.mask for cube in cubes])
     else:
         data = _stack_step_aligned_arrays([cube.data for cube in cubes], target_steps, fill_value=np.nan)
         mask = _stack_step_aligned_arrays([cube.mask for cube in cubes], target_steps, fill_value=True)

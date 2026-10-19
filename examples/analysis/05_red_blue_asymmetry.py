@@ -45,9 +45,8 @@ raster = read_files(raster_filename, spectral_windows="Si IV 1403")
 si_iv = raster["Si IV 1403"]
 
 ###############################################################################
-# Now we will calculate the red-blue asymmetry on a small cutout around the
-# selected feature. This keeps the example light enough for documentation builds
-# while still showing the full workflow.
+# Now we will calculate the red-blue asymmetry on a small cutout around the pixel
+# we will examine below, to keep the example light enough for the documentation build.
 
 full_raster_pixel_index = (499, 148)
 raster_cutout = slice(450, 550)
@@ -62,7 +61,7 @@ velocity_range = (25, 75) * u.km / u.s
 # Ignore pixels where the line peak is too weak for a useful wing comparison.
 min_intensity = 75 * si_iv.unit
 
-# rest_wavelength is auto-detected from the cube metadata (TWAVE[N] FITS keyword).
+# rest_wavelength defaults to si_iv.meta.rest_wavelength, the catalog wavelength of the window's line.
 # You can also pass it explicitly, for example rest_wavelength=140.277 * u.nm.
 red_blue = calculate_red_blue_asymmetry(
     si_iv,
@@ -101,7 +100,7 @@ axes = [fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)]
 
 ax = axes[0]
 rba_map = np.where(quality.data == int(RBAQualityFlag.OK), asymmetry.data, np.nan)
-# Colour scale: 98th percentile of absolute RBA, floored so subtle features remain visible.
+# Color scale: 98th percentile of absolute RBA, floored so subtle features remain visible.
 vmax = max(np.nanpercentile(np.abs(rba_map), 98), 0.15)
 latitude = asymmetry[0].axis_world_coords()[0].Ty.to_value(u.arcsec)
 minutes = (asymmetry.time - asymmetry.time[0]).to_value(u.min)
@@ -132,8 +131,8 @@ ax = axes[1]
 finite = np.isfinite(velocities.value) & np.isfinite(profile)
 ax.plot(velocities.value[finite], profile[finite], color="black", marker="o", markersize=3)
 v_peak = velocities.value[finite][np.argmax(profile[finite])]
-ax.axvline(0, color="grey", linestyle="dashed", label="Rest wavelength")
-ax.axvline(v_peak, color="grey", linestyle="dotted", label="Line peak")
+ax.axvline(0, color="gray", linestyle="dashed", label="Rest wavelength")
+ax.axvline(v_peak, color="gray", linestyle="dotted", label="Line peak")
 
 v_low = velocity_range[0].to_value(u.km / u.s)
 v_high = velocity_range[1].to_value(u.km / u.s)

@@ -1,0 +1,1 @@
+`~irispy.utils.spectrograph.radiometric_calibration` and `~irispy.utils.bursts.find_bright_image_events` now give their output its own copy of the input's extra coordinates and mask, so a later change to one cube no longer changes the other.

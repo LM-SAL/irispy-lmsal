@@ -14,6 +14,46 @@ This means that the light leak is absorbed at a different CCD depth than the FUV
 The light leak effectively acts as an extra "dark current" although it appears to have varying intensity levels for different pointings on the Sun.
 This background has been characterized and is automatically removed by ``iris_prep.pro``, and therefore subtracted in level 1.5 and level 2 data.
 
+A background or continuum left under a line can be removed with `~irispy.utils.spectrograph.subtract_background`.
+The windows are your choice: take them from the spectra of your observation, clear of the lines, their wings and any weaker lines.
+For example, for the C II 1334.53 and 1335.71 Å lines the windows could be 150 to 300 km/s beyond each line.
+
+The plot compares one spectrum from the first raster step before and after a straight-line background is subtracted.
+The shaded regions on either side of the C II lines are the background fit windows.
+Only unmasked, finite samples in these windows determine the straight-line background.
+The fitted background is then evaluated and subtracted at every wavelength, including the C II lines.
+
+.. plot::
+    :include-source:
+
+    import matplotlib.pyplot as plt
+
+    import astropy.units as u
+
+    import irispy.data.sample as sample_data
+    from irispy.io import read_files
+    from irispy.utils.spectrograph import subtract_background
+
+    blue = ([-300, -150] * u.km / u.s).to(u.AA, equivalencies=u.doppler_optical(1334.53 * u.AA))
+    red = ([150, 300] * u.km / u.s).to(u.AA, equivalencies=u.doppler_optical(1335.71 * u.AA))
+    windows = u.Quantity([blue, red])
+
+    c_ii = read_files(sample_data.RASTER_FITS, spectral_windows="C II 1336")["C II 1336"][0]
+    spectrum = c_ii[0, 150]
+    corrected = subtract_background(spectrum, windows)
+
+    wavelengths = spectrum.spectral_axis.to_value(u.AA)
+    shown = (wavelengths >= blue[0].value) & (wavelengths <= red[1].value)
+    fig, ax = plt.subplots(figsize=(7, 4), layout="constrained")
+    ax.plot(wavelengths[shown], spectrum.data[shown], label="Original")
+    ax.plot(wavelengths[shown], corrected.data[shown], label="Background subtracted")
+    for low, high in windows.to_value(u.AA):
+        ax.axvspan(low, high, color="gray", alpha=0.2)
+    ax.axhline(0, color="black", linewidth=0.5)
+    ax.set(xlabel="Wavelength [Å]", ylabel=f"Intensity [{spectrum.unit}]")
+    ax.legend()
+    plt.show()
+
 Coalignment between channels and SJI & spectra
 ==============================================
 
@@ -43,6 +83,14 @@ In spectrograms the fiducial marks appear as solid black lines along the wavelen
     :align: center
 
     Position of fiducial marks on an NUV spectrogram.
+
+The marks are two gaps in the slit, each two pixels (0.33″) long, one in each half of the CCD :cite:p:`depontieu2014`, and the Level 2 pipeline shifts the spectra so that the marks fall on the same rows in every spectral window :cite:p:`wulser2018`.
+In the ten observations from 2013 to 2026 we checked, the marks are 89.7″ apart, at rows 238.0 and 777.1 (counting from 0) of a window that covers the whole slit without spatial summing.
+They are clear in the NUV windows but often not visible in the FUV windows: only three of the ten observations show them there (2014-07-08, 2015-01-30 and 2021-04-29).
+Some FUV windows also show a dark row that is not a mark, about 61 rows (10″) below the lower mark.
+
+`irispy.utils.fiducials.find_fiducials` finds the marks in a spectral window; see :ref:`sphx_glr_generated_gallery_how_to_07_find_fiducials.py`.
+In the observations we checked, the FUV and NUV windows line up to a fraction of a pixel; see :ref:`irspy_known_issues`.
 
 Cosmic rays
 ===========
@@ -76,7 +124,13 @@ Flagging of saturated data
 ==========================
 
 Some observations show strong solar activity and resulting saturation either on the CCD or (especially in OBS sequences where data is summed) in the A/D converter.
-Saturated pixels are flagged as ``inf`` so they can be clearly identified.
+Level 2 processing flags saturated pixels as ``inf``, but level 2 files hold none: every sample, saturated or merely bright, is clipped at 16182 DN (``irispy.utils.constants.SATURATION_LIMIT``), and their ``NSATPIX`` and ``TSATPXn`` keywords are 0.
+The readers, the mosaic reader included, restore the flag in the cubes they return with ``memmap=False``: samples at the ceiling keep their value, but are masked and marked in ``cube.meta["saturated"]``, which tells them from the other masked samples.
+The mark survives slicing, `~irispy.utils.spectrograph.subtract_background`, exposure time correction and calibration, but not rebinning.
+`~irispy.utils.moments.calculate_moments`, `~irispy.utils.mg_features.calculate_mg_features` and `~irispy.utils.red_blue.calculate_red_blue_asymmetry` flag the pixels with a sample that is both masked and marked, and give them no values.
+`~irispy.utils.moments.average_window` masks such pixels, the burst finders use the samples at their value, as IDL does, and the other utilities leave them out like any masked sample.
+To use the values, unmask the samples; for a stricter limit, mask and mark more samples yourself.
+To fit such spectra, give the samples no weight, as the fitting examples do with ``~cube.mask``.
 
 Cosmetic finishing in quicklook movies
 ======================================
@@ -115,9 +169,6 @@ There is no Python code to automatically determine the best scaling for a given 
 Cleaning Up
 -----------
 
-The slit-jaw CCD contains some particles that cause dark regions of order up to a few arcseconds in size in the slit.
-These features are marked as bad pixels and set to zero values (0) in ``iris_prep.pro`` so they can be easily recognized during data analysis.
-The particles are stable in position and do not let any light through - they are completely dark.
-They are most prominent in the FUV images (1400 Å and 1330 Å) and much less visible in the NUV images (2796 Å and 2830 Å).
-
-These dust spots can be cosmetically corrected in slit-jaw images and movies but there is currently no routine to do this in ``irispy``.
+The dust spots described in `Particles on slit-jaw images`_ can be cosmetically corrected in slit-jaw images and movies with `irispy.sji.SJICube.remove_dust`, which takes their positions from the IRIS pipeline's bad-pixel table and replaces them with values from neighboring frames or, failing that, a local median.
+`irispy.sji.SJICube.apply_dust_mask` only masks them.
+See :ref:`sphx_glr_generated_gallery_calibration_04_remove_dust.py`.

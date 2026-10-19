@@ -1,61 +1,68 @@
 """
-=====================================
-Remove Dust from IRIS Slit-Jaw Imager
-=====================================
+======================================
+Fix the dust pixels in slit-jaw images
+======================================
 
-This example shows how to remove dust from IRIS slit-jaw imager (SJI).
+Dust on the slit-jaw detectors darkens the same pixels in every image.
+This example removes them and shows the difference.
 """
 
 import matplotlib.pyplot as plt
-import pooch
+import numpy as np
 
+from irispy.data import sample
 from irispy.io import read_files
+from irispy.utils.dust import calculate_dust_mask
 
 ###############################################################################
-# `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20140919_051712_3860608353_2014-09-19T05%3A17%3A122014-09-19T05%3A17%3A12.xml>`__.
-#
-# In this case, we will use ``pooch`` to keep this example self-contained
-# but you can download the data manually using your browser as well.
-#
-# You will need to update the path to the data in the next section if you do that.
+# We start with the SJI 2832 sample file, which ``irispy.data.sample`` downloads on first use.
+# To use your own data, pass the path of a Level 2 SJI file from the
+# `IRIS data archive <https://www.lmsal.com/hek/hcr>`__ to ``read_files`` instead.
 
-sji_filename = pooch.retrieve(
-    "https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2014/09/19/20140919_051712_3860608353/iris_l2_20140919_051712_3860608353_SJI_2832_t000.fits.gz",
-    known_hash="7ec0f3d63d97bc7620675c78fb6c670ef5b4249d31ef7818435b629c04b72f60",
-)
+sji_2832 = read_files(sample.SJI_2832)
 
 ###############################################################################
-# Now we just read it and apply the `irispy.utils.dust.remove_dust` method to
-# the cube.
+# `~irispy.sji.SJICube.remove_dust` knows where the dust is for each channel.
+# It replaces those pixels with the values of the neighboring images or,
+# when the dust covers them too, with a local median.
 
-sji_2832 = read_files(sji_filename)
-# We crop the cube to reduce memory usage for the online documentation build.
-sji_subset = sji_2832[44:46]
-clean_subset = sji_subset.remove_dust()
+clean_2832 = sji_2832.remove_dust()
 
 ###############################################################################
-# Finally, we can compare one frame before and after the dust treatment.
+# To only mark the dust pixels instead, use `~irispy.sji.SJICube.apply_dust_mask`,
+# and `~irispy.utils.dust.calculate_dust_mask` gives the mask itself.
 
-frame_index = 1
-original_frame = sji_subset[frame_index]
-cleaned_frame = clean_subset[frame_index]
+dust_mask = calculate_dust_mask(sji_2832)
+print(f"{dust_mask[0].sum()} dust pixels in the first image")
 
-fig = plt.figure(figsize=(10, 4.5))
-fig.subplots_adjust(wspace=0.03)
+###############################################################################
+# Finally, we cut out a dust streak in the first image, compare it before and after,
+# and show what changed.
 
-ax0 = fig.add_subplot(121, projection=original_frame.wcs)
-original_frame.plot(axes=ax0)
+original = sji_2832[0, 95:170, 350:430]
+cleaned = clean_2832[0, 95:170, 350:430]
+difference = cleaned - original.data * original.unit
+limit = np.nanmax(np.abs(difference.data))
+# The same stretch for both images, so that the dust pixels do not set it
+vmin, vmax = np.nanpercentile(cleaned.data, [1, 99])
+
+fig = plt.figure(figsize=(14, 5), layout="constrained")
+
+ax0 = fig.add_subplot(131, projection=original.wcs)
+original.plot(axes=ax0, vmin=vmin, vmax=vmax)
 ax0.set_title("Original")
 
-ax1 = fig.add_subplot(122, projection=cleaned_frame.wcs)
-cleaned_frame.plot(axes=ax1)
-ax1.set_title("Dust Removed")
+ax1 = fig.add_subplot(132, projection=cleaned.wcs)
+cleaned.plot(axes=ax1, vmin=vmin, vmax=vmax)
+ax1.set_title("Dust removed")
 
-for ax in (ax0, ax1):
-    ax.coords[0].set_ticks_visible(False)
-    ax.coords[0].set_ticklabel_visible(False)
-    ax.coords[1].set_ticks_visible(False)
+ax2 = fig.add_subplot(133, projection=difference.wcs)
+difference.plot(axes=ax2, cmap="RdBu_r", vmin=-limit, vmax=limit)
+ax2.set_title("Difference")
+fig.colorbar(ax2.images[0], ax=ax2, label=str(difference.unit))
+
+for ax in (ax1, ax2):
     ax.coords[1].set_ticklabel_visible(False)
+    ax.coords[1].set_axislabel("")
 
-fig.tight_layout()
 plt.show()

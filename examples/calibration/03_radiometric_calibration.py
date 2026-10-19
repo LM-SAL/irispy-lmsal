@@ -5,44 +5,31 @@ Apply Radiometric Calibration
 
 In this example we will show how to perform radiometric calibration on IRIS data.
 
-IRIS level 2 data are provided in units of Data Number (DN). To convert these to a flux
+IRIS Level 2 data are provided in units of Data Number (DN). To convert these to a flux
 in physical units (e.g., :math:`erg s^{-1} sr^{-1} cm^{-2} Å^{-1}`) one must perform a
 radiometric calibration.
 
-The calibration output has been confirmed to provide the same results as those provided
-by the SolarSoft IDL routine `IRIS_CALIB <https://hesperia.gsfc.nasa.gov/ssw/iris/idl/nrl/iris_calib.pro>`__.
-
-The major difference being that the output here is accounting for the wavelength, which is why the units
-here are :math:`erg s^{-1} sr^{-1} cm^{-2} Å^{-1}` and not :math:`erg s^{-1} sr^{-1} cm^{-2}`.
-Notice the extra :math:`Å^{-1}` in the units.
-
-Please refer to
-`ITN26 for more information on the calibration process <https://iris.lmsal.com/itn26/calibration.html>`__.
+The output matches the SolarSoft IDL routine
+`IRIS_CALIB <https://hesperia.gsfc.nasa.gov/ssw/iris/idl/nrl/iris_calib.pro>`__, except that it is
+per unit wavelength, hence the extra :math:`Å^{-1}` in the units. See
+`ITN26 <https://iris.lmsal.com/itn26/calibration.html>`__ for the calibration process.
 """
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pooch
 
 import astropy.units as u
 
+from irispy.data import sample
 from irispy.io import read_files
 from irispy.utils.spectrograph import radiometric_calibration
 
 ###############################################################################
-# `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20260308_051050_3893012099_2026-03-08T05%3A10%3A502026-03-08T05%3A10%3A50.xml>`__.
-# The full observation is available as a `Level 2 raster tarball <https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2026/03/08/20260308_051050_3893012099/iris_l2_20260308_051050_3893012099_raster.tar.gz>`__.
-# To keep the download small, we use a cutout of it that only has the Mg II k 2796 and Si IV 1394 windows.
-#
-# In this case, we will use ``pooch`` to keep this example self-contained
-# but you can download the data manually using your browser as well.
-#
-# You will need to update the path to the data in the next section if you do that.
+# We start with the raster sample file, which ``irispy.data.sample`` downloads on first use.
+# To use your own data, pass the path of a Level 2 raster tarball from the
+# `IRIS data archive <https://www.lmsal.com/hek/hcr>`__ to ``read_files`` instead.
 
-raster_filename = pooch.retrieve(
-    "https://github.com/LM-SAL/irispy-data/releases/download/v1/iris_l2_20260308_051050_3893012099_cutout_raster.tar.gz",
-    known_hash="16e7152b5525e16d78df93e8679c870dcbd9f5f78283c91e7631cbe417575987",
-)
+raster_filename = sample.RASTER_TAR
 
 ###############################################################################
 # We will now open the data using a helper function which is designed to read
@@ -76,17 +63,14 @@ del raster
 # :math:`t_\mathrm{exp}` is the exposure time in seconds and
 # :math:`W_\mathrm{slit}` is the slit width in radians (:math:`W_\mathrm{slit} \equiv \pi/(180\cdot3600\cdot3)`).
 #
-# This is a complex equation and requires careful attention to units.
-# Within `irispy`, there is a function called `irispy.utils.spectrograph.radiometric_calibration` that handles this process.
+# `irispy.utils.spectrograph.radiometric_calibration` does this calculation, with the units handled.
 
 calibrated_mg_ii_k_2796 = radiometric_calibration(mg_ii_k_2796)
 calibrated_si_iv_1394 = radiometric_calibration(si_iv_1394)
 
 ###############################################################################
-# We will now plot both the before and after spectrums at a single spatial
-# pixel to see the difference.
-#
-# We will apply the cube's mask when plotting, which removes bad pixels.
+# We will now plot the spectra before and after at a single spatial pixel,
+# applying the cube's mask to remove bad pixels.
 
 
 def plot_before_after(cube, calibrated_cube, title, spectral_slice=slice(None)):
@@ -120,13 +104,20 @@ plot_before_after(mg_ii_k_2796, calibrated_mg_ii_k_2796, "Mg II k 2796 Spectrum"
 ###############################################################################
 # Now the same spatial pixel for the Si IV 1394 (FUV) window.
 #
-# This spectral window extends blueward of the nominal FUV spectral range
-# (~1389-1408 Å) within which the response file defines the effective area.
-#
-# `irispy` returns NaN for those wavelengths,
-# which is why the calibrated (blue) curve stops at ~1389 Å while the uncalibrated
-# counts (red) continue to the edge of the window.
+# This window extends blueward of the nominal FUV range (~1389-1408 Å) over which the
+# response file defines the effective area, so the calibrated (blue) curve stops at
+# ~1389 Å while the counts (red) continue to the edge of the window.
 
 plot_before_after(si_iv_1394, calibrated_si_iv_1394, "Si IV 1394 Spectrum")
+
+###############################################################################
+# `~irispy.utils.spectrograph.radiometric_calibration` returns radiance per unit wavelength.
+# `ndcube.NDCube.to` converts the data and uncertainty to other units. Per unit frequency
+# or photon units depend on wavelength, so they also need `astropy.units.spectral_density`
+# with the cube's wavelengths.
+
+wavelength = calibrated_mg_ii_k_2796.axis_world_coords("em.wl")[0]
+per_hz = calibrated_mg_ii_k_2796.to(u.erg / u.cm**2 / u.s / u.sr / u.Hz, equivalencies=u.spectral_density(wavelength))
+print(per_hz.unit)
 
 plt.show()

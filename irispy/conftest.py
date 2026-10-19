@@ -1,18 +1,19 @@
-import os
 import logging
 import tarfile
 import importlib
 from pathlib import Path
 
-import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import pooch
 import pytest
 from scipy.io import readsav
 
-from astropy.io import fits
+from astropy.config.paths import temporary_cache_dir_path
 
 from irispy.data.test import get_test_filepath
 from irispy.io.sji import read_sji_lvl2
+from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.utils import record_to_dict
 
 console_logger = logging.getLogger()
@@ -22,14 +23,7 @@ console_logger.setLevel("INFO")
 remotedata_spec = importlib.util.find_spec("pytest_remotedata")
 HAVE_REMOTEDATA = remotedata_spec is not None
 # Force MPL to use non-gui backends for testing.
-try:
-    import matplotlib as mpl
-    import matplotlib.pyplot as plt
-
-    HAVE_MATPLOTLIB = True
-    mpl.use("Agg")
-except ImportError:
-    HAVE_MATPLOTLIB = False
+mpl.use("Agg")
 
 
 def pytest_runtest_setup(item):
@@ -41,7 +35,7 @@ def pytest_runtest_setup(item):
         pytest.skip("skipping remotedata tests as pytest-remotedata is not installed")
 
     # Confirm that the pyplot figure stack is empty before the test
-    if HAVE_MATPLOTLIB and plt.get_fignums():
+    if plt.get_fignums():
         msg = f"There are stale pyplot figures prior to running {item.name}"
         raise UserWarning(msg)
 
@@ -49,10 +43,17 @@ def pytest_runtest_setup(item):
 def pytest_runtest_teardown(item):
     # Clear the pyplot figure stack if it is not empty after the test
     # You can see these log messages by passing "-o log_cli=true" to pytest on the command line
-    if HAVE_MATPLOTLIB and plt.get_fignums():
+    if plt.get_fignums():
         msg = f"Removing {len(plt.get_fignums())} pyplot figure(s) left open by {item.name}"
         console_logger.info(msg)
         plt.close("all")
+
+
+@pytest.fixture(autouse=True)
+def _temp_irispy_cache(tmp_path):
+    # Tar files are extracted into the irispy cache folder: keep the tests out of the user's.
+    with temporary_cache_dir_path(tmp_path, namespace="irispy"):
+        yield
 
 
 @pytest.fixture
@@ -124,16 +125,6 @@ def sns_sjicube_2832():
 
 
 @pytest.fixture
-def sns_sji_filelist():
-    return [
-        get_test_filepath("sns/iris_l2_20210905_001833_3620258102_SJI_1330_t000_test.fits"),
-        get_test_filepath("sns/iris_l2_20210905_001833_3620258102_SJI_1400_t000_test.fits"),
-        get_test_filepath("sns/iris_l2_20210905_001833_3620258102_SJI_2796_t000_test.fits"),
-        get_test_filepath("sns/iris_l2_20210905_001833_3620258102_SJI_2832_t000_test.fits"),
-    ]
-
-
-@pytest.fixture
 def raster_sg_file():
     return get_test_filepath(
         "raster/iris_l2_20140329_140938_3860258481_raster/iris_l2_20140329_140938_3860258481_raster_t000_r00000_test.fits"
@@ -163,15 +154,6 @@ def small_raster_tar(tmp_path, raster_sg_files):
 
 
 @pytest.fixture
-def raster_sji_filelist():
-    return [
-        get_test_filepath("raster/iris_l2_20230408_110821_3880012095_SJI_1400_t000_test.fits"),
-        get_test_filepath("raster/iris_l2_20230408_110821_3880012095_SJI_2796_t000_test.fits"),
-        get_test_filepath("raster/iris_l2_20230408_110821_3880012095_SJI_2832_t000_test.fits"),
-    ]
-
-
-@pytest.fixture
 def raster_sji_1400_file():
     return get_test_filepath("raster/iris_l2_20230408_110821_3880012095_SJI_1400_t000_test.fits")
 
@@ -187,32 +169,47 @@ def raster_sji_2832_file():
 
 
 @pytest.fixture
-def raster_sjicube_1400():
-    return read_sji_lvl2(get_test_filepath("raster/iris_l2_20230408_110821_3880012095_SJI_1400_t000_test.fits"))
+def bursts_si_iv_file():
+    return get_test_filepath("bursts/iris_l2_20130902_182935_4000005156_raster_t000_r00000_si_iv_test.fits")
 
 
 @pytest.fixture
-def raster_sjicube_2796():
-    return read_sji_lvl2(get_test_filepath("raster/iris_l2_20230408_110821_3880012095_SJI_2796_t000_test.fits"))
+def bursts_sji_1400_file():
+    return get_test_filepath("bursts/iris_l2_20130902_163935_4000255147_SJI_1400_t000_test.fits")
+
+
+@pytest.fixture(scope="module")
+def bursts_si_iv_raster():
+    return read_spectrograph_lvl2(
+        get_test_filepath("bursts/iris_l2_20130902_182935_4000005156_raster_t000_r00000_si_iv_test.fits")
+    )["Si IV 1403"]
+
+
+@pytest.fixture(scope="module")
+def bursts_sjicube_1400():
+    return read_sji_lvl2(get_test_filepath("bursts/iris_l2_20130902_163935_4000255147_SJI_1400_t000_test.fits"))
 
 
 @pytest.fixture
-def raster_sjicube_2832():
-    return read_sji_lvl2(get_test_filepath("raster/iris_l2_20230408_110821_3880012095_SJI_2832_t000_test.fits"))
+def sot_fg_file():
+    return get_test_filepath("sot/sot_l2_20150830_070953_3603259402_20150830100400_Gband4305_FG_test.fits")
 
 
-@pytest.fixture(scope="session")
-def fake_long_sns_obs(tmp_path_factory):
-    header = fits.getheader(get_test_filepath("raster/iris_l2_20230408_110821_3880012095_SJI_2832_t000_test.fits"))
-    header["STARTOBS"] = "2017-05-02T05:25:51.000"
-    header["ENDOBS"] = "2017-05-02T08:25:51.000"
-    header["NAXIS3"] = 100
-    if header["CUNIT3"] == "seconds":
-        header["CUNIT3"] = "s"
-    rng = np.random.default_rng(12345)
-    data = rng.random((header["NAXIS3"], header["NAXIS2"], header["NAXIS1"]))
-    temp_dir = tmp_path_factory.mktemp("IRIS")
-    hdu = fits.PrimaryHDU(data=data, header=header, do_not_scale_image_data=True, scale_back=True)
-    fits_file = os.fspath(temp_dir.joinpath("iris_l2_20230408_110821_3880012095_SJI_2832_t000_test.fits"))
-    hdu.writeto(fits_file)
-    return [fits_file]
+@pytest.fixture
+def sot_mg_file():
+    return get_test_filepath("sot/sot_l2_20160108_191211_3680100932_20160108181400_TFNaI5896_MG_test.fits")
+
+
+@pytest.fixture
+def sot_sp_file():
+    return get_test_filepath("sot/sotsp_l2_20160108_191211_3680100932_20160108_185006_blapp_index_test.fits")
+
+
+@pytest.fixture
+def aia_1700_file():
+    return get_test_filepath("aia/aia_l2_20170305_164021_3620106076_1700_test.fits")
+
+
+@pytest.fixture
+def v34_sg_file():
+    return get_test_filepath("v34/iris_l2_20260206_210853_3460104433_raster_t000_r00000_test.fits")

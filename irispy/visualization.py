@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+import matplotlib as mpl
 from mpl_animators import ArrayAnimatorWCS
 
 import astropy.units as u
@@ -6,7 +6,6 @@ import astropy.units as u
 import sunpy.visualization.colormaps as cm  # NOQA: F401
 from ndcube.visualization.mpl_plotter import MatplotlibPlotter
 from ndcube.visualization.plotting_utils import prep_plot_kwargs
-from sunpy import log as logger
 
 __all__ = ["IRISArrayAnimatorWCS", "IRISPlotter", "SJIPlotter", "SpectrogramPlotter"]
 
@@ -178,30 +177,39 @@ class IRISArrayAnimatorWCS(Plot2DMixin, ArrayAnimatorWCS):
         return [_shorten_slider_label(label) for label in super()._compute_slider_labels_from_wcs(slices)]
 
 
+def _registered_colormap(name):
+    """
+    ``name`` when matplotlib knows that colormap, viridis otherwise.
+    """
+    return name if name in mpl.colormaps else "viridis"
+
+
 class IRISPlotter(MatplotlibPlotter):
     def _default_cmap_name(self):
-        return "viridis"
+        # sunpy registers the IRIS spectrograph color tables as irissjiFUV and irissjiNUV
+        return _registered_colormap(f"irissji{getattr(self._ndcube.meta, 'detector_band', '')}")
 
     def plot(self, axes=None, plot_axes=None, axes_coordinates=None, **kwargs):
         """
         Plot the cube with IRIS defaults.
 
-        For images and animations, a falsey ``cmap`` is replaced with a default IRIS
-        colormap derived from the cube metadata (falling back to viridis), and
+        For images and animations, if ``cmap`` is falsey, the IRIS color table of the data
+        is used: the passband table for slit-jaw images and the FUV or NUV table for
+        spectrograms, with viridis for data without one (AIA and Hinode/SOT cubes), and
         ``interpolation`` defaults to ``"nearest"``. For one-dimensional cubes ``cmap``
         is dropped entirely, even when given. IRIS axis styling is applied to the result
         (see ``set_axis_properties``); all other arguments are passed to the parent
         plotter's ``plot``.
+
+        The colors run linearly from the minimum to the maximum of the data by default,
+        which a few hot pixels turn into a nearly black image. For a cube with more than
+        two dimensions, ``clip_interval=(1, 99.5) * u.percent`` limits them to those
+        percentiles of each frame.
         """
         if len(self._ndcube.shape) == 1:
             kwargs.pop("cmap", None)
         else:
-            if not kwargs.get("cmap"):
-                try:
-                    kwargs["cmap"] = plt.get_cmap(name=self._default_cmap_name())
-                except Exception as e:  # NOQA: BLE001
-                    logger.debug(e)
-                    kwargs["cmap"] = "viridis"
+            kwargs["cmap"] = kwargs.get("cmap") or self._default_cmap_name()
             kwargs.setdefault("interpolation", "nearest")
         ax = super().plot(axes=axes, plot_axes=plot_axes, axes_coordinates=axes_coordinates, **kwargs)
         ax._iris_axes_coordinates = axes_coordinates
@@ -246,4 +254,6 @@ class SpectrogramPlotter(IRISPlotter):
 
 class SJIPlotter(IRISPlotter):
     def _default_cmap_name(self):
-        return f"irissji{int(self._ndcube.meta['TWAVE1'])}"
+        # Hinode/SOT cubes have TWAVE1 = 0, and a cube built by hand may have none
+        twave = self._ndcube.meta.get("TWAVE1")
+        return _registered_colormap(f"irissji{int(twave)}") if twave else "viridis"

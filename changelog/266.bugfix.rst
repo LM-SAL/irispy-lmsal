@@ -1,0 +1,1 @@
+`~irispy.io.spectrograph.read_spectrograph_lvl2` now reads a spectral window requested more than once only once, and its error for a window not in the file lists the windows the file has.

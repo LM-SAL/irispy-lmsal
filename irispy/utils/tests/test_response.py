@@ -16,15 +16,25 @@ from irispy.tests.helpers import figure_test
 from irispy.utils.response import _fit_xput_lite, get_interpolated_effective_area, get_latest_response
 
 
-def test_fit_xput_lite_idl():
+@pytest.mark.parametrize(
+    ("observation_time", "idl_output"),
+    [
+        ("2025-08-25T20:44:06.066", "fit_iris_xput_output.sav"),
+        # IDL 9.2 fit_iris_xput with the same coefficients, in an interval before the last one
+        ("2013-10-22T21:00", "fit_iris_xput_output_20131022.sav"),
+        # In the gap between two calibration intervals; see make_fit_iris_xput_output.pro
+        ("2020-11-15T00:00", "fit_iris_xput_output_20201115.sav"),
+    ],
+)
+def test_fit_xput_lite_idl(observation_time, idl_output):
     fit_xput_idl_inputs = scipy.io.readsav(get_test_filepath("fit_iris_xput_input.sav"), python_dict=True)
-    fit_xput_idl_outputs = scipy.io.readsav(get_test_filepath("fit_iris_xput_output.sav"), python_dict=True)
+    fit_xput_idl_outputs = scipy.io.readsav(get_test_filepath(idl_output), python_dict=True)
 
     time_cal_coeffs = fit_xput_idl_inputs["cftime"]
     cal_coeffs = fit_xput_idl_inputs["coeffs_fuv"]
     iris_fit_expected = fit_xput_idl_outputs["rr"]
 
-    test_time = [parse_time("2025-08-05T22:25:04.723", format="utime")]
+    test_time = [parse_time(observation_time)]
     time_cal_coeffs_astropy = Time(time_cal_coeffs, format="utime")
 
     # Test each coefficient set
@@ -107,6 +117,17 @@ def test_get_latest_response_multiple_inputs():
     times = parse_time(["2025-08-05T22:25:04.723", "2025-08-06T22:25:04.723", "2025-08-07T22:25:04.723"])
     iris_response = get_latest_response(times)
     assert len(iris_response) == 3
+
+
+def test_get_latest_response_multiple_times_do_not_share_areas():
+    # The responses used to share one AREA_SG and AREA_SJI array, so every time got the last time's areas
+    times = parse_time(["2014-01-01", "2024-01-01"])
+    responses = get_latest_response(times)
+    for response, time in zip(responses, times, strict=True):
+        single = get_latest_response(time)
+        np_test.assert_array_equal(response["AREA_SG"], single["AREA_SG"])
+        np_test.assert_array_equal(response["AREA_SJI"], single["AREA_SJI"])
+    assert not np.array_equal(responses[0]["AREA_SG"], responses[1]["AREA_SG"])
 
 
 def test_get_latest_response_no_observation_time():

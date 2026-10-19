@@ -1,0 +1,1 @@
+Added `irispy.utils.fitting.starts_from_model`, which gives a model fitted to one spectrum a start for every spectrum of a cube, from that spectrum's background and peaks, for `astropy.modeling.fitting.parallel_fit_dask`.

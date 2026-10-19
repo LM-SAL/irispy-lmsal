@@ -1,0 +1,1 @@
+``irispy.io.fits_info`` now prints its table at its full width instead of truncating it to the width of the terminal.

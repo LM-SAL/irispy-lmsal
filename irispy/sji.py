@@ -1,27 +1,44 @@
 import textwrap
-import warnings
 from numbers import Integral
 from functools import cached_property
 
-import numpy as np
+import matplotlib as mpl
 
 import gwcs
 from astropy.wcs import WCS
 from astropy.wcs.wcsapi import SlicedLowLevelWCS
 
 from ndcube.visualization import PlotterDescriptor
-from sunpy.map import Map
 from sunpy.util import MetaDict
-from sunpy.util.exceptions import SunpyMetadataWarning
 from sunraster import SpectrogramCube
 
 from irispy._wcs import _celestial_frame_from_cube, _ResolveNegativeIndicesMixin
-from irispy.utils import calculate_dust_mask
+from irispy.utils._spectral import check_scaled
 from irispy.utils.cosmic_rays import remove_cosmic_rays
+from irispy.utils.dust import calculate_dust_mask
 from irispy.utils.dust import remove_dust as _remove_dust
 from irispy.visualization import SJIPlotter
 
-__all__ = ["AIACube", "SJICube"]
+__all__ = ["AIACube", "SJICube", "SOTCube"]
+
+
+def _slice_header(header, spatial):
+    """
+    The FITS header of one frame after the spatial slice ``spatial`` (numpy order) of
+    its cube, in the file's own units.
+
+    ``preserve_units`` keeps the header's arcsec keywords; without it ``to_header``
+    rewrites the celestial keywords in degrees.
+    """
+    # ndcube spells a full axis slice(0, n, None)
+    shape = (header["naxis2"], header["naxis1"])
+    if all(isinstance(axis, slice) and axis.indices(n) == (0, n, 1) for axis, n in zip(spatial, shape, strict=True)):
+        return header
+    sliced = WCS(header, preserve_units=True).slice(spatial, numpy_order=True)
+    header = header.copy()
+    header.update(sliced.to_header())
+    header["naxis1"], header["naxis2"] = sliced.pixel_shape
+    return header
 
 
 class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
@@ -57,6 +74,26 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         as reference. Note however that it is not always possible to save the
         input as reference.
         Default is False.
+
+    Examples
+    --------
+    The array axes are time, solar Y and solar X; the exposure times are an extra coordinate:
+
+    >>> from irispy.data.test import get_test_filepath
+    >>> from irispy.io import read_files
+    >>> cube = read_files(
+    ...     get_test_filepath(
+    ...         "sns/iris_l2_20210905_001833_3620258102_SJI_1330_t000_test.fits"
+    ...     )
+    ... )
+    >>> cube.shape, cube.unit
+    ((52, 40, 37), Unit("DN_IRIS_SJI"))
+    >>> cube.meta.spectral_window, cube.meta.observing_mode_id
+    ('1330', 3620258102)
+    >>> cube[0, 10:20, 10:20].shape
+    (10, 10)
+    >>> cube.exposure_time[:2]
+    <Quantity [8.00004959, 8.00007725] s>
     """
 
     plotter = PlotterDescriptor(default_type=SJIPlotter)
@@ -74,6 +111,7 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         **kwargs,
     ) -> None:
         self.dust_masked = False
+        self._mask_before_dust = None
         super().__init__(
             data,
             wcs,
@@ -112,9 +150,6 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
             """,
         )
 
-    def plot(self, *args, **kwargs):
-        return self.plotter.plot(*args, **kwargs)
-
     def apply_dust_mask(self, *, undo=False):
         """
         Applies or undoes an update of the mask with the dust particles positions.
@@ -128,104 +163,39 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
             If True, dust particles positions mask will be removed.
             Default=False
         """
-        dust_mask = calculate_dust_mask(self.data)
+        check_scaled(self)
         if undo:
-            if self.mask is not None:
-                self.mask[dust_mask] = False
+            # Restore the mask as it was, so pixels masked for other reasons under the dust stay masked
+            if self.dust_masked:
+                self.mask = self._mask_before_dust
             self.dust_masked = False
         else:
-            if self.mask is None:
-                self.mask = np.zeros(self.shape, dtype=bool)
-            self.mask[dust_mask] = True
+            if not self.dust_masked:
+                self._mask_before_dust = self.mask
+            dust_mask = calculate_dust_mask(self)
+            self.mask = dust_mask if self.mask is None else self.mask | dust_mask
             self.dust_masked = True
 
-    def remove_cosmic_rays(
-        self,
-        *,
-        method="rsliding",
-        sigma: float | None = None,
-        max_iters: int | None = None,
-        method_kwargs=None,
-    ):
-        """
-        Return a cleaned copy of the cube with cosmic rays removed.
+    remove_cosmic_rays = remove_cosmic_rays
+    remove_dust = _remove_dust
 
-        This is a convenience wrapper around `irispy.utils.cosmic_rays.remove_cosmic_rays`.
-
-        Parameters
-        ----------
-        method : ``{"rsliding", "astroscrappy"}``, optional
-            Backend used to detect and clean cosmic rays.
-        sigma : `float`, optional
-            Shared clipping threshold override for the selected backend.
-        max_iters : `int`, optional
-            Shared iteration-count override for the selected backend.
-        method_kwargs : `dict`, optional
-            Additional keyword arguments passed to the selected backend.
-
-        Returns
-        -------
-        `irispy.sji.SJICube`
-            Cleaned cube with the same metadata and coordinates as the original.
-        """
-        return remove_cosmic_rays(
-            self,
-            method=method,
-            sigma=sigma,
-            max_iters=max_iters,
-            method_kwargs=method_kwargs,
-        )
-
-    def remove_dust(
-        self,
-        *,
-        dust_mask=None,
-        temporal_window=2,
-        exposure_normalize=True,
-        fallback="spatial",
-        spatial_box=5,
-    ):
-        """
-        Return a new cube with dust-darkened pixels repaired.
-
-        This is a convenience wrapper around `irispy.utils.dust.remove_dust`.
-
-        Parameters
-        ----------
-        dust_mask : `numpy.ndarray`, optional
-            Boolean mask marking pixels to repair. If omitted, a mask is derived
-            from data values.
-        temporal_window : `int`, optional
-            Number of neighboring frames on either side to use for temporal
-            replacement.
-        exposure_normalize : `bool`, optional
-            If `True`, normalize temporal candidate pixels by exposure time when
-            metadata are available.
-        fallback : {``"spatial"``, None}, optional
-            Fallback behavior when temporal replacement is unavailable.
-        spatial_box : `int`, optional
-            Size of the local median filter used by the spatial fallback.
-
-        Returns
-        -------
-        `irispy.sji.SJICube`
-            Cleaned cube with dust-darkened pixels repaired.
-        """
-        return _remove_dust(
-            self,
-            dust_mask=dust_mask,
-            temporal_window=temporal_window,
-            exposure_normalize=exposure_normalize,
-            fallback=fallback,
-            spatial_box=spatial_box,
-        )
+    def _get_axis_coord_index(self, axis_name, coord_loc):
+        # The exposure time of a slit-jaw cube is an extra coordinate, whose axis sunraster
+        # gives as a pixel axis int, where apply_exposure_time_correction unpacks a tuple
+        # of array axes, as for a coordinate in the meta.
+        index = super()._get_axis_coord_index(axis_name, coord_loc)
+        if coord_loc == "extra_coords":
+            return (self.data.ndim - 1 - index,)
+        return index
 
     celestial_frame = property(_celestial_frame_from_cube)
 
     @cached_property
-    def fits_wcs(self):
+    def _file_frames(self):
         """
-        Returns a standard WCS instead of gWCS.
+        The file's FITS header of each frame of this cube (one header for a single
+        frame, a list for a time axis) and the cube's spatial item in numpy order;
+        `None` when the cube has no frame headers.
         """
         headers = self.meta.get("frame_wcs_headers") if self.meta is not None else None
         low = self.wcs.low_level_wcs
@@ -235,8 +205,33 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         # Any other low-level WCS (e.g. a rebinned one) no longer matches the frame headers.
         if headers is None or not isinstance(low, gwcs.WCS):
             return None
-        frames = headers[item[0]]
-        spatial = tuple(item[1:])
+        return headers[item[0]], tuple(item[1:])
+
+    @cached_property
+    def _frame_headers(self):
+        """
+        The FITS header of each frame of this cube, following its slicing: one header
+        for a single frame, a list for a time axis, `None` when the cube has no frame
+        headers or an integer spatial index left a 1-D image, which no header describes.
+        """
+        if self._file_frames is None or not all(isinstance(axis, slice) for axis in self._file_frames[1]):
+            return None
+        frames, spatial = self._file_frames
+        if isinstance(frames, MetaDict):
+            return _slice_header(frames, spatial)
+        return [_slice_header(h, spatial) for h in frames]
+
+    @cached_property
+    def fits_wcs(self):
+        """
+        Returns a standard WCS instead of gWCS.
+
+        One per frame, following the cube's slicing; after an integer spatial index it
+        is the sliced WCS of each frame.
+        """
+        if self._file_frames is None:
+            return None
+        frames, spatial = self._file_frames
         if isinstance(frames, MetaDict):
             return WCS(frames).slice(spatial, numpy_order=True)
         return [WCS(h).slice(spatial, numpy_order=True) for h in frames]
@@ -255,9 +250,34 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         -------
         `sunpy.map.Map` or `sunpy.map.MapSequence`
             A single Map if index is an int, otherwise a MapSequence.
+            Each map is built from its frame's FITS header, so sunpy picks the map class
+            from the instrument (`~sunpy.map.sources.SJIMap` for slit-jaw images) and the
+            map has the data unit and the frame's own exposure time.
+
+        Examples
+        --------
+        >>> from irispy.data.test import get_test_filepath
+        >>> from irispy.io import read_files
+        >>> cube = read_files(
+        ...     get_test_filepath(
+        ...         "sns/iris_l2_20210905_001833_3620258102_SJI_1330_t000_test.fits"
+        ...     )
+        ... )
+        >>> sji_map = cube.to_maps(0)
+        >>> sji_map.date.isot, sji_map.wavelength, sji_map.data.shape
+        ('2021-09-05T00:18:37.740', <Quantity 1330. Angstrom>, (40, 37))
+        >>> len(cube.to_maps([0, 1]))
+        2
         """
-        if self.fits_wcs is None:
-            msg = "This cube has no FITS WCS (for example, it was rebinned), so it cannot be converted to maps."
+        from sunpy.map import Map  # NOQA: PLC0415
+
+        # The frame headers say DN, which the raw integers of a memmap read are not
+        check_scaled(self)
+        if self._frame_headers is None:
+            msg = (
+                "This cube has no FITS WCS header for its frames (for example, it was rebinned or indexed along a "
+                "spatial axis), so it cannot be converted to maps."
+            )
             raise ValueError(msg)
         if isinstance(index, Integral):
             idx_list = [index]
@@ -266,28 +286,21 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         else:
             idx_list = index
 
-        # We can shortcut if the Cube has been reduced to a 2D slice
-        if self.wcs.world_n_dim == 2:
-            # TODO: Missing metadata
-            return Map(self.data, self.fits_wcs)
-        # pixel_to_world does not wrap negative indices the way the data and fits_wcs lists do.
-        idx_list = [range(self.data.shape[0])[i] for i in idx_list]
-        data_wcs = ((self.data[i], self.fits_wcs[i]) for i in idx_list)
-        times_iso = (self.wcs.pixel_to_world(0, 0, i)[-1].utc.isot for i in idx_list)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", SunpyMetadataWarning)
-            maps = Map(data_wcs, sequence=True)
-        for m, t in zip(maps, times_iso, strict=True):
-            m.meta["DATE-OBS"] = t
-            m.meta["INSTRUME"] = self.meta.get("INSTRUME", "SJI")
-            m.meta["TELESCOP"] = self.meta.get("TELESCOP", "IRIS")
-            m.meta["EXPTIME"] = self.meta.get("EXPTIME", 0.0)
-            m.meta["TWAVE1"] = self.meta.get("TWAVE1")
-            # sunpy reads the wavelength (shown in the map name and plot title) from these.
-            m.meta["WAVELNTH"] = self.meta.get("TWAVE1")
-            m.meta["WAVEUNIT"] = "Angstrom"
-            m.plot_settings["cmap"] = f"irissji{int(self.meta['TWAVE1'])}"
-        return maps[0] if isinstance(index, Integral) else maps
+        is_2d = self.wcs.world_n_dim == 2
+        if is_2d:
+            frames = [(self.data, self._frame_headers)]
+        else:
+            # The data and header lists wrap negative indices; resolve them once for both.
+            idx_list = [range(self.data.shape[0])[i] for i in idx_list]
+            frames = [(self.data[i], self._frame_headers[i]) for i in idx_list]
+        # Keep the requested order; a MapSequence sorts by date by default
+        maps = Map(frames, sequence=True, sortby=None)
+        # Hinode/SOT cubes and most AIA channels have no IRIS colormap
+        cmap = f"irissji{int(self.meta['TWAVE1'])}"
+        if cmap in mpl.colormaps:
+            for m in maps:
+                m.plot_settings["cmap"] = cmap
+        return maps[0] if is_2d or isinstance(index, Integral) else maps
 
 
 class AIACube(SJICube):
@@ -299,3 +312,12 @@ class AIACube(SJICube):
 
     def __str__(self) -> str:
         return super().__str__().replace("SJICube", "AIACube")
+
+
+class SOTCube(SJICube):
+    """
+    Hinode/SOT image and magnetic data supplied with IRIS observations :cite:p:`itn32`.
+    """
+
+    def __str__(self) -> str:
+        return super().__str__().replace("SJICube", "SOTCube")

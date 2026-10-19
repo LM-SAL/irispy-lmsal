@@ -1,0 +1,1 @@
+`~irispy.utils.fitting.non_thermal_velocity` is tested against IDL's ``iris_nonthermalwidth`` for six IRIS lines.

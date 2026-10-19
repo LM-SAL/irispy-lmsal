@@ -3,26 +3,20 @@
 Plot a quick SJI
 ================
 
-In this example we will show how to plot a South Pole SJI dataset.
+In this example we will show how to plot an SJI dataset.
 """
 
 import matplotlib.pyplot as plt
-import pooch
 
+from irispy.data import sample
 from irispy.io import read_files
 
 ###############################################################################
-# `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20230211_083601_3880012095_2023-02-11T08%3A36%3A012023-02-11T08%3A36%3A01.xml>`__.
-#
-# In this case, we will use ``pooch`` to keep this example self-contained
-# but you can download the data manually using your browser as well.
-#
-# You will need to update the path to the data in the next section if you do that.
+# We start with the SJI 2832 sample file, which ``irispy.data.sample`` downloads on first use.
+# To use your own data, pass the path of a Level 2 SJI file from the
+# `IRIS data archive <https://www.lmsal.com/hek/hcr>`__ to ``read_files`` instead.
 
-sji_filename = pooch.retrieve(
-    "https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2023/02/11/20230211_083601_3880012095/iris_l2_20230211_083601_3880012095_SJI_2832_t000.fits.gz",
-    known_hash="282595a2c0a5400ef98d1df0172618483dc74b5b56ff16a0f388723363c6f0f1",
-)
+sji_filename = sample.SJI_2832
 
 ###############################################################################
 # We will now open the data using a helper function which is designed to read
@@ -36,17 +30,16 @@ sji_2832 = read_files(sji_filename)
 print(sji_2832)
 
 ###############################################################################
-# We will now plot the IRIS SJI data.
-#
-# You can also change the axis labels and ticks if you so desire.
-# `WCSAxes provides us an API we can use. <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__
+# We will now plot the IRIS SJI data. The axis labels and ticks can be changed through the
+# `WCSAxes API <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__.
 
-# Note that the .get_animation() is used to animate this example and is not required normally.
-ax = sji_2832.plot().get_animation()
+# ``get_animation`` lets Sphinx Gallery render the sequence as an animation.
+animation = sji_2832.plot().get_animation()
 plt.title(f"IRIS SJI {sji_2832.meta['TWAVE1']:.0f} Å", pad=25)
+# ``animation.save("sji_2832.mp4")`` saves it as a movie, which needs FFmpeg.
 
 ###############################################################################
-# Finally we will output a frame of the SJI into a sunpy Map.
+# Next, we will output a frame of the SJI as a sunpy Map.
 
 sji_map = sji_2832.to_maps(0)
 print(sji_map)
@@ -54,7 +47,7 @@ print(sji_map)
 ###############################################################################
 # We can now plot the SJI Map using sunpy Map's plotting capabilities.
 
-fig = plt.figure()
+fig = plt.figure(layout="constrained")
 ax = fig.add_subplot(projection=sji_map.wcs)
 sji_map.plot(axes=ax)
 

@@ -1,4 +1,3 @@
-import warnings
 from pathlib import Path
 from functools import wraps
 
@@ -15,14 +14,7 @@ from astropy.wcs import WCS
 from irispy.meta import SGMeta
 from irispy.spectrograph import SpectrogramCube
 
-__all__ = ["make_test_spectrogram_cube", "warnings_as_errors"]
-
-
-@pytest.fixture
-def warnings_as_errors():
-    warnings.simplefilter("error")
-    yield
-    warnings.resetwarnings()
+__all__ = ["make_test_spectrogram_cube", "mark_saturated"]
 
 
 def get_hash_library_name():
@@ -72,7 +64,7 @@ def figure_test(test_function):
     return test_wrapper
 
 
-def make_test_spectrogram_cube(data, wavelengths):
+def make_test_spectrogram_cube(data, wavelengths, *, uncertainty=None, unit=u.DN, mask=None):
     """
     Build a minimal 3-D SpectrogramCube for unit tests.
 
@@ -83,15 +75,22 @@ def make_test_spectrogram_cube(data, wavelengths):
 
     Parameters
     ----------
-    data : `numpy.ndarray`
+    data : array-like
         3-D array with shape ``(ny, nx, n_wavelengths)``.
     wavelengths : `astropy.units.Quantity`
         1-D wavelength grid.
+    uncertainty : `astropy.nddata.NDUncertainty`, optional
+        Uncertainty of ``data``.
+    unit : `astropy.units.Unit`, optional
+        Unit of ``data``, DN by default.
+    mask : array-like, optional
+        Mask of ``data``.
 
     Returns
     -------
     `irispy.spectrograph.SpectrogramCube`
     """
+    data = np.asarray(data)
     header = fits.Header()
     header["NAXIS"] = 3
     header["NAXIS1"] = data.shape[2]
@@ -123,4 +122,20 @@ def make_test_spectrogram_cube(data, wavelengths):
     meta_header["TWMAX1"] = float(wavelengths.to(u.AA).value[-1])
     meta_header["TDET1"] = "FUV"
     meta = SGMeta(meta_header, "test")
-    return SpectrogramCube(data, wcs=wcs, uncertainty=None, unit=u.DN, meta=meta, mask=None)
+    return SpectrogramCube(data, wcs=wcs, uncertainty=uncertainty, unit=unit, meta=meta, mask=mask)
+
+
+def mark_saturated(cube, saturated):
+    """
+    Mark the ``saturated`` samples of ``cube`` as the readers mark clipped ones.
+
+    They go in its mask and in ``meta["saturated"]``, which keeps any samples marked
+    already. A plain `dict` meta, which slicing leaves as it is, holds the array as it
+    is.
+    """
+    saturated = np.asarray(saturated, dtype=bool) | cube.meta.get("saturated", False)
+    cube.mask = np.asarray(cube.mask, dtype=bool) | saturated  # a copy, so either can change alone
+    if hasattr(cube.meta, "add"):
+        cube.meta.add("saturated", saturated, None, tuple(range(saturated.ndim)), overwrite=True)
+    else:
+        cube.meta["saturated"] = saturated

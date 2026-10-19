@@ -38,6 +38,7 @@ These classes also provide methods for applying a number of calibration routines
 
           iris
           migration
+          line_database
           tutorial/index
           generated/gallery/index
 
@@ -53,6 +54,7 @@ These classes also provide methods for applying a number of calibration routines
           contributing
           reference/index
           changelog
+          bibliography
 
 .. _Interface Region Imaging Spectrograph: https://iris.lmsal.com/
 

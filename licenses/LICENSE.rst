@@ -1,4 +1,4 @@
-Copyright (c) 2020-2025, IRIS Instrument Team @ LMSAL
+Copyright (c) 2020-2026, IRIS Instrument Team @ LMSAL
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,

@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 import numpy as np
 
 import astropy.units as u
@@ -6,16 +8,33 @@ import gwcs.coordinate_frames as cf
 from astropy.io import fits
 from astropy.nddata import StdDevUncertainty
 from astropy.time import Time
+from astropy.wcs.utils import celestial_frame_to_wcs
 
 from dkist.wcs.models import CoupledCompoundModel, VaryingCelestialTransform
+from sunpy.util import MetaDict
 
 from irispy._interpolation import _time_lookup
+from irispy.io._level2 import _check_level2
+from irispy.io._mask import _fill_mask_values, _memmap_fill_mask
 from irispy.meta import SJIMeta
-from irispy.sji import AIACube, SJICube
+from irispy.sji import AIACube, SJICube, SOTCube
 from irispy.utils import calculate_uncertainty
-from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, BAD_PIXEL_VALUE_UNSCALED, DN_UNIT, READOUT_NOISE
+from irispy.utils.constants import (
+    BAD_PIXEL_VALUE_SCALED,
+    BAD_PIXEL_VALUES_SCALED,
+    DN_UNIT,
+    READOUT_NOISE,
+    SATURATION_LIMIT,
+)
 
 __all__ = ["read_sji_lvl2"]
+
+# SOT unit descriptions that Astropy cannot parse directly.
+_SOT_BUNIT = {
+    "DN = 64 photoelectrons": "DN",
+    "dimensionless ratio": "",
+    "unitless number between 0 and 1": "",
+}
 
 
 def _t_obs(hdulist):
@@ -56,6 +75,8 @@ def _fill_dropped_pointing_rows(hdulist) -> None:
     valid_rows = np.flatnonzero(np.any(pointing != 0, axis=1))
     if dropped_rows.size == 0 or valid_rows.size == 0:
         return
+    if not hdulist[1].data.flags["W"]:
+        hdulist[1].data = hdulist[1].data.copy()
     right = np.clip(np.searchsorted(valid_rows, dropped_rows), 0, valid_rows.size - 1)
     left = np.clip(right - 1, 0, valid_rows.size - 1)
     for column in columns:
@@ -115,7 +136,7 @@ def _create_gwcs(hdulist: fits.HDUList, t_obs) -> gwcs.WCS:
     return gwcs.WCS(forward_transform, input_frame=input_frame, output_frame=output_frame)
 
 
-def _create_headers_wcs(hdulist, t_obs):
+def _create_headers_wcs(hdulist, t_obs, bunit):
     """
     This is required as occasionally we need a normal WCS instead of a gWCS due to
     compatibility issues.
@@ -123,30 +144,44 @@ def _create_headers_wcs(hdulist, t_obs):
     This has been set to have an Earth Observer at the time of the observation.
 
     However, this only creates the WCS headers, not the full WCS objects. Those are
-    created in the SJICube class property fits_wcs.
+    created in the SJICube class property fits_wcs, and `irispy.sji.SJICube.to_maps`
+    builds its maps from them, so they carry the keys sunpy reads: the instrument and
+    telescope that pick the map class, ``bunit`` and the frame's exposure time.
     """
     from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst  # NOQA: PLC0415
     from sunpy.coordinates.frames import Helioprojective  # NOQA: PLC0415
-    from sunpy.map.header_helper import make_fitswcs_header  # NOQA: PLC0415
 
     aux = {key: hdulist[1].data[:, hdulist[1].header[key]] for key in ("XCENIX", "YCENIX", "EXPTIMES")}
     pc = [hdulist[1].data[:, hdulist[1].header[key]] for key in ("PC1_1IX", "PC1_2IX", "PC2_1IX", "PC2_2IX")]
     # Earth is looked up at millisecond precision, as t_obs[i].isot would for each frame.
     earth = get_body_heliographic_stonyhurst("Earth", Time(t_obs.isot))
     pointing = Helioprojective(aux["XCENIX"] * u.arcsec, aux["YCENIX"] * u.arcsec, observer=earth, obstime=t_obs)
-    # make_fitswcs_header takes ~2 ms, so build frame 0 once and swap in the keys that vary per frame.
-    template = make_fitswcs_header(
-        data=hdulist[0].data.shape[1:],
-        coordinate=pointing[0],
-        scale=[hdulist[0].header["CDELT1"], hdulist[0].header["CDELT2"]] * u.arcsec / u.pixel,
-        rotation_matrix=np.asanyarray([[pc[0][0], pc[1][0]], [pc[2][0], pc[3][0]]]),
-        instrument="SJI",
-        telescope="IRIS",
-        observatory="IRIS",
-        wavelength=int(hdulist[0].header["TWAVE1"]) * u.AA,
-        exposure=aux["EXPTIMES"][0] * u.second,
-        unit=u.DN,
+    # Build the same SJI header using Astropy's registered solar WCS converter,
+    # without importing sunpy.map just to prepare headers at open.
+    template = MetaDict(celestial_frame_to_wcs(pointing[0], "TAN").to_header())
+    height, width = hdulist[0].data.shape[1:]
+    template.update(
+        {
+            "naxis": 2,
+            "naxis1": width,
+            "naxis2": height,
+            # The reference pixel of the file, where XCENIX/YCENIX point; it need not be the array center
+            "crpix1": hdulist[0].header["CRPIX1"],
+            "crpix2": hdulist[0].header["CRPIX2"],
+            "cunit1": "arcsec",
+            "cunit2": "arcsec",
+            "cdelt1": hdulist[0].header["CDELT1"],
+            "cdelt2": hdulist[0].header["CDELT2"],
+            "lonpole": 180.0 if pointing[0].spherical.lat.to_value(u.deg) < 90 else 0.0,
+            "instrume": hdulist[0].header["INSTRUME"],
+            "telescop": hdulist[0].header["TELESCOP"],
+            "twave1": hdulist[0].header["TWAVE1"],
+            "bunit": bunit,
+        }
     )
+    # Hinode/SOT cubes have no wavelength (TWAVE1 is 0)
+    if hdulist[0].header["TWAVE1"]:
+        template.update({"wavelnth": int(hdulist[0].header["TWAVE1"]), "waveunit": "Angstrom"})
     per_frame = {
         "crval1": pointing.spherical.lon.to_value(template["cunit1"]),
         "crval2": pointing.spherical.lat.to_value(template["cunit2"]),
@@ -175,14 +210,17 @@ def _create_headers_wcs(hdulist, t_obs):
 
 def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     """
-    Reads a SINGLE level 2 SJI FITS or the IRIS aligned AIA Cube.
+    Read one SJI, AIA, or Hinode/SOT FITS file supplied with IRIS data.
 
     Does not handle multiple files nor tar files.
 
     Parameters
     ----------
-    filename: `str`
-        Filename to read.
+    filename : `str`, `pathlib.Path`, file-like, `bytes` or `astropy.io.fits.HDUList`
+        File or decompressed FITS data to read. A supplied HDU list is left open, its
+        auxiliary table is edited in place (dropped pointing rows are filled) and, with
+        ``memmap=False``, its image is copied before the fill values are replaced; open it
+        with ``do_not_scale_image_data=True`` when using ``memmap=True``.
     uncertainty : `bool`, optional
         If `True` (not the default), will compute the uncertainty for the data (slower and
         uses more memory). If ``memmap=True``, the uncertainty is never computed.
@@ -191,15 +229,53 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
         the file into memory when needed. This option is faster and uses a
         lot less memory. However, because FITS scaling is not done on-the-fly,
         the data units will be unscaled, not the usual data numbers (DN).
+        When ``memmap=True``, missing pixels retain their original values and are marked in a
+        lazy Dask mask, computed only for the slices that are used.
+        With ``memmap=False``, missing pixels are marked in the mask and replaced with ``NaN`` for
+        floating-point data or ``-200`` for integer data, and IRIS pixels at the level 2 ceiling,
+        ``irispy.utils.constants.SATURATION_LIMIT``, keep their value and are marked in the mask
+        and, if there are any, in ``meta["saturated"]``.
+        Hinode/SOT data retain their units and ``NaN`` values with either setting.
+        Compressed filenames are decompressed into memory once and cannot be memory-mapped.
 
     Returns
     -------
     `irispy.sji.SJICube`
-        The data cube, using a gWCS.
+        The data cube, using a gWCS. AIA and Hinode/SOT cubes are an
+        `irispy.sji.AIACube` and an `irispy.sji.SOTCube`.
+
+    Examples
+    --------
+    >>> from irispy.data.test import get_test_filepath
+    >>> from irispy.io import read_sji_lvl2
+    >>> filename = get_test_filepath(
+    ...     "sns/iris_l2_20210905_001833_3620258102_SJI_1400_t000_test.fits"
+    ... )
+    >>> cube = read_sji_lvl2(filename)
+    >>> cube.shape, cube.unit
+    ((62, 40, 37), Unit("DN_IRIS_SJI"))
+    >>> cube.axis_world_coords("time")[0][[0, -1]].isot
+    array(['2021-09-05T00:18:47.390', '2021-09-05T05:07:22.210'], dtype='<U23')
     """
-    with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
-        hdulist.verify("silentfix")
+    if isinstance(filename, fits.HDUList):
+        context = nullcontext(filename)
+    elif isinstance(filename, bytes):
+        context = fits.HDUList.fromstring(filename, do_not_scale_image_data=memmap)
+    else:
+        try:
+            context = fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
+        except (OSError, ValueError, TypeError):
+            # A directory or a file that is not FITS: raises the level 2 error, chained to this one
+            _check_level2(filename, None, "SJI")
+    with context as hdulist:
+        # Bytes and an HDU list made in memory have no filename, so name what was given
+        given = hdulist.filename() or f"The data given ({type(filename).__name__})"
+        _check_level2(given, hdulist[0].header, "SJI")
         instrume = hdulist[0].header["INSTRUME"]
+        is_sot = instrume.startswith("SOT")
+        if hdulist[1].data.ndim == 1:
+            # A one-frame cube, such as a Hinode/SOT-SP map, stores its auxiliary row as a 1D array
+            hdulist[1].data = hdulist[1].data[np.newaxis]
         t_obs = _t_obs(hdulist)
         _fill_dropped_pointing_rows(hdulist)
         extra_coords = [
@@ -220,15 +296,16 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             ),
             ("pztx", 0, hdulist[1].data[:, hdulist[1].header["PZTX"]] * u.arcsec),
             ("pzty", 0, hdulist[1].data[:, hdulist[1].header["PZTY"]] * u.arcsec),
+            # SLTPX1IX and SLTPX2IX are 1-based FITS pixels (the level 1 CRPIX); the cube's pixels are 0-based
             (
                 "slit x position",
                 0,
-                hdulist[1].data[:, hdulist[1].header["SLTPX1IX"]] * u.pix,
+                (hdulist[1].data[:, hdulist[1].header["SLTPX1IX"]] - 1) * u.pix,
             ),
             (
                 "slit y position",
                 0,
-                hdulist[1].data[:, hdulist[1].header["SLTPX2IX"]] * u.pix,
+                (hdulist[1].data[:, hdulist[1].header["SLTPX2IX"]] - 1) * u.pix,
             ),
             ("xcenix", 0, hdulist[1].data[:, hdulist[1].header["XCENIX"]] * u.arcsec),
             ("ycenix", 0, hdulist[1].data[:, hdulist[1].header["YCENIX"]] * u.arcsec),
@@ -236,24 +313,43 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
         data = hdulist[0].data
         data_nan_masked = hdulist[0].data
         out_uncertainty = None
+        saturated = None
+        # Negative SOT magnetic values are valid measurements; only NaN marks missing pixels.
         if memmap:
-            data_nan_masked[data == BAD_PIXEL_VALUE_UNSCALED] = 0
-            mask = None
+            mask = _memmap_fill_mask(data, hdulist[0].header, nan_only=is_sot)
             scaled = False
             unit = DN_UNIT["SJI_UNSCALED"]
         else:
             # This is a workaround for the AIA cubes being in int and not float
-            mask = data == BAD_PIXEL_VALUE_SCALED
+            mask = np.isnan(data) if is_sot else _fill_mask_values(data, *BAD_PIXEL_VALUES_SCALED)
             mask_value = BAD_PIXEL_VALUE_SCALED if np.issubdtype(data.dtype, np.integer) else np.nan
-            data_nan_masked[data == BAD_PIXEL_VALUE_SCALED] = mask_value
+            # A caller's HDU list keeps its image: the fill values are replaced in a copy.
+            if isinstance(filename, fits.HDUList) or not data_nan_masked.flags["W"]:
+                data_nan_masked = data_nan_masked.copy()
+            data_nan_masked[mask] = mask_value
+            if instrume in ["IRIS", "SJI"]:
+                # Level 2 clips at the ceiling, where iris_prep's +Inf saturation flags were lost
+                saturated = data_nan_masked >= SATURATION_LIMIT.value
+                mask |= saturated
             scaled = True
             unit = DN_UNIT["SJI"]
             if uncertainty and instrume in ["IRIS", "SJI"]:
-                out_uncertainty = StdDevUncertainty(calculate_uncertainty(data, READOUT_NOISE["SJI"], DN_UNIT["SJI"]))
+                out_uncertainty = StdDevUncertainty(
+                    calculate_uncertainty(data_nan_masked, READOUT_NOISE["SJI"], DN_UNIT["SJI"])
+                )
         cube_class = SJICube if instrume in ["IRIS", "SJI"] else AIACube
+        if is_sot:
+            # Hinode/SOT cubes are floats without FITS scaling
+            cube_class, scaled = SOTCube, True
+            bunit = hdulist[0].header.get("BUNIT", "")
+            unit = u.Unit(_SOT_BUNIT.get(bunit, bunit), parse_strict="silent")
         meta = SJIMeta(hdulist[0].header)
-        meta["frame_wcs_headers"] = _create_headers_wcs(hdulist, t_obs)  # root-relative, not axis-aware
+        # The IRIS DN units are not FITS units; sunpy reads the SOT units ("", G) as they are
+        bunit = unit.to_string() if is_sot else "DN"
+        meta["frame_wcs_headers"] = _create_headers_wcs(hdulist, t_obs, bunit)  # root-relative, not axis-aware
         meta["scaled"] = scaled
+        if saturated is not None and saturated.any():
+            meta.add("saturated", saturated, "Samples at the level 2 ceiling, also masked", (0, 1, 2))
         map_cube = cube_class(
             data_nan_masked,
             _create_gwcs(hdulist, t_obs),

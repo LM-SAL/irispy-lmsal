@@ -6,7 +6,7 @@ Deal with IRIS v34 rasters
 In this example we will show how ``irispy`` deals with a v34 dataset by default and how
 to undo that if you so desire.
 
-These v34 are scans which raster from west to east instead of the default east to west.
+v34 observations raster from west to east instead of the default east to west.
 """
 
 import matplotlib.pyplot as plt
@@ -39,8 +39,8 @@ raster_filename = pooch.retrieve(
 # We will now open the data using a helper function which is designed to read
 # all files from a single observation.
 #
-# By default, irispy will read the v34 data, flipping the data so that it
-# is in the same orientation as normal IRIS data and adjust the WCS accordingly.
+# By default, ``irispy`` flips v34 data into the orientation of other IRIS rasters
+# and adjusts the WCS to match.
 
 raster = read_files(raster_filename, spectral_windows="Mg II k 2796")
 # We will also undo the v34 handling and read the data as is.
@@ -66,15 +66,10 @@ for raster_scan in mg_ii_k.split_rasters():
     print(raster_scan.shape)
 
 ###############################################################################
-# To see the effect of the v34 handling, we will plot a spectroheliogram
-# for the Mg II k core wavelength.
-#
-# We can use the ``crop`` method to get this information, this will
-# require a `astropy.coordinates.SpectralCoord` object from `astropy.coordinates`.
+# To see the effect of the v34 handling, we will plot a spectroheliogram at the
+# Mg II k core wavelength, by cropping with a `~astropy.coordinates.SpectralCoord`.
 
-# None means that the world component is not cropped.
-# Since we want one physical coordinate, we will just use the
-# same spectral coordinate for both bounds.
+# ``None`` means that the world component is not cropped, and the same bound twice selects a single wavelength.
 lower_corner = [SpectralCoord(279.63, unit=u.nm), None, None, None]
 
 mg_spec_crop = first_raster.crop(lower_corner, lower_corner)
@@ -101,7 +96,7 @@ print("*" * 50)
 print(f"Unflipped time: {first_raster_unflipped.time[:5]}")
 
 ###############################################################################
-# Finally we will just see that the spectral profiles are unaffected in either case.
+# Finally, the spectral profiles are the same either way.
 #
 # We choose a specific helioprojective location on the disk and crop the spectrogram
 # down to the spectrum at that point.
@@ -126,7 +121,7 @@ mg_ii_k_spectra = first_raster.crop(
 fig = plt.figure()
 ax = fig.add_subplot(111, projection=mg_ii_k_unflipped_spectra.wcs)
 mg_ii_k_unflipped_spectra.plot(axes=ax, color="red", label="v34 unflipped")
-mg_ii_k_spectra.plot(axes=ax, color="black", label="v34 default", linestyle="--")
+mg_ii_k_spectra.plot(axes=ax, color="black", label="v34 flipped", linestyle="--")
 plt.legend()
 
 plt.show()

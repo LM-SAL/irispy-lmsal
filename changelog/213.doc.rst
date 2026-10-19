@@ -1,0 +1,1 @@
+The slit-jaw plotting example now notes how to save an animation as a movie with FFmpeg.

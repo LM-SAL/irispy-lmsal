@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
@@ -8,10 +9,52 @@ from astropy.wcs import WCS
 from ndcube.meta import NDMeta
 
 from irispy import SJICube, utils
-from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED
 
 TIMES = Time(["2014-12-11T19:39:00.48", "2014-12-11T19:43:07.6"])
-EXTRA_COORDS = [("time", 0, TIMES)]
+
+
+def _fake_sji_cube(data, *, uncertainty, mask, **meta):
+    """
+    A slit-jaw cube on a plain FITS WCS, with the exposure times and time of two frames.
+    """
+    data = np.asarray(data)
+    header = {
+        "CTYPE1": "HPLN-TAN",
+        "CUNIT1": "arcsec",
+        "CDELT1": 0.4,
+        "CRPIX1": 0,
+        "CRVAL1": 0,
+        "NAXIS1": data.shape[-1],
+        "CTYPE2": "HPLT-TAN",
+        "CUNIT2": "arcsec",
+        "CDELT2": 0.5,
+        "CRPIX2": 0,
+        "CRVAL2": 0,
+        "NAXIS2": data.shape[-2],
+    }
+    if data.ndim == 3:
+        header |= {
+            "CTYPE3": "Time    ",
+            "CUNIT3": "s",
+            "CDELT3": 0.3,
+            "CRPIX3": 0,
+            "CRVAL3": 0,
+            "NAXIS3": data.shape[0],
+        }
+    cube = SJICube(
+        data,
+        WCS(header=header, naxis=data.ndim),
+        uncertainty=uncertainty,
+        mask=mask,
+        unit=utils.constants.DN_UNIT["SJI"],
+        meta=NDMeta(
+            {"exposure time": 2 * np.ones(2) * u.s, "scaled": True, **meta},
+            axes={"exposure time": 0},
+            data_shape=data.shape,
+        ),
+    )
+    cube.extra_coords.add("time", 0, TIMES)
+    return cube
 
 
 @pytest.fixture
@@ -22,184 +65,13 @@ def cube():
             [[2, 4, 5, 1], [10, 5, 2, 2], [10, 3, 3, 0]],
         ],
     )
-    exposure_times = 2 * np.ones((2), float) * u.s
-    uncertainty = np.sqrt(data)
-    header = {
-        "CTYPE1": "HPLN-TAN",
-        "CUNIT1": "arcsec",
-        "CDELT1": 0.4,
-        "CRPIX1": 0,
-        "CRVAL1": 0,
-        "NAXIS1": 4,
-        "CTYPE2": "HPLT-TAN",
-        "CUNIT2": "arcsec",
-        "CDELT2": 0.5,
-        "CRPIX2": 0,
-        "CRVAL2": 0,
-        "NAXIS2": 3,
-        "CTYPE3": "Time    ",
-        "CUNIT3": "s",
-        "CDELT3": 0.3,
-        "CRPIX3": 0,
-        "CRVAL3": 0,
-        "NAXIS3": 2,
-    }
-    wcs = WCS(header=header, naxis=3)
-    cube = SJICube(
-        data,
-        wcs,
-        uncertainty=uncertainty,
-        mask=data >= 0,
-        unit=utils.constants.DN_UNIT["SJI"],
-        meta=NDMeta(
-            {"exposure time": exposure_times, "scaled": True}, axes={"exposure time": 0}, data_shape=data.shape
-        ),
-    )
-    cube.extra_coords.add(*EXTRA_COORDS[0])
-    return cube
+    return _fake_sji_cube(data, uncertainty=np.sqrt(data), mask=data >= 0)
 
 
 @pytest.fixture
 def cube_2d():
-    data_2d = np.array([[1, 2, 3, 4], [2, 4, 5, 3]])
-    uncertainty_2d = np.sqrt(data_2d)
-    header_2d = {
-        "CTYPE1": "HPLN-TAN",
-        "CUNIT1": "arcsec",
-        "CDELT1": 0.4,
-        "CRPIX1": 0,
-        "CRVAL1": 0,
-        "NAXIS1": 4,
-        "CTYPE2": "HPLT-TAN",
-        "CUNIT2": "arcsec",
-        "CDELT2": 0.5,
-        "CRPIX2": 0,
-        "CRVAL2": 0,
-        "NAXIS2": 3,
-    }
-    exposure_times = 2 * np.ones((2), float) * u.s
-    wcs_2d = WCS(header=header_2d, naxis=2)
-    cube_2d = SJICube(
-        data_2d,
-        wcs_2d,
-        uncertainty=uncertainty_2d,
-        mask=data_2d >= 0,
-        unit=utils.constants.DN_UNIT["SJI"],
-        meta=NDMeta(
-            {"exposure time": exposure_times, "scaled": True}, axes={"exposure time": 0}, data_shape=data_2d.shape
-        ),
-    )
-    cube_2d.extra_coords.add(*EXTRA_COORDS[0])
-    return cube_2d
-
-
-@pytest.fixture
-def cube_1d():
-    header_1d = {
-        "CTYPE1": "Time    ",
-        "CUNIT1": "s",
-        "CDELT1": 0.4,
-        "CRPIX1": 0,
-        "CRVAL1": 0,
-        "NAXIS1": 2,
-    }
-    exposure_times = 2 * np.ones((2), float) * u.s
-    wcs_1d = WCS(header=header_1d, naxis=1)
-    data_1d = np.array([1, 2])
-    cube_1d = SJICube(
-        data_1d,
-        wcs_1d,
-        uncertainty=np.sqrt(np.array([1, 2])),
-        mask=data_1d >= 0,
-        unit=utils.constants.DN_UNIT["SJI"],
-        meta=NDMeta(
-            {"exposure time": exposure_times, "scaled": True}, axes={"exposure time": 0}, data_shape=data_1d.shape
-        ),
-    )
-    cube_1d.extra_coords.add(*EXTRA_COORDS[0])
-    return cube_1d
-
-
-@pytest.fixture
-def dust_cube():
-    data_dust = np.array(
-        [
-            [[-1, 2, -3, 4], [2, BAD_PIXEL_VALUE_SCALED, 5, 3], [0, 1, 2, -300]],
-            [[2, BAD_PIXEL_VALUE_SCALED, 5, 1], [10, -5, 2, 2], [10, -3, 3, 0]],
-        ],
-    )
-    header = {
-        "CTYPE1": "HPLN-TAN",
-        "CUNIT1": "arcsec",
-        "CDELT1": 0.4,
-        "CRPIX1": 0,
-        "CRVAL1": 0,
-        "NAXIS1": 4,
-        "CTYPE2": "HPLT-TAN",
-        "CUNIT2": "arcsec",
-        "CDELT2": 0.5,
-        "CRPIX2": 0,
-        "CRVAL2": 0,
-        "NAXIS2": 3,
-        "CTYPE3": "Time    ",
-        "CUNIT3": "s",
-        "CDELT3": 0.3,
-        "CRPIX3": 0,
-        "CRVAL3": 0,
-        "NAXIS3": 2,
-    }
-    wcs = WCS(header=header, naxis=3)
-    unit = utils.constants.DN_UNIT["SJI"]
-    mask_dust = data_dust == BAD_PIXEL_VALUE_SCALED
-
-    uncertainty = 1
-    times = Time(["2014-12-11T19:39:00.48", "2014-12-11T19:43:07.6"])
-    exposure_times = 2 * np.ones((2), float) * u.s
-    extra_coords = [("time", 0, times)]
-    meta = NDMeta(
-        {"exposure time": exposure_times, "OBSID": 1, "scaled": True},
-        axes={"exposure time": 0},
-        data_shape=data_dust.shape,
-    )
-    dust_cube = SJICube(
-        data_dust,
-        wcs,
-        uncertainty=uncertainty,
-        mask=mask_dust,
-        unit=unit,
-        meta=meta,
-    )
-    dust_cube.extra_coords.add(*extra_coords[0])
-    return dust_cube
-
-
-def test_sjicube_apply_dust_mask(dust_cube):
-    # TODO: The expected values are not correct.
-    dust_mask_expected = np.array(
-        [
-            [[True, True, True, True], [True, True, True, True], [True, True, False, False]],
-            [[True, True, True, False], [True, True, True, True], [True, True, True, True]],
-        ]
-    )
-    dust_cube.apply_dust_mask()
-    np.testing.assert_array_equal(dust_cube.mask, dust_mask_expected)
-    dust_cube.apply_dust_mask(undo=True)
-    before_mask = np.array(
-        [
-            [[False, False, False, False], [False, False, False, False], [False, False, False, False]],
-            [[False, False, False, False], [False, False, False, False], [False, False, False, False]],
-        ]
-    )
-    np.testing.assert_array_equal(dust_cube.mask, before_mask)
-
-
-def test_sjicube_apply_dust_mask_initializes_missing_mask(dust_cube):
-    dust_cube.mask = None
-
-    dust_cube.apply_dust_mask()
-
-    assert dust_cube.mask is not None
-    assert dust_cube.mask.any()
+    data = np.array([[1, 2, 3, 4], [2, 4, 5, 3]])
+    return _fake_sji_cube(data, uncertainty=np.sqrt(data), mask=data >= 0)
 
 
 @pytest.mark.parametrize(
@@ -244,8 +116,14 @@ def test_sjicube_slice_rejects_step_slices(sns_sjicube_1330):
 
 
 def test_sjicube_slice_rejects_too_many_indices(sns_sjicube_1330):
-    with pytest.raises((IndexError, ValueError), match=r"can not be greater than the dimensionality .* of the wcs"):
+    with pytest.raises((IndexError, ValueError), match=r"can not be greater than the dimensionality"):
         sns_sjicube_1330[(slice(0, 3), slice(0, 10), slice(0, 10), slice(None))]
+
+
+def test_sjicube_slice_rejects_out_of_range_index(sns_sjicube_1330):
+    with pytest.raises(IndexError, match=r"out of range for a cube of shape \(52, 40, 37\)") as error:
+        sns_sjicube_1330[0, 100]
+    assert not isinstance(error.value, ValueError)
 
 
 def test_sjicube_slice_without_frame_headers_keeps_fits_wcs_none(cube):
@@ -253,6 +131,14 @@ def test_sjicube_slice_without_frame_headers_keeps_fits_wcs_none(cube):
 
     assert cube.fits_wcs is None
     assert subset.fits_wcs is None
+
+
+def test_sjicube_plot_without_twave1_uses_viridis(cube, cube_2d):
+    assert "TWAVE1" not in cube.meta  # fixture check
+    assert cube.plotter._default_cmap_name() == "viridis"
+    ax = cube_2d.plot()
+    assert ax.images[0].get_cmap().name == "viridis"
+    plt.close(ax.figure)
 
 
 def test_sjicube_2d_slice(cube_2d):
@@ -265,21 +151,14 @@ def test_sjicube_2d_slice(cube_2d):
 def test_sjicube_remove_cosmic_rays(cube_2d, monkeypatch):
     captured = {}
 
-    def fake_remove_cosmic_rays(cube, *, method, sigma, max_iters, method_kwargs):
-        captured["method"] = method
-        captured["mask"] = cube.mask.copy()
+    def fake_remove_cosmic_rays(data, mask, *, sigma, max_iters, method_kwargs):
+        captured["mask"] = mask.copy()
         captured["sigma"] = sigma
         captured["max_iters"] = max_iters
         captured["method_kwargs"] = method_kwargs
-        return cube.to_nddata(
-            data=cube.data + 1,
-            mask="copy",
-            nddata_type=type(cube),
-            extra_coords="copy",
-            global_coords="copy",
-        )
+        return data + 1
 
-    monkeypatch.setattr("irispy.sji.remove_cosmic_rays", fake_remove_cosmic_rays)
+    monkeypatch.setattr("irispy.utils.cosmic_rays._remove_cosmic_rays_astroscrappy", fake_remove_cosmic_rays)
 
     original_data = cube_2d.data.copy()
     cleaned_cube = cube_2d.remove_cosmic_rays(
@@ -295,7 +174,6 @@ def test_sjicube_remove_cosmic_rays(cube_2d, monkeypatch):
     assert cleaned_cube.meta["scaled"] == cube_2d.meta["scaled"]
     assert cleaned_cube.dust_masked == cube_2d.dust_masked
     assert list(cleaned_cube.extra_coords.keys()) == list(cube_2d.extra_coords.keys())
-    assert captured["method"] == "astroscrappy"
     assert captured["sigma"] == 2.0
     assert captured["max_iters"] == 3
     assert captured["method_kwargs"] == {"readnoise": 4.0}

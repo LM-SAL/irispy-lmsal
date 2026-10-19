@@ -10,7 +10,9 @@ from astropy.time import Time
 from astropy.wcs.wcsapi import SlicedLowLevelWCS
 
 from ndcube import NDCollection
+from ndcube.utils.wcs import pixel_axis_to_physical_types
 from ndcube.visualization import PlotterDescriptor
+from ndcube.wcs.tools import unwrap_wcs_to_fitswcs
 from ndcube.wcs.wrappers import ResampledLowLevelWCS
 from sunpy import log as logger
 from sunraster import SpectrogramCube as SpecCube
@@ -22,7 +24,7 @@ from irispy.utils.constants import SLIT_WIDTH
 from irispy.utils.cosmic_rays import remove_cosmic_rays
 from irispy.visualization import SpectrogramPlotter
 
-__all__ = ["RasterCollection", "SpectrogramCube"]
+__all__ = ["MosaicCube", "RasterCollection", "SpectrogramCube"]
 
 
 class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
@@ -61,6 +63,26 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
         before saving it while False tries to save every parameter as reference.
         Note however that it is not always possible to save the input as reference.
         Default is False.
+
+    Examples
+    --------
+    The array axes are raster step or time, slit position and wavelength; the exposure
+    times are an extra coordinate:
+
+    >>> from irispy.data.test import get_test_filepath
+    >>> from irispy.io import read_files
+    >>> filename = get_test_filepath(
+    ...     "sns/iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits"
+    ... )
+    >>> cube = read_files(filename, spectral_windows="Si IV 1403")["Si IV 1403"][0]
+    >>> cube.shape, cube.unit, cube.wavelength_axis
+    ((187, 40, 29), Unit("DN_IRIS_FUV"), 2)
+    >>> cube.meta.spectral_window, cube.meta.rest_wavelength
+    ('Si IV 1403', <Quantity 140.277 nm>)
+    >>> cube.spectral_dispersion.to("pm")
+    <Quantity 25.44 pm>
+    >>> cube[:, 10:20, 5:10].shape
+    (187, 10, 5)
     """
 
     plotter = PlotterDescriptor(default_type=SpectrogramPlotter)
@@ -96,13 +118,12 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
             Obs Description:    {self.meta.get("OBS_DESC")}
             Obs Date:           {instance_start} -- {instance_end}
             Data shape:         {self.shape}
-            Axis Types:         {self.array_axis_physical_types}
+            Axis Types:         {self._wcs_array_axis_physical_types}
             Roll:               {self.meta.get("SAT_ROT")}
             """,
         )
 
-    def plot(self, *args, **kwargs):
-        return self.plotter.plot(*args, **kwargs)
+    remove_cosmic_rays = remove_cosmic_rays
 
     celestial_frame = property(_celestial_frame_from_cube)
     _get_crop_bounds = _raster_crop_bounds
@@ -173,42 +194,16 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
         )
         return new_cube
 
-    def remove_cosmic_rays(
-        self,
-        *,
-        method="rsliding",
-        sigma: float | None = None,
-        max_iters: int | None = None,
-        method_kwargs=None,
-    ):
+    @property
+    def _wcs_array_axis_physical_types(self):
         """
-        Return a cleaned copy of the cube with cosmic rays removed.
+        `~ndcube.NDCube.array_axis_physical_types` from the main WCS alone.
 
-        This is a convenience wrapper around `irispy.utils.cosmic_rays.remove_cosmic_rays`.
-
-        Parameters
-        ----------
-        method : ``{"rsliding", "astroscrappy"}``, optional
-            Backend used to detect and clean cosmic rays.
-        sigma : `float`, optional
-            Shared clipping threshold override for the selected backend.
-        max_iters : `int`, optional
-            Shared iteration-count override for the selected backend.
-        method_kwargs : `dict`, optional
-            Additional keyword arguments passed to the selected backend.
-
-        Returns
-        -------
-        `irispy.spectrograph.SpectrogramCube`
-            Cleaned cube with the same metadata and coordinates as the original.
+        The combined WCS, with the extra coordinates, raises on a length-1 step axis
+        (ndcube: mismatched pixel bounds), such as ``cube[0:1]`` or a one-exposure file.
         """
-        return remove_cosmic_rays(
-            self,
-            method=method,
-            sigma=sigma,
-            max_iters=max_iters,
-            method_kwargs=method_kwargs,
-        )
+        wcs = self.wcs.low_level_wcs
+        return [tuple(pixel_axis_to_physical_types(axis, wcs).tolist()) for axis in reversed(range(wcs.pixel_n_dim))]
 
     @property
     def _fits_wcsprm(self):
@@ -263,12 +258,105 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
         try:
             return next(
                 axis
-                for axis, physical_types in enumerate(self.array_axis_physical_types)
+                for axis, physical_types in enumerate(self._wcs_array_axis_physical_types)
                 if physical_types and "em.wl" in physical_types
             )
         except StopIteration:
             msg = "Could not identify a spectral wavelength axis on the cube"
             raise ValueError(msg) from None
+
+
+def _wavelength_indices(wavelengths, wavelength_range, *, allow_empty=False):
+    """
+    Indices of the ``wavelengths`` between two wavelengths, inclusive.
+
+    The bounds are widened by 1e-6 Å, so that a wavelength typed from the grid is kept
+    despite the rounding of the WCS unit conversion. With ``allow_empty=True``, a range
+    without samples returns an empty array.
+    """
+    wavelength_range = u.Quantity(wavelength_range, u.AA)
+    if wavelength_range.shape != (2,):
+        msg = f"Expected two wavelengths, got {wavelength_range}"
+        raise ValueError(msg)
+    low, high = wavelength_range + [-1e-6, 1e-6] * u.AA
+    indices = np.flatnonzero((wavelengths >= low) & (wavelengths <= high))
+    if not indices.size and not allow_empty:
+        msg = f"No wavelengths between {wavelength_range[0]} and {wavelength_range[1]}"
+        raise ValueError(msg)
+    return indices
+
+
+class MosaicCube(SpectrogramCube):
+    """
+    An IRIS full-disk mosaic of one spectral window, read by `irispy.io.read_mosaic`.
+
+    The array axes are (wavelength, solar Y, solar X), the reverse of a Level 2 raster,
+    so the raster analysis helpers reject it; use `to_map` and
+    `~irispy.utils.moments.calculate_moments`.
+    """
+
+    def __str__(self) -> str:
+        return textwrap.dedent(
+            f"""
+            MosaicCube
+            ----------
+            Obs ID:          {self.meta.get("OBSID")}
+            Rest wavelength: {self.meta.get("LAMREF")} Angstrom
+            Obs Date:        {self.meta.get("DATE_OBS")} -- {self.meta.get("DATE_END")}
+            Data shape:      {self.shape}
+            Axis Types:      {self.array_axis_physical_types}
+            """,
+        )
+
+    def to_map(self, wavelength):
+        """
+        Return a `sunpy.map.Map` at one wavelength or averaged over a range.
+
+        The color map is that of the nearest slit-jaw passband. Masked values are left
+        out of the average.
+
+        Parameters
+        ----------
+        wavelength : `astropy.units.Quantity`
+            One wavelength, for the nearest mosaic wavelength, or two, for the mean
+            between them (inclusive).
+
+        Returns
+        -------
+        `sunpy.map.GenericMap`
+        """
+        from sunpy.map import Map  # NOQA: PLC0415
+
+        wavelength = u.Quantity(wavelength, u.AA)
+        axis = self.wavelength_axis
+        wavelengths = u.Quantity(self.axis_world_coords(axis)[0], u.AA)
+        if wavelength.isscalar:
+            indices = [np.argmin(np.abs(wavelengths - wavelength))]
+        else:
+            indices = _wavelength_indices(wavelengths, wavelength)
+        data = np.take(self.data, indices, axis=axis)
+        if self.mask is not None:
+            data = np.where(np.take(self.mask, indices, axis=axis), np.nan, data)
+        # A masked mean leaves positions with no unmasked value NaN, without a warning.
+        data = np.ma.masked_invalid(data).mean(axis=axis).filled(np.nan)
+        header = unwrap_wcs_to_fitswcs(self.wcs)[0].celestial.to_header()
+        mean_wavelength = wavelengths[indices].mean()
+        header.update(
+            {
+                "TELESCOP": "IRIS",
+                "OBSRVTRY": "IRIS",
+                "INSTRUME": "SPEC",  # the Level 2 spectrograph value
+                "EXPTIME": self.meta.get("EXPTIME"),
+                "DATE-END": self.meta.get("DATE_END"),
+                "WAVELNTH": mean_wavelength.to_value(u.AA),
+                "WAVEUNIT": "Angstrom",
+                "BUNIT": "DN",
+            }
+        )
+        sunpy_map = Map(data, header)
+        passband = min((1330, 1400, 2796, 2832), key=lambda band: abs(band - mean_wavelength.to_value(u.AA)))
+        sunpy_map.plot_settings["cmap"] = f"irissji{passband}"
+        return sunpy_map
 
 
 class RasterCollection(NDCollection):

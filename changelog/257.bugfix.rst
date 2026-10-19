@@ -1,0 +1,1 @@
+`~irispy.io.read_sji_lvl2` now names bytes or an `~astropy.io.fits.HDUList` it refuses as ``The data given (bytes)`` or ``The data given (HDUList)`` in its "is not an IRIS level 2 SJI file" error, instead of ``filename``.

@@ -16,8 +16,9 @@ from irispy.io._raster_combine import _lazy_raster_scan_chunk_rows
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.io.utils import read_files
 from irispy.spectrograph import SpectrogramCube
-from irispy.tests.helpers import make_test_spectrogram_cube
+from irispy.tests.helpers import figure_test, make_test_spectrogram_cube
 from irispy.utils.constants import BAD_PIXEL_VALUE_UNSCALED, SLIT_WIDTH
+from irispy.visualization import _registered_colormap
 
 LON, LAT = "custom:pos.helioprojective.lon", "custom:pos.helioprojective.lat"
 SPATIAL_AXES = [("HPLT-TAN", "arcsec", 0.1, 0), ("HPLN-TAN", "arcsec", 0.1, 0)]
@@ -46,13 +47,11 @@ def test_fits_data_comparison(sns_sg_file):
 def test_spectrogram_cube_remove_cosmic_rays(sns_sg_file, monkeypatch):
     captured = {}
 
-    def fake_remove_cosmic_rays(cube, **kwargs):
-        captured.update(kwargs, mask=cube.mask.copy())
-        return cube.to_nddata(
-            data=cube.data + 2, mask="copy", nddata_type=type(cube), extra_coords="copy", global_coords="copy"
-        )
+    def fake_remove_cosmic_rays(data, mask, **kwargs):
+        captured.update(kwargs, mask=mask.copy())
+        return data + 2
 
-    monkeypatch.setattr("irispy.spectrograph.remove_cosmic_rays", fake_remove_cosmic_rays)
+    monkeypatch.setattr("irispy.utils.cosmic_rays._remove_cosmic_rays_astroscrappy", fake_remove_cosmic_rays)
     raster = read_spectrograph_lvl2(sns_sg_file)
     cube = raster[next(iter(raster))]
     cleaned_cube = cube.remove_cosmic_rays(
@@ -60,7 +59,7 @@ def test_spectrogram_cube_remove_cosmic_rays(sns_sg_file, monkeypatch):
     )
 
     np.testing.assert_array_equal(captured.pop("mask"), cube.mask)
-    assert captured == {"method": "astroscrappy", "sigma": 5.0, "max_iters": 5, "method_kwargs": {"batch_size": 16}}
+    assert captured == {"sigma": 5.0, "max_iters": 5, "method_kwargs": {"batch_size": 16}}
     np.testing.assert_array_equal(cleaned_cube.data, cube.data + 2)
     np.testing.assert_array_equal(cleaned_cube.mask, cube.mask)
     assert list(cleaned_cube.extra_coords.keys()) == list(cube.extra_coords.keys())
@@ -437,6 +436,13 @@ def test_pixel_scales_need_a_fits_wcs(combined_si_iv):
         _ = cube.spectral_dispersion
 
 
+def test_length_one_step_axis(sns_sg_file):
+    # The combined WCS of a length-1 step axis raises in ndcube
+    cube = read_spectrograph_lvl2(sns_sg_file)["C II 1336"][0:1]
+    assert cube.wavelength_axis == 2
+    assert "('em.wl',)" in str(cube)
+
+
 def test_pixel_scales_real_data(sns_sg_file):
     cube = read_files(sns_sg_file)["Si IV 1403"]
 
@@ -474,13 +480,24 @@ def test_fits_wcs_cube_keeps_native_pixel_scales(derive):
 
 @pytest.mark.parametrize(
     ("item", "kwargs", "cmaps"),
-    [(0, {}, ["viridis"]), (0, {"cmap": "gray"}, ["gray"]), ((0, 20), {"cmap": "gray"}, [])],
+    [(0, {}, ["irissjiFUV"]), (0, {"cmap": "gray"}, ["gray"]), ((0, 20), {"cmap": "gray"}, [])],
     ids=["default", "cmap", "1d_drops_cmap"],
 )
 def test_spectrogram_cube_plot_defaults(sns_sg_file, item, kwargs, cmaps):
     ax = read_files(sns_sg_file)["Si IV 1403"][item].plot(**kwargs)
     assert [image.get_cmap().name for image in ax.images] == cmaps
     plt.close(ax.figure)
+
+
+def test_default_colormap_falls_back_to_viridis():
+    assert _registered_colormap("irissjiNUV") == "irissjiNUV"
+    assert _registered_colormap("irissji1700") == "viridis"
+
+
+@figure_test
+def test_spectrogram_figure(sns_sg_file):
+    # One exposure of the Si IV 1403 window: slit position against wavelength
+    read_files(sns_sg_file)["Si IV 1403"][0].plot()
 
 
 def test_raster_collection_aligned_axis_physical_types_are_sorted(sns_sg_file):

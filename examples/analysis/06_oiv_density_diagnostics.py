@@ -24,7 +24,7 @@ from irispy.utils.density import density_diagnostic
 
 ###############################################################################
 # We will reproduce aspects of the top row of Fig. 4 from
-# `Dudík et al. (2014) <https://doi.org/10.1088/2041-8205/780/1/L12>`__, which shows the O IV line
+# :cite:t:`dudik2014`, which shows the O IV line
 # ratios as a function of electron density for three different Maxwellian temperatures.
 
 density = np.logspace(9, 12, 20) * u.cm**-3
@@ -38,14 +38,14 @@ ion = fiasco.Ion("O IV", temperature_samples, ask_before=False)
 o4_models = list(zip(line_styles, temperature_labels, temperature_samples, strict=True))
 
 ratio_definitions = [
-    ("O IV 1401.16 / 1404.78Å", 1401.157 * u.angstrom, 1404.806 * u.angstrom),
-    ("O IV 1404.78 / 1399.77Å", 1404.806 * u.angstrom, 1399.780 * u.angstrom),
+    ("O IV 1401.16 / 1404.78 Å", 1401.157 * u.angstrom, 1404.806 * u.angstrom),
+    ("O IV 1404.78 / 1399.77 Å", 1404.806 * u.angstrom, 1399.780 * u.angstrom),
 ]
 
 ###############################################################################
 # The exact curve values will differ somewhat from the paper because this example
 # uses the current CHIANTI database through `fiasco` rather than the CHIANTI
-# version used by Dudík et al. (2014).
+# version used by :cite:t:`dudik2014`.
 #
 # `~irispy.utils.density.density_diagnostic` needs measured line intensities as
 # input because it maps an observed ratio back to density. To plot the diagnostic
@@ -99,7 +99,7 @@ for ax, (title, numerator, denominator) in zip(axes, ratio_definitions, strict=T
         color="tab:red",
         marker="o",
         linestyle="none",
-        label=r"synthetic observation ($\log T = 5.15$)",
+        label=r"synthetic observation ($\log(T / \mathrm{K}) = 5.15$)",
     )
     ax.set_title(title)
     ax.set_xlabel(r"$\log(n_e / \mathrm{cm^{-3}})$")

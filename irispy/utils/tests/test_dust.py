@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -5,8 +7,16 @@ from scipy import ndimage
 
 from astropy import units as u
 
+from irispy.io import read_files
 from irispy.tests.helpers import figure_test
-from irispy.utils.dust import _local_median_fill, remove_dust
+from irispy.utils.dust import _local_median_fill, calculate_dust_mask, remove_dust
+
+
+@pytest.mark.parametrize("method", [False, True])
+def test_remove_dust_rejects_unscaled_data(sns_sji_1330_file, method):
+    cube = read_files(sns_sji_1330_file, memmap=True)
+    with pytest.raises(ValueError, match=r"unscaled.*memmap=False"):
+        cube.remove_dust() if method else remove_dust(cube)
 
 
 def test_remove_dust_repairs_pixels_from_neighboring_frames(sns_sjicube_1330):
@@ -96,102 +106,31 @@ def test_remove_dust_exposure_normalize_uses_exposure_time(sns_sjicube_1330, mon
     assert cleaned.data[1, 0, 0] != np.median([10.0, 40.0, 80.0])
 
 
-def test_remove_dust_exposure_normalize_scalar_exposure_time_falls_back(sns_sjicube_1330, monkeypatch):
-    # Two otherwise-identical cubes: one with exposure_normalize=True and a bad
-    # exposure_time, and one with exposure_normalize=False
-    cube_norm = sns_sjicube_1330[:4, :1, :1]
-    cube_no_norm = sns_sjicube_1330[:4, :1, :1]
-
-    for cube in (cube_norm, cube_no_norm):
-        cube.data[...] = 1.0
-        cube.mask = np.zeros_like(cube.data, dtype=bool)
-
-    dust_mask = np.zeros_like(cube_norm.data, dtype=bool)
+@pytest.mark.parametrize(
+    "exposure_time",
+    [pytest.param(2 * u.s, id="scalar"), pytest.param([1, 2, 3] * u.s, id="wrong-length")],
+)
+def test_remove_dust_exposure_normalize_invalid_exposure_time_falls_back(sns_sjicube_1330, monkeypatch, exposure_time):
+    cube = sns_sjicube_1330[:4, :1, :1]
+    cube.data[...] = 1.0
+    cube.data[1, 0, 0] = 0.0
+    dust_mask = np.zeros(cube.shape, dtype=bool)
     dust_mask[1, 0, 0] = True
-    cube_norm.data[1, 0, 0] = 0.0
-    cube_no_norm.data[1, 0, 0] = 0.0
-    cube_norm.mask[1, 0, 0] = True
-    cube_no_norm.mask[1, 0, 0] = True
-
-    # Bad exposure_time: scalar instead of 1D array matching the time axis
-    monkeypatch.setattr(type(cube_norm), "exposure_time", property(lambda _self: 2.0 * u.s))
-
-    cleaned_no_norm = remove_dust(
-        cube_no_norm,
-        dust_mask=dust_mask,
-        temporal_window=1,
-        exposure_normalize=False,
-    )
-    cleaned_norm = remove_dust(
-        cube_norm,
-        dust_mask=dust_mask,
-        temporal_window=1,
-        exposure_normalize=True,
+    cube.mask = dust_mask.copy()
+    monkeypatch.setattr(type(cube), "exposure_time", property(lambda _self: exposure_time))
+    warning = (
+        nullcontext()
+        if exposure_time.isscalar
+        else pytest.warns(UserWarning, match="exposure_normalize=True but the number of exposure_time values")
     )
 
-    # With an invalid exposure_time, the function should fall back to the
-    # non-normalized behavior without raising
-    np.testing.assert_allclose(cleaned_norm.data, cleaned_no_norm.data)
-
-
-def test_remove_dust_exposure_normalize_wrong_length_exposure_time_falls_back(sns_sjicube_1330, monkeypatch):
-    cube_norm = sns_sjicube_1330[:4, :1, :1]
-    cube_no_norm = sns_sjicube_1330[:4, :1, :1]
-
-    for cube in (cube_norm, cube_no_norm):
-        cube.data[...] = 1.0
-        cube.mask = np.zeros_like(cube.data, dtype=bool)
-
-    dust_mask = np.zeros_like(cube_norm.data, dtype=bool)
-    dust_mask[2, 0, 0] = True
-    cube_norm.data[2, 0, 0] = 0.0
-    cube_no_norm.data[2, 0, 0] = 0.0
-    cube_norm.mask[2, 0, 0] = True
-    cube_no_norm.mask[2, 0, 0] = True
-
-    # Bad exposure_time: array length does not match number of time steps (4)
-    monkeypatch.setattr(type(cube_norm), "exposure_time", property(lambda _self: u.Quantity([1, 2, 3], u.s)))
-
-    cleaned_no_norm = remove_dust(
-        cube_no_norm,
-        dust_mask=dust_mask,
-        temporal_window=1,
-        exposure_normalize=False,
-    )
-    with pytest.warns(UserWarning, match=r"exposure_normalize=True but the number of exposure_time values"):
-        cleaned_norm = remove_dust(
-            cube_norm,
-            dust_mask=dust_mask,
-            temporal_window=1,
-            exposure_normalize=True,
-        )
-
-    # Again, we should fall back to the same behavior as exposure_normalize=False
-    np.testing.assert_allclose(cleaned_norm.data, cleaned_no_norm.data)
-
-
-def test_remove_dust_warns_when_exposure_time_length_mismatches_frames(sns_sjicube_1330, monkeypatch):
-    cube = sns_sjicube_1330[:4, :3, :3]
-    cube.data[...] = np.array(
-        [
-            [[10, 10, 10], [10, 10, 10], [10, 10, 10]],
-            [[20, 20, 20], [20, 0, 20], [20, 20, 20]],
-            [[10, 10, 10], [10, 10, 10], [10, 10, 10]],
-            [[20, 20, 20], [20, 20, 20], [20, 20, 20]],
-        ],
-        dtype=float,
-    )
-    cube.mask = np.zeros_like(cube.data, dtype=bool)
-    dust_mask = np.zeros_like(cube.data, dtype=bool)
-    dust_mask[1, 1, 1] = True
-
-    monkeypatch.setattr(type(cube), "exposure_time", property(lambda _self: np.array([1.0, 2.0]) * u.s))
-
-    with pytest.warns(UserWarning, match=r"exposure_normalize=True but the number of exposure_time values"):
+    with warning:
         cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=1, exposure_normalize=True)
 
-    assert type(cleaned) is type(cube)
-    assert cleaned.data.shape == cube.data.shape
+    np.testing.assert_array_equal(cleaned.data, np.ones(cube.shape))
+    assert not cleaned.mask.any()
+    assert cube.data[1, 0, 0] == 0
+    np.testing.assert_array_equal(cube.mask, dust_mask)
 
 
 def test_remove_dust_broadcasts_2d_mask_over_time(sns_sjicube_1330):
@@ -240,52 +179,19 @@ def test_remove_dust_raises_for_incompatible_mask_shapes(sns_sjicube_1330, mask_
     assert "shape" in message
 
 
-def test_remove_dust_uses_spatial_fallback_for_single_images(sns_sjicube_1330):
+@pytest.mark.parametrize(("fallback", "expected", "unfilled"), [("spatial", 5, False), (None, 0, True)])
+def test_remove_dust_spatial_fallback_for_single_images(sns_sjicube_1330, fallback, expected, unfilled):
     cube = sns_sjicube_1330[0, :3, :3]
-    cube.data[...] = np.array(
-        [
-            [5, 5, 5],
-            [5, 0, 9],
-            [5, 5, 5],
-        ],
-        dtype=float,
-    )
-    cube.mask = np.zeros_like(cube.data, dtype=bool)
-    dust_mask = np.zeros_like(cube.data, dtype=bool)
+    cube.data[...] = [[5, 5, 5], [5, 0, 9], [5, 5, 5]]
+    cube.mask = np.zeros(cube.shape, dtype=bool)
+    dust_mask = np.zeros(cube.shape, dtype=bool)
     dust_mask[1, 1] = True
 
-    cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=0, spatial_box=3)
+    cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=0, spatial_box=3, fallback=fallback)
 
-    assert cleaned.data[1, 1] == 5
-    assert cleaned.mask[1, 1] is np.False_
-    assert cleaned.dust_masked is False
-
-
-def test_remove_dust_keeps_unfilled_pixels_masked_when_fallback_disabled(sns_sjicube_1330):
-    cube = sns_sjicube_1330[0, :3, :3]
-    cube.data[...] = np.array(
-        [
-            [5, 5, 5],
-            [5, 0, 9],
-            [5, 5, 5],
-        ],
-        dtype=float,
-    )
-    cube.mask = np.zeros_like(cube.data, dtype=bool)
-    dust_mask = np.zeros_like(cube.data, dtype=bool)
-    dust_mask[1, 1] = True
-
-    cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=0, fallback=None)
-
-    assert cleaned.data[1, 1] == 0
-    assert cleaned.mask[1, 1] is np.True_
-    assert cleaned.dust_masked is True
-
-    cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=0, spatial_box=3)
-
-    assert cleaned.data[1, 1] == 5
-    assert cleaned.mask[1, 1] is np.False_
-    assert cleaned.dust_masked is False
+    assert cleaned.data[1, 1] == expected
+    np.testing.assert_array_equal(cleaned.mask, dust_mask if unfilled else np.zeros_like(dust_mask))
+    assert cleaned.dust_masked is unfilled
 
 
 def test_remove_dust_rejects_string_none_fallback(sns_sjicube_1330):
@@ -369,3 +275,72 @@ def test_local_median_fill_matches_generic_filter(spatial_box):
     result = _local_median_fill(frame, invalid, spatial_box, target)
     np.testing.assert_array_equal(result[target], expected[target])
     assert np.isnan(result[~target]).all()
+
+
+def _dark_fraction(frame, where):
+    """
+    The share of the pixels at ``where`` darker than half their 15 by 15 neighborhood.
+    """
+    frame = np.asarray(frame, dtype=float)
+    local = ndimage.median_filter(np.nan_to_num(frame, nan=np.nanmedian(frame)), 15)
+    return float(((frame / np.maximum(local, 1)) < 0.5)[where].mean())
+
+
+@pytest.mark.remote_data
+@pytest.mark.parametrize("channel", ["SJI_1330", "SJI_1400", "SJI_2796", "SJI_2832"])
+def test_remove_dust_repairs_the_dust_of_each_channel(channel):
+    from irispy.data import sample  # NOQA: PLC0415
+
+    cube = read_files(str(getattr(sample, channel)))
+    dust_mask = calculate_dust_mask(cube)
+    cleaned = remove_dust(cube)
+
+    core = ndimage.binary_erosion(dust_mask[0], np.ones((3, 3)))
+    elsewhere = ~dust_mask[0] & np.isfinite(np.asarray(cube.data[0]))
+    assert _dark_fraction(cube.data[0], core) > _dark_fraction(cube.data[0], elsewhere) + 0.2
+    assert _dark_fraction(cleaned.data[0], core) < _dark_fraction(cube.data[0], elsewhere) + 0.05
+
+
+@pytest.mark.remote_data
+def test_calculate_dust_mask_follows_slicing():
+    from irispy.data import sample  # NOQA: PLC0415
+
+    cube = read_files(str(sample.SJI_2832))
+    dust_mask = calculate_dust_mask(cube)
+    assert dust_mask.shape == cube.shape
+    assert dust_mask.any()
+    np.testing.assert_array_equal(calculate_dust_mask(cube[2:5, 30:, 40:]), dust_mask[2:5, 30:, 40:])
+    np.testing.assert_array_equal(calculate_dust_mask(cube[3]), dust_mask[3])
+    # A crop whose edge is next to a bad pixel still gets the dilation into it
+    rows, columns = np.nonzero(dust_mask[3])
+    y0, x0 = rows.min() + 1, columns.min() + 1
+    np.testing.assert_array_equal(calculate_dust_mask(cube[3, y0:, x0:]), dust_mask[3, y0:, x0:])
+
+
+def test_calculate_dust_mask_has_the_cube_shape(sns_sjicube_2832):
+    dust_mask = calculate_dust_mask(sns_sjicube_2832)
+    assert dust_mask.shape == sns_sjicube_2832.shape
+    assert dust_mask.dtype == bool
+    assert not dust_mask[np.isnan(np.asarray(sns_sjicube_2832.data))].any()
+
+
+def test_calculate_dust_mask_rejects_other_instruments(aia_1700_file):
+    with pytest.raises(ValueError, match="No bad-pixel table"):
+        calculate_dust_mask(read_files(aia_1700_file))
+
+
+def test_remove_dust_leaves_pixels_without_values(sns_sjicube_1330):
+    cube = sns_sjicube_1330[:3, :4, :4]
+    cube.data[...] = 10.0
+    cube.data[1, 1, 1] = np.nan
+    cube.mask = np.isnan(cube.data)
+    dust_mask = np.zeros(cube.shape, dtype=bool)
+    dust_mask[1, 1, 1] = True
+    dust_mask[1, 2, 2] = True
+
+    cleaned = remove_dust(cube, dust_mask=dust_mask, exposure_normalize=False)
+
+    assert np.isnan(cleaned.data[1, 1, 1])
+    assert cleaned.mask[1, 1, 1]
+    assert cleaned.data[1, 2, 2] == 10
+    assert not cleaned.mask[1, 2, 2]

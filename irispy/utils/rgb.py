@@ -14,7 +14,8 @@ import numpy as np
 
 import astropy.units as u
 
-from irispy.utils.utils import _import_optional
+from irispy.utils._spectral import check_scaled
+from irispy.utils.utils import _boolean_mask, _import_optional
 from irispy.visualization import LAT_AXIS_LABEL, LON_AXIS_LABEL
 
 __all__ = ["asinh_velocity", "calculate_rgb", "linear_velocity", "plot_rgb"]
@@ -24,7 +25,7 @@ def _colorbar_axes(ax, fraction, pad):
     """
     Split the grid cell of ``ax`` so the colorbar stays under the layout engine.
 
-    `mpl_toolkits.axes_grid1` hides the colorbar from the engine, so neighbouring panels
+    `mpl_toolkits.axes_grid1` hides the colorbar from the engine, so neighboring panels
     overlap it; `matplotlib.colorbar.make_axes_gridspec` registers it as a colorbar of
     ``ax``, and constrained layout then moves it into a margin.
     """
@@ -128,14 +129,14 @@ def calculate_rgb(
         in one wavelength bin. Finite-width lines can have different colors at the
         same peak intensity; this is not a calibration of line intensity or velocity.
     """
+    check_scaled(cube)
     colorsynth = _import_optional("colorsynth", reason="false-color RGB images", extra="rgb")
     if len(cube.shape) != 3:
         msg = f"A false-color image needs a three dimensional cube, got shape {cube.shape}"
         raise ValueError(msg)
     axis_wavelength = cube.wavelength_axis
-    # The mask may cover only some axes.
-    mask = None if cube.mask is None else np.broadcast_to(np.asarray(cube.mask, dtype=bool), np.shape(cube.data))
-    data = np.ma.filled(np.ma.MaskedArray(cube.data, mask=mask, dtype=float), np.nan)
+    data = np.ma.filled(np.ma.MaskedArray(cube.data, mask=_boolean_mask(cube), dtype=float), np.nan)
+    data[np.isinf(data)] = np.nan  # blank like a masked sample
     wavelength = u.Quantity(cube.spectral_axis).to(u.AA)
     if wavelength.ndim != 1:
         msg = f"The wavelength coordinate must be one dimensional, got shape {wavelength.shape}"
@@ -226,7 +227,7 @@ def plot_rgb(
         coordinates and ``"auto"`` for time; use ``"auto"`` for a raster with few steps too.
     rest_wavelength : `astropy.units.Quantity` or `False`, optional
         Rest wavelength for the color mapping and the optical Doppler velocity axis,
-        as in `calculate_rgb`. Defaults to ``TWAVE`` from the metadata. `False` hides
+        as in `calculate_rgb`. Defaults to ``cube.meta.rest_wavelength``. `False` hides
         the velocity axis while retaining the metadata color mapping.
     cbar_fraction : `float`, optional
         Fraction of ``ax`` given to the colorbar when ``cax`` is not given.

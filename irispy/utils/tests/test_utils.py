@@ -3,24 +3,7 @@ import numpy.testing as np_test
 import pytest
 
 from irispy import utils
-from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, DN_UNIT, READOUT_NOISE
-
-data_dust = np.array(
-    [
-        [[-1, 2, -3, 4], [2, BAD_PIXEL_VALUE_SCALED, 5, 3], [0, 1, 2, -300]],
-        [[2, BAD_PIXEL_VALUE_SCALED, 5, 1], [10, -5, 2, 2], [10, -3, 3, 0]],
-    ],
-)
-dust_mask_expected = np.array(
-    [
-        [
-            [True, True, True, True],
-            [True, True, True, True],
-            [True, True, False, False],
-        ],
-        [[True, True, True, False], [True, True, True, True], [True, True, True, True]],
-    ],
-)
+from irispy.utils.constants import DN_UNIT, READOUT_NOISE
 
 
 @pytest.mark.parametrize(
@@ -35,16 +18,14 @@ def test_get_detector_type(test_input, expected_output):
     assert utils.get_detector_type(test_input) == expected_output
 
 
-@pytest.mark.parametrize(("input_array", "expected_array"), [(data_dust, dust_mask_expected)])
-def test_calculate_dust_mask(input_array, expected_array):
-    np_test.assert_array_equal(utils.calculate_dust_mask(input_array), expected_array)
+@pytest.mark.parametrize(
+    ("dtype", "expected"),
+    [(np.int16, (4.0, 16.0)), (np.float64, (3.99920004, 9.00360036))],
+)
+def test_image_clipping(dtype, expected):
+    image = np.array([0, 0, 0, 1, 2, 3, 4, 9], dtype=dtype)
 
-
-def test_calculate_dust_mask_2d():
-    data = np.ones((3, 3))
-    data[1, 1] = 0
-
-    np_test.assert_array_equal(utils.calculate_dust_mask(data), np.ones((3, 3), dtype=bool))
+    np_test.assert_allclose(utils.image_clipping(image, cutoff=0.2, gamma=2), expected)
 
 
 def test_import_optional_missing_module_names_the_extra():
@@ -60,6 +41,16 @@ def test_import_optional_preserves_transitive_import_error(monkeypatch):
     monkeypatch.setattr(utils.utils, "import_module", import_module)
     with pytest.raises(ModuleNotFoundError, match="transitive_dependency"):
         utils.utils._import_optional("optional_module", reason="testing", extra="tests")
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_calculate_uncertainty_keeps_the_data_dtype(dtype):
+    # Level 2 data are float32; the readout noise scalar used to promote the uncertainty to float64
+    data = np.array([0.0, 50.0, 3000.0], dtype=dtype)
+    uncertainty = utils.calculate_uncertainty(data, READOUT_NOISE["SJI"], DN_UNIT["SJI"])
+    assert uncertainty.dtype == dtype
+    expected = utils.calculate_uncertainty(data.astype(np.float64), READOUT_NOISE["SJI"], DN_UNIT["SJI"])
+    np_test.assert_allclose(uncertainty, expected, rtol=1e-6)
 
 
 def test_calculate_uncertainty_of_negative_data():

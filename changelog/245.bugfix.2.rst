@@ -1,0 +1,1 @@
+``calculate_moments`` with a ``velocity_range`` now accepts a scalar or lower-dimensional mask and ``subtract_background`` an integer one, as the other analysis functions do.

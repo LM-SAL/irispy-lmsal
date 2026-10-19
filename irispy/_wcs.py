@@ -1,6 +1,8 @@
+import numpy as np
+
+from astropy.utils.shapes import simplify_basic_index
 from astropy.wcs import WCS
 from astropy.wcs.utils import wcs_to_celestial_frame
-from astropy.wcs.wcsapi.wrappers.sliced_wcs import sanitize_slices
 
 from sunpy.coordinates.frames import Helioprojective
 
@@ -17,12 +19,14 @@ def _celestial_frame_from_cube(cube):
     if observer is not None:
         return Helioprojective(observer=observer, obstime=observer.obstime)
 
-    fits_wcs = cube.fits_wcs
-    if fits_wcs is None:
-        fits_wcs = cube.meta.get("fits_wcs")
-    if fits_wcs is None and cube.meta.get("frame_wcs_headers") is not None:
-        # A rebinned SJI cube has no fits_wcs, but binning does not change the frame.
-        fits_wcs = WCS(cube.meta["frame_wcs_headers"][0])
+    headers = cube.meta.get("frame_wcs_headers")
+    if headers is not None:
+        # The first frame, whatever the slice: fits_wcs follows an integer index and a rebinned cube has none.
+        fits_wcs = WCS(headers[0])
+    else:
+        fits_wcs = cube.fits_wcs
+        if fits_wcs is None:
+            fits_wcs = cube.meta.get("fits_wcs")
     if isinstance(fits_wcs, list):
         fits_wcs = fits_wcs[0] if fits_wcs else None
     if fits_wcs is None or not hasattr(fits_wcs, "celestial"):
@@ -45,15 +49,22 @@ class _ResolveNegativeIndicesMixin:
     """
 
     def __getitem__(self, item):
-        if isinstance(item, tuple) and item.count(Ellipsis) == 1:
-            # sanitize_slices counts the Ellipsis itself against the dimensionality.
-            at = item.index(Ellipsis)
-            item = (*item[:at], *[slice(None)] * (len(self.shape) - len(item) + 1), *item[at + 1 :])
-        # sanitize_slices raises for any step other than 1, so dropping the step loses nothing.
-        item = tuple(
-            slice(*index.indices(length)[:2]) if isinstance(index, slice) else range(length)[index]
-            for index, length in zip(sanitize_slices(item, len(self.shape)), self.shape, strict=True)
-        )
+        if any(np.iterable(index) for index in (item if isinstance(item, tuple | list) else (item,))):
+            # As ndcube, where sanitize_slices rejects an array index, which simplify_basic_index trips over
+            msg = "This slice is invalid, only integer or range slices are supported."
+            raise IndexError(msg)
+        # Against the shape, so that negative indices resolve here
+        try:
+            item = simplify_basic_index(item, shape=self.shape)
+        except np.exceptions.AxisError:
+            # An IndexError, as for arrays, not numpy's AxisError, which is a ValueError and speaks of axes
+            msg = f"Index {item} is out of range for a cube of shape {self.shape}"
+            raise IndexError(msg) from None
+        # A sliced WCS cannot describe a step, so dropping the step below loses nothing
+        if any(isinstance(index, slice) and index.step not in (None, 1) for index in item):
+            msg = "Slicing WCS with a step is not supported."
+            raise IndexError(msg)
+        item = tuple(slice(index.start, index.stop) if isinstance(index, slice) else index for index in item)
         if 0 not in self.shape and any(isinstance(index, slice) and index.start >= index.stop for index in item):
             msg = "Slicing would give a length-0 axis, which a WCS cannot describe."
             raise IndexError(msg)

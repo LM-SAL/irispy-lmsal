@@ -1,3 +1,5 @@
+import copy
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -104,6 +106,12 @@ def test_calculate_rgb_colors_the_short_wavelength_line_blue(shifted_line_cube):
 def test_calculate_rgb_rejects_a_cube_that_is_not_three_dimensional(si_iv_cube):
     with pytest.raises(ValueError, match="three dimensional cube"):
         calculate_rgb(si_iv_cube[0])
+
+
+def test_calculate_rgb_rejects_unscaled_data():
+    cube = make_test_spectrogram_cube(np.ones((1, 1, 5), dtype=np.int16), np.arange(5) * u.nm)
+    with pytest.raises(ValueError, match="unscaled"):
+        calculate_rgb(cube)
 
 
 def test_calculate_rgb_entirely_masked_cube():
@@ -287,3 +295,10 @@ def test_plot_rgb_figure():
     plot_rgb(cube, ax=axes[1], vmax=100, stretch=np.sqrt, wavelength_min=wavelength_min, wavelength_max=wavelength_max)
     axes[1].set_title("+/-50 km/s, sqrt stretch")
     return fig
+
+
+def test_calculate_rgb_blanks_clipped_samples(si_iv_cube):
+    clipped, masked = copy.deepcopy(si_iv_cube), copy.deepcopy(si_iv_cube)
+    clipped.data[0, 0, 5] = np.inf  # blank, like a masked sample
+    masked.mask[0, 0, 5] = True
+    np.testing.assert_array_equal(calculate_rgb(clipped)[0], calculate_rgb(masked)[0])

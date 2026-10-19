@@ -8,28 +8,23 @@ In this example, we will showcase how to open, crop and plot IRIS spectrograph d
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pooch
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord, SpectralCoord
 from astropy.visualization import quantity_support
 
+from irispy.data import sample
 from irispy.io import read_files
+from irispy.utils.moments import average_window
 
 quantity_support()
 
 ###############################################################################
-# `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20180102_153155_3610108077_2018-01-02T15%3A31%3A552018-01-02T15%3A31%3A55.xml>`__.
-#
-# In this case, we will use ``pooch`` to keep this example self-contained
-# but you can download the data manually using your browser as well.
-#
-# You will need to update the path to the data in the next section if you do that.
+# We start with the raster sample file, which ``irispy.data.sample`` downloads on first use.
+# To use your own data, pass the path of a Level 2 raster tarball from the
+# `IRIS data archive <https://www.lmsal.com/hek/hcr>`__ to ``read_files`` instead.
 
-raster_filename = pooch.retrieve(
-    "https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2018/01/02/20180102_153155_3610108077/iris_l2_20180102_153155_3610108077_raster.tar.gz",
-    known_hash="8949562149cfa5fba067b5b102e8434b14cea3c3416dd79c06b7f6e211c61a39",
-)
+raster_filename = sample.RASTER_TAR
 
 ###############################################################################
 # We will now open the data using a helper function which is designed to read
@@ -38,14 +33,12 @@ raster_filename = pooch.retrieve(
 raster = read_files(raster_filename)
 
 ###############################################################################
-# Let us now explore what was returned.
-#
-# Provides an overview of the Spectrograph object
+# Let us now explore what was returned. Printing gives an overview of the raster collection.
 
 print(raster)
 
 ###############################################################################
-# Will give us all the keys that corresponds to all the wavelength windows.
+# The keys are the spectral windows.
 
 print(raster.keys())
 
@@ -55,8 +48,11 @@ print(raster.keys())
 mg_ii = raster["Mg II k 2796"]
 
 ###############################################################################
-# This observation contains a single raster, so the spectral window is already a
-# `irispy.spectrograph.SpectrogramCube` with scan-step, slit, and wavelength axes.
+# This observation has five complete rasters, so the spectral window is one
+# `irispy.spectrograph.SpectrogramCube` with raster scan, raster step, slit and
+# wavelength axes. ``raster_slice`` gives the first raster, which we work with.
+
+mg_ii = mg_ii.raster_slice(0)
 print(mg_ii)
 
 ###############################################################################
@@ -81,10 +77,10 @@ mg_ii_k_line = mg_ii.crop(
     [SpectralCoord(279.4, unit=u.nm), None, None, None], [SpectralCoord(279.9, unit=u.nm), None, None, None]
 )
 fig = plt.figure()
-wavelength_animation = mg_ii_k_line.plot(fig=fig, plot_axes=["x", "y", None], vmin=0, vmax=500).get_animation()
+wavelength_animation = mg_ii_k_line.plot(fig=fig, plot_axes=["x", "y", None], vmin=0, vmax=100).get_animation()
 
 ###############################################################################
-# We can plot a spectrum at raster step 120 and slit pixel 200 using the data directly.
+# We can plot a spectrum at raster step 8 and slit pixel 200 using the data directly.
 # We read the wavelengths of the Mg window by calling
 # `ndcube.NDCube.axis_world_coords` for "wl" (wavelength).
 
@@ -92,23 +88,19 @@ wavelength_animation = mg_ii_k_line.plot(fig=fig, plot_axes=["x", "y", None], vm
 
 fig, ax = plt.subplots()
 # The array still holds the fill values (-200) that the cube masks, so we hide them as well.
-ax.plot(mg_wave.to("AA"), np.where(mg_ii.mask[120, 200], np.nan, mg_ii.data[120, 200]))
+ax.plot(mg_wave.to("AA"), np.where(mg_ii.mask[8, 200], np.nan, mg_ii.data[8, 200]))
+ax.set_xlabel("Wavelength [Å]")
 ax.set_ylabel(f"Intensity [{mg_ii.unit}]")
 
 ###############################################################################
-# When we use the underlying data directly, we lose all the metadata, the mask and the WCS information.
-# So the main workflow for most code in ``irispy`` is to use provided WCS wherever possible
-# , and only use the underlying data when you need to do some custom processing.
+# Using the data directly loses the metadata, the mask and the WCS, so prefer the WCS
+# wherever possible and only use the data for custom processing.
 #
-# If you are unfamiliar with WCS, the following links are quite useful:
+# If you are unfamiliar with WCS, see the `astropy WCS <https://docs.astropy.org/en/stable/wcs/index.html>`__
+# and `WCSAxes <https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html>`__ documentation, and
+# `ndcube's guide to coordinates <https://docs.sunpy.org/projects/ndcube/en/stable/explaining_ndcube/coordinates.html>`__.
 #
-# * https://docs.astropy.org/en/stable/wcs/index.html
-# * https://docs.astropy.org/en/stable/visualization/wcsaxes/index.html
-#
-# Some of the higher-level utilities are via ndcube, e.g., coordinate transformations: https://docs.sunpy.org/projects/ndcube/en/stable/explaining_ndcube/coordinates.html.
-#
-# Now, let's take a look at the WCS information.
-# For example, what is the wavelength position that corresponds to Mg II k core (279.63 nm)?
+# For example, which wavelength pixel corresponds to the Mg II k core (279.63 nm)?
 
 iris_frame = mg_ii.celestial_frame
 wcs_loc = mg_ii.fits_wcs.world_to_pixel(
@@ -119,9 +111,8 @@ mg_index = int(np.round(wcs_loc[0]))
 print(mg_index)
 
 ###############################################################################
-# Now we will plot spectroheliogram for Mg II k core wavelength.
-# We can use the ``crop`` method to get this information, this will
-# require a `astropy.coordinates.SpectralCoord` object from `astropy.coordinates`.
+# Now we will plot a spectroheliogram at the Mg II k core wavelength, by cropping
+# with a `~astropy.coordinates.SpectralCoord`.
 
 # Note that this has to be in world-component order and that ``None`` means
 # that component is not cropped.
@@ -140,10 +131,20 @@ mg_spec_crop.plot(
 fig.tight_layout()
 
 ###############################################################################
-# Imagine there's a really cool feature at (-338", 275"), how can you plot
+# `~irispy.utils.moments.average_window` averages the samples in a wavelength window
+# into a map; here 279.4 to 279.9 nm around the Mg II k core.
+
+mg_ii_k_map = average_window(mg_ii, [279.4, 279.9] * u.nm)
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection=mg_ii_k_map.wcs)
+mg_ii_k_map.plot(axes=ax, plot_axes=["x", "y"])
+
+###############################################################################
+# Imagine there's a really cool feature at (-320", 400"), how can you plot
 # the spectrum at that location?
 
-target = SkyCoord(-338 * u.arcsec, 275 * u.arcsec, frame=iris_frame)
+target = SkyCoord(-320 * u.arcsec, 400 * u.arcsec, frame=iris_frame)
 raster_step, slit_pixel, _ = mg_ii.fits_wcs.world_to_array_index(SpectralCoord(279.63, unit=u.nm), target)
 mg_ii_cut = mg_ii.crop(
     mg_ii.wcs.array_index_to_world(raster_step, slit_pixel, 0),
@@ -157,15 +158,13 @@ mg_ii_cut.plot(axes=ax)
 plt.show()
 
 ###############################################################################
-#  Now, you may also be interested in knowing the time that was this observation taken.
-# There is some information in ``.meta``.
+# You may also want to know when this observation was taken. ``.meta`` describes the
+# observation as a whole.
 
 print(mg_ii.meta)
 
 ###############################################################################
-# But this is mostly about the observation in general.
-# Times of individual exposures are available on the cube's time coordinate.
-# For combined raster files this is indexed by raster scan and raster step.
+# The time of each exposure (raster step) is available as ``.time``.
 
 print(mg_ii.time)
 

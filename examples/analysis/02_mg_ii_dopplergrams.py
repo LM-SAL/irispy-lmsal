@@ -5,7 +5,11 @@ Produce Mg II Dopplergrams
 
 In this example, we are going to produce a Dopplergram for the Mg II k line from a
 400-step raster. The Dopplergram is obtained by subtracting the intensities at
-symmetrical velocity shifts from the line core (e.g., ±50 km/s).
+symmetrical velocity shifts from the line core (e.g., ±50 km/s), so every step needs
+the same wavelength scale. We measure and correct its drift with
+`~irispy.utils.wavelength_drift.calculate_wavelength_drift`, as the
+`IDL tutorial <https://iris.lmsal.com/itn26/tutorials.html#mg-ii-dopplergrams>`__ does
+with ``iris_prep_wavecorr_l2``.
 """
 
 import matplotlib.pyplot as plt
@@ -19,6 +23,8 @@ from astropy.coordinates import SpectralCoord
 
 from irispy.io import read_files
 from irispy.utils import image_clipping
+from irispy.utils.constants import BAD_PIXEL_VALUE_UNSCALED
+from irispy.utils.wavelength_drift import calculate_wavelength_drift
 
 ###############################################################################
 # `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20140708_114109_3824262996_2014-07-08T11%3A41%3A092014-07-08T11%3A41%3A09.xml>`__.
@@ -51,122 +57,126 @@ mg_ii = raster["Mg II k 2796"]
 (mg_wave,) = mg_ii.axis_world_coords("wl")
 
 ###############################################################################
-# We will plot the spatially averaged spectrum:
+# The reader masks the Level 2 fill values (-200 and -199 DN). With memory mapping
+# the mask is lazy: it is computed from the data each time it is used, so it would
+# follow the changes we make to the data below. We compute it once now instead.
 
-plt.figure()
-plt.plot(mg_wave.to("nm"), mg_ii.data.mean((0, 1)))
-plt.ylabel("DN (Memory Mapped Value)")
-plt.xlabel("Wavelength (nm)")
+mg_ii.mask = mg_ii.mask.compute()
 
 ###############################################################################
 # This very large dense raster took more than three hours to complete
-# across the 400 raster steps (with 30 s exposures), which means that the
-# spacecraft's orbital velocity changes during the observations.
-# This means that any calibration will need to correct for those shifts.
+# across the 400 raster steps (with 30 s exposures). Over that time the
+# spacecraft's orbital velocity and the temperature of the spectrograph
+# change, and both move the spectra in wavelength.
 #
-# To illustrate the correction, we will compare the intensity near the
-# Mn I line at around 280.2 nm, between the Mg II k and h lines.
-#
-# For this dataset, the line core of this line falls around 280.2 nm.
-# We crop in wavelength space.
+# To see the effect, we will compare the intensity in the core of a strong
+# Mn I line at 280.19 nm, in between the Mg II k and h lines, before and
+# after the correction. We crop in wavelength space.
 
-lower_corner = [SpectralCoord(280.2, unit=u.nm), None, None, None]
-upper_corner = [SpectralCoord(280.2, unit=u.nm), None, None, None]
+lower_corner = [SpectralCoord(280.19, unit=u.nm), None, None, None]
+upper_corner = [SpectralCoord(280.19, unit=u.nm), None, None, None]
 mg_crop = mg_ii.crop(lower_corner, upper_corner)
 # Save the on-disk part of the slit (roughly its first 600 pixels) before modifying
-# the data, masking the raw fill value (-32768). We will compare this below.
-before = mg_crop.data[:, :600].astype(float)
-before[before == -32768] = np.nan
+# the data, with the masked samples as NaN. We will compare this below.
+before = np.where(mg_crop.mask[:, :600], np.nan, mg_crop.data[:, :600])
 vmin, vmax = np.nanpercentile(before, [1, 99])
 
 ###############################################################################
-# Orbital motion changes the wavelength sampled at each raster step.
-# The radial velocities are stored in the auxiliary data
-# extension past the "last" window in the FITS file (column ``OBS_VRIX``).
-# ``read_files`` already reads that extension and stores the values, one per
-# raster step, in the cube metadata.
+# The shifts can be measured from photospheric lines of known rest wavelength:
+# this window holds the Ni I 279.9474, Mn I 280.1902 and Fe I 280.5346 nm
+# absorption lines. `~irispy.utils.wavelength_drift.calculate_wavelength_drift`
+# measures them at every step and fits a sine with the orbital period, plus a slow
+# polynomial, to the Ni I shifts; see its documentation for the details. The table
+# has one row per exposure, sorted by time, with the ``raster`` and ``step`` it
+# belongs to.
 
-v_obs = mg_ii.meta["observer radial velocity"].to("km/s")
-
-plt.figure()
-plt.plot(v_obs)
-plt.ylabel("Orbital velocity (km/s)")
-plt.xlabel("Raster step")
+drift = calculate_wavelength_drift(raster)
+drift[:5]
 
 ###############################################################################
-# To look at intensities at any given raster step we only need to subtract this
-# velocity shift from the wavelength scale, but to look at the whole image
-# at a given wavelength we must interpolate the original data to take this
-# shift into account. Here is a way to do it (note that array dimensions
-# apply to this specific example).
+# Let us plot the measured shifts and the fitted NUV drift against time, with
+# the Doppler shift of the spacecraft's orbital velocity alone, which the Level
+# 2 files record in their auxiliary data. The difference between the two curves
+# is the thermal drift of the spectrograph.
 
-c = constants.c.to("km/s")
-mn_i_wavelength = 280.2 * u.nm
-wave_shift = -v_obs * mn_i_wavelength / c
-# Linear interpolation in wavelength, for each raster step
-for i in range(mg_ii.data.shape[0]):
-    shifted_data = make_interp_spline(
-        (mg_wave - wave_shift[i]).to_value(u.nm),
-        mg_ii.data[i, :, :],
-        k=1,
-        axis=-1,
-    )(mg_wave.to_value(u.nm), extrapolate=False)
-    mg_ii.data[i, :, :] = np.nan_to_num(shifted_data, nan=0.0)
+minutes = (drift["time"] - drift["time"][0]).to_value(u.min)
+v_obs = mg_ii.meta["observer radial velocity"]
+orbital = (v_obs / constants.c * 279.9474 * u.nm).to_value(u.AA)
+fig, ax = plt.subplots(layout="constrained")
+for name in ("Ni I", "Mn I", "Fe I"):
+    ax.plot(minutes, drift[name].to_value(u.AA), ".", label=name)
+ax.plot(minutes, drift["nuv"].to_value(u.AA), "k", label="NUV drift")
+ax.plot(minutes, orbital, "k--", label="Orbital velocity alone")
+ax.set_xlabel("Time since the first step (min)")
+ax.set_ylabel("Wavelength shift (Å)")
+# The curves fill the axes, so the legend goes above them.
+fig.legend(loc="outside upper center", ncols=5)
 
 ###############################################################################
-# In this observation the correction shifts the spectra by less than one wavelength
-# pixel, so the solar structures look very similar before and after correction.
-# We use the same intensity scale for both images and show their difference on a
-# separate scale centred on zero to make the small changes visible.
+# Adding the drift to the wavelengths of a step corrects them. To look at the
+# whole image at a given wavelength, we instead interpolate each step back onto
+# the original wavelength grid. Unsupported wavelengths and interpolation through
+# bad pixels stay invalid. We work on one floating-point step at a time, mask
+# invalid results and store them as the FITS fill value in the integer array.
+# The rows of the first raster give the drift of each ``step`` of ``mg_ii``.
+
+for i, shift in drift[drift["raster"] == 0].iterrows("step", "nuv"):
+    data = np.where(mg_ii.mask[i], np.nan, mg_ii.data[i])
+    corrected = make_interp_spline((mg_wave + shift).to_value(u.nm), data, k=1, axis=-1, check_finite=False)(
+        mg_wave.to_value(u.nm), extrapolate=False
+    )
+    mg_ii.mask[i] = ~np.isfinite(corrected)
+    mg_ii.data[i] = np.where(mg_ii.mask[i], BAD_PIXEL_VALUE_UNSCALED, corrected)
+
+###############################################################################
+# Before the correction, the Mn I intensity shows a regular bright-dark pattern
+# along the raster steps: the intensities were not taken at the same position in
+# the line because of the wavelength shifts. After it, the map is uniform along
+# the solar disk. The two images share one gray scale and their difference is
+# shown on a separate scale centered on zero.
 
 # Since we changed the underlying data, we need to re-crop
 mg_crop = mg_ii.crop(lower_corner, upper_corner)
-after = mg_crop.data[:, :600].astype(float)
-after[after == -32768] = np.nan
+after = np.where(mg_crop.mask[:, :600], np.nan, mg_crop.data[:, :600])
 difference = after - before
 limit = np.nanpercentile(np.abs(difference), 99)
 
-fig, axes = plt.subplots(1, 3, figsize=(13, 4), sharex=True, sharey=True, layout="constrained")
+fig, axes = plt.subplots(1, 3, figsize=(12, 5), sharex=True, sharey=True, layout="constrained")
 for ax, data, title in zip(axes[:2], (before, after), ("Before correction", "After correction"), strict=True):
-    ax.imshow(data, origin="lower", aspect="auto", vmin=vmin, vmax=vmax)
+    ax.imshow(data.T, origin="lower", aspect="auto", cmap="gray", vmin=vmin, vmax=vmax)
     ax.set_title(title)
 
-change = axes[2].imshow(difference, origin="lower", aspect="auto", cmap="RdBu_r", vmin=-limit, vmax=limit)
+change = axes[2].imshow(difference.T, origin="lower", aspect="auto", cmap="RdBu_r", vmin=-limit, vmax=limit)
 axes[2].set_title("After minus before")
-fig.colorbar(change, ax=axes[2], label="Intensity change (DN)")
+fig.colorbar(change, ax=axes[2], label="Intensity change (unscaled DN)")
 for ax in axes:
-    ax.set_xlabel("Position along the slit (pixel)")
-axes[0].set_ylabel("Raster step")
+    ax.set_xlabel("Raster step")
+axes[0].set_ylabel("Position along the slit (pixel)")
 
 ###############################################################################
-# This correction accounts for the measured orbital velocity; other wavelength
-# shifts can remain. A more elaborate correction can be obtained by the IDL routine
-# ``iris_prep_wavecorr_l2``, but this has not yet been ported to Python
-# see the `IDL version of this
-# tutorial <http://iris.lmsal.com/itn26/tutorials.html#mg-ii-dopplergrams>`__
-# for more details.
-#
-# We can use the calibrated data for example to calculate Dopplergrams. A
+# We can use the corrected data, for example, to calculate Dopplergrams. A
 # Dopplergram is here defined as the difference between the intensities at
 # two wavelength positions at the same (and opposite) distance from the
-# line core. For example, at +/- 50 km/s from the Mg II k3 core. To do
+# line core. For example, at ±50 km/s from the Mg II k3 core. To do
 # this, let us first calculate a velocity scale for the k line and find
 # the indices of the -50 and +50 km/s velocity positions (here using the
-# convention of negative velocities for up flows):
+# convention of negative velocities for upflows):
 
-mg_k_centre = 279.6351 * u.nm
-pos = 50 * u.km / u.s  # Around the line centre
-velocity = (mg_wave - mg_k_centre) * c / mg_k_centre
+mg_k_center = 279.6351 * u.nm
+pos = 50 * u.km / u.s  # Around the line center
+velocity = ((mg_wave - mg_k_center) * constants.c / mg_k_center).to(u.km / u.s)
 index_p = np.argmin(np.abs(velocity - pos))
 index_m = np.argmin(np.abs(velocity + pos))
-doppler = mg_ii.data[..., index_m] - mg_ii.data[..., index_p]
+# Use floats for the subtraction and leave the result invalid if either wing is bad.
+wings = np.where(mg_ii.mask[..., [index_m, index_p]], np.nan, mg_ii.data[..., [index_m, index_p]])
+doppler = wings[..., 0] - wings[..., 1]
 
 ###############################################################################
 # And now we can plot this as before (intensity units are again arbitrary
 # because of the unscaled DNs).
 
-vmin, vmax = image_clipping(doppler)
-# A diverging colour map needs limits centred on zero.
+vmin, vmax = image_clipping(doppler[np.isfinite(doppler)])
+# A diverging color map needs limits centered on zero.
 limit = max(abs(vmin), abs(vmax))
 plt.figure()
 plt.imshow(
@@ -185,4 +195,4 @@ plt.tight_layout()
 
 plt.show()
 
-# sphinx_gallery_thumbnail_number = 4
+# sphinx_gallery_thumbnail_number = 3

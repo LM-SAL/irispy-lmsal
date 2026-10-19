@@ -22,9 +22,10 @@ from irispy._spectrograph_wcs import (
     _sanitize_raster_times,
     _sanitize_raster_wcs_tables,
 )
+from irispy.data.test import get_test_filepath
 from irispy.io.spectrograph import _nuv_t_obs_from_source_filenames, read_spectrograph_lvl2
 from irispy.spectrograph import SpectrogramCube
-from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED
+from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED, DN_UNIT, SATURATION_LIMIT
 
 SG_METADATA = {
     "sns_sg_file": {
@@ -62,6 +63,16 @@ V34_WINDOWS = ["Si IV 1403", "Mg II k 2796"]
 # Raster indices are (step, slit, wavelength); sit-and-stare has 187 exposures of 40 slit pixels.
 RASTER_INDICES = ((0, 50, 3), (3, 50, 10), (4, 50, 10), (7, 80, 20), (0, 80, 20))
 SIT_AND_STARE_INDICES = ((0, 0, 10), (3, 20, 10), (4, 25, 10), (10, 30, 5), (93, 39, 5), (186, 0, 5))
+
+
+def test_read_spectrograph_orders_files_by_date_obs(raster_sg_files):
+    ordered = read_spectrograph_lvl2(raster_sg_files, spectral_windows="C II 1336")["C II 1336"]
+    unordered = read_spectrograph_lvl2(raster_sg_files[::-1], spectral_windows="C II 1336")["C II 1336"]
+    np.testing.assert_array_equal(unordered.data, ordered.data)
+    assert (unordered.time == ordered.time).all()
+    dates = [raster.fits_wcs.wcs.dateobs for raster in unordered.split_rasters()]
+    assert dates == sorted(dates)
+    assert dates == [raster.fits_wcs.wcs.dateobs for raster in ordered.split_rasters()]
 
 
 @contextmanager
@@ -174,7 +185,7 @@ def test_read_spectrograph_lvl2_keeps_requested_window_order_and_data_and_report
     for window in requested_windows:
         assert raster_collection[window].meta.spectral_window == window
         np.testing.assert_array_equal(raster_collection[window].data, all_windows[window].data)
-    with pytest.raises(ValueError, match=r"Spectral windows \['NOPE1', 'NOPE2'\] not in file"):
+    with pytest.raises(ValueError, match=r"Spectral windows \['NOPE1', 'NOPE2'\] not in file .*, which has \['C II 1336', "):
         read_spectrograph_lvl2(filename, spectral_windows=[*requested_windows, "NOPE1", "NOPE2"])
 
 
@@ -201,6 +212,12 @@ def test_read_spectrograph_lvl2_uses_auxiliary_pointing(request, files):
         assert raster[windows[0]].time[0].isot == "2014-03-29T14:09:43.000"
         assert raster[windows[1]].time[0].isot == "2014-03-29T14:09:42.940"
         assert raster[windows[0]].meta["auxiliary times"][0].isot == "2014-03-29T14:09:39.000"
+
+
+def test_read_spectrograph_lvl2_reads_a_repeated_window_once(sns_sg_file):
+    raster = read_spectrograph_lvl2(sns_sg_file, spectral_windows=["C II 1336", "Si IV 1394", "C II 1336"])
+    assert list(raster) == ["C II 1336", "Si IV 1394"]
+    assert len(raster["C II 1336"]) == 1
 
 
 def test_nuv_times_reject_invalid_source_filename(raster_sg_file):
@@ -314,6 +331,30 @@ def test_memmap_combined_v34_rasters_read_flipped_chunks(tmp_path, raster_sg_fil
             np.testing.assert_array_equal(
                 np.asarray(cube.data[scan]), hdulist[_window_ext(hdulist, "Si IV 1403")].data[::-1]
             )
+
+
+def test_read_spectrograph_flips_a_real_v34_raster(v34_sg_file):
+    # OBS 3460104433 steps the slit by -2": solar x falls along the file's steps and rises along the cube's
+    windows = ["C II 1336", "Mg II k 2796"]
+    with fits.open(v34_sg_file) as hdulist:
+        assert hdulist[0].header["STEPS_AV"] < -0.01
+        auxiliary = hdulist[-2]
+        x_center = auxiliary.data[:, auxiliary.header["XCENIX"]]
+        file_data = [hdulist[index].data for index in (1, 2)]
+        reference_rows = [hdulist[index].header["CRPIX2"] - 1 for index in (1, 2)]
+    assert np.all(np.diff(x_center) < 0)
+
+    flipped = read_spectrograph_lvl2(v34_sg_file, spectral_windows=windows)
+    reverted = read_spectrograph_lvl2(v34_sg_file, spectral_windows=windows, revert_v34=True)
+    steps = np.arange(len(x_center))
+    for window, data, row in zip(windows, file_data, reference_rows, strict=True):
+        cube = flipped[window]
+        np.testing.assert_array_equal(cube.data, data[::-1])
+        np.testing.assert_array_equal(reverted[window].data, data)
+        assert np.all(np.diff(cube.time.jd) < 0)
+        assert_quantity_allclose(cube.meta["exposure FOV center"].Tx, x_center[::-1] * u.arcsec)
+        sky = cube.wcs.array_index_to_world(steps, np.full(len(steps), row), np.zeros(len(steps)))[1]
+        assert_quantity_allclose(sky.Tx.to(u.arcsec), x_center[::-1] * u.arcsec, atol=0.01 * u.arcsec)
 
 
 def test_raster_wcs_steps_have_no_index_vector(raster_sg_file):
@@ -863,6 +904,25 @@ def test_celestial_frame_is_slicing_invariant(raster_sg_files):
     assert np.isfinite(roundtripped.Ty.value)
 
 
+@pytest.mark.parametrize("memmap", [False, True])
+def test_read_spectrograph_masks_both_fill_values(tmp_path, sns_sg_file, memmap):
+    filename = tmp_path / "raster_fill.fits"
+    with fits.open(sns_sg_file, memmap=False) as hdulist:
+        data = np.full(hdulist[1].data.shape, 7.0)
+        data.flat[:4] = [-200, -199, -198, 7]
+        expected_mask = np.isin(data, [-200, -199])
+        hdulist[1].data = data
+        hdulist[1].scale("int16", bscale=0.25, bzero=7992)
+        raw = hdulist[1].data.copy()
+        hdulist.writeto(filename)
+
+    cube = read_spectrograph_lvl2(filename, spectral_windows="C II 1336", memmap=memmap)["C II 1336"].data[0]
+
+    np.testing.assert_array_equal(cube.mask, expected_mask)
+    if memmap:
+        np.testing.assert_array_equal(cube.data, raw)
+
+
 def test_read_spectrograph_uncertainty_is_a_standard_deviation(raster_sg_file):
     # A bare array would be stored as an UnknownUncertainty (issue #57).
     cube = read_spectrograph_lvl2(raster_sg_file, spectral_windows="C II 1336", uncertainty=True)["C II 1336"][0]
@@ -935,3 +995,44 @@ def test_gwcs_inverse_uses_explicit_step_when_time_is_not_monotonic():
     for scan_index in (1, 9):
         point = wcs.array_index_to_world(scan_index, 20, 10)
         assert wcs.world_to_array_index(*point) == (scan_index, 20, 10)
+
+
+def test_memmap_records_the_window_scaling():
+    # memmap=True keeps the FITS integers, so the window's BSCALE and BZERO go in the metadata
+    filename = get_test_filepath(
+        "wavelength_drift/iris_l2_20140708_114109_3824262996_raster_t000_r00000_wavelength_drift_test.fits"
+    )
+    cube = read_spectrograph_lvl2(filename, memmap=True, spectral_windows="Mg II k 2796")["Mg II k 2796"]
+    assert np.issubdtype(cube.data.dtype, np.integer)
+    with fits.open(filename) as hdulist:
+        header = hdulist[3].header
+    assert (cube.meta["BSCALE"], cube.meta["BZERO"]) == (header["BSCALE"], header["BZERO"])
+
+
+@pytest.mark.parametrize(("window", "band"), [("O I 1356", "FUV"), ("Mg II k 2796", "NUV")])
+def test_memmap_unit_is_unscaled(window, band, raster_sg_file):
+    filename = get_test_filepath(
+        "wavelength_drift/iris_l2_20140708_114109_3824262996_raster_t000_r00000_wavelength_drift_test.fits"
+    )
+    assert read_spectrograph_lvl2(filename, memmap=True)[window].unit == DN_UNIT[f"{band}_UNSCALED"]
+    assert read_spectrograph_lvl2(filename)[window].unit == DN_UNIT[band]
+    # Float data hold DN already
+    assert read_spectrograph_lvl2(raster_sg_file, memmap=True)["C II 1336"].unit == DN_UNIT["FUV"]
+
+
+def test_read_spectrograph_masks_clipped_samples(tmp_path, sns_sg_file):
+    with fits.open(sns_sg_file) as hdul:
+        window = hdul[0].header["TDESC1"]
+        data = hdul[1].data.astype("float32")
+        data.flat[7] = SATURATION_LIMIT.value
+        hdul[1].data = data
+        hdul.writeto(tmp_path / "clipped.fits")
+    raster = read_spectrograph_lvl2(tmp_path / "clipped.fits", uncertainty=True)
+    cube = raster[window]
+    # The clipped sample keeps its value, masked and marked saturated
+    assert np.flatnonzero(cube.meta["saturated"]).tolist() == [7]
+    assert cube.data.flat[7] == SATURATION_LIMIT.value
+    assert cube.mask.flat[7]
+    assert np.isfinite(cube.uncertainty.array.flat[7])
+    # Windows without clipped samples have no saturated meta
+    assert not any("saturated" in other.meta for name, other in raster.items() if name != window)

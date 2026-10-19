@@ -1,0 +1,1 @@
+`~irispy.utils.fitting.non_thermal_velocity` no longer needs ``temperature``; it defaults to the ion's temperature of maximum abundance from the line catalog.
