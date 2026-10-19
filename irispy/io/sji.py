@@ -14,6 +14,7 @@ from dkist.wcs.models import CoupledCompoundModel, VaryingCelestialTransform
 from sunpy.util import MetaDict
 
 from irispy._interpolation import _time_lookup
+from irispy.io._level2 import _check_level2
 from irispy.io._mask import _fill_mask_values, _memmap_fill_mask
 from irispy.meta import SJIMeta
 from irispy.sji import AIACube, SJICube, SOTCube
@@ -244,8 +245,13 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     elif isinstance(filename, bytes):
         context = fits.HDUList.fromstring(filename, do_not_scale_image_data=memmap)
     else:
-        context = fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
+        try:
+            context = fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
+        except (OSError, ValueError, TypeError):
+            # A directory or a file that is not FITS: raises the level 2 error, chained to this one
+            _check_level2(filename, None, "SJI")
     with context as hdulist:
+        _check_level2(hdulist.filename() or "filename", hdulist[0].header, "SJI")
         instrume = hdulist[0].header["INSTRUME"]
         is_sot = instrume.startswith("SOT")
         if hdulist[1].data.ndim == 1:

@@ -15,6 +15,7 @@ from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst
 from sunpy.coordinates.frames import Helioprojective
 from sunpy.coordinates.wcs_utils import _set_wcs_aux_obs_coord
 
+from irispy.io._level2 import _check_level2
 from irispy.io._mask import _memmap_fill_mask
 from irispy.meta import SGMeta
 from irispy.spectrograph import RasterCollection, SpectrogramCube, SpectrogramCubeSequence
@@ -161,11 +162,23 @@ def read_spectrograph_lvl2(
     filenames = [str(f) for f in filenames]
     if len(filenames) > 1:
         # The sequence follows time whatever the order given, such as that of an unsorted glob.
-        date_obs = Time([fits.getheader(filename)["DATE_OBS"] for filename in filenames])
-        filenames = [filenames[i] for i in date_obs.argsort()]
+        date_obs = []
+        for filename in filenames:
+            try:
+                date_obs.append(fits.getheader(filename)["DATE_OBS"])
+            except (OSError, ValueError, TypeError):
+                # A directory or a file that is not FITS: raises the level 2 error, chained to this one
+                _check_level2(filename, None, "raster")
+        filenames = [filenames[i] for i in Time(date_obs).argsort()]
     for file_index, filename in enumerate(filenames):
-        # The extensions are read out of order, which rewinds a gzip stream: inflate it once instead.
-        with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True) as hdulist:
+        try:
+            # The extensions are read out of order, which rewinds a gzip stream: inflate it once instead.
+            hdulist = fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
+        except (OSError, ValueError, TypeError):
+            # A directory or a file that is not FITS: raises the level 2 error, chained to this one
+            _check_level2(filename, None, "raster")
+        with hdulist:
+            _check_level2(filename, hdulist[0].header, "raster")
             if file_index == 0:
                 # After a discussion with the IRIS team, it was decided that instead of the
                 # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.
