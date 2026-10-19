@@ -79,7 +79,7 @@ Now we fit every spectrum:
 The other properties of each fit, such as ``status``, ``success`` and ``nfev``, come out of ``fitter.fit_info`` in the same way.
 The default ``scheduler`` uses several processes; ``"single-threaded"`` keeps this example simple.
 A ``dask.distributed.Client`` can be passed instead.
-Any scheduler works because the fit is given arrays, not the cube: the cubes themselves cannot be pickled until `ndcube issue 847 <https://github.com/sunpy/ndcube/issues/847>`__ is fixed, so they cannot be sent to worker processes or a cluster.
+Any dask scheduler works. Pickling a cube is not a supported way to save or share results; re-run the script that made them.
 
 Maps from the fit
 =================
