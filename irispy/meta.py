@@ -93,6 +93,9 @@ class BaseMeta(NDMeta):
 
     @property
     def fits_header(self):
+        """
+        The primary header of the file as an `astropy.io.fits.Header`.
+        """
         return self._fits_header
 
     @property
