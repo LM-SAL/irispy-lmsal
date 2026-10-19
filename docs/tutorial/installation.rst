@@ -141,4 +141,67 @@ This checks if ``irispy`` was installed correctly.
 
 If you want to install another package later, you can run ``conda install <package_name>``.
 
+.. _irispy-install-pip:
+
+Installing with pip
+-------------------
+
+``irispy`` is also on PyPI, so in any Python environment (Python 3.13 or newer) you can run:
+
+.. code-block:: bash
+
+    $ pip install irispy-lmsal
+
+.. _irispy-install-extras:
+
+Optional dependencies
+---------------------
+
+Some functions need packages that are not installed by default.
+They are grouped in extras, which you add to the package name, for example ``pip install "irispy-lmsal[cosmic-rays,rgb]"``.
+Each of these functions raises an error that names the missing package and the extra.
+Not every package is available on conda-forge; the ``rsliding`` package, the default backend of ``remove_cosmic_rays``, is only on PyPI, so install it with ``pip`` even in a conda environment.
+
+.. list-table::
+   :widths: 20 30 50
+   :header-rows: 1
+
+   * - Extra
+     - Packages
+     - What it unlocks
+   * - ``cosmic-rays``
+     - ``rsliding``, ``astroscrappy``
+     - ``remove_cosmic_rays`` of the SJI and raster cubes, with the ``"rsliding"`` (default) or ``"astroscrappy"`` method
+   * - ``density``
+     - ``fiasco``
+     - The density diagnostics in `irispy.utils.density`
+   * - ``rgb``
+     - ``colorsynth``
+     - The false-color images of `irispy.utils.rgb`
+   * - ``all``
+     - The three extras above
+     - Everything above
+   * - ``tests``, ``docs``, ``dev``
+     - Test, documentation and all of the above
+     - Running the tests and building the documentation, see :ref:`irispy-dev-install`
+
+.. _irispy-dev-install:
+
+Installing a development version
+================================
+
+To work on the code, fork `the repository <https://github.com/LM-SAL/irispy>`__ on GitHub, clone your fork and install it in editable mode into a new environment (Python 3.13 or newer):
+
+.. code-block:: bash
+
+    $ git clone https://github.com/<your-username>/irispy.git
+    $ cd irispy
+    $ conda create --name irispy-dev python=3.14 pip
+    $ conda activate irispy-dev
+    $ python -m pip install -e ".[dev]"
+    $ python -m pip install pre-commit tox
+
+The ``dev`` extra installs the test and documentation dependencies and all optional dependencies.
+Run the tests with ``pytest``, the style checks with ``pre-commit run --all-files`` and the documentation build with ``tox -e build_docs``, and add a changelog entry in ``changelog/`` for a user-visible change.
+
 Now we've got a working installation of ``irispy``, in the next few chapters we'll look at some of the basic data structures ``irispy`` uses for representing IRIS SJI and SG data.

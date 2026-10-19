@@ -17,7 +17,7 @@ There are several photospheric spectral lines that can be used for accurate wave
    The slit may cover regions of significant line-of-sight flows, such as flux emergence in active regions, and thus these photospheric lines may not necessarily be at their nominal rest wavelengths as assumed by the automatic calibration.
    In such cases, the user is advised, again, to perform manual wavelength calibration by avoiding such regions under the slit coverage.
 
-A detailed discussion of the wavelength calibration steps for IRIS and how to use them on data can be found in `IRIS Technical Note 20 <https://www.lmsal.com/iris_science/doc?cmd=dcur&proj_num=IS0203&file_type=pdf>`__.
+A detailed discussion of the wavelength calibration steps for IRIS and how to use them on data can be found in IRIS Technical Note 20 :cite:p:`itn20`.
 
 Radiometric Calibration
 =======================
@@ -30,7 +30,7 @@ The latest calibration data are included in ``irispy`` and can be read:
 
    >>> from sunpy.time import parse_time
 
-   >>> from irispy.utils.response import get_interpolated_effective_area, get_latest_response
+   >>> from irispy.utils.response import get_latest_response
 
    >>> response = get_latest_response(observation_time=parse_time("2020-01-01T00:00:00"))
 
@@ -42,7 +42,7 @@ The output is a dictionary with the following keys:
    >>> response.keys()
    dict_keys(['DATE_OBS', 'LAMBDA', 'AREA_SG', 'NAME_SG', 'DN2PHOT_SG', 'AREA_SJI', 'NAME_SJI', 'DN2PHOT_SJI', 'COEFFS_FUV', 'C_F_TIME', 'C_F_LAMBDA', 'COEFFS_NUV', 'C_N_TIME', 'C_N_LAMBDA', 'COEFFS_SJI', 'C_S_TIME', 'GEOM_AREA', 'ELEMENTS', 'INDEX_EL_SG', 'INDEX_EL_SJI', 'COMMENT', 'VERSION', 'VERSION_DATE'])
 
-Here ``AREA_SG`` and ``AREA_SJI`` are the effective areas (in cm\ :sup:`-2`) as a function of wavelength (``LAMBDA``) respectively for the spectrograph and slit-jaw camera.
+Here ``AREA_SG`` and ``AREA_SJI`` are the effective areas (in cm\ :sup:`2`) as a function of wavelength (``LAMBDA``) respectively for the spectrograph and slit-jaw camera.
 The ``DN2PHOT_*`` tags give the conversion from DN counts to photons.
 
 .. warning::
@@ -56,9 +56,9 @@ To convert the spectral units from DN to flux one must do the following conversi
 
    \mathrm{Flux}(\mathrm{erg}\: \mathrm{s}^{-1}\: \mathrm{cm}^{-2} \text{Å}^{-1}\: \mathrm{sr}^{-1}) = \mathrm{Flux}(\mathrm{DN}) \frac{E_\lambda \cdot \mathrm{DN2PHOT\_SG}}{A_\mathrm{eff} \cdot \mathrm{Pix}_{xy} \cdot \mathrm{Pix}_{\lambda} \cdot t_\mathrm{exp} \cdot W_\mathrm{slit}},
 
-where :math:`E_\lambda \equiv h \cdot c / \lambda` is the photon energy (in erg), :math:`\mathrm{DN2PHOT\_SG}` is the number of photons per DN (get from ``iris_get_response``), :math:`A_\mathrm{eff}` is the effective area (in cm\ :sup:`-2`), :math:`\mathrm{Pix}_{xy}` is the size of the spatial pixels in radians (e.g. multiply the spatial binning factor by :math:`\pi/(180\cdot 3600 \cdot 6)`), :math:`\mathrm{Pix}_{\lambda}` is the size of the spectral pixels in Å, :math:`t_\mathrm{exp}` is the exposure time in seconds and :math:`W_\mathrm{slit}` is the slit width in radians (:math:`W_\mathrm{slit}\equiv \pi/(180\cdot 3600 \cdot 3)`).
+where :math:`E_\lambda \equiv h \cdot c / \lambda` is the photon energy (in erg), :math:`\mathrm{DN2PHOT\_SG}` is the number of photons per DN (``response["DN2PHOT_SG"]`` from `~irispy.utils.response.get_latest_response`), :math:`A_\mathrm{eff}` is the effective area (in cm\ :sup:`2`), :math:`\mathrm{Pix}_{xy}` is the size of the spatial pixels in radians (e.g. multiply the spatial binning factor by :math:`\pi/(180\cdot 3600 \cdot 6)`), :math:`\mathrm{Pix}_{\lambda}` is the size of the spectral pixels in Å, :math:`t_\mathrm{exp}` is the exposure time in seconds and :math:`W_\mathrm{slit}` is the slit width in radians (:math:`W_\mathrm{slit}\equiv \pi/(180\cdot 3600 \cdot 3)`).
 
-A detailed discussion of the radiometric calibration steps for IRIS and how to use them on data can be found in `IRIS Technical Note 24 <https://www.lmsal.com/iris_science/doc?cmd=dcur&proj_num=IS0123&file_type=pdf>`__.
+A detailed discussion of the radiometric calibration steps for IRIS and how to use them on data can be found in IRIS Technical Note 24 :cite:p:`itn24`.
 
 .. note::
 
@@ -67,7 +67,7 @@ A detailed discussion of the radiometric calibration steps for IRIS and how to u
    The level 2 FITS headers have only one value for the exposure time (the value without AEC).
    The sequence-dependent exposure times are available in the auxiliary metadata in the FITS files (see :ref:`irispy-tutorial-lev2`), with table index given by ``EXPTIMEF``, ``EXPTIMEN``, and ``EXPTIME`` for FUV, NUV, and slit-jaw, respectively.
 
-The routine that converts DN to physical units is described in this example :ref:`sphx_glr_generated_gallery_calibration_03_radiometric_calibration.py`.
+The routine that converts DN to physical units is described in this example :ref:`sphx_glr_generated_gallery_calibration_03_radiometric_calibration.py`; IRIS Technical Note 26 :cite:p:`itn26` describes the calibration process it follows.
 
 Radiation Temperature
 =====================
@@ -78,8 +78,16 @@ A cube still in DN raises an error, so calibrate it first:
 
 .. code-block:: python
 
-   from irispy.io import read_files
-   from irispy.utils.spectrograph import radiation_temperature, radiometric_calibration
+   >>> import numpy as np
 
-   raster = read_files("iris_l2_20260308_051050_3893012099_raster.tar.gz")
-   temperature = radiation_temperature(radiometric_calibration(raster["Mg II k 2796"]))
+   >>> import irispy.data.sample as sample_data  # doctest: +REMOTE_DATA
+   >>> from irispy.io import read_files
+   >>> from irispy.utils.spectrograph import radiation_temperature, radiometric_calibration
+
+   >>> raster = read_files(sample_data.RASTER_FITS, spectral_windows="Mg II k 2796")  # doctest: +REMOTE_DATA
+   >>> calibrated = radiometric_calibration(raster["Mg II k 2796"][0])  # doctest: +REMOTE_DATA
+   >>> temperature = radiation_temperature(calibrated)  # doctest: +REMOTE_DATA
+   >>> temperature.unit  # doctest: +REMOTE_DATA
+   Unit("K")
+   >>> int(np.median(temperature.data[~temperature.mask]))  # doctest: +REMOTE_DATA
+   5003

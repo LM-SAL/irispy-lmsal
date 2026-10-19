@@ -490,6 +490,10 @@ def starts_from_model(model, cube):
 class FitQualityFlag(_QualityFlag):
     """
     Quality flags for the per-spectrum fits in `maps_from_fit`, most severe first.
+
+    `OK` only means that the fitter converged within the bounds. A fit to noise gets it
+    too, so check the signal-to-noise ratio and the reduced chi-square as in
+    :ref:`irispy-tutorial-fitting`.
     """
 
     OK = (0, "ok")

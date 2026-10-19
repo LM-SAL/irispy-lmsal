@@ -29,6 +29,45 @@ def _mu(center, sun_radius):
 
 
 class BaseMeta(NDMeta):
+    """
+    Metadata of a Level 2 file, read from its primary FITS header.
+
+    This is a dictionary of the header keywords, with sliceable per-exposure entries
+    (see `ndcube.meta.NDMeta`), and a set of properties that give the common keywords
+    names, units and types. A property that reads one keyword is `None` when the header lacks it;
+    a property derived from a keyword needs that keyword.
+    You do not create it yourself: the cubes from `irispy.io.read_files` carry it as ``cube.meta``.
+
+    Parameters
+    ----------
+    header : `astropy.io.fits.Header` or `dict`
+        The primary header of the Level 2 file.
+    **kwargs
+        Passed to `ndcube.meta.NDMeta`.
+
+    Notes
+    -----
+    The properties are in these groups.
+
+    * The file: `fits_header`, `processing_level`, `data_type`, `data_unit`, `data_status`,
+      `build_version`, `reformat_version`, `reformat_date`.
+    * The instrument: `instrument`, `observatory`, `camera`, `detector`, `detector_band`,
+      `spectral_window`, `spectral_range`, `spectral_band`, `rest_wavelength`.
+    * The times: `date_reference`, `date_start`, `date_end`, `temporal_cadence`.
+    * The observing mode: `observing_mode_id`, `observing_mode_description`, `observing_label`,
+      `observing_title`, `observing_campaign_start`, `observing_campaign_end`, `lut_id`,
+      `automatic_exposure_control_enabled`, `tracking_mode_enabled`, `spatial_summing_factor`,
+      `spectral_summing_factor`, `exposure_time`, `exposure_time_min`, `exposure_time_max`.
+    * The pointing and the Sun: `fov_center`, `raster_fov_width_x`, `raster_fov_width_y`,
+      `sun_angular_radius`, `distance_to_sun`, `observer_radial_velocity`, `mu`,
+      `satellite_rotation`, `observatory_at_high_latitude`, `observation_includes_saa`.
+    * The raster: `number_of_raster_positions`, `number_of_unique_raster_positions`,
+      `number_of_exposures`, `number_of_exposures_planned`, `number_of_exposures_observation`,
+      `exposure_control_triggers_in_raster`, `exposure_control_triggers_in_observation`.
+    * Statistics of the data: `data_mean`, `data_rms`, `data_median`, `data_min`, `data_max`,
+      `percent_data`, `number_of_saturated_pixels`, `number_of_spikes`.
+    """
+
     _iwin = 1
 
     def __init__(self, header, **kwargs) -> None:
@@ -487,7 +526,17 @@ class BaseMeta(NDMeta):
 
 class SJIMeta(BaseMeta, RemoteSensorMetaABC):
     """
-    Metadata class for IRIS slit-jaw images.
+    Metadata of an IRIS slit-jaw image file (also AIA and Hinode/SOT files).
+
+    It has the properties of `~irispy.meta.BaseMeta`; `spectral_window` is the channel
+    name without the ``SJI_`` prefix, e.g. ``"1330"``. Printing it gives a summary of the file.
+
+    Parameters
+    ----------
+    header : `astropy.io.fits.Header` or `dict`
+        The primary header of the file.
+    **kwargs
+        Passed to `ndcube.meta.NDMeta`.
     """
 
     def __str__(self) -> str:
@@ -515,7 +564,33 @@ class SJIMeta(BaseMeta, RemoteSensorMetaABC):
 
 class SGMeta(BaseMeta, SlitSpectrographMetaABC):
     """
-    Metadata class for IRIS slit spectrograph data.
+    Metadata of one spectral window of an IRIS raster file.
+
+    It has the properties of `~irispy.meta.BaseMeta`, which refer to the selected window, and
+    those of the raster: `observer`, `exposure_mu`, `number_of_spectral_windows`,
+    `raster_repetition`, `raster_type_index`, `raster_type_total`, the average and standard
+    deviation of the step size, step time and planned and executed cadence
+    (`step_size_average`, `step_size_stddev`, `step_time_average`, `step_time_stddev`,
+    `cadence_planned_average`, `cadence_planned_stddev`, `cadence_executed_stddev`),
+    `number_of_missing_raster_files`, `number_of_missing_observation_files` and the statistics
+    of the window (`window_mean`, `window_rms`, `window_median`, `window_min`, `window_max`,
+    `window_saturated_pixels`, `window_spikes`).
+    Printing it gives a summary of the window.
+
+    Parameters
+    ----------
+    header : `astropy.io.fits.Header` or `dict`
+        The primary header of the file.
+    spectral_window : `str`
+        Name, or part of the name, of the spectral window, e.g. ``"Mg II k"``.
+        It must match exactly one window of the header.
+    **kwargs
+        Passed to `ndcube.meta.NDMeta`.
+
+    Raises
+    ------
+    ValueError
+        If ``spectral_window`` matches no window or more than one.
     """
 
     def __init__(self, header, spectral_window, **kwargs) -> None:
@@ -724,7 +799,17 @@ class SGMeta(BaseMeta, SlitSpectrographMetaABC):
 
 class MosaicMeta(BaseMeta, SlitSpectrographMetaABC):
     """
-    Metadata class for IRIS full-disk mosaics.
+    Metadata of an IRIS full-disk mosaic.
+
+    It has the properties of `~irispy.meta.BaseMeta`, except that `rest_wavelength` and
+    `detector` come from the mosaic's wavelength. Printing it gives a summary of the mosaic.
+
+    Parameters
+    ----------
+    header : `astropy.io.fits.Header` or `dict`
+        The primary header of the mosaic file.
+    **kwargs
+        Passed to `ndcube.meta.NDMeta`.
     """
 
     def __str__(self) -> str:

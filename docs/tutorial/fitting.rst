@@ -17,40 +17,50 @@ Every starting parameter can be an array over the spatial axes of a cube, so eac
 Fitting a cube
 ==============
 
-We use a cutout of an active region observation with the Si IV 1403 window, as in the gallery examples, and a small part of its field of view:
+We use the Si IV 1394 window of the sample raster, which is the sample data of the other tutorials, and a small part of its field of view:
 
 .. code-block:: python
 
     >>> import numpy as np
-    >>> import pooch
     >>> import astropy.units as u
     >>> from astropy.coordinates import SpectralCoord
     >>> from astropy.modeling.fitting import TRFLSQFitter, parallel_fit_dask
+    >>> import irispy.data.sample as sample_data  # doctest: +REMOTE_DATA
     >>> from irispy.io import read_files
-    >>> from irispy.utils.fitting import si_iv_1403_model
+    >>> from irispy.utils.fitting import profiles_on_background
 
-    >>> filename = pooch.retrieve(
-    ...     "https://github.com/LM-SAL/irispy-data/releases/download/v1/iris_l2_20180102_153155_3610108077_cutout_raster.tar.gz",
-    ...     known_hash="ff80e6a7900d4d5e1716a6415db25d40b6058f3523184b549c7e0d9928c0b68b",
-    ... )  # doctest: +REMOTE_DATA
-    >>> raster = read_files(filename, spectral_windows="Si IV 1403", uncertainty=True)  # doctest: +REMOTE_DATA
-    >>> cube = raster["Si IV 1403"][0][100:140, 200:260]  # doctest: +REMOTE_DATA
+    >>> raster = read_files(sample_data.RASTER_FITS, spectral_windows="Si IV 1394", uncertainty=True)  # doctest: +REMOTE_DATA
+    >>> cube = raster["Si IV 1394"][0]  # doctest: +REMOTE_DATA
 
-The starting models describe one line and no other, so the cube has to be cropped to that line.
-The Si IV 1403 window also holds O IV and S IV lines, and `~irispy.utils.fitting.si_iv_1403_model` raises an error if the cube covers any of them.
-Here we keep the wavelengths halfway to the neighboring O IV lines at 140.116 and 140.481 nm:
+The starting models of `~irispy.utils.fitting` describe the lines of a few documented windows and no other: `~irispy.utils.fitting.si_iv_1403_model` is for the Si IV 1403 window, which this sample does not have.
+For any other line, `~irispy.utils.fitting.profiles_on_background` builds the model from starting values that you choose.
+The model also describes one line, so the cube has to be cropped to it.
+The Si IV 1394 window holds Fe II, Ni II and O IV lines as well as Si IV 139.376 nm.
+Here we keep the wavelengths halfway to the Ni II line at 139.333 nm and the O IV line at 139.978 nm:
 
 .. code-block:: python
 
-    >>> si_iv = 1402.77 * u.AA
-    >>> window = [(1401.157 * u.AA + si_iv) / 2, (si_iv + 1404.806 * u.AA) / 2]
+    >>> si_iv = 1393.76 * u.AA
+    >>> window = [(1393.330 * u.AA + si_iv) / 2, (si_iv + 1399.776 * u.AA) / 2]
     >>> cube = cube.crop([SpectralCoord(window[0]), None], [SpectralCoord(window[1]), None])  # doctest: +REMOTE_DATA
-    >>> model = si_iv_1403_model(cube)  # doctest: +REMOTE_DATA
+    >>> cube = cube[:, 410:470]  # doctest: +REMOTE_DATA
+
+The line is faint in this quiet part of the sample, a few DN above the background, so the starting values are small.
+They are the line center at its rest wavelength, an amplitude of 5 DN, a standard deviation of 0.1 Å and a background of 0.5 DN, with the center bounded to 0.25 Å of the rest wavelength:
+
+.. code-block:: python
+
+    >>> model = profiles_on_background(  # doctest: +REMOTE_DATA
+    ...     si_iv[np.newaxis],
+    ...     amplitudes=[5] * cube.unit,
+    ...     widths=[0.1] * u.AA,
+    ...     background_level=0.5 * cube.unit,
+    ...     bounds={"mean_1": (si_iv - 0.25 * u.AA, si_iv + 0.25 * u.AA)},
+    ... )
     >>> model.param_names  # doctest: +REMOTE_DATA
     ('amplitude_0', 'amplitude_1', 'mean_1', 'stddev_1')
-    >>> model.mean_1.shape  # doctest: +REMOTE_DATA
-    (40, 60)
 
+Every starting parameter can instead be an array over the spatial axes, as `~irispy.utils.fitting.si_iv_1403_model` does from the data.
 The background is component 0 and the line component 1.
 Now we fit every spectrum:
 
@@ -73,7 +83,7 @@ Now we fit every spectrum:
     >>> covariance = fitter.fit_info.get_property_as_array("param_cov")  # doctest: +REMOTE_DATA
     >>> errors = np.sqrt(np.diagonal(covariance, axis1=-2, axis2=-1))  # doctest: +REMOTE_DATA
     >>> fitted.mean_1.quantity.shape, errors.shape  # doctest: +REMOTE_DATA
-    ((40, 60), (40, 60, 4))
+    ((16, 60), (16, 60, 4))
 
 ``errors[..., i]`` is the 1σ uncertainty of the parameter ``fitted.param_names[i]``.
 The other properties of each fit, such as ``status``, ``success`` and ``nfev``, come out of ``fitter.fit_info`` in the same way.
@@ -99,6 +109,30 @@ When the fitter provides covariance, parameter maps carry the uncertainties from
 The velocities are against the rest wavelength of the one documented line in the cube, here Si IV, unless ``rest_wavelength`` is given.
 ``"quality"`` holds a `~irispy.utils.fitting.FitQualityFlag` for each spectrum: whether its fit failed or did not converge, stopped at a bound, or used a spectrum with masked samples.
 ``"residual"`` is the cube minus the fitted model, to check the fits. It retains the cube's uncertainty and coordinates.
+
+Judging the fits
+----------------
+
+`~irispy.utils.fitting.FitQualityFlag.OK` only says that the fitter converged within the bounds of the parameters.
+A fit to noise converges just as well, so it does not say that there is a line.
+Two checks, both from quantities above, tell more.
+The signal-to-noise ratio of the line is the fitted amplitude over its 1σ error, and the reduced chi-square is the sum of the squared residuals over the uncertainties of the unmasked samples, divided by their number minus the number of parameters:
+
+.. code-block:: python
+
+    >>> from irispy.utils.fitting import FitQualityFlag
+    >>> with np.errstate(divide="ignore", invalid="ignore"):  # doctest: +REMOTE_DATA
+    ...     snr = fitted.amplitude_1.value / errors[..., 1]
+    >>> chi2 = np.sum(np.where(good, maps["residual"].data / cube.uncertainty.array, 0) ** 2, axis=-1)  # doctest: +REMOTE_DATA
+    >>> reduced_chi2 = chi2 / (good.sum(axis=-1) - len(fitted.param_names))  # doctest: +REMOTE_DATA
+    >>> converged = maps["quality"].data == FitQualityFlag.OK  # doctest: +REMOTE_DATA
+    >>> int(converged.sum()), int((converged & (snr > 3)).sum())  # doctest: +REMOTE_DATA
+    (670, 42)
+
+Here the fitter converged for 670 of the 960 spectra, but only 42 of those have a signal-to-noise ratio above 3.
+There is no universal threshold: choose one for your science case, and keep the fits above it.
+A reduced chi-square near 1 means that the model describes the spectrum within its uncertainties, which a fit to pure noise does as well, so it is a check of the model and of the uncertainties and not of the presence of the line.
+Values well above 1 point to a profile that the model does not describe, such as a blend or a second component, or to uncertainties that are too small.
 
 Non-thermal velocities
 ======================

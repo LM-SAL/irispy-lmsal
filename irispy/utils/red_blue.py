@@ -26,6 +26,8 @@ from irispy.utils.utils import _boolean_mask, _saturated_samples
 __all__ = ["RBAQualityFlag", "calculate_red_blue_asymmetry"]
 
 # Minimum fraction of wing bins that must have finite interpolated values.
+# This is a choice of this module, not a value from the literature: a pixel with fewer
+# finite bins is flagged INCOMPLETE_WINGS.
 _MIN_WING_COVERAGE = 0.8
 # Spatial pixels whose profiles are interpolated at a time: without return_profiles only one
 # chunk of interpolated profiles is held
@@ -159,6 +161,15 @@ def calculate_red_blue_asymmetry(
 
     Notes
     -----
+    Red-blue asymmetries were used to find the upflows of the transition region and corona by
+    :cite:t:`depontieu2009` and :cite:t:`tian2011`. This function is not a port of either method.
+    These choices are its own, and the papers should be consulted before comparing values with
+    theirs: the profile is interpolated with a spline on a regular velocity grid, centered on the
+    peak of the interpolated profile and not on a fitted centroid or the rest wavelength, the
+    asymmetry is the difference of the mean intensities of the two wings over the interpolated
+    peak intensity, and the default wing range of 50 to 150 km/s and the requirement that
+    80% of the wing bins are finite have no source.
+
     Pixels with a saturated sample, as the mask and ``cube.meta["saturated"]`` mark the samples the
     readers find at the level 2 ceiling, are flagged `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`.
     Subtract a background first with `~irispy.utils.spectrograph.subtract_background` if the line

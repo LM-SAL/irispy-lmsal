@@ -121,6 +121,11 @@ class _IRISPlotMixin:
         cubes ``cmap`` is dropped entirely, even when given. IRIS axis styling is
         applied to the result; all other arguments are passed to the parent plotter's
         ``plot``.
+
+        The colors run linearly from the minimum to the maximum of the data by default,
+        which a few hot pixels turn into a nearly black image. For a cube with more than
+        two dimensions, ``clip_interval=(1, 99.5) * u.percent`` limits them to those
+        percentiles of each frame.
         """
         kwargs["cmap"] = kwargs.get("cmap") or self._default_cmap_name()
         if len(self._ndcube.shape) == 1:

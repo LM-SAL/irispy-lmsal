@@ -99,6 +99,14 @@ def test_fits_info(capsys, request, monkeypatch, file_fixture):
     assert opens == [1]
 
 
+def test_fits_info_does_not_truncate_to_the_terminal_width(capsys, monkeypatch, sns_sji_1330_file):
+    monkeypatch.setenv("COLUMNS", "40")
+
+    fits_info(sns_sji_1330_file)
+
+    assert "..." not in capsys.readouterr().out
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [{}, {"revert_v34": True}, {"revert_v34": True, "allow_errors": True}],
