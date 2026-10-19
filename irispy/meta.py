@@ -13,6 +13,7 @@ from sunpy.time import parse_time
 from sunraster.meta import RemoteSensorMetaABC, SlitSpectrographMetaABC
 
 from irispy.utils.constants import SPECTRAL_BAND
+from irispy.utils.lines import get_lines
 
 __all__ = ["BaseMeta", "MosaicMeta", "SGMeta", "SJIMeta"]
 
@@ -616,6 +617,24 @@ class SGMeta(BaseMeta, SlitSpectrographMetaABC):
                 msg,
             )
         self._iwin = np.arange(len(spectral_windows))[window_mask][0] + 1
+
+    @property
+    def rest_wavelength(self):
+        """
+        Rest wavelength of the window's line from the IRIS line catalog.
+
+        The window center ``TWAVE`` for a continuum window such as ``'2832'``; `None`
+        when the window has no usable ``TWAVE`` keyword.
+        """
+        twave = super().rest_wavelength
+        if twave is None:
+            return None
+        # TWAVE is a rounded planning value. In real files, 1 Å covers its largest offset from its line, 0.152 Å
+        # (Mg II k), and misses the nearest documented line to a continuum window's TWAVE, 5.34 Å (2786 to Mg II 2791.599).
+        lines = get_lines(twave + [-1, 1] * u.AA, main_only=True)["wavelength"]
+        if not len(lines):
+            return twave
+        return lines[np.argmin(np.abs(lines - twave))].to(u.nm)
 
     @cached_property
     def observer(self):

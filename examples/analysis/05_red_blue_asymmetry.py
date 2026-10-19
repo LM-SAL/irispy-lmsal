@@ -61,7 +61,7 @@ velocity_range = (25, 75) * u.km / u.s
 # Ignore pixels where the line peak is too weak for a useful wing comparison.
 min_intensity = 75 * si_iv.unit
 
-# rest_wavelength is auto-detected from the cube metadata (TWAVE[N] FITS keyword).
+# rest_wavelength defaults to si_iv.meta.rest_wavelength, the catalog wavelength of the window's line.
 # You can also pass it explicitly, for example rest_wavelength=140.277 * u.nm.
 red_blue = calculate_red_blue_asymmetry(
     si_iv,

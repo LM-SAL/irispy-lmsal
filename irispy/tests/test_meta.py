@@ -35,6 +35,16 @@ def test_sgmeta_rest_wavelength():
     assert u.isclose(meta.rest_wavelength, 140.277 * u.nm, rtol=1e-4)
 
 
+@pytest.mark.parametrize(
+    ("spectral_window", "rest_wavelength"),
+    [("Mg II k 2796", 2796.352 * u.AA), ("2832", 2832.982 * u.AA)],
+    ids=["line", "continuum"],
+)
+def test_sgmeta_rest_wavelength_from_line_catalog(sns_sg_file, spectral_window, rest_wavelength):
+    meta = SGMeta(fits.getheader(sns_sg_file), spectral_window)
+    assert u.isclose(meta.rest_wavelength, rest_wavelength, atol=1 * u.mAA)
+
+
 def test_sgmeta_detector_band_fuv():
     meta = SGMeta(_make_sg_header(), "Si IV 1403")
     assert meta.detector_band == "FUV"
