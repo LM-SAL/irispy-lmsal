@@ -3,7 +3,6 @@ import numpy as np
 from astropy.utils.shapes import simplify_basic_index
 from astropy.wcs import WCS
 from astropy.wcs.utils import wcs_to_celestial_frame
-from astropy.wcs.wcsapi.wrappers.sliced_wcs import sanitize_slices
 
 from sunpy.coordinates.frames import Helioprojective
 
@@ -54,15 +53,17 @@ class _ResolveNegativeIndicesMixin:
             # As ndcube, where sanitize_slices rejects an array index, which simplify_basic_index trips over
             msg = "This slice is invalid, only integer or range slices are supported."
             raise IndexError(msg)
-        # Against the shape, as since astropy 8.0.2 sanitize_slices rejects negative indices without it
+        # Against the shape, so that negative indices resolve here
         try:
             item = simplify_basic_index(item, shape=self.shape)
         except np.exceptions.AxisError:
             # An IndexError, as for arrays, not numpy's AxisError, which is a ValueError and speaks of axes
             msg = f"Index {item} is out of range for a cube of shape {self.shape}"
             raise IndexError(msg) from None
-        # sanitize_slices raises for any step other than 1, so dropping the step loses nothing.
-        sanitize_slices(item, len(self.shape))
+        # A sliced WCS cannot describe a step, so dropping the step below loses nothing
+        if any(isinstance(index, slice) and index.step not in (None, 1) for index in item):
+            msg = "Slicing WCS with a step is not supported."
+            raise IndexError(msg)
         item = tuple(slice(index.start, index.stop) if isinstance(index, slice) else index for index in item)
         if 0 not in self.shape and any(isinstance(index, slice) and index.start >= index.stop for index in item):
             msg = "Slicing would give a length-0 axis, which a WCS cannot describe."
