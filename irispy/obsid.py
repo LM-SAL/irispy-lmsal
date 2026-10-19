@@ -19,8 +19,10 @@ class ObsID(dict):
 
     Notes
     -----
-    Currently, only OBS IDs with version numbers 36, 38, and 40 are
-    supported. Calibration OBS IDs (version 42) are not yet supported.
+    OBS IDs from the OBS table versions 34, 36, 38 and 40 are supported.
+    OBS IDs of 4200000000 and above are calibration and special sequences
+    with no OBS table; the ``OBS_DESC`` and ``OBSTITLE`` header keywords
+    describe them.
 
     Examples
     --------
@@ -106,12 +108,18 @@ class ObsID(dict):
         if len(str(obsid)) != 10:
             msg = "Invalid OBS ID: must have 10 digits."
             raise ValueError(msg)
-        # here choose between tables
-        version = int(str(obsid)[:2])
-        if version not in versions:
-            msg = f"Invalid OBS ID: two first digits must one of {versions}"
+        # iris_obsid2struct.pro: the table version is obsid // 2e8 * 2, so v40 Full readout OBS IDs start with 41
+        version = int(obsid) // 200_000_000 * 2
+        if version >= 42:
+            msg = (
+                f"OBS ID {obsid} is a calibration or special sequence, which has no OBS table. "
+                "The OBS_DESC and OBSTITLE keywords in the file header describe it."
+            )
             raise ValueError(msg)
-        obsid = int(str(obsid)[2:])  # version digits are no longer needed
+        if version not in versions:
+            msg = f"Invalid OBS ID: OBS table version {version} is not one of {versions}"
+            raise ValueError(msg)
+        obsid = int(obsid) - version * 100_000_000
         reader = ascii_io.get_reader(reader_cls=ascii_io.Csv)
         # Option descriptions are also dictionary keys, so keep their trailing spaces.
         reader.data.splitter.process_val = None
@@ -160,4 +168,7 @@ class ObsID(dict):
                     attr_value = desc[index - start].strip()
                 data[attr_name] = attr_value
                 options[attr_name] = opt
+        if obsid != id_raster:
+            msg = f"Invalid OBS ID: no combination of v{version} OBS table options gives {data['obsid']}"
+            raise ValueError(msg)
         return data, options
