@@ -156,6 +156,21 @@ def read_spectrograph_lvl2(
     Returns
     -------
     `irispy.spectrograph.RasterCollection`
+
+    Examples
+    --------
+    >>> from irispy.data.test import get_test_filepath
+    >>> from irispy.io.spectrograph import read_spectrograph_lvl2
+    >>> filename = get_test_filepath(
+    ...     "sns/iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits"
+    ... )
+    >>> raster = read_spectrograph_lvl2(
+    ...     filename, spectral_windows=["Si IV 1403", "Mg II k 2796"]
+    ... )
+    >>> len(raster), raster["Si IV 1403"][0].shape, raster["Mg II k 2796"][0].shape
+    (2, (187, 40, 29), (187, 40, 52))
+    >>> raster["Si IV 1403"][0].unit, raster["Mg II k 2796"][0].unit
+    (Unit("DN_IRIS_FUV"), Unit("DN_IRIS_NUV"))
     """
     if isinstance(filenames, (str, Path)):
         filenames = [filenames]

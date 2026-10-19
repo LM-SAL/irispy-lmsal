@@ -243,6 +243,19 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     `irispy.sji.SJICube`
         The data cube, using a gWCS. AIA and Hinode/SOT cubes are an
         `irispy.sji.AIACube` and an `irispy.sji.SOTCube`.
+
+    Examples
+    --------
+    >>> from irispy.data.test import get_test_filepath
+    >>> from irispy.io import read_sji_lvl2
+    >>> filename = get_test_filepath(
+    ...     "sns/iris_l2_20210905_001833_3620258102_SJI_1400_t000_test.fits"
+    ... )
+    >>> cube = read_sji_lvl2(filename)
+    >>> cube.shape, cube.unit
+    ((62, 40, 37), Unit("DN_IRIS_SJI"))
+    >>> cube.axis_world_coords("time")[0][[0, -1]].isot
+    array(['2021-09-05T00:18:47.390', '2021-09-05T05:07:22.210'], dtype='<U23')
     """
     if isinstance(filename, fits.HDUList):
         context = nullcontext(filename)

@@ -1,0 +1,1 @@
+The fitting tutorial now says that ``parallel_fit_dask`` runs with any dask scheduler and that pickling a cube is not a supported way to save results.

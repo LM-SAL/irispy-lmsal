@@ -13,7 +13,7 @@ from ndcube import NDCubeSequence
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.io.utils import read_files
 from irispy.spectrograph import SpectrogramCube, SpectrogramCubeSequence
-from irispy.tests.helpers import make_test_spectrogram_cube
+from irispy.tests.helpers import figure_test, make_test_spectrogram_cube
 from irispy.utils.constants import SLIT_WIDTH
 from irispy.visualization import _registered_colormap
 
@@ -225,6 +225,12 @@ def test_spectrogram_cube_plot_defaults(sns_sg_file):
 def test_default_colormap_falls_back_to_viridis():
     assert _registered_colormap("irissjiNUV") == "irissjiNUV"
     assert _registered_colormap("irissji1700") == "viridis"
+
+
+@figure_test
+def test_spectrogram_figure(sns_sg_file):
+    # One exposure of the Si IV 1403 window: slit position against wavelength
+    read_files(sns_sg_file)["Si IV 1403"][0][0].plot()
 
 
 @pytest.mark.filterwarnings("ignore:Attempting to set identical low and high xlims")

@@ -1,0 +1,1 @@
+The tox test environments now run the suite in parallel with ``pytest-xdist``.

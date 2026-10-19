@@ -79,6 +79,7 @@ Now we fit every spectrum:
 The other properties of each fit, such as ``status``, ``success`` and ``nfev``, come out of ``fitter.fit_info`` in the same way.
 The default ``scheduler`` uses several processes; ``"single-threaded"`` keeps this example simple.
 A ``dask.distributed.Client`` can be passed instead.
+Any dask scheduler works. Pickling a cube is not a supported way to save or share results; re-run the script that made them.
 
 Maps from the fit
 =================

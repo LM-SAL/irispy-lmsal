@@ -8,6 +8,8 @@ import astropy.units as u
 import sunpy.map
 
 from irispy.io.utils import read_files
+from irispy.tests.helpers import figure_test
+from irispy.visualization import LAT_AXIS_LABEL, LON_AXIS_LABEL
 
 
 def test_apply_dust_mask_with_lazy_mask(sns_sjicube_1330):
@@ -133,6 +135,24 @@ def test_sji_plot_slider_labels(sns_sjicube_1330, kwargs, expected):
     animator = sns_sjicube_1330.plot(fig=fig, **kwargs)
     assert animator.slider_labels == expected
     plt.close(fig)
+
+
+def test_sji_plot_slider_updates_the_frame(sns_sjicube_1330):
+    fig = plt.figure()
+    animator = sns_sjicube_1330.plot(fig=fig)
+
+    animator.sliders[0]._slider.set_val(3)
+
+    expected = np.ma.masked_array(sns_sjicube_1330.data[3], sns_sjicube_1330.mask[3])
+    np.testing.assert_array_equal(animator.im.get_array(), expected)
+    # The update resets the WCS axes, so the IRIS labels are applied again
+    assert {axis.get_axislabel() for axis in animator.axes.coords} >= {LON_AXIS_LABEL, LAT_AXIS_LABEL}
+    plt.close(fig)
+
+
+@figure_test
+def test_sji_frame_figure(sns_sjicube_1400):
+    sns_sjicube_1400[0].plot()
 
 
 def test_negative_slices(sns_sjicube_1330):

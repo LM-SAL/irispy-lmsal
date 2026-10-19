@@ -1,0 +1,1 @@
+``read_files``, ``read_sji_lvl2``, ``read_spectrograph_lvl2``, ``fits_info``, `~irispy.sji.SJICube`, `~irispy.sji.SJICube.to_maps` and `~irispy.spectrograph.SpectrogramCube` now have short examples that run on the packaged test files.

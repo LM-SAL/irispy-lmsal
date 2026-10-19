@@ -12,7 +12,50 @@ from irispy import SJICube, utils
 from irispy.utils.constants import BAD_PIXEL_VALUE_SCALED
 
 TIMES = Time(["2014-12-11T19:39:00.48", "2014-12-11T19:43:07.6"])
-EXTRA_COORDS = [("time", 0, TIMES)]
+
+
+def _fake_sji_cube(data, *, uncertainty, mask, **meta):
+    """
+    A slit-jaw cube on a plain FITS WCS, with the exposure times and time of two frames.
+    """
+    data = np.asarray(data)
+    header = {
+        "CTYPE1": "HPLN-TAN",
+        "CUNIT1": "arcsec",
+        "CDELT1": 0.4,
+        "CRPIX1": 0,
+        "CRVAL1": 0,
+        "NAXIS1": data.shape[-1],
+        "CTYPE2": "HPLT-TAN",
+        "CUNIT2": "arcsec",
+        "CDELT2": 0.5,
+        "CRPIX2": 0,
+        "CRVAL2": 0,
+        "NAXIS2": data.shape[-2],
+    }
+    if data.ndim == 3:
+        header |= {
+            "CTYPE3": "Time    ",
+            "CUNIT3": "s",
+            "CDELT3": 0.3,
+            "CRPIX3": 0,
+            "CRVAL3": 0,
+            "NAXIS3": data.shape[0],
+        }
+    cube = SJICube(
+        data,
+        WCS(header=header, naxis=data.ndim),
+        uncertainty=uncertainty,
+        mask=mask,
+        unit=utils.constants.DN_UNIT["SJI"],
+        meta=NDMeta(
+            {"exposure time": 2 * np.ones(2) * u.s, "scaled": True, **meta},
+            axes={"exposure time": 0},
+            data_shape=data.shape,
+        ),
+    )
+    cube.extra_coords.add("time", 0, TIMES)
+    return cube
 
 
 @pytest.fixture
@@ -23,128 +66,24 @@ def cube():
             [[2, 4, 5, 1], [10, 5, 2, 2], [10, 3, 3, 0]],
         ],
     )
-    exposure_times = 2 * np.ones((2), float) * u.s
-    uncertainty = np.sqrt(data)
-    header = {
-        "CTYPE1": "HPLN-TAN",
-        "CUNIT1": "arcsec",
-        "CDELT1": 0.4,
-        "CRPIX1": 0,
-        "CRVAL1": 0,
-        "NAXIS1": 4,
-        "CTYPE2": "HPLT-TAN",
-        "CUNIT2": "arcsec",
-        "CDELT2": 0.5,
-        "CRPIX2": 0,
-        "CRVAL2": 0,
-        "NAXIS2": 3,
-        "CTYPE3": "Time    ",
-        "CUNIT3": "s",
-        "CDELT3": 0.3,
-        "CRPIX3": 0,
-        "CRVAL3": 0,
-        "NAXIS3": 2,
-    }
-    wcs = WCS(header=header, naxis=3)
-    cube = SJICube(
-        data,
-        wcs,
-        uncertainty=uncertainty,
-        mask=data >= 0,
-        unit=utils.constants.DN_UNIT["SJI"],
-        meta=NDMeta(
-            {"exposure time": exposure_times, "scaled": True}, axes={"exposure time": 0}, data_shape=data.shape
-        ),
-    )
-    cube.extra_coords.add(*EXTRA_COORDS[0])
-    return cube
+    return _fake_sji_cube(data, uncertainty=np.sqrt(data), mask=data >= 0)
 
 
 @pytest.fixture
 def cube_2d():
-    data_2d = np.array([[1, 2, 3, 4], [2, 4, 5, 3]])
-    uncertainty_2d = np.sqrt(data_2d)
-    header_2d = {
-        "CTYPE1": "HPLN-TAN",
-        "CUNIT1": "arcsec",
-        "CDELT1": 0.4,
-        "CRPIX1": 0,
-        "CRVAL1": 0,
-        "NAXIS1": 4,
-        "CTYPE2": "HPLT-TAN",
-        "CUNIT2": "arcsec",
-        "CDELT2": 0.5,
-        "CRPIX2": 0,
-        "CRVAL2": 0,
-        "NAXIS2": 3,
-    }
-    exposure_times = 2 * np.ones((2), float) * u.s
-    wcs_2d = WCS(header=header_2d, naxis=2)
-    cube_2d = SJICube(
-        data_2d,
-        wcs_2d,
-        uncertainty=uncertainty_2d,
-        mask=data_2d >= 0,
-        unit=utils.constants.DN_UNIT["SJI"],
-        meta=NDMeta(
-            {"exposure time": exposure_times, "scaled": True}, axes={"exposure time": 0}, data_shape=data_2d.shape
-        ),
-    )
-    cube_2d.extra_coords.add(*EXTRA_COORDS[0])
-    return cube_2d
+    data = np.array([[1, 2, 3, 4], [2, 4, 5, 3]])
+    return _fake_sji_cube(data, uncertainty=np.sqrt(data), mask=data >= 0)
 
 
 @pytest.fixture
 def dust_cube():
-    data_dust = np.array(
+    data = np.array(
         [
             [[-1, 2, -3, 4], [2, BAD_PIXEL_VALUE_SCALED, 5, 3], [0, 1, 2, -300]],
             [[2, BAD_PIXEL_VALUE_SCALED, 5, 1], [10, -5, 2, 2], [10, -3, 3, 0]],
         ],
     )
-    header = {
-        "CTYPE1": "HPLN-TAN",
-        "CUNIT1": "arcsec",
-        "CDELT1": 0.4,
-        "CRPIX1": 0,
-        "CRVAL1": 0,
-        "NAXIS1": 4,
-        "CTYPE2": "HPLT-TAN",
-        "CUNIT2": "arcsec",
-        "CDELT2": 0.5,
-        "CRPIX2": 0,
-        "CRVAL2": 0,
-        "NAXIS2": 3,
-        "CTYPE3": "Time    ",
-        "CUNIT3": "s",
-        "CDELT3": 0.3,
-        "CRPIX3": 0,
-        "CRVAL3": 0,
-        "NAXIS3": 2,
-    }
-    wcs = WCS(header=header, naxis=3)
-    unit = utils.constants.DN_UNIT["SJI"]
-    mask_dust = data_dust == BAD_PIXEL_VALUE_SCALED
-
-    uncertainty = 1
-    times = Time(["2014-12-11T19:39:00.48", "2014-12-11T19:43:07.6"])
-    exposure_times = 2 * np.ones((2), float) * u.s
-    extra_coords = [("time", 0, times)]
-    meta = NDMeta(
-        {"exposure time": exposure_times, "OBSID": 1, "scaled": True},
-        axes={"exposure time": 0},
-        data_shape=data_dust.shape,
-    )
-    dust_cube = SJICube(
-        data_dust,
-        wcs,
-        uncertainty=uncertainty,
-        mask=mask_dust,
-        unit=unit,
-        meta=meta,
-    )
-    dust_cube.extra_coords.add(*extra_coords[0])
-    return dust_cube
+    return _fake_sji_cube(data, uncertainty=1, mask=data == BAD_PIXEL_VALUE_SCALED, OBSID=1)
 
 
 def test_sjicube_apply_dust_mask(dust_cube):

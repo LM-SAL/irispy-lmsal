@@ -19,96 +19,91 @@ from sunpy.map.sources import AIAMap, SOTMap
 from irispy.data.test import get_test_filepath
 from irispy.io.sji import _create_headers_wcs, _fill_dropped_pointing_rows, _t_obs, read_sji_lvl2
 from irispy.sji import AIACube, SOTCube
-from irispy.utils.constants import SATURATION_LIMIT
+from irispy.utils.constants import BAD_PIXEL_VALUES_SCALED, DN_UNIT, SATURATION_LIMIT
+
+SJI_FILES = [
+    "sns_sji_1330_file",
+    "sns_sji_1400_file",
+    "sns_sji_2796_file",
+    "sns_sji_2832_file",
+    "raster_sji_1400_file",
+    "raster_sji_2796_file",
+    "raster_sji_2832_file",
+]
 
 
-def test_sns_read_sji_lvl2(sns_sji_2832_file):
-    sji_2832_cube = read_sji_lvl2(sns_sji_2832_file)
-    # Simple repr check
-    assert str(sji_2832_cube)
-    assert sji_2832_cube.meta is not None
-    meta = sji_2832_cube.meta
-    assert sji_2832_cube.data.shape == (10, 40, 37)  # (time, y, x)
-    assert np.all(sji_2832_cube.data.shape == meta.data_shape)
-    # Meta is both a dict with the fits header keys but also provides
-    # helper functions for specific values
-    assert meta["TELESCOP"] == "IRIS" == meta.observatory
-    assert meta["INSTRUME"] == "SJI" == meta.instrument
-    assert meta.detector == "SJI"
-    assert meta.spectral_band == "NUV"
-    assert meta.automatic_exposure_control_enabled is True
-    assert meta.date_end.isot == "2021-09-05T05:05:17.950"
-    assert meta.date_reference.isot == "2021-09-05T00:19:01.890"
-    assert meta.date_start.isot == "2021-09-05T00:19:01.890"
-    assert_quantity_allclose(meta.distance_to_sun, 1.00827638 * u.AU)
-    assert meta.exposure_control_triggers_in_observation == 0
-    assert meta.exposure_control_triggers_in_raster == 0
-    assert len(meta.fits_header) == 162 == (len(meta.keys()) + 12)  # History is missing
-    assert meta.fov_center == SkyCoord(
-        Tx=meta.get("XCEN"),
-        Ty=meta.get("YCEN"),
-        unit=u.arcsec,
-        frame=Helioprojective,
-    )
-    assert meta.key_comments == {}
-    assert meta.number_of_unique_raster_positions == 1
-    assert meta.number_of_raster_positions == 1
-    assert meta.observation_includes_saa is True
-    assert meta.observatory_at_high_latitude is False
-    assert meta.observing_campaign_start.isot == "2021-09-05T00:18:33.640"
-    assert meta.observing_mode_description == "Medium sit-and-stare 0.3x60 1s  C II   Si IV   Mg II h/k   Mg II w s"
-    assert meta.observing_mode_id == 3620258102
-    assert meta.processing_level == 2
-    assert meta.raster_fov_width_x == 61.2168 * u.arcsec
-    assert meta.raster_fov_width_y == 66.54 * u.arcsec
-    assert meta.satellite_rotation == 4.1483e-05 * u.deg
-    assert meta.spatial_summing_factor == 1
-    assert_quantity_allclose(meta.spectral_range, (2830.0, 2834.0) * u.angstrom)
-    assert meta.spectral_summing_factor is None
-    assert meta.tracking_mode_enabled is False
+@pytest.mark.parametrize("file_fixture", SJI_FILES)
+def test_read_sji_lvl2_matches_the_file(request, file_fixture):
+    filename = request.getfixturevalue(file_fixture)
+    cube = read_sji_lvl2(filename)
+    with fits.open(filename) as hdulist:
+        header, data = hdulist[0].header, hdulist[0].data
+        aux, columns = hdulist[1].data, hdulist[1].header
 
-    # TODO: Decide if I want to set these, they are more WCS properties...
-    assert meta.observer_location is None
-    assert meta.rsun_angular is None
-    assert meta.rsun_meters is None
+    assert str(cube)
+    assert cube.shape == (header["NAXIS3"], header["NAXIS2"], header["NAXIS1"])
+    assert tuple(cube.meta.data_shape) == cube.shape
+    assert cube.unit == DN_UNIT["SJI"]
+    assert cube.mask.sum() == (np.isin(data, BAD_PIXEL_VALUES_SCALED) | (data >= SATURATION_LIMIT.value)).sum()
+    # The times are the exposure midpoints
+    times = cube.axis_world_coords("time")[0]
+    expected_times = Time(header["STARTOBS"]) + (aux[:, columns["TIME"]] + aux[:, columns["EXPTIMES"]] / 2) * u.s
+    assert_quantity_allclose((times[[0, -1]] - expected_times[[0, -1]]).to(u.s), 0 * u.s, atol=1 * u.us)
+    assert [wcs.wcs.dateobs for wcs in cube.fits_wcs] == times.isot.tolist()
+    # The reference pixel of the first frame points at that frame's XCENIX and YCENIX
+    reference = cube.wcs.pixel_to_world(header["CRPIX1"] - 1, header["CRPIX2"] - 1, 0)[0]
+    assert_quantity_allclose(reference.Tx, aux[0, columns["XCENIX"]] * u.arcsec, atol=1e-6 * u.arcsec)
+    assert_quantity_allclose(reference.Ty, aux[0, columns["YCENIX"]] * u.arcsec, atol=1e-6 * u.arcsec)
 
-
-def test_raster_read_sji_lvl2(raster_sji_1400_file):
-    sji_1400_cube = read_sji_lvl2(raster_sji_1400_file)
-    # Simple repr check
-    assert str(sji_1400_cube)
-    assert sji_1400_cube.meta is not None
-    meta = sji_1400_cube.meta
-    assert sji_1400_cube.data.shape == (2, 109, 178)  # (time, y, x)
-    assert np.all(sji_1400_cube.data.shape == meta.data_shape)
-    # Meta is both a dict with the fits header keys but also provides
-    # helper functions for specific values
-    assert meta["TELESCOP"] == "IRIS" == meta.observatory
-    assert meta["INSTRUME"] == "SJI" == meta.instrument
-    assert meta.detector == "SJI"
-    assert meta.spectral_band == "FUV"
-    assert meta.automatic_exposure_control_enabled is True
-    assert meta.date_end.isot == "2023-04-08T11:42:01.050"
-    assert meta.date_reference.isot == "2023-04-08T11:09:57.690"
-    assert meta.date_start.isot == "2023-04-08T11:09:57.690"
-    assert_quantity_allclose(meta.distance_to_sun, 1.0011105057794114 * u.AU)
-    assert meta.exposure_control_triggers_in_observation == 0
-    assert meta.exposure_control_triggers_in_raster == 0
-    assert len(meta.fits_header) == 162 == (len(meta.keys()) + 12)  # History is missing
-    assert meta["XCEN"] == -2.73951
-    assert meta["YCEN"] == 945.279
-    assert_quantity_allclose(meta.fov_center.Tx, -2.73951 * u.arcsec)
-    assert_quantity_allclose(meta.fov_center.Ty, 945.279 * u.arcsec)
-    assert meta.key_comments == {}
-    assert meta.number_of_unique_raster_positions == 16
-    assert meta.number_of_raster_positions == 1
-    assert meta.observation_includes_saa is True
-    assert meta.observatory_at_high_latitude is False
-    assert meta.observing_campaign_start.isot == "2023-04-08T11:08:21.730"
-    assert meta.observing_mode_description == "Very large coarse 64-step raster 126x175 64s   Deep x 30"
-    observation_times = sji_1400_cube.axis_world_coords("time")[0]
-    assert observation_times.isot.tolist() == ["2023-04-08T11:10:12.690", "2023-04-08T11:42:16.050"]
-    assert [wcs.wcs.dateobs for wcs in sji_1400_cube.fits_wcs] == observation_times.isot.tolist()
+    meta = cube.meta
+    assert len(meta.fits_header) == len(header)
+    assert meta.fov_center == SkyCoord(Tx=header["XCEN"], Ty=header["YCEN"], unit=u.arcsec, frame=Helioprojective)
+    assert_quantity_allclose(meta.spectral_range, [header["TWMIN1"], header["TWMAX1"]] * u.AA)
+    values = {
+        "observatory": header["TELESCOP"],
+        "instrument": header["INSTRUME"],
+        "detector": header["TDET1"],
+        "spectral_window": header["TDESC1"].removeprefix("SJI_"),
+        "spectral_band": "FUV" if header["TWAVE1"] < 2000 else "NUV",
+        "observing_mode_id": int(header["OBSID"]),
+        "observing_mode_description": header["OBS_DESC"],
+        "processing_level": header["DATA_LEV"],
+        "number_of_unique_raster_positions": header["NRASTERP"],
+        "number_of_raster_positions": header["RASNRPT"],
+        "exposure_control_triggers_in_observation": header["AECNOBS"],
+        "exposure_control_triggers_in_raster": header["AECNRAS"],
+        "spatial_summing_factor": header["SUMSPAT"],
+        "spectral_summing_factor": None,
+        "key_comments": {},
+    }
+    for name, expected in values.items():
+        assert getattr(meta, name) == expected, name
+    flags = {
+        "automatic_exposure_control_enabled": "IAECFLAG",
+        "observation_includes_saa": "SAA",
+        "observatory_at_high_latitude": "HLZ",
+        "tracking_mode_enabled": "TR_MODE",
+    }
+    for name, keyword in flags.items():
+        assert getattr(meta, name) is bool(header[keyword]), name
+    quantities = {
+        "distance_to_sun": ("DSUN_OBS", u.m),
+        "raster_fov_width_x": ("FOVX", u.arcsec),
+        "raster_fov_width_y": ("FOVY", u.arcsec),
+        "satellite_rotation": ("SAT_ROT", u.deg),
+        "exposure_time": ("EXPTIME", u.s),
+    }
+    for name, (keyword, unit) in quantities.items():
+        assert_quantity_allclose(getattr(meta, name), header[keyword] * unit, err_msg=name)
+    dates = {
+        "date_reference": "DATE_OBS",
+        "date_start": "DATE_OBS",
+        "date_end": "DATE_END",
+        "observing_campaign_start": "STARTOBS",
+        "observing_campaign_end": "ENDOBS",
+    }
+    for name, keyword in dates.items():
+        assert getattr(meta, name).isot == Time(header[keyword]).isot, name
 
 
 @pytest.mark.parametrize("from_bytes", [False, True])

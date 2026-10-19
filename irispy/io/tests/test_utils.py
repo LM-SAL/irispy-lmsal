@@ -291,6 +291,27 @@ def test_read_files_sot_repeated_names(tmp_path, sot_sp_file, source):
     assert len(returns) == 4
 
 
+def test_read_files_raster_tarball_matches_the_loose_files(tmp_path, raster_sg_files):
+    tar_path = tmp_path / "iris_l2_20140329_140938_3860258481_raster.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tar:
+        for filename in raster_sg_files:
+            tar.add(filename, arcname=Path(filename).name)
+    expected = read_files(raster_sg_files)
+
+    returns = read_files(tar_path)
+
+    assert list(returns.keys()) == list(expected.keys())
+    np.testing.assert_array_equal(returns.aligned_dimensions, expected.aligned_dimensions)
+    for key in expected:
+        assert len(returns[key]) == len(expected[key]) == len(raster_sg_files)
+        for cube, reference in zip(returns[key], expected[key], strict=True):
+            np.testing.assert_array_equal(cube.data, reference.data)
+            np.testing.assert_array_equal(cube.mask, reference.mask)
+            assert cube.meta["DATE_OBS"] == reference.meta["DATE_OBS"]
+            times = cube.axis_world_coords(wcs=cube.extra_coords["time"])[0]
+            assert (times == reference.axis_world_coords(wcs=reference.extra_coords["time"])[0]).all()
+
+
 @pytest.mark.remote_data
 def test_read_files_raster_scanning(remote_raster_scanning_tar):
     returns = read_files(remote_raster_scanning_tar)
