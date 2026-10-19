@@ -79,6 +79,32 @@ def test_decompresses_file_once(tmp_path, monkeypatch, memmap, source, reader):
     np.testing.assert_array_equal(cube.mask, expected.mask)
 
 
+def test_raster_reader_takes_an_opened_file_and_leaves_it_open(tmp_path, monkeypatch):
+    source = get_test_filepath(
+        "raster/iris_l2_20140329_140938_3860258481_raster/iris_l2_20140329_140938_3860258481_raster_t000_r00000_test.fits"
+    )
+    filename = tmp_path / "compressed.fits.gz"
+    with Path(source).open("rb") as original, gzip.open(filename, "wb") as compressed:
+        compressed.write(original.read())
+    expected = read_spectrograph_lvl2(source)["C II 1336"][0]
+    inflated = []
+    real_read = gzip._GzipReader.read
+
+    def tracked_read(self, size=-1):
+        chunk = real_read(self, size)
+        inflated.append(len(chunk))
+        return chunk
+
+    monkeypatch.setattr(gzip._GzipReader, "read", tracked_read)
+    # As a caller holds a file whose headers it read first: inflated once, by the caller
+    with fits.open(filename, decompress_in_memory=True) as hdulist:
+        cube = read_spectrograph_lvl2(hdulist)["C II 1336"][0]
+        assert not hdulist.fileinfo(0)["file"].closed
+    assert sum(inflated) < 2 * Path(source).stat().st_size
+    np.testing.assert_array_equal(cube.data, expected.data)
+    np.testing.assert_array_equal(cube.mask, expected.mask)
+
+
 @pytest.mark.parametrize(
     "file_fixture", ["sns_sg_file", "sns_sji_1330_file", "sns_sji_1400_file", "sns_sji_2796_file", "sns_sji_2832_file"]
 )
