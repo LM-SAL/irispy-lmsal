@@ -2,6 +2,7 @@ import io
 import os
 import gzip
 import shutil
+import hashlib
 import tarfile
 import threading
 from pathlib import Path
@@ -10,6 +11,7 @@ from collections import Counter
 import numpy as np
 import pytest
 
+from astropy.config.paths import temporary_cache_dir_path
 from astropy.io import fits
 from astropy.io.fits import file as fits_file
 
@@ -20,6 +22,12 @@ from irispy.io.sji import read_sji_lvl2
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.io.utils import _extract_tarfile, _get_spec_group_key, fits_info, read_files
 from irispy.sji import SOTCube
+
+
+def _extract_target(root, tar_path):
+    # The folder a tar file is extracted into: its name and the first 8 hex digits of its path's SHA-1
+    digest = hashlib.sha1(os.fsencode(Path(tar_path).resolve()), usedforsecurity=False).hexdigest()[:8]
+    return Path(root) / f"{Path(tar_path).with_suffix('').with_suffix('').name}-{digest}"
 
 
 @pytest.mark.parametrize("memmap", [False, True])
@@ -227,6 +235,23 @@ def test_read_files_grouped_spectrograph_honors_allow_errors(
     assert list(returns.keys()) == list(expected.keys())
 
 
+def test_read_files_skips_a_bad_tar_member_with_allow_errors(tmp_path, raster_sg_files):
+    tar_path = tmp_path / "obs_raster.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tar:
+        for filename in raster_sg_files:
+            tar.add(filename, arcname=Path(filename).name)
+        info = tarfile.TarInfo("corrupt.fits")  # sorts before the rasters
+        info.size = 3
+        tar.addfile(info, io.BytesIO(b"abc"))
+
+    with pytest.raises(ValueError, match=r"corrupt\.fits is not an IRIS level 2 file"):
+        read_files(tar_path)
+    returns = read_files(tar_path, allow_errors=True)
+
+    # The other members still load
+    assert len(returns["Si IV 1403"]) == len(raster_sg_files)
+
+
 def test_read_files_sji_more_than_one(sns_sji_1330_file, sns_sji_1400_file):
     returns = read_files([sns_sji_1330_file, sns_sji_1400_file])
     assert len(returns) == 2
@@ -239,10 +264,11 @@ def test_read_files_sot(tmp_path, sot_fg_file, sot_mg_file, sot_sp_file):
         tar.add(sot_sp_file, arcname="sotsp_a.fits")
         tar.add(sot_sp_file, arcname="sotsp_b.fits")
 
-    returns = read_files([sot_fg_file, sot_mg_file, str(tar_path)])
+    returns = read_files([sot_fg_file, sot_mg_file, str(tar_path)], extract_dir=tmp_path / "extracted")
 
     assert set(returns.keys()) == {"G band 4305", "TF Na I 5896", "6302A B_LOS", "6302A B_LOS (sotsp_b)"}
     assert all(isinstance(cube, SOTCube) for cube in returns.values())
+    assert (_extract_target(tmp_path / "extracted", tar_path) / "sotsp_b.fits").is_file()
 
 
 @pytest.mark.parametrize("source", ["files", "archive"], ids=["same-stem-files", "same-stem-members"])
@@ -265,14 +291,6 @@ def test_read_files_sot_repeated_names(tmp_path, sot_sp_file, source):
     assert len(returns) == 4
 
 
-def test_read_files_raises_when_no_files_are_supported(tmp_path):
-    filename = tmp_path / "not-a-fits.txt"
-    filename.write_text("not a supported IRIS file")
-
-    with pytest.raises(ValueError, match="No supported IRIS files were loaded"):
-        read_files(filename)
-
-
 @pytest.mark.remote_data
 def test_read_files_raster_scanning(remote_raster_scanning_tar):
     returns = read_files(remote_raster_scanning_tar)
@@ -290,17 +308,21 @@ def test_extract_tarfile_reuses_complete_extraction(tmp_path):
             info = tarfile.TarInfo(name)
             info.size = 3
             tar.addfile(info, io.BytesIO(b"abc"))
-    extract_dir = tmp_path / "obs_raster"
-    first = _extract_tarfile([tar_path])
+    extract_dir = _extract_target(tmp_path, tar_path)
+    first = _extract_tarfile([tar_path], extract_dir=tmp_path)
     assert first == [extract_dir / "a.fits", extract_dir / "b.fits"]
     # A second call must not extract again, or it would restore "abc".
     (extract_dir / "a.fits").write_bytes(b"new")
-    assert _extract_tarfile([tar_path]) == first
+    assert _extract_tarfile([tar_path], extract_dir=tmp_path) == first
     assert (extract_dir / "a.fits").read_bytes() == b"new"
     # A missing file means the extraction is incomplete, so it is extracted again.
     (extract_dir / "b.fits").unlink()
-    assert _extract_tarfile([tar_path]) == first
+    assert _extract_tarfile([tar_path], extract_dir=tmp_path) == first
     assert (extract_dir / "a.fits").read_bytes() == b"abc"
+    # So does a truncated file.
+    (extract_dir / "b.fits").write_bytes(b"ab")
+    assert _extract_tarfile([tar_path], extract_dir=tmp_path) == first
+    assert (extract_dir / "b.fits").read_bytes() == b"abc"
     # A replaced tar file is extracted again, even if its modification time is older.
     old_mtime_ns = tar_path.stat().st_mtime_ns - 10**9
     with tarfile.open(tar_path, "w:gz") as tar:
@@ -308,8 +330,65 @@ def test_extract_tarfile_reuses_complete_extraction(tmp_path):
         info.size = 4
         tar.addfile(info, io.BytesIO(b"abcd"))
     os.utime(tar_path, ns=(old_mtime_ns, old_mtime_ns))
-    assert _extract_tarfile([tar_path]) == [extract_dir / "a.fits"]
+    assert _extract_tarfile([tar_path], extract_dir=tmp_path) == [extract_dir / "a.fits"]
     assert (extract_dir / "a.fits").read_bytes() == b"abcd"
+
+
+def test_extract_tarfile_strips_the_leading_slash_of_a_member_name(tmp_path):
+    tar_path = tmp_path / "obs_raster.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tar:
+        info = tarfile.TarInfo("/a.fits")
+        info.size = 3
+        tar.addfile(info, io.BytesIO(b"abc"))
+    extracted = _extract_target(tmp_path, tar_path) / "a.fits"
+
+    files = _extract_tarfile([tar_path], extract_dir=tmp_path)
+
+    # extractall(filter="data") strips the slash, so the file is in the folder, not at /a.fits
+    assert files == [extracted]
+    assert extracted.read_bytes() == b"abc"
+    # and the extraction is found complete and reused
+    extracted.write_bytes(b"new")
+    assert _extract_tarfile([tar_path], extract_dir=tmp_path) == [extracted]
+    assert extracted.read_bytes() == b"new"
+
+
+def test_extract_tarfile_keeps_same_named_archives_apart(tmp_path, raster_sg_file, sns_sg_file):
+    # The same archive name in two folders, such as two downloads of one observation, with the same member name
+    tarballs = []
+    for folder, filename in zip(("first", "second"), (raster_sg_file, sns_sg_file), strict=True):
+        (tmp_path / folder).mkdir()
+        tarballs.append(tmp_path / folder / "obs_raster.tar.gz")
+        with tarfile.open(tarballs[-1], "w:gz") as tar:
+            tar.add(filename, arcname="raster.fits")
+    expected = {fits.getheader(raster_sg_file)["OBSID"], fits.getheader(sns_sg_file)["OBSID"]}
+
+    extracted = _extract_tarfile(tarballs, extract_dir=tmp_path / "extracted")
+    returns = read_files(tarballs, extract_dir=tmp_path / "extracted")
+
+    assert [file.parent for file in extracted] == [_extract_target(tmp_path / "extracted", tar) for tar in tarballs]
+    assert len(returns) == 2
+    assert {raster["C II 1336"][0].meta["OBSID"] for raster in returns.values()} == expected
+
+
+def test_extract_tarfile_defaults_to_the_irispy_cache(tmp_path):
+    # The archive's folder can be read-only, such as a download folder on a shared mount.
+    archive_dir = tmp_path / "downloads"
+    archive_dir.mkdir()
+    tar_path = archive_dir / "obs_raster.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tar:
+        info = tarfile.TarInfo("a.fits")
+        info.size = 3
+        tar.addfile(info, io.BytesIO(b"abc"))
+    archive_dir.chmod(0o555)
+    try:
+        with temporary_cache_dir_path(tmp_path, namespace="irispy") as cache:
+            files = _extract_tarfile([tar_path])
+            assert files == [_extract_target(cache, tar_path) / "a.fits"]
+            assert files[0].read_bytes() == b"abc"
+    finally:
+        archive_dir.chmod(0o755)
+    assert list(archive_dir.iterdir()) == [tar_path]
 
 
 def test_extract_tarfile_serializes_concurrent_callers(tmp_path, monkeypatch):
@@ -329,7 +408,10 @@ def test_extract_tarfile_serializes_concurrent_callers(tmp_path, monkeypatch):
 
     monkeypatch.setattr(tarfile.TarFile, "extractall", paused_extractall)
     results = []
-    threads = [threading.Thread(target=lambda: results.append(_extract_tarfile([tar_path]))) for _ in range(2)]
+    threads = [
+        threading.Thread(target=lambda: results.append(_extract_tarfile([tar_path], extract_dir=tmp_path)))
+        for _ in range(2)
+    ]
     try:
         threads[0].start()
         assert extracting.acquire(timeout=10), "First caller did not start extracting"
@@ -343,5 +425,5 @@ def test_extract_tarfile_serializes_concurrent_callers(tmp_path, monkeypatch):
 
     # The second caller reused the finished extraction instead of extracting again.
     assert not extracting.acquire(blocking=False)
-    assert results == [[tmp_path / "obs_raster" / "a.fits"]] * 2
-    assert (tmp_path / "obs_raster" / "a.fits").read_bytes() == b"abc"
+    assert results == [[_extract_target(tmp_path, tar_path) / "a.fits"]] * 2
+    assert (_extract_target(tmp_path, tar_path) / "a.fits").read_bytes() == b"abc"

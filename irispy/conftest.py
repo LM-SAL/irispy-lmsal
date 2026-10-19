@@ -8,6 +8,8 @@ import pooch
 import pytest
 from scipy.io import readsav
 
+from astropy.config.paths import temporary_cache_dir_path
+
 from irispy.data.test import get_test_filepath
 from irispy.io.sji import read_sji_lvl2
 from irispy.io.spectrograph import read_spectrograph_lvl2
@@ -44,6 +46,13 @@ def pytest_runtest_teardown(item):
         msg = f"Removing {len(plt.get_fignums())} pyplot figure(s) left open by {item.name}"
         console_logger.info(msg)
         plt.close("all")
+
+
+@pytest.fixture(autouse=True)
+def _temp_irispy_cache(tmp_path):
+    # Tar files are extracted into the irispy cache folder: keep the tests out of the user's.
+    with temporary_cache_dir_path(tmp_path, namespace="irispy"):
+        yield
 
 
 @pytest.fixture
