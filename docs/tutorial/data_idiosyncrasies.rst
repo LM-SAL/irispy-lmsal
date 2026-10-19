@@ -164,7 +164,7 @@ Intensity Scaling
 
 The IRIS data consists of 14-bit pixel values (DN in level 0 data can range from 0-16383; corrections applied during processing to level 2 can move the data values somewhat outside this range).
 
-There is no Python code to automatically determine the best scaling for a given observation, but the `irispy.utils.image_clipping` routine can be used to determine good values for ``vmin`` and ``vmax`` for scaling the data in a plot.
+There is no Python code to automatically determine the best scaling for a given observation, but `astropy.visualization.AsymmetricPercentileInterval` can be used to determine good values for ``vmin`` and ``vmax`` for scaling the data in a plot, by clipping the darkest and brightest pixels.
 
 Cleaning Up
 -----------

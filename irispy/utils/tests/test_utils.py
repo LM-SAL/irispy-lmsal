@@ -6,16 +6,6 @@ from irispy import utils
 from irispy.utils.constants import DN_UNIT, READOUT_NOISE
 
 
-@pytest.mark.parametrize(
-    ("dtype", "expected"),
-    [(np.int16, (4.0, 16.0)), (np.float64, (3.99920004, 9.00360036))],
-)
-def test_image_clipping(dtype, expected):
-    image = np.array([0, 0, 0, 1, 2, 3, 4, 9], dtype=dtype)
-
-    np_test.assert_allclose(utils.image_clipping(image, cutoff=0.2, gamma=2), expected)
-
-
 def test_import_optional_missing_module_names_the_extra():
     with pytest.raises(ImportError, match=r"pip install 'irispy-lmsal\[rgb\]'"):
         utils.utils._import_optional("definitely_not_a_module", reason="testing", extra="rgb")

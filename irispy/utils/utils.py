@@ -2,7 +2,6 @@
 This module provides general utility functions.
 """
 
-import numbers
 from importlib import import_module
 
 import numpy as np
@@ -11,7 +10,6 @@ import astropy.units as u
 
 __all__ = [
     "calculate_uncertainty",
-    "image_clipping",
     "record_to_dict",
 ]
 
@@ -71,55 +69,6 @@ def record_to_dict(arr: np.ndarray):
         if isinstance(arr[name], np.ndarray) and arr[name].dtype == np.object_:
             new_arr[name] = arr[name].tolist()
     return {name: new_arr[name] for name in new_arr.dtype.names}
-
-
-def image_clipping(image, cutoff=1.5e-3, gamma=1.0):
-    """
-    Computes and returns the min and max values of the input (image), clipping brightest
-    and darkest pixels.
-
-    Parameters
-    ----------
-    image : `numpy.ndarray`
-        The input image.
-    cutoff : float, optional
-        The cutoff value for the histogram.
-        Defaults to 1.5e-3
-    gamma : float, optional
-        The gamma value for the histogram.
-        Defaults to 1.0
-
-    References
-    ----------
-    Based on original IDL routine by P.Suetterlin (06 Jul 1993)
-    Ported by V.Hansteen (15 Apr 2020)
-    """
-    hmin = np.min(image)
-    hmax = np.max(image)
-    if issubclass(image.dtype.type, numbers.Integral):
-        nbins = np.abs(np.max(image) - np.min(image))
-        hist = np.histogram(image, bins=nbins)
-        fak = 1
-    else:
-        nbins = 10000
-        fak = nbins / (hmax - hmin)
-        hist = np.histogram((image - hmin) * fak, range=(0.0, float(nbins)), bins=nbins)
-    h = np.cumsum(hist[0])
-    bins = hist[1]
-    nh = np.size(h)
-    h = h / float(h[nh - 2])
-    h[nh - 1] = 1
-    # As cutoff is in percent and h is normalized to unity,
-    # vmin/vmax are the indices of the point where the number of pixels
-    # with lower/higher intensity reach the given limit. This has to be
-    # converted to a real image value by dividing by the scalefactor
-    # fak and adding the min value of the image
-    # Note that the bottom value is taken off (addition of h[0] to cutoff),
-    # there are often very many points in IRIS images that are set to zero, this
-    # removes them from calculation... and seems to work.
-    vmin = (np.max(np.where(h <= (cutoff + h[0]), bins[1:] - bins[0], 0)) / fak + hmin) ** gamma
-    vmax = (np.min(np.where(h >= (1.0 - cutoff), bins[1:] - bins[0], nh - 2)) / fak + hmin) ** gamma
-    return vmin, vmax
 
 
 def calculate_uncertainty(data: np.ndarray, readout_noise: u.Quantity, unit: u.Quantity) -> np.ndarray:
