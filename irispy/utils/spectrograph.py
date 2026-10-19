@@ -59,8 +59,8 @@ def radiometric_calibration(
     Raises
     ------
     ValueError
-        If ``line`` is given for a spectrograph cube, or if the cube is not from an IRIS slit-jaw
-        passband, such as an AIA cube.
+        If ``line`` is given for a spectrograph cube or lies where the slit-jaw passband has no
+        effective area, or if the cube is not from an IRIS slit-jaw passband, such as an AIA cube.
 
     Notes
     -----
@@ -132,7 +132,12 @@ def _calibrate_sji(cube, line):
         per_photon = constants.h * constants.c / np.trapezoid(area * wavelength, wavelength)
         unit = RADIANCE_UNIT
     else:
-        per_photon = constants.h * constants.c / line / np.interp(line, wavelength, area)
+        # The response table is zero or absent where the passband does not reach
+        line_area = np.interp(line, wavelength, area, left=0, right=0)
+        if not line_area > 0:
+            msg = f"The {cube.meta.spectral_window} slit-jaw passband has no effective area at line={line}"
+            raise ValueError(msg)
+        per_photon = constants.h * constants.c / line / line_area
         unit = RADIANCE_UNIT * u.AA
     # DN_UNIT["SJI"] holds the NUV gain for all passbands; DN2PHOT_SJI has the gain of each
     photons_per_dn = response["DN2PHOT_SJI"][band] / DN_UNIT["SJI"]

@@ -324,6 +324,13 @@ def test_radiometric_calibration_of_slit_jaw_images(sns_sji_1330_file):
         )
 
 
+@pytest.mark.parametrize("line", [1216 * u.AA, 5000 * u.AA])
+def test_radiometric_calibration_rejects_line_outside_slit_jaw_passband(sns_sji_1330_file, line):
+    cube = read_files(sns_sji_1330_file)
+    with pytest.raises(ValueError, match="1330 slit-jaw passband has no effective area"):
+        radiometric_calibration(cube, line=line)
+
+
 def test_radiometric_calibration_rejects_line_for_spectra(sns_sg_file):
     cube = read_files(sns_sg_file, spectral_windows="C II 1336")["C II 1336"][0]
     with pytest.raises(ValueError, match="line is for slit-jaw cubes"):
