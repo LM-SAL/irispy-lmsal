@@ -394,6 +394,17 @@ def test_memmap_unit_is_unscaled(window, band, raster_sg_file):
     assert read_spectrograph_lvl2(raster_sg_file, memmap=True)["C II 1336"][0].unit == DN_UNIT["FUV"]
 
 
+def test_unscaled_opened_file_needs_memmap():
+    filename = get_test_filepath(
+        "wavelength_drift/iris_l2_20140708_114109_3824262996_raster_t000_r00000_wavelength_drift_test.fits"
+    )
+    with fits.open(filename, do_not_scale_image_data=True) as hdulist:
+        with pytest.raises(ValueError, match="needs memmap=True"):
+            read_spectrograph_lvl2(hdulist, spectral_windows="Mg II k 2796")
+        cube = read_spectrograph_lvl2(hdulist, spectral_windows="Mg II k 2796", memmap=True)["Mg II k 2796"][0]
+    assert cube.unit == DN_UNIT["NUV_UNSCALED"]
+
+
 def test_read_spectrograph_masks_clipped_samples(tmp_path, sns_sg_file):
     with fits.open(sns_sg_file) as hdul:
         window = hdul[0].header["TDESC1"]

@@ -1,6 +1,6 @@
-from contextlib import nullcontext
 from copy import copy
 from pathlib import Path
+from contextlib import nullcontext
 
 import numpy as np
 
@@ -133,7 +133,8 @@ def read_spectrograph_lvl2(
     filenames: `str`, `pathlib.Path`, `astropy.io.fits.HDUList` or a `list` of them
         Files to be read, or files already opened, which are left open. They must all be
         associated with the same OBS number. They are read in order of their ``DATE_OBS``,
-        whatever their order here.
+        whatever their order here. Open files with ``do_not_scale_image_data=True`` when using
+        ``memmap=True``, and without it otherwise.
     spectral_windows: iterable of `str` or `str`
         Spectral windows to extract from files. Default=None, implies, extract all
         spectral windows.
@@ -303,6 +304,9 @@ def read_spectrograph_lvl2(
                     data_mask = _memmap_fill_mask(data, header)
                     if np.issubdtype(data.dtype, np.integer):  # the FITS integers, not DN
                         dn_unit = DN_UNIT[f"{meta.detector_band}_UNSCALED"]
+                elif "BSCALE" in header or "BZERO" in header:  # astropy drops them once it scales the data
+                    msg = "An HDU list opened with do_not_scale_image_data=True needs memmap=True"
+                    raise ValueError(msg)
                 else:
                     # Level 2 clips at the ceiling, where iris_prep's +Inf saturation flags were lost
                     saturated = data >= SATURATION_LIMIT.value
