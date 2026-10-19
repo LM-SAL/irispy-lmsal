@@ -9,7 +9,7 @@ import numpy as np
 import astropy.units as u
 
 from ._spectral import check_scaled
-from .utils import calculate_dust_mask
+from .utils import _boolean_mask, calculate_dust_mask
 
 __all__ = ["remove_dust"]
 
@@ -133,10 +133,7 @@ def remove_dust(
 
     check_scaled(cube)
     clean_data = np.asarray(cube.data, dtype=float).copy()
-    if cube.mask is None:
-        original_mask = np.zeros(cube.data.shape, dtype=bool)
-    else:
-        original_mask = np.asarray(cube.mask, dtype=bool).copy()
+    original_mask = _boolean_mask(cube)
     dust_mask = _coerce_dust_mask(clean_data, dust_mask)
     filled_mask = np.zeros_like(dust_mask, dtype=bool)
 

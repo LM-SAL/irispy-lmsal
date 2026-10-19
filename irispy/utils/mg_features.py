@@ -13,7 +13,7 @@ import astropy.units as u
 from irispy.spectrograph import RasterCollection, SpectrogramCube
 from irispy.utils._spectral import check_scaled, make_map_cube, make_spatial_template
 from irispy.utils.constants import BAD_PIXEL_VALUES_SCALED
-from irispy.utils.utils import _saturated_samples
+from irispy.utils.utils import _boolean_mask, _saturated_samples
 
 __all__ = ["calculate_mg_features"]
 
@@ -111,8 +111,7 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
             msg = f"Too few wavelength points of Mg II {line} between {low} and {high} km/s"
             raise ValueError(msg)
         window = np.asarray(cube.data[..., inside])
-        mask = False if cube.mask is None else np.asarray(cube.mask, dtype=bool)
-        masked = np.broadcast_to(mask, cube.data.shape)[..., inside]
+        masked = _boolean_mask(cube)[..., inside]
         missing = ~np.isfinite(window) | np.isin(window, BAD_PIXEL_VALUES_SCALED) | masked
         # Masked, so missing, and no features
         saturated = np.any(_saturated_samples(cube)[..., inside], axis=-1)

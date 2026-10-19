@@ -38,6 +38,17 @@ def _import_optional(module_name: str, *, reason: str, extra: str):
         raise ImportError(msg) from exc
 
 
+def _boolean_mask(cube):
+    """
+    The mask of ``cube`` as a read-only boolean array of its data's shape, `False`
+    everywhere without one.
+
+    A mask may be a scalar, cover only the trailing axes or be an integer array.
+    """
+    mask = False if cube.mask is None else np.asarray(cube.mask, dtype=bool)
+    return np.broadcast_to(mask, cube.data.shape)
+
+
 def _saturated_samples(cube):
     """
     `True` for the saturated samples of ``cube``: those its mask and
@@ -53,8 +64,7 @@ def _saturated_samples(cube):
     # Rebinning leaves the mark at the old shape
     if saturated is None or cube.mask is None or np.shape(saturated) != cube.data.shape:
         return np.zeros(cube.data.shape, dtype=bool)
-    mask = np.broadcast_to(np.asarray(cube.mask, dtype=bool), cube.data.shape)
-    return mask & np.asarray(saturated, dtype=bool)
+    return _boolean_mask(cube) & np.asarray(saturated, dtype=bool)
 
 
 def record_to_dict(arr: np.ndarray):

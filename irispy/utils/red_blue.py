@@ -21,7 +21,7 @@ from irispy.utils._spectral import (
     make_spatial_template,
     standard_deviation,
 )
-from irispy.utils.utils import _saturated_samples
+from irispy.utils.utils import _boolean_mask, _saturated_samples
 
 __all__ = ["RBAQualityFlag", "calculate_red_blue_asymmetry"]
 
@@ -85,12 +85,12 @@ def _prepare_data(cube, wavelength_axis):
     """
     data = np.asarray(cube.data, dtype=float)
     # Negative samples are left out
-    dropped = data < 0 if cube.mask is None else (data < 0) | cube.mask
-    data = np.where(dropped, np.nan, data)
+    mask = _boolean_mask(cube)
+    data = np.where((data < 0) | mask, np.nan, data)
 
     errors = standard_deviation(cube)
-    if errors is not None and cube.mask is not None:
-        errors = np.where(cube.mask, np.nan, errors)
+    if errors is not None:
+        errors = np.where(mask, np.nan, errors)
 
     data = np.moveaxis(data, wavelength_axis, -1)
     if errors is not None:
