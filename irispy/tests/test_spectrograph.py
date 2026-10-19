@@ -394,7 +394,7 @@ def test_failed_slice_raises_and_keeps_meta(raster_sg_file, item):
     cube = read_spectrograph_lvl2(raster_sg_file, spectral_windows="Si IV 1403")["Si IV 1403"]
 
     with pytest.raises((IndexError, ValueError)):
-        cube[item]
+        _ = cube[item]
     assert cube.fits_wcs is not None
 
 
