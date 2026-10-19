@@ -38,9 +38,9 @@ def test_classify(cards, expected):
     assert _classify(fits.Header(cards)) == expected
 
 
-@pytest.mark.parametrize("kind", ["directory", "text file", "level 3 file"])
+@pytest.mark.parametrize("kind", ["text file", "level 3 file"])
 def test_read_files_rejects_what_is_not_level_2(tmp_path, level3_file, kind):
-    path = {"directory": tmp_path, "text file": tmp_path / "notes.txt", "level 3 file": level3_file}[kind]
+    path = {"text file": tmp_path / "notes.txt", "level 3 file": level3_file}[kind]
     if kind == "text file":
         path.write_text("not a FITS file")
 
@@ -71,11 +71,23 @@ def test_read_sji_lvl2_names_the_data_it_rejects_without_a_filename(level3_file,
         read_sji_lvl2(data)
 
 
-@pytest.mark.parametrize("kind", ["directory", "text file"])
+# read_files reads a folder, so only the single-file readers reject one
 @pytest.mark.parametrize(
-    ("reader", "product"),
-    [(read_files, "file"), (read_sji_lvl2, "SJI file"), (read_spectrograph_lvl2, "raster file")],
-    ids=["read-files", "sji-reader", "spectrograph-reader"],
+    ("reader", "product", "kind"),
+    [
+        (read_files, "file", "text file"),
+        (read_sji_lvl2, "SJI file", "directory"),
+        (read_sji_lvl2, "SJI file", "text file"),
+        (read_spectrograph_lvl2, "raster file", "directory"),
+        (read_spectrograph_lvl2, "raster file", "text file"),
+    ],
+    ids=[
+        "read-files-text file",
+        "sji-reader-directory",
+        "sji-reader-text file",
+        "spectrograph-reader-directory",
+        "spectrograph-reader-text file",
+    ],
 )
 def test_readers_reject_what_is_not_fits_despite_its_suffix(tmp_path, sns_sg_file, reader, product, kind):
     # Named like FITS, so it is opened before it is classified

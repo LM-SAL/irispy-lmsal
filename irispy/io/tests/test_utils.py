@@ -161,6 +161,17 @@ def test_read_files_accepts_mixed_types_and_reads_duplicates_once(
     assert set(returns.keys()) == {"SJI_1330", "SJI_1400"}
 
 
+def test_read_files_folder(tmp_path, sns_sg_file, sns_sji_1330_file, sns_sji_1400_file):
+    for filename in (sns_sg_file, sns_sji_1330_file, sns_sji_1400_file):
+        (tmp_path / Path(filename).name).symlink_to(filename)
+    # An archive download folder also holds the quick-look movies
+    (tmp_path / "iris_l2_20210905_001833_3620258102_movies.tar").touch()
+
+    returns = read_files(tmp_path)
+
+    assert set(returns.keys()) == {"C II 1336", "SJI_1330", "SJI_1400"}
+
+
 def test_read_files_raster_file_list(raster_sg_files):
     returns = read_files(raster_sg_files)
     assert set(returns.keys()) == {

@@ -241,7 +241,9 @@ def read_files(
     Parameters
     ----------
     filenames : `list` of `str` or `pathlib.Path`, `str`, `pathlib.Path`
-        Filename(s) to load. A file given more than once, by any path or symlink, is read once.
+        Filename(s) or folder(s) to load. For a folder, every ``iris_l2_*`` ``.fits``, ``.fits.gz``
+        and ``.tar.gz`` file directly in it is read, such as the files of an observation downloaded
+        from the IRIS archive. A file given more than once, by any path or symlink, is read once.
         Tar files are extracted first. Full-disk mosaics are not read here, use `irispy.io.read_mosaic`.
     spectral_windows : iterable of `str` or `str`, optional
         Spectral windows to extract from the raster files; slit-jaw, AIA and SOT files have none.
@@ -320,7 +322,14 @@ def read_files(
     """
     if isinstance(filenames, (str, Path)):
         filenames = [filenames]
-    filenames = sorted({Path(f).resolve() for f in filenames})
+    paths = []
+    for f in map(Path, filenames):
+        if f.is_dir():
+            # An archive download folder also holds iris_l2_<obs>_movies.tar, the quick-look movies.
+            paths.extend(p for p in f.glob("iris_l2_*") if p.name.endswith((".fits", ".fits.gz", ".tar.gz")))
+        else:
+            paths.append(f)
+    filenames = sorted({p.resolve() for p in paths})
     returns = {}
     spec_groups = {}
     for filename in filenames:
@@ -348,7 +357,7 @@ def read_files(
                 try:
                     header = _primary_header(file) if file.name.endswith((".fits", ".fits.gz")) else None
                 except (OSError, EOFError, ValueError, TypeError):
-                    # A directory or a file that is not FITS: raises the level 2 error, chained to this one
+                    # A file that is not FITS: raises the level 2 error, chained to this one
                     _check_level2(file, None)
                 product = _check_level2(file, header)
                 _, describe = _get_simple_metadata(header)
