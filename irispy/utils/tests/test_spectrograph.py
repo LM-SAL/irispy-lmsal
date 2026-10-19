@@ -3,6 +3,7 @@ import pytest
 from scipy.io import readsav
 
 import astropy.units as u
+from astropy import constants
 from astropy.modeling.physical_models import BlackBody
 from astropy.nddata import StdDevUncertainty
 from astropy.tests.helper import assert_quantity_allclose
@@ -11,6 +12,7 @@ from sunpy.time import parse_time
 
 from irispy.data.test import get_test_filepath
 from irispy.io.utils import read_files
+from irispy.sji import SJICube
 from irispy.spectrograph import SpectrogramCube, SpectrogramCubeSequence
 from irispy.tests.helpers import make_test_spectrogram_cube
 from irispy.utils.constants import RADIANCE_UNIT, RADIANCE_UNIT_PER_HZ, SLIT_WIDTH
@@ -296,3 +298,40 @@ def test_subtract_background_keeps_inf():
     assert np.isposinf(corrected.data[0, 1, 40])
     corrected.data[0, 0, 0] = corrected.data[0, 1, 40] = 0
     np.testing.assert_allclose(corrected.data, 0, atol=1e-9)
+
+
+def test_radiometric_calibration_of_slit_jaw_images(sns_sji_1330_file):
+    cube = read_files(sns_sji_1330_file, uncertainty=True)
+    response = get_latest_response(cube.meta.date_reference)
+    wavelength, area = response["LAMBDA"], response["AREA_SJI"][0]
+    # 12 photons per DN in the FUV slit-jaw passbands
+    photon_rate = (
+        cube.data
+        * 12
+        / cube.exposure_time[:, np.newaxis, np.newaxis]
+        / (cube.meta["CDELT1"] * cube.meta["CDELT2"] * u.arcsec**2)
+    )
+    hc = constants.h * constants.c
+    line = 1336 * u.AA
+    for calibrated, expected in (
+        (radiometric_calibration(cube, line=line), photon_rate * hc / line / np.interp(line, wavelength, area)),
+        (radiometric_calibration(cube), photon_rate * hc / np.trapezoid(area * wavelength, wavelength)),
+    ):
+        assert isinstance(calibrated, SJICube)
+        assert_quantity_allclose(calibrated.data * calibrated.unit, expected)
+        np.testing.assert_allclose(
+            calibrated.uncertainty.array * cube.data, calibrated.data * cube.uncertainty.array, rtol=1e-6
+        )
+
+
+@pytest.mark.parametrize("line", [1216 * u.AA, 5000 * u.AA])
+def test_radiometric_calibration_rejects_line_outside_slit_jaw_passband(sns_sji_1330_file, line):
+    cube = read_files(sns_sji_1330_file)
+    with pytest.raises(ValueError, match="1330 slit-jaw passband has no effective area"):
+        radiometric_calibration(cube, line=line)
+
+
+def test_radiometric_calibration_rejects_line_for_spectra(sns_sg_file):
+    cube = read_files(sns_sg_file, spectral_windows="C II 1336")["C II 1336"][0]
+    with pytest.raises(ValueError, match="line is for slit-jaw cubes"):
+        radiometric_calibration(cube, line=1336 * u.AA)
