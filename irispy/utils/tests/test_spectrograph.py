@@ -176,7 +176,7 @@ def test_radiometric_calibration_keeps_a_standard_deviation(sns_sg_file):
 
 
 def test_radiometric_calibration_does_not_share_coordinates_or_mask(sns_sg_file):
-    cube = read_files(sns_sg_file)["C II 1336"][0]
+    cube = read_files(sns_sg_file)["C II 1336"]
     mask = cube.mask.copy()
     new_cube = radiometric_calibration(cube)
     new_cube.extra_coords.add("sequence", 0, np.arange(len(new_cube.data)) * u.one)
@@ -223,7 +223,7 @@ def test_radiation_temperature_uncertainty_and_mask():
 
 
 def test_radiation_temperature_on_level_2_cube(sns_sg_file):
-    cube = read_files(sns_sg_file, uncertainty=True)["C II 1336"][0]
+    cube = read_files(sns_sg_file, uncertainty=True)["C II 1336"]
     with pytest.raises(ValueError, match="radiometric_calibration"):
         radiation_temperature(cube)
     temperature = radiation_temperature(radiometric_calibration(cube))

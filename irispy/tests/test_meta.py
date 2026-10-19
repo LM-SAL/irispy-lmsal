@@ -97,7 +97,7 @@ def test_sgmeta_observer_uses_campaign_start_when_date_obs_is_blank():
 
 def test_sgmeta_real_sns_data(sns_sg_file):
     raster = read_files(sns_sg_file)
-    cube = raster["Si IV 1403"][0]
+    cube = raster["Si IV 1403"]
     meta = cube.meta
 
     assert meta.detector_band == "FUV"
@@ -142,7 +142,7 @@ def test_meta_mu_matches_sunpy(fraction):
 
 
 def test_sgmeta_exposure_mu(raster_sg_file):
-    cube = read_files(raster_sg_file)["C II 1336"][0]
+    cube = read_files(raster_sg_file)["C II 1336"]
     exposure_mu = cube.meta.exposure_mu
     assert exposure_mu.shape == cube.data.shape[:1]
     # The raster steps across its center, so mu at the center lies within the per-step range

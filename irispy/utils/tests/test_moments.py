@@ -414,7 +414,7 @@ def test_calculate_moments_rebinned_has_no_saturated():
 
 
 def test_calculate_moments_saturated_survives_exposure_time_correction(sns_sg_file):
-    cube = read_files(sns_sg_file)["C II 1336"][0]
+    cube = read_files(sns_sg_file)["C II 1336"]
     cube.data[0, 3, 5] = SATURATION_LIMIT.value
     mark_saturated(cube, cube.data >= SATURATION_LIMIT.value)
     for unit_cube in (cube, cube.apply_exposure_time_correction()):
@@ -705,10 +705,10 @@ def test_calculate_moments_mask_representations(mask):
 
 
 def test_average_window_real_data(sns_sg_file):
-    cube = read_files(sns_sg_file, uncertainty=True)["C II 1336"][0]
+    cube = read_files(sns_sg_file, uncertainty=True)["C II 1336"]
     window = average_window(cube, [1335.2, 1336.2] * u.AA)
     assert window.shape == cube.shape[:-1]
-    assert window.wcs.world_axis_physical_types == cube.wcs.world_axis_physical_types[1:]
+    assert list(window.wcs.world_axis_physical_types) == list(cube.wcs.world_axis_physical_types[1:])
     assert "time" in tuple(window.extra_coords.keys())
     assert np.isfinite(window.data[~window.mask]).all()
     assert np.isfinite(window.uncertainty.array[~window.mask]).all()

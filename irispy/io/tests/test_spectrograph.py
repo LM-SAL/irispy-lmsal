@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 
+import dask.array as da
 import numpy as np
 import pytest
 
@@ -216,7 +217,7 @@ def test_read_spectrograph_lvl2_uses_auxiliary_pointing(request, files):
 def test_read_spectrograph_lvl2_reads_a_repeated_window_once(sns_sg_file):
     raster = read_spectrograph_lvl2(sns_sg_file, spectral_windows=["C II 1336", "Si IV 1394", "C II 1336"])
     assert list(raster) == ["C II 1336", "Si IV 1394"]
-    assert len(raster["C II 1336"]) == 1
+    assert raster["C II 1336"].data.ndim == 3  # one raster, not the window stacked twice
 
 
 def test_nuv_times_reject_invalid_source_filename(raster_sg_file):
@@ -484,12 +485,12 @@ def test_read_spectrograph_lvl2_rejects_bad_wcs_inputs(tmp_path, raster_sg_file,
 
 @pytest.mark.parametrize("files", ["sns_sg_file", "raster_sg_file", "raster_sg_files"])
 def test_memmap_mode_never_computes_uncertainty(request, files):
-    # memmap data are unscaled integers, so no uncertainty (or mask) is computed from them
+    # memmap data are unscaled integers, so no uncertainty is computed from them, and the fill mask is lazy
     files = request.getfixturevalue(files)
     with pytest.warns(UserWarning, match="uncertainty is not computed when memmap=True"):
         memmap = read_spectrograph_lvl2(files, memmap=True, uncertainty=True)["Si IV 1403"]
     assert memmap.uncertainty is None
-    assert memmap.mask is None
+    assert isinstance(memmap.mask, da.Array)
     scaled = read_spectrograph_lvl2(files, spectral_windows="Si IV 1403", uncertainty=True)["Si IV 1403"]
     assert scaled.uncertainty is not None
 
@@ -915,7 +916,7 @@ def test_read_spectrograph_masks_both_fill_values(tmp_path, sns_sg_file, memmap)
         raw = hdulist[1].data.copy()
         hdulist.writeto(filename)
 
-    cube = read_spectrograph_lvl2(filename, spectral_windows="C II 1336", memmap=memmap)["C II 1336"].data[0]
+    cube = read_spectrograph_lvl2(filename, spectral_windows="C II 1336", memmap=memmap)["C II 1336"]
 
     np.testing.assert_array_equal(cube.mask, expected_mask)
     if memmap:
@@ -924,7 +925,7 @@ def test_read_spectrograph_masks_both_fill_values(tmp_path, sns_sg_file, memmap)
 
 def test_read_spectrograph_uncertainty_is_a_standard_deviation(raster_sg_file):
     # A bare array would be stored as an UnknownUncertainty (issue #57).
-    cube = read_spectrograph_lvl2(raster_sg_file, spectral_windows="C II 1336", uncertainty=True)["C II 1336"][0]
+    cube = read_spectrograph_lvl2(raster_sg_file, spectral_windows="C II 1336", uncertainty=True)["C II 1336"]
     assert isinstance(cube.uncertainty, StdDevUncertainty)
     assert cube.uncertainty.array.shape == cube.data.shape
 

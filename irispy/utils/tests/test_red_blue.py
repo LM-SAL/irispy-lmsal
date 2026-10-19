@@ -574,7 +574,7 @@ def test_calculate_red_blue_asymmetry_auto_detect_rest_wavelength():
 
 def test_calculate_red_blue_asymmetry_auto_detect_on_real_data(sns_sg_file):
     raster = read_files(sns_sg_file)
-    cube = raster["C II 1336"][0]
+    cube = raster["C II 1336"]
     result = calculate_red_blue_asymmetry(cube, spline_degree=1)
     assert "red_blue_asymmetry" in result
     assert result["red_blue_asymmetry"].shape == cube.shape[:-1]

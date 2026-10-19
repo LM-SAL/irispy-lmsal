@@ -220,7 +220,7 @@ def test_mg_ii_model_recovers_parameters():
 
 def test_mg_ii_model_on_level_2_data():
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
-    cube = raster["Mg II k 2796"][0]
+    cube = raster["Mg II k 2796"]
     wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
     fitted, _ = _fit(
         mg_ii_model(cube), np.nan_to_num(cube.data.clip(min=0)), cube.uncertainty.array, wavelength, cube.unit
@@ -254,7 +254,7 @@ def test_presets_accept_scalar_mask(function, centers, start):
 def test_presets_reject_unscaled_data(function):
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), memmap=True)
     with pytest.raises(ValueError, match="unscaled"):
-        function(raster["Mg II k 2796"][0])
+        function(raster["Mg II k 2796"])
 
 
 @pytest.mark.parametrize(
@@ -494,7 +494,7 @@ def test_starts_from_model_units():
 
 def test_starts_from_model_starts_blended_lines_at_their_own_peaks():
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
-    cube = raster["Mg II k 2796"][0]
+    cube = raster["Mg II k 2796"]
     wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
     start = profiles_on_background(
         [2796.20, 2796.50] * u.AA,
@@ -511,7 +511,7 @@ def test_starts_from_model_starts_blended_lines_at_their_own_peaks():
 @pytest.mark.parametrize("background", ["constant", "polynomial"])
 def test_starts_from_model_on_level_2_data(background):
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
-    cube = raster["Mg II k 2796"][0][:, 700:740]  # Rows 731 to 739 are masked in full.
+    cube = raster["Mg II k 2796"][:, 700:740]  # Rows 731 to 739 are masked in full.
     wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
     data = np.where(cube.mask, np.nan, cube.data)
     start = profiles_on_background(
