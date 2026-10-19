@@ -96,17 +96,7 @@ def radiometric_calibration(
     )
     new_data = new_data_quantities[0].value
     new_uncertainty = StdDevUncertainty(new_data_quantities[1].value) if len(new_data_quantities) > 1 else None
-    new_unit = new_data_quantities[0].unit
-    new_cube = SpectrogramCube(
-        new_data,
-        cube.wcs,
-        new_uncertainty,
-        new_unit,
-        cube.meta,
-        mask=cube.mask,
-    )
-    new_cube._extra_coords = cube.extra_coords
-    return new_cube
+    return make_map_cube(cube, new_data, new_data_quantities[0].unit, uncertainty=new_uncertainty)
 
 
 def radiation_temperature(

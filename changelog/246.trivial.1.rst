@@ -1,0 +1,1 @@
+`~irispy.utils.red_blue.calculate_red_blue_asymmetry` fits one spline per peak position to the profiles without gaps and computes the asymmetries of 20000 pixels at a time, instead of looping over every pixel in Python, so without ``return_profiles`` it holds only one such chunk of interpolated profiles; the results are unchanged.

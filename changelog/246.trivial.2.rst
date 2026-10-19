@@ -1,0 +1,1 @@
+`~irispy.utils.wavelength_drift.calculate_wavelength_drift` no longer computes the whole lazy fill mask of a raster read with ``memmap=True`` for every line it fits: the fill values are negative, so the fit already counts them as zero.

@@ -15,6 +15,7 @@ from irispy.io.utils import read_files
 from irispy.spectrograph import SpectrogramCube, SpectrogramCubeSequence
 from irispy.tests.helpers import make_test_spectrogram_cube
 from irispy.utils.constants import SLIT_WIDTH
+from irispy.visualization import _registered_colormap
 
 
 def test_fits_data_comparison(sns_sg_file):
@@ -213,10 +214,17 @@ def test_solid_angle_real_data(sns_sg_file):
 
 def test_spectrogram_cube_plot_defaults(sns_sg_file):
     cube = read_files(sns_sg_file)["Si IV 1403"][0][0]
+    # The IRIS FUV color table, as sunpy registers it, for an FUV window
+    assert cube.meta.detector_band == "FUV"
+    assert cube.plotter._default_cmap_name() == "irissjiFUV"
     ax = cube.plot()
-    # FUV detectors have no irissji colormap, so the default falls back to viridis.
-    assert ax.images[0].get_cmap().name == "viridis"
+    assert ax.images[0].get_cmap().name == "irissjiFUV"
     plt.close(ax.figure)
+
+
+def test_default_colormap_falls_back_to_viridis():
+    assert _registered_colormap("irissjiNUV") == "irissjiNUV"
+    assert _registered_colormap("irissji1700") == "viridis"
 
 
 @pytest.mark.filterwarnings("ignore:Attempting to set identical low and high xlims")

@@ -353,6 +353,18 @@ def test_calculate_red_blue_asymmetry_flags_incomplete_wings():
     assert np.isnan(result["red_blue_asymmetry"].data[0, 0])
 
 
+def test_calculate_red_blue_asymmetry_rejects_wings_without_samples():
+    # The interpolated grid starts at -(150 + 10) km/s, so no sample falls between 50 and 52 km/s
+    velocity = np.arange(-200, 201, 10) * u.km / u.s
+    cube = make_test_spectrogram_cube(
+        _flat_wing_profile(velocity).reshape(1, 1, -1), _wavelengths_from_velocity(velocity)
+    )
+    with pytest.raises(ValueError, match=r"dv=10\.0 km/s.*velocity_range=\(50\.0, 52\.0\) km/s"):
+        calculate_red_blue_asymmetry(
+            cube, rest_wavelength=REST_WAVELENGTH, velocity_range=(50, 52) * u.km / u.s, dv=10 * u.km / u.s
+        )
+
+
 def test_calculate_red_blue_asymmetry_flags_low_signal():
     velocity = np.arange(-200, 201, 10) * u.km / u.s
     wavelengths = _wavelengths_from_velocity(velocity)
@@ -377,6 +389,62 @@ def test_calculate_red_blue_asymmetry_flags_saturated():
     assert RBAQualityFlag(result["quality"].data[0, 0]) is RBAQualityFlag.SATURATED
     assert np.isnan(result["red_blue_asymmetry"].data[0, 0])
     assert RBAQualityFlag(result["quality"].data[0, 1]) is RBAQualityFlag.OK
+
+
+def _varied_cube():
+    """
+    Six noisy Gaussians at different velocities, with gaps, a masked sample and a
+    missing error.
+    """
+    velocity = np.arange(-200, 201, 10) * u.km / u.s
+    rng = np.random.default_rng(1)
+    centers = rng.normal(0, 30, (2, 3, 1))
+    data = 100 * np.exp(-(((velocity.to_value(u.km / u.s) - centers) / 25) ** 2)) + rng.normal(0, 1, (2, 3, 41))
+    data[0, 1, 3] = np.nan  # a gap
+    data[1, 2, 30] = -1  # dropped, so a gap too
+    errors = np.sqrt(np.abs(data) + 1)
+    errors[1, 0, 5] = np.nan
+    mask = np.zeros(data.shape, dtype=bool)
+    mask[1, 1, 7] = True
+    return make_test_spectrogram_cube(
+        data, _wavelengths_from_velocity(velocity), uncertainty=StdDevUncertainty(errors), mask=mask
+    )
+
+
+def test_calculate_red_blue_asymmetry_pixels_are_independent():
+    # Profiles without gaps share one spline per peak sample and those with gaps get their own,
+    # so each pixel must come out as it does alone.
+    cube = _varied_cube()
+    result = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH)
+    assert set(np.unique(result["quality"].data)) == {RBAQualityFlag.OK}
+    for i, j in np.ndindex(2, 3):
+        alone = calculate_red_blue_asymmetry(cube[i : i + 1, j : j + 1], rest_wavelength=REST_WAVELENGTH)
+        for name in result:
+            np.testing.assert_allclose(result[name].data[i, j], alone[name].data[0, 0], rtol=1e-12, err_msg=name)
+        np.testing.assert_allclose(
+            result["interpolated_profile"].uncertainty.array[i, j],
+            alone["interpolated_profile"].uncertainty.array[0, 0],
+            rtol=1e-12,
+        )
+
+
+@pytest.mark.parametrize("return_profiles", [True, False])
+def test_calculate_red_blue_asymmetry_chunks_give_the_same_results(monkeypatch, return_profiles):
+    cube = _varied_cube()
+    # A peak at 120 km/s has no full red wing (fixture check below), so one pixel is flagged in its chunk
+    cube.data[0, 2] = 100 * np.exp(-(((np.arange(-200, 201, 10) - 120) / 25) ** 2)) + 1
+    kwargs = {"rest_wavelength": REST_WAVELENGTH, "return_profiles": return_profiles}
+    expected = calculate_red_blue_asymmetry(cube, **kwargs)
+    assert RBAQualityFlag(expected["quality"].data[0, 2]) is RBAQualityFlag.INCOMPLETE_WINGS
+    monkeypatch.setattr(red_blue_module, "_CHUNK_ROWS", 4)
+    result = calculate_red_blue_asymmetry(cube, **kwargs)
+    assert list(result) == list(expected)
+    for name in expected:
+        np.testing.assert_array_equal(result[name].data, expected[name].data, err_msg=name)
+        if expected[name].uncertainty is not None:
+            np.testing.assert_array_equal(
+                result[name].uncertainty.array, expected[name].uncertainty.array, err_msg=name
+            )
 
 
 def test_calculate_red_blue_asymmetry_real_cube_shape_and_coords(sns_sg_file):

@@ -108,6 +108,12 @@ def test_calculate_rgb_rejects_a_cube_that_is_not_three_dimensional(si_iv_cube):
         calculate_rgb(si_iv_cube[0])
 
 
+def test_calculate_rgb_rejects_unscaled_data():
+    cube = make_test_spectrogram_cube(np.ones((1, 1, 5), dtype=np.int16), np.arange(5) * u.nm)
+    with pytest.raises(ValueError, match="unscaled"):
+        calculate_rgb(cube)
+
+
 def test_calculate_rgb_entirely_masked_cube():
     """
     Without a finite sample there is no percentile; an explicit ``vmax`` still works.
