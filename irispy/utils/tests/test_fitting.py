@@ -6,7 +6,7 @@ import pytest
 import astropy.units as u
 from astropy import constants
 from astropy.modeling import models
-from astropy.modeling.fitting import LevMarLSQFitter, TRFLSQFitter, parallel_fit_dask
+from astropy.modeling.fitting import LevMarLSQFitter, LMLSQFitter, TRFLSQFitter, parallel_fit_dask
 from astropy.nddata import StdDevUncertainty
 from astropy.time import Time
 
@@ -660,6 +660,28 @@ def test_maps_from_fit_bound_tolerance_is_relative():
     )
     cube = make_test_spectrogram_cube(np.zeros((2, 3, 60)), WAVELENGTH)
     assert np.all(maps_from_fit(model, cube)["quality"].data == FitQualityFlag.OK)
+
+
+# TRFLSQFitter stops just inside a bound and LMLSQFitter beyond it.
+@pytest.mark.parametrize("fitter_class", [TRFLSQFitter, LMLSQFitter])
+def test_maps_from_fit_flags_bounds_per_spectrum(fitter_class):
+    truth, cube = _si_iv_cube(np.random.default_rng(3))
+    background = truth.amplitude_0.value
+    # Dips, which take the amplitude to its bound of 0, and one line bright enough to fit an amplitude of about 1e10.
+    dips = np.zeros(SHAPE, dtype=bool)
+    dips[1::4, 1::4] = True
+    cube.data[dips] = 2 * background - cube.data[dips]
+    cube.data[0, 0] = background + 1e8 * (cube.data[0, 0] - background)
+    cube.uncertainty.array[0, 0] *= 1e8
+    model = si_iv_1403_model(cube)
+    for name in ("mean_1", "stddev_1"):
+        setattr(model, name, getattr(truth, name).quantity)
+        model.fixed[name] = True
+    fitted, fitter = _fit(model, cube.data, cube.uncertainty.array, unit=cube.unit, fitter=fitter_class())
+    assert fitted.amplitude_1.value[0, 0] > 1e9
+    quality = maps_from_fit(fitted, cube, fitter=fitter)["quality"].data
+    assert np.all(quality[dips] == FitQualityFlag.AT_BOUND)
+    assert np.all(quality[~dips] == FitQualityFlag.OK)
 
 
 @pytest.mark.parametrize(("wavelength_axis", "wcs_axes"), [(0, [2, 3, 1]), (1, [2, 1, 3])])

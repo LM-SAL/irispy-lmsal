@@ -565,6 +565,13 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None):
     maximum is :math:`2\sqrt{2\ln 2}\,\sigma` for a Gaussian and the ``fwhm`` parameter of a
     Lorentzian, and the integral is :math:`\sqrt{2\pi}\,A\sigma` for a Gaussian and
     :math:`\pi A\,\mathrm{FWHM}/2` for a Lorentzian.
+
+    A spectrum is `FitQualityFlag.AT_BOUND` where a free parameter is at or beyond one of its
+    bounds, to within 1e-8 times the larger of their magnitudes in that spectrum, or,
+    given ``fitter``, where the fitter reports the bound as active (the ``active_mask`` of
+    `scipy.optimize.least_squares`). `~astropy.modeling.fitting.TRFLSQFitter` keeps the
+    parameters strictly inside their bounds, so without ``fitter`` its fits that stopped just
+    inside a bound of zero are not flagged.
     """
     names = fitted_model.param_names
     values = {name: getattr(fitted_model, name).quantity for name in names}
@@ -651,11 +658,17 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None):
     quality = np.full(shape, FitQualityFlag.OK, dtype=np.uint8)
     quality[np.any(_boolean_mask(cube), axis=cube.wavelength_axis)] = FitQualityFlag.MASKED_INPUT
     for name in free:
-        bounds = [bound for bound in fitted_model.bounds[name] if bound is not None and np.isfinite(bound)]
-        scale = max([np.nanmax(np.abs(values[name].value), initial=0), *(abs(bound) for bound in bounds)])
-        for bound in bounds:
-            pinned = np.abs(values[name].value - bound) <= 1e-8 * scale
-            quality[pinned] = FitQualityFlag.AT_BOUND
+        value = values[name].value
+        # +1 for the lower bound and -1 for the upper; beyond counts, as LMLSQFitter returns clipped parameters there.
+        for bound, side in zip(fitted_model.bounds[name], (1, -1), strict=True):
+            if bound is not None and np.isfinite(bound):
+                # Per spectrum, so that a runaway fit cannot widen the tolerance for the others.
+                tolerance = 1e-8 * np.maximum(np.abs(value), abs(bound))
+                quality[side * (value - bound) <= tolerance] = FitQualityFlag.AT_BOUND
+    # TRFLSQFitter stops strictly inside a bound, within its own tolerance of it.
+    active = None if fit_info is None else _fit_property(fit_info, "active_mask", 0)
+    if active is not None:
+        quality[np.any(active != 0, axis=-1)] = FitQualityFlag.AT_BOUND
     success = None if fit_info is None else _fit_property(fit_info, "success", 0)
     if success is not None:
         quality[success == 0] = FitQualityFlag.NOT_CONVERGED
