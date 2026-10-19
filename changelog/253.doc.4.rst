@@ -1,1 +1,0 @@
-The installation guide states the support policy: ``irispy`` follows SPEC 0 and needs Python 3.13 or later.

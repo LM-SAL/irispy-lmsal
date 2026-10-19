@@ -1,1 +1,0 @@
-The installation guide explains why ``dkist`` is a dependency: its ``VaryingCelestialTransform`` and ``CoupledCompoundModel`` describe the per-exposure pointing of slit-jaw and AIA cubes.

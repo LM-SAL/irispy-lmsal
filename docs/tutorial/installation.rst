@@ -158,10 +158,9 @@ Optional dependencies
 ---------------------
 
 Some functions need packages that are not installed by default.
-They are grouped in extras of the ``irispy-lmsal`` distribution, which you add to the package name, for example ``pip install "irispy-lmsal[cosmic-rays,rgb]"``.
+They are grouped in extras, which you add to the package name, for example ``pip install "irispy-lmsal[cosmic-rays,rgb]"``.
 Each of these functions raises an error that names the missing package and the extra.
 Not every package is available on conda-forge; the ``rsliding`` package, the default backend of ``remove_cosmic_rays``, is only on PyPI, so install it with ``pip`` even in a conda environment.
-No fiasco release ships ``fiasco.line_ratio`` yet, so install fiasco from its git main branch until one does.
 
 .. list-table::
    :widths: 20 30 50
@@ -185,21 +184,6 @@ No fiasco release ships ``fiasco.line_ratio`` yet, so install fiasco from its gi
    * - ``tests``, ``docs``, ``dev``
      - Test, documentation and all of the above
      - Running the tests and building the documentation, see :ref:`irispy-dev-install`
-
-With conda, install the packages by name instead, or use ``pip`` in the same environment.
-
-Supported Python and dependency versions
-========================================
-
-``irispy`` follows `SPEC 0 <https://scientific-python.org/specs/spec-0000/>`__: it supports each Python version for three years after its release and each core dependency (numpy, scipy, matplotlib, astropy, sunpy and their kind) for two years, and raises its minimum versions in the first release after that, whether or not the dependencies have dropped the version themselves.
-``irispy`` 1.0 therefore needs Python 3.13 or later, as Python 3.12 turns three in October 2026, and the ``update-spec0`` workflow proposes the next floors every quarter.
-
-Why ``dkist`` is a dependency
-=============================
-
-``irispy`` depends on `dkist <https://docs.dkist.nso.edu/projects/python-tools/>`__, which brings in about sixteen distributions of its own, for two model classes only: ``VaryingCelestialTransform`` and ``CoupledCompoundModel`` from ``dkist.wcs.models``.
-They describe the pointing of every slit-jaw and AIA frame as one ``gwcs`` transform, so a cube's coordinates follow the roll and the pointing of each exposure.
-The two classes have no home outside ``dkist`` yet; ``irispy`` keeps the dependency rather than copy them, and will drop it once they move to ``gwcs`` or a models-only distribution.
 
 .. _irispy-dev-install:
 

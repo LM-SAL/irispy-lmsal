@@ -1,1 +1,1 @@
-``tools/cut.py``, which cuts real level 2 files down to test files, has a test that the pixels it keeps have the world coordinates and values of the whole file, and ``tools/compress.py`` no longer needs ``tqdm``.
+``tools/compress.py`` no longer needs ``tqdm``.

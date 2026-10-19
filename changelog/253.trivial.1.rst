@@ -1,1 +1,1 @@
-The installation guide documents the ``cosmic-rays``, ``density``, ``rgb``, ``all``, ``tests``, ``docs`` and ``dev`` extras, and the ``tests`` extra no longer installs the optional features; the tests of a feature skip without its extra.
+The ``tests`` extra no longer installs the optional features; the tests of a feature skip without its extra, and the tox environments request the ``all`` and ``tests`` extras so CI still exercises them.
