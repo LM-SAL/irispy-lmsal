@@ -43,7 +43,7 @@ def test_read_sji_lvl2_matches_the_file(request, file_fixture):
     assert str(cube)
     assert cube.shape == (header["NAXIS3"], header["NAXIS2"], header["NAXIS1"])
     assert tuple(cube.meta.data_shape) == cube.shape
-    assert cube.unit == DN_UNIT["SJI"]
+    assert cube.unit == DN_UNIT[header["TDESC1"]]
     assert cube.mask.sum() == (np.isin(data, BAD_PIXEL_VALUES_SCALED) | (data >= SATURATION_LIMIT.value)).sum()
     # The times are the exposure midpoints
     times = cube.axis_world_coords("time")[0]
@@ -160,6 +160,29 @@ def test_read_sji_lvl2_masks_both_fill_values_without_changing_raw_data(memmap):
         np.testing.assert_allclose(cube.data, expected)
         assert isinstance(cube.uncertainty, StdDevUncertainty)
         assert cube.uncertainty.array.shape == cube.data.shape
+
+
+@pytest.mark.parametrize(("file_fixture", "photons_per_dn"), [("sns_sji_1400_file", 12), ("sns_sji_2796_file", 18)])
+def test_read_sji_lvl2_uncertainty_uses_the_photons_per_dn_of_the_passband(request, file_fixture, photons_per_dn):
+    # Wülser et al. (2018) Table 1: 12 photons per DN in the FUV slit-jaw passbands, 18 in the NUV ones
+    cube = read_sji_lvl2(request.getfixturevalue(file_fixture), uncertainty=True)
+    assert cube.unit.to(u.photon) == photons_per_dn
+    brightest = np.unravel_index(np.nanargmax(cube.data), cube.shape)
+    # Photon noise and 1.2 DN of read noise
+    photons = cube.data[brightest] * photons_per_dn
+    expected = np.sqrt(photons + (1.2 * photons_per_dn) ** 2) / photons_per_dn
+    assert cube.uncertainty.array[brightest] == pytest.approx(expected, rel=1e-6)
+
+
+def test_read_sji_lvl2_other_passband_stays_in_dn(tmp_path, sns_sji_1400_file):
+    # SJI_5000W and SJI_1600W have no published photons per DN
+    filename = tmp_path / "sji_5000w.fits"
+    with fits.open(sns_sji_1400_file, memmap=False) as hdulist:
+        hdulist[0].header["TDESC1"] = "SJI_5000W"
+        hdulist.writeto(filename)
+    assert read_sji_lvl2(filename).unit == u.DN
+    with pytest.raises(ValueError, match="SJI_5000W"):
+        read_sji_lvl2(filename, uncertainty=True)
 
 
 @pytest.mark.parametrize("input_kind", ["bytes", "file-like", "hdulist"])
@@ -297,7 +320,7 @@ def test_read_aia_cube(aia_1700_file):
     assert isinstance(aia, AIACube)
     assert "AIACube" in str(aia)
     assert aia.shape == (3, 382, 320)
-    assert aia.unit == DN_UNIT["SJI"]
+    assert aia.unit == u.DN
     assert aia.meta.instrument == "AIA_3"
     assert aia.meta.observing_mode_id == 3620106076
     # The cube keeps the file's integers: no fill values, so nothing to replace or mask
