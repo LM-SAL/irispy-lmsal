@@ -34,7 +34,8 @@ class BaseMeta(NDMeta):
 
     This is a dictionary of the header keywords, with sliceable per-exposure entries
     (see `ndcube.meta.NDMeta`), and a set of properties that give the common keywords
-    names, units and types. A property is `None` when the header lacks its keyword.
+    names, units and types. A property that reads one keyword is `None` when the header lacks it;
+    a property derived from a keyword needs that keyword.
     You do not create it yourself: the cubes from `irispy.io.read_files` carry it as ``cube.meta``.
 
     Parameters
