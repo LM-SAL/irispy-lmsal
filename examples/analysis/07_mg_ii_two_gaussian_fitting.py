@@ -16,6 +16,7 @@ For a model-independent alternative, the spectral moments, see
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pooch
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord, SpectralCoord
@@ -24,24 +25,31 @@ from astropy.wcs.utils import wcs_to_celestial_frame
 
 from sunpy.coordinates.frames import Helioprojective
 
-from irispy.data import sample
 from irispy.io import read_files
 from irispy.spectrograph import SpectrogramCube
 from irispy.utils.fitting import FitQualityFlag, maps_from_fit, mg_ii_model
 
 ###############################################################################
-# We start with the raster sample file, which ``irispy.data.sample`` downloads on first use.
-# To use your own data, pass the path of a Level 2 raster tarball from the
-# `IRIS data archive <https://www.lmsal.com/hek/hcr>`__ to ``read_files`` instead.
+# `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20180102_153155_3610108077_2018-01-02T15%3A31%3A552018-01-02T15%3A31%3A55.xml>`__.
+# The full observation is available as a `Level 2 raster tarball <https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2018/01/02/20180102_153155_3610108077/iris_l2_20180102_153155_3610108077_raster.tar.gz>`__.
+# To keep the download small, we use a cutout of it that only has the Si IV 1403 and Mg II k 2796 windows.
+#
+# In this case, we will use ``pooch`` to keep this example self-contained
+# but you can download the data manually using your browser as well.
+#
+# You will need to update the path to the data in the next section if you do that.
 
-raster_filename = sample.RASTER_TAR
+raster_filename = pooch.retrieve(
+    "https://github.com/LM-SAL/irispy-data/releases/download/v1/iris_l2_20180102_153155_3610108077_cutout_raster.tar.gz",
+    known_hash="ff80e6a7900d4d5e1716a6415db25d40b6058f3523184b549c7e0d9928c0b68b",
+)
 
 ###############################################################################
 # We will now open the data using a helper function which is designed to read
 # all files from a single observation.
 #
 # We read only the Mg II k window, with its uncertainties to weight the fit,
-# and select the first of the complete scans.
+# and select the one complete scan.
 
 raster = read_files(raster_filename, spectral_windows="Mg II k 2796", uncertainty=True)
 mg_ii_k = raster["Mg II k 2796"][0]
@@ -54,8 +62,8 @@ mg_ii_k = raster["Mg II k 2796"][0]
 
 iris_observer = wcs_to_celestial_frame(mg_ii_k.wcs.celestial).observer
 iris_frame = Helioprojective(observer=iris_observer)
-top_left = [None, SkyCoord(-326 * u.arcsec, 440 * u.arcsec, frame=iris_frame)]
-bottom_right = [None, SkyCoord(-314 * u.arcsec, 380 * u.arcsec, frame=iris_frame)]
+top_left = [None, SkyCoord(-350 * u.arcsec, 310 * u.arcsec, frame=iris_frame)]
+bottom_right = [None, SkyCoord(-290 * u.arcsec, 260 * u.arcsec, frame=iris_frame)]
 mg_ii_k = mg_ii_k.crop(top_left, bottom_right)
 
 lower_corner = [SpectralCoord(279.40, unit=u.nm), None]

@@ -1,1 +1,1 @@
-The gallery examples "Plot a quick SJI", "Manipulate spectrograph data", "Apply Radiometric Calibration" and "Fit Spectral Models to Spectra - Double Gaussian Fitting" now read ``irispy.data.sample`` files instead of downloading full Level 2 observations.
+The gallery examples "Plot a quick SJI", "Manipulate spectrograph data" and "Apply Radiometric Calibration" now read ``irispy.data.sample`` files instead of downloading full Level 2 observations.
