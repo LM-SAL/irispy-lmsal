@@ -106,6 +106,3 @@ py:class NDDataArray
 py:obj NDDataRef
 py:obj NDDataArray
 py:class irispy.visualization.Plot2DMixin
-
-# Removed API that released changelog entries still name
-py:obj irispy.sji.SJICube.remove_dust
