@@ -268,7 +268,9 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             # A directory or a file that is not FITS: raises the level 2 error, chained to this one
             _check_level2(filename, None, "SJI")
     with context as hdulist:
-        _check_level2(hdulist.filename() or "filename", hdulist[0].header, "SJI")
+        # Bytes and an HDU list made in memory have no filename, so name what was given
+        given = hdulist.filename() or f"The data given ({type(filename).__name__})"
+        _check_level2(given, hdulist[0].header, "SJI")
         instrume = hdulist[0].header["INSTRUME"]
         is_sot = instrume.startswith("SOT")
         if hdulist[1].data.ndim == 1:
