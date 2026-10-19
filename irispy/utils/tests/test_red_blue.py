@@ -213,6 +213,21 @@ def test_calculate_red_blue_asymmetry_centers_profiles_on_peak():
     assert centered_velocity[np.nanargmax(centered_profile.data)].to_value(u.km / u.s) == pytest.approx(0, abs=1e-6)
 
 
+@pytest.mark.parametrize("velocity_range", [(25, 75), (50, 150)])
+def test_calculate_red_blue_asymmetry_symmetric_line_between_samples(velocity_range):
+    # The 5.44 km/s samples of the Si IV gallery cutout, and lines shifted across one sample
+    velocity = np.arange(-80, 81) * 5.44
+    shift = 30 + 5.44 * np.linspace(0, 1, 5)[:, None, None]
+    width = np.array([20, 30, 40])[:, None]
+    data = 100 * np.exp(-(((velocity - shift) / width) ** 2))
+    cube = make_test_spectrogram_cube(data, _wavelengths_from_velocity(velocity * u.km / u.s))
+
+    result = calculate_red_blue_asymmetry(
+        cube, rest_wavelength=REST_WAVELENGTH, velocity_range=velocity_range * u.km / u.s
+    )
+    assert np.abs(result["red_blue_asymmetry"].data).max() < 0.002
+
+
 def test_calculate_red_blue_asymmetry_return_profiles():
     velocity = np.arange(-200, 201, 10) * u.km / u.s
     wavelengths = _wavelengths_from_velocity(velocity)

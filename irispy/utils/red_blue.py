@@ -5,7 +5,7 @@ Red-blue asymmetry utilities for IRIS spectrogram cubes.
 import warnings
 
 import numpy as np
-from scipy.interpolate import make_interp_spline
+from scipy.interpolate import BSpline, make_interp_spline
 
 import astropy.units as u
 from astropy import constants
@@ -130,7 +130,8 @@ def calculate_red_blue_asymmetry(
         If omitted, read from ``cube.meta.rest_wavelength`` (requires an
         `~irispy.meta.SGMeta` instance with a ``TWAVE<n>`` FITS keyword).
     velocity_range : `astropy.units.Quantity`, optional
-        Two positive velocities defining the wing range to average.
+        Two positive velocities. The red wing spans these velocities and the blue wing their
+        negatives, both measured from the peak of each profile (see Notes).
     dv : `astropy.units.Quantity`, optional
         Velocity spacing for the interpolated profile.
     spline_degree : `int`, optional
@@ -150,8 +151,8 @@ def calculate_red_blue_asymmetry(
         ``"red_blue_asymmetry_error"`` is added when the input cube has uncertainty.
         ``"observed_profile"`` and ``"interpolated_profile"`` 3D cubes are added
         when ``return_profiles=True``. The interpolated profile velocity axis is
-        peak-centered; the observed profile velocity axis is relative to
-        ``rest_wavelength``.
+        measured from the peak of each profile; the observed profile velocity axis is
+        relative to ``rest_wavelength``.
 
     Raises
     ------
@@ -164,11 +165,12 @@ def calculate_red_blue_asymmetry(
     Red-blue asymmetries were used to find the upflows of the transition region and corona by
     :cite:t:`depontieu2009` and :cite:t:`tian2011`. This function is not a port of either method.
     These choices are its own, and the papers should be consulted before comparing values with
-    theirs: the profile is interpolated with a spline on a regular velocity grid, centered on the
-    peak of the interpolated profile and not on a fitted centroid or the rest wavelength, the
-    asymmetry is the difference of the mean intensities of the two wings over the interpolated
-    peak intensity, and the default wing range of 50 to 150 km/s and the requirement that
-    80% of the wing bins are finite have no source.
+    theirs: the profile is interpolated with a spline on a regular velocity grid centered on its
+    peak, the asymmetry is the difference of the mean intensities of the two wings over the
+    interpolated peak intensity, and the default wing range of 50 to 150 km/s and the requirement
+    that 80% of the wing bins are finite have no source. The peak of a profile is the vertex of the
+    parabola through its brightest sample and the samples on either side, or the brightest sample
+    when one of those is missing.
 
     Pixels with a saturated sample, as the mask and ``cube.meta["saturated"]`` mark the samples the
     readers find at the level 2 ceiling, are flagged `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`.
@@ -244,41 +246,63 @@ def calculate_red_blue_asymmetry(
     peak_index = np.argmax(np.where(finite, profiles, -np.inf), axis=-1)
     quality[todo & ((peak_index == 0) | (peak_index == profiles.shape[1] - 1))] = RBAQualityFlag.PEAK_AT_EDGE
     todo &= quality == RBAQualityFlag.OK
-    # The spline goes through the finite samples at finite velocities from the peak
+    # The spline goes through the finite samples at finite velocities
     points = finite & finite_velocity
     n_points = np.where(finite_velocity[peak_index], points.sum(axis=-1), 0)
     quality[todo & (n_points < min_points)] = RBAQualityFlag.TOO_FEW_POINTS
     todo &= quality == RBAQualityFlag.OK
+    # Each profile is centered on the vertex of the parabola through its peak sample and the two
+    # neighbors, or on the peak sample when a neighbor is missing. Centered on the peak sample, a
+    # symmetric line between two samples had an asymmetry as large as real ones.
+    around = np.clip(peak_index[:, None] + [-1, 0, 1], 0, profiles.shape[1] - 1)
+    below, top, above = np.take_along_axis(profiles, around, axis=-1).T
+    with np.errstate(invalid="ignore"):
+        offset = 0.5 * (below - above) / (below - 2 * top + above)
+    center = velocity[peak_index] + np.nan_to_num(offset * (velocity[around[:, 2]] - velocity[around[:, 0]]) / 2)
 
     def interpolate(x, y):
         return make_interp_spline(x, y, k=spline_degree, axis=-1)(interp_velocity, extrapolate=False)
 
-    def asymmetries(profiles, profile_errors, peak_index, points, todo, quality):
+    def interpolate_rows(x, y, center):
+        """
+        The splines through the rows of ``y`` at ``x``, each at ``interp_velocity`` from
+        its own ``center``.
+        """
+        t, c, k = make_interp_spline(x, y, k=spline_degree, axis=-1).tck
+        at = center[:, None] + interp_velocity
+        inside = (at >= x[0]) & (at <= x[-1])
+        # The k + 1 B-splines that are nonzero at each velocity, to weight with the coefficients of its row
+        basis = BSpline.design_matrix(np.where(inside, at, x[0]).ravel(), t, k)
+        shape = (*at.shape, k + 1)
+        terms = basis.data.reshape(shape) * c[basis.indices.reshape(shape), np.arange(len(at))[:, None, None]]
+        return np.where(inside, terms.sum(axis=-1), np.nan)
+
+    def asymmetries(profiles, profile_errors, center, points, todo, quality):
         """
         The asymmetries and errors of a chunk of rows, flagging ``quality`` in place,
         with their interpolated profiles and errors.
         """
         interpolated = np.full((len(profiles), interp_velocity.size), np.nan)
         interpolated_errors = None if profile_errors is None else np.full_like(interpolated, np.nan)
-        # Profiles without gaps share their velocity grid, so one spline fits all of those whose peak
-        # is at the same sample; a gap leaves a profile its own grid, and its own spline.
+        # Profiles without gaps share their velocity grid, so one spline fits all of them;
+        # a gap leaves a profile its own grid, and its own spline.
         complete = todo & points.all(axis=-1)
         if profile_errors is not None:
             complete &= np.isfinite(profile_errors).all(axis=-1)
         order = np.argsort(velocity)
-        for index in np.unique(peak_index[complete]):
-            rows = np.flatnonzero(complete & (peak_index == index))
-            x = velocity[order] - velocity[index]
-            try:
-                interpolated[rows] = interpolate(x, profiles[rows][:, order])
-                if profile_errors is not None:
-                    interpolated_errors[rows] = interpolate(x, profile_errors[rows][:, order])
-            except ValueError:
-                quality[rows] = RBAQualityFlag.INTERP_FAILED
-                interpolated[rows] = np.nan
+        rows = np.flatnonzero(complete)
+        try:
+            interpolated[rows] = interpolate_rows(velocity[order], profiles[rows][:, order], center[rows])
+            if profile_errors is not None:
+                interpolated_errors[rows] = interpolate_rows(
+                    velocity[order], profile_errors[rows][:, order], center[rows]
+                )
+        except ValueError:
+            quality[rows] = RBAQualityFlag.INTERP_FAILED
+            interpolated[rows] = np.nan
         for row in np.flatnonzero(todo & ~complete):
             kept = points[row]
-            shifted_velocity = velocity[kept] - velocity[peak_index[row]]
+            shifted_velocity = velocity[kept] - center[row]
             order = np.argsort(shifted_velocity)
             x = shifted_velocity[order]
             samples = profiles[row][kept][order]
@@ -343,7 +367,7 @@ def calculate_red_blue_asymmetry(
         red_blue[chunk], red_blue_error[chunk], chunk_profiles, chunk_errors = asymmetries(
             profiles[chunk],
             None if profile_errors is None else profile_errors[chunk],
-            peak_index[chunk],
+            center[chunk],
             points[chunk],
             todo[chunk],
             quality[chunk],

@@ -1,0 +1,2 @@
+`~irispy.utils.red_blue.calculate_red_blue_asymmetry` now centers each profile on the vertex of the parabola through its brightest sample and the samples on either side.
+Centered on the brightest sample, a symmetric line between two samples, with a 1/e width of 20 to 40 km/s, had an asymmetry of up to 0.035 over 25 to 75 km/s and 0.007 over the default 50 to 150 km/s (twice that with spectral summing 2), which is now below 0.001.
