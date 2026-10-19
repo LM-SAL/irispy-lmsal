@@ -174,6 +174,19 @@ def test_spatial_slice_fits_wcs_describes_sliced_pixels(sns_sjicube_1330):
     assert sliced.separation(full) < 1e-6 * u.arcsec
 
 
+def test_sliced_frame_headers_keep_the_file_units(sns_sjicube_1330):
+    rows, columns = sns_sjicube_1330.data.shape[1:]
+    original = sns_sjicube_1330._frame_headers[0]
+    sliced = sns_sjicube_1330[:, 2 : rows - 3, 4 : columns - 5]._frame_headers[0]
+    assert sliced["cunit1"] == sliced["cunit2"] == original["cunit1"] == "arcsec"
+    assert sliced["crpix1"] == pytest.approx(original["crpix1"] - 4)
+    assert sliced["crpix2"] == pytest.approx(original["crpix2"] - 2)
+    assert (sliced["naxis1"], sliced["naxis2"]) == (columns - 9, rows - 5)
+    # to_header writes 14 significant digits
+    assert sliced["cdelt1"] == pytest.approx(original["cdelt1"], rel=1e-12)
+    assert sliced["crval1"] == pytest.approx(original["crval1"], rel=1e-12)
+
+
 @pytest.mark.parametrize(
     "file_fixture",
     [

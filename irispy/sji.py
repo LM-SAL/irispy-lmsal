@@ -26,13 +26,16 @@ __all__ = ["AIACube", "SJICube", "SOTCube"]
 def _slice_header(header, spatial):
     """
     The FITS header of one frame after the spatial slice ``spatial`` (numpy order) of
-    its cube.
+    its cube, in the file's own units.
+
+    ``preserve_units`` keeps the header's arcsec keywords; without it ``to_header``
+    rewrites the celestial keywords in degrees.
     """
     # ndcube spells a full axis slice(0, n, None)
     shape = (header["naxis2"], header["naxis1"])
-    if all(axis.indices(n) == (0, n, 1) for axis, n in zip(spatial, shape, strict=True)):
+    if all(isinstance(axis, slice) and axis.indices(n) == (0, n, 1) for axis, n in zip(spatial, shape, strict=True)):
         return header
-    sliced = WCS(header).slice(spatial, numpy_order=True)
+    sliced = WCS(header, preserve_units=True).slice(spatial, numpy_order=True)
     header = header.copy()
     header.update(sliced.to_header())
     header["naxis1"], header["naxis2"] = sliced.pixel_shape
