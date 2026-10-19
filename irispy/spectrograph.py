@@ -75,7 +75,7 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
     >>> filename = get_test_filepath(
     ...     "sns/iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits"
     ... )
-    >>> cube = read_files(filename, spectral_windows="Si IV 1403")["Si IV 1403"][0]
+    >>> cube = read_files(filename, spectral_windows="Si IV 1403")["Si IV 1403"]
     >>> cube.shape, cube.unit, cube.wavelength_axis
     ((187, 40, 29), Unit("DN_IRIS_FUV"), 2)
     >>> cube.meta.spectral_window, cube.meta.rest_wavelength
