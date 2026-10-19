@@ -87,7 +87,8 @@ vmin, vmax = np.nanpercentile(before, [1, 99])
 # absorption lines. `~irispy.utils.wavelength_drift.calculate_wavelength_drift`
 # measures them at every step and fits a sine with the orbital period, plus a slow
 # polynomial, to the Ni I shifts; see its documentation for the details. The table
-# has one row per step.
+# has one row per exposure, sorted by time, with the ``raster`` and ``step`` it
+# belongs to.
 
 drift = calculate_wavelength_drift(raster)
 drift[:5]
@@ -117,8 +118,9 @@ fig.legend(loc="outside upper center", ncols=5)
 # the original wavelength grid. Unsupported wavelengths and interpolation through
 # bad pixels stay invalid. We work on one floating-point step at a time, mask
 # invalid results and store them as the FITS fill value in the integer array.
+# The rows of the first raster give the drift of each ``step`` of ``mg_ii``.
 
-for i, shift in enumerate(drift["nuv"]):
+for i, shift in drift[drift["raster"] == 0].iterrows("step", "nuv"):
     data = np.where(mg_ii.mask[i], np.nan, mg_ii.data[i])
     corrected = make_interp_spline((mg_wave + shift).to_value(u.nm), data, k=1, axis=-1, check_finite=False)(
         mg_wave.to_value(u.nm), extrapolate=False

@@ -130,7 +130,8 @@ def calculate_red_blue_asymmetry(
         If omitted, read from ``cube.meta.rest_wavelength`` (requires an
         `~irispy.meta.SGMeta` instance with a ``TWAVE<n>`` FITS keyword).
     velocity_range : `astropy.units.Quantity`, optional
-        Two positive velocities defining the wing range to average.
+        Two positive velocities. The red wing spans them and the blue wing their negatives,
+        both measured from the brightest sample of each profile.
     dv : `astropy.units.Quantity`, optional
         Velocity spacing for the interpolated profile.
     spline_degree : `int`, optional
@@ -150,8 +151,8 @@ def calculate_red_blue_asymmetry(
         ``"red_blue_asymmetry_error"`` is added when the input cube has uncertainty.
         ``"observed_profile"`` and ``"interpolated_profile"`` 3D cubes are added
         when ``return_profiles=True``. The interpolated profile velocity axis is
-        peak-centered; the observed profile velocity axis is relative to
-        ``rest_wavelength``.
+        relative to the brightest sample of each profile; the observed profile velocity
+        axis is relative to ``rest_wavelength``.
 
     Raises
     ------
@@ -164,8 +165,8 @@ def calculate_red_blue_asymmetry(
     Red-blue asymmetries were used to find the upflows of the transition region and corona by
     :cite:t:`depontieu2009` and :cite:t:`tian2011`. This function is not a port of either method.
     These choices are its own, and the papers should be consulted before comparing values with
-    theirs: the profile is interpolated with a spline on a regular velocity grid, centered on the
-    peak of the interpolated profile and not on a fitted centroid or the rest wavelength, the
+    theirs: the profile is interpolated with a spline on a regular velocity grid, centered on its
+    brightest sample and not on a fitted centroid or the rest wavelength, the
     asymmetry is the difference of the mean intensities of the two wings over the interpolated
     peak intensity, and the default wing range of 50 to 150 km/s and the requirement that
     80% of the wing bins are finite have no source.
