@@ -97,8 +97,8 @@ def calculate_wavelength_drift(raster):
     if not used:
         msg = f"The raster has no window with any of the reference lines {list(_LINES)}"
         raise ValueError(msg)
-    # The cubes of each window used, with their wavelengths
-    cubes = {key: [(cube, _wavelengths(cube)) for cube in raster[key].data] for key in used}
+    # The rasters of each window used, with their wavelengths
+    cubes = {key: [(cube, _wavelengths(cube)) for cube in raster[key].split_rasters()] for key in used}
     table = vstack(
         [
             QTable(
@@ -108,7 +108,7 @@ def calculate_wavelength_drift(raster):
                     "step": np.arange(len(cube.data)),
                 }
             )
-            for index, cube in enumerate(raster[used[0]].data)
+            for index, cube in enumerate(raster[used[0]].split_rasters())
         ]
     )
     for name, key in windows.items():
@@ -134,7 +134,7 @@ def _window(raster, wavelength):
     The key of the first window whose wavelengths cover ``wavelength``, or None.
     """
     for key, window in raster.items():
-        grid = _wavelengths(window.data[0])
+        grid = _wavelengths(window)
         if grid.min() <= wavelength <= grid.max():
             return key
     return None
@@ -152,7 +152,8 @@ def _line_shifts(cube, wavelength, rest, fit_range, min_intensity, sign):
         return shifts
     # The fit bins in DN, which memmap=True leaves as the FITS integers, averaged along the slit
     # with bad, masked, +Inf and negative pixels as zero, as in IDL
-    data = cube.data[..., bins]
+    # A multi-file memmap raster is a Dask array: read the fit bins only
+    data = np.asarray(cube.data[..., bins])
     unscaled = np.issubdtype(data.dtype, np.integer)
     if unscaled:
         data = data.astype(np.float32) * cube.meta["BSCALE"] + cube.meta["BZERO"]
