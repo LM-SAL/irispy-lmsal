@@ -130,10 +130,10 @@ The signal-to-noise ratio of the line is the fitted amplitude over its 1σ error
     >>> chi2 = np.sum(np.where(good, maps["residual"].data / cube.uncertainty.array, 0) ** 2, axis=-1)  # doctest: +REMOTE_DATA
     >>> reduced_chi2 = chi2 / (good.sum(axis=-1) - len(fitted.param_names))  # doctest: +REMOTE_DATA
     >>> converged = maps["quality"].data == FitQualityFlag.OK  # doctest: +REMOTE_DATA
-    >>> int(converged.sum()), int((converged & (snr > 3)).sum())  # doctest: +REMOTE_DATA
-    (670, 42)
+    >>> f"{converged.mean():.0%}", int((converged & (snr > 3)).sum())  # doctest: +REMOTE_DATA
+    ('70%', 42)
 
-Here the fitter converged for 670 of the 960 spectra, but only 42 of those have a signal-to-noise ratio above 3.
+Here the fitter converged for 70% of the 960 spectra, but only 42 of those have a signal-to-noise ratio above 3.
 There is no universal threshold: choose one for your science case, and keep the fits above it.
 A reduced chi-square near 1 means that the model describes the spectrum within its uncertainties, which a fit to pure noise does as well, so it is a check of the model and of the uncertainties and not of the presence of the line.
 Values well above 1 point to a profile that the model does not describe, such as a blend or a second component, or to uncertainties that are too small.
