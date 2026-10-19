@@ -1,5 +1,6 @@
 from copy import copy
 from pathlib import Path
+from contextlib import nullcontext
 
 import numpy as np
 
@@ -129,9 +130,11 @@ def read_spectrograph_lvl2(
 
     Parameters
     ----------
-    filenames: `list` of `str` or `str`
-        Filename of filenames to be read. They must all be associated with the same
-        OBS number. They are read in order of their ``DATE_OBS``, whatever their order here.
+    filenames: `str`, `pathlib.Path`, `astropy.io.fits.HDUList` or a `list` of them
+        Files to be read, or files already opened, which are left open. They must all be
+        associated with the same OBS number. They are read in order of their ``DATE_OBS``,
+        whatever their order here. Open files with ``do_not_scale_image_data=True`` when using
+        ``memmap=True``, and without it otherwise. Open gzipped files with ``decompress_in_memory=True``.
     spectral_windows: iterable of `str` or `str`
         Spectral windows to extract from files. Default=None, implies, extract all
         spectral windows.
@@ -172,28 +175,34 @@ def read_spectrograph_lvl2(
     >>> raster["Si IV 1403"][0].unit, raster["Mg II k 2796"][0].unit
     (Unit("DN_IRIS_FUV"), Unit("DN_IRIS_NUV"))
     """
-    if isinstance(filenames, (str, Path)):
+    if isinstance(filenames, (str, Path, fits.HDUList)):
         filenames = [filenames]
-    filenames = [str(f) for f in filenames]
+    filenames = list(filenames)
     if len(filenames) > 1:
         # The sequence follows time whatever the order given, such as that of an unsorted glob.
         date_obs = []
         for filename in filenames:
             try:
-                date_obs.append(fits.getheader(filename)["DATE_OBS"])
+                header = filename[0].header if isinstance(filename, fits.HDUList) else fits.getheader(filename)
+                date_obs.append(header["DATE_OBS"])
             except (OSError, ValueError, TypeError):
                 # A directory or a file that is not FITS: raises the level 2 error, chained to this one
                 _check_level2(filename, None, "raster")
         filenames = [filenames[i] for i in Time(date_obs).argsort()]
     for file_index, filename in enumerate(filenames):
-        try:
-            # The extensions are read out of order, which rewinds a gzip stream: inflate it once instead.
-            hdulist = fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
-        except (OSError, ValueError, TypeError):
-            # A directory or a file that is not FITS: raises the level 2 error, chained to this one
-            _check_level2(filename, None, "raster")
-        with hdulist:
-            _check_level2(filename, hdulist[0].header, "raster")
+        if isinstance(filename, fits.HDUList):
+            context = nullcontext(filename)
+        else:
+            try:
+                # The extensions are read out of order, which rewinds a gzip stream: inflate it once instead.
+                context = fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
+            except (OSError, ValueError, TypeError):
+                # A directory or a file that is not FITS: raises the level 2 error, chained to this one
+                _check_level2(filename, None, "raster")
+        with context as hdulist:
+            # An HDU list made in memory has no filename, so name what was given
+            given = hdulist.filename() or f"The data given ({type(filename).__name__})"
+            _check_level2(given, hdulist[0].header, "raster")
             if file_index == 0:
                 # After a discussion with the IRIS team, it was decided that instead of the
                 # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.
@@ -215,7 +224,7 @@ def read_spectrograph_lvl2(
                     if not all(window_is_in_obs):
                         missing_windows = spectral_windows_req[~window_is_in_obs]
                         msg = (
-                            f"Spectral windows {missing_windows.tolist()} not in file {filenames[0]}, "
+                            f"Spectral windows {missing_windows.tolist()} not in {given}, "
                             f"which has {windows_in_obs.tolist()}"
                         )
                         raise ValueError(msg)
@@ -265,7 +274,7 @@ def read_spectrograph_lvl2(
                             source_data,
                             exposure_times,
                             aux_times,
-                            filename=filename,
+                            filename=given,
                         )
                     t_obs = t_obs_nuv
                 meta.add("exposure time", exposure_times[steps], None, 0)
@@ -286,7 +295,7 @@ def read_spectrograph_lvl2(
                     msg = (
                         f"WCS failed to load while reading one step of the raster due to {e}"
                         "The loading will continue but this will be missing in the final cube. "
-                        f"Spectral window: {window_name}, step {i} in file: {filename}"
+                        f"Spectral window: {window_name}, step {i} in file: {given}"
                     )
                     logger.warning(msg)
                     continue
@@ -297,6 +306,9 @@ def read_spectrograph_lvl2(
                     data_mask = _memmap_fill_mask(data, header)
                     if np.issubdtype(data.dtype, np.integer):  # the FITS integers, not DN
                         dn_unit = DN_UNIT[f"{meta.detector_band}_UNSCALED"]
+                elif "BSCALE" in header or "BZERO" in header:  # astropy drops them once it scales the data
+                    msg = "An HDU list opened with do_not_scale_image_data=True needs memmap=True"
+                    raise ValueError(msg)
                 else:
                     # Level 2 clips at the ceiling, where iris_prep's +Inf saturation flags were lost
                     saturated = data >= SATURATION_LIMIT.value

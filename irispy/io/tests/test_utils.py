@@ -30,6 +30,14 @@ def _extract_target(root, tar_path):
     return Path(root) / f"{Path(tar_path).with_suffix('').with_suffix('').name}-{digest}"
 
 
+def _read_opened_raster(filename, memmap):
+    # As a caller who opened the file as the docstring says, and keeps it open
+    with fits.open(filename, do_not_scale_image_data=memmap, decompress_in_memory=True) as hdulist:
+        raster = read_spectrograph_lvl2(hdulist, memmap=memmap)
+        assert not hdulist.fileinfo(0)["file"].closed
+    return raster
+
+
 @pytest.mark.parametrize("memmap", [False, True])
 @pytest.mark.parametrize(
     ("source", "reader"),
@@ -44,8 +52,10 @@ def _extract_target(root, tar_path):
             "raster/iris_l2_20140329_140938_3860258481_raster/iris_l2_20140329_140938_3860258481_raster_t000_r00000_test.fits",
             read_spectrograph_lvl2,
         ),
+        # Scaled integers, as most rasters are
+        ("v34/iris_l2_20260206_210853_3460104433_raster_t000_r00000_test.fits", _read_opened_raster),
     ],
-    ids=["sji-read-files", "sji-reader", "raster-read-files", "raster-reader"],
+    ids=["sji-read-files", "sji-reader", "raster-read-files", "raster-reader", "raster-opened"],
 )
 def test_decompresses_file_once(tmp_path, monkeypatch, memmap, source, reader):
     source = get_test_filepath(source)
@@ -56,7 +66,7 @@ def test_decompresses_file_once(tmp_path, monkeypatch, memmap, source, reader):
     def first_cube(result):
         return result["C II 1336"][0] if isinstance(result, NDCollection) else result
 
-    expected = first_cube(reader(source, memmap=memmap))
+    expected = first_cube(read_files(source, memmap=memmap))
     inflated = []
     real_read = gzip._GzipReader.read
 
@@ -77,6 +87,7 @@ def test_decompresses_file_once(tmp_path, monkeypatch, memmap, source, reader):
     assert sum(inflated) < 2 * Path(source).stat().st_size
     np.testing.assert_array_equal(cube.data, expected.data)
     np.testing.assert_array_equal(cube.mask, expected.mask)
+    assert cube.unit == expected.unit
 
 
 @pytest.mark.parametrize(

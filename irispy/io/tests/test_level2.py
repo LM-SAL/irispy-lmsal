@@ -58,8 +58,11 @@ def test_read_files_rejects_what_is_not_level_2(tmp_path, level3_file, kind):
 def test_readers_reject_other_products_and_levels(request, level3_file, reader, product, wrong_fixture):
     wrong_file = request.getfixturevalue(wrong_fixture)
     for path in (wrong_file, level3_file):
-        with pytest.raises(ValueError, match=re.escape(f"{path} is not an IRIS level 2 {product} file")):
+        message = re.escape(f"{path} is not an IRIS level 2 {product} file")
+        with pytest.raises(ValueError, match=message):
             reader(path)
+        with fits.open(path) as hdulist, pytest.raises(ValueError, match=message):
+            reader(hdulist)
 
 
 @pytest.mark.parametrize("kind", ["bytes", "HDUList"])
