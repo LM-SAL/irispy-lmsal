@@ -200,7 +200,9 @@ def read_spectrograph_lvl2(
                 # A directory or a file that is not FITS: raises the level 2 error, chained to this one
                 _check_level2(filename, None, "raster")
         with context as hdulist:
-            _check_level2(filename, hdulist[0].header, "raster")
+            # An HDU list made in memory has no filename, so name what was given
+            given = hdulist.filename() or f"The data given ({type(filename).__name__})"
+            _check_level2(given, hdulist[0].header, "raster")
             if file_index == 0:
                 # After a discussion with the IRIS team, it was decided that instead of the
                 # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.
@@ -222,7 +224,7 @@ def read_spectrograph_lvl2(
                     if not all(window_is_in_obs):
                         missing_windows = spectral_windows_req[~window_is_in_obs]
                         msg = (
-                            f"Spectral windows {missing_windows.tolist()} not in file {filenames[0]}, "
+                            f"Spectral windows {missing_windows.tolist()} not in file {given}, "
                             f"which has {windows_in_obs.tolist()}"
                         )
                         raise ValueError(msg)
@@ -272,7 +274,7 @@ def read_spectrograph_lvl2(
                             source_data,
                             exposure_times,
                             aux_times,
-                            filename=filename,
+                            filename=given,
                         )
                     t_obs = t_obs_nuv
                 meta.add("exposure time", exposure_times[steps], None, 0)
@@ -293,7 +295,7 @@ def read_spectrograph_lvl2(
                     msg = (
                         f"WCS failed to load while reading one step of the raster due to {e}"
                         "The loading will continue but this will be missing in the final cube. "
-                        f"Spectral window: {window_name}, step {i} in file: {filename}"
+                        f"Spectral window: {window_name}, step {i} in file: {given}"
                     )
                     logger.warning(msg)
                     continue
