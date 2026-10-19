@@ -1,0 +1,1 @@
+Removed ``irispy.data.sample.AIA_1700``; search for and download AIA images with `~sunpy.net.Fido` instead.

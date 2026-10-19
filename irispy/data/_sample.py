@@ -2,17 +2,15 @@ import os
 from pathlib import Path
 from urllib.parse import urljoin
 
+import sunpy
 from sunpy import log
-from sunpy.util.config import _is_writable_dir, get_and_create_sample_dir
 from sunpy.util.parfive_helpers import Downloader
 
 _BASE_URLS = (
     "https://github.com/sunpy/data/raw/main/irispy-lmsal/",
-    "https://github.com/sunpy/sample-data/raw/master/irispy-lmsal/",
     "http://data.sunpy.org/irispy-lmsal/",
 )
 _SAMPLE_DATA = {
-    "AIA_1700": "aia_20140919_060030_1700_image_lev1.fits",
     "RASTER_TAR": "iris_l2_20211001_060925_3683602040_raster.tar.gz",
     "RASTER_FITS": "iris_l2_20211001_060925_3683602040_raster_t000_r00000.fits",
     "SJI_1330": "iris_l2_20211001_060925_3683602040_SJI_1330_t000.fits.gz",
@@ -79,14 +77,9 @@ def _handle_final_errors(results):
 
 
 def _get_sampledata_dir():
-    # Workaround for tox only. This is not supported as a user option
-    sampledata_dir = os.environ.get("SUNPY_SAMPLEDIR", "")
-    if sampledata_dir:
-        sampledata_dir = Path(sampledata_dir).expanduser().resolve()
-        _is_writable_dir(sampledata_dir)
-    else:
-        # Creating the directory for sample files to be downloaded
-        sampledata_dir = Path(get_and_create_sample_dir())
+    # SUNPY_SAMPLEDIR is sunpy's override for tox, not a user option
+    sampledata_dir = Path(os.environ.get("SUNPY_SAMPLEDIR") or sunpy.config.get("downloads", "sample_dir")).expanduser()
+    sampledata_dir.mkdir(parents=True, exist_ok=True)
     return sampledata_dir
 
 
