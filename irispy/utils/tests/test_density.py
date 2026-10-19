@@ -146,13 +146,22 @@ def test_density_diagnostic_error_bar_off_the_curve_gives_its_end():
     )
 
 
-def test_density_diagnostic_adds_transitions_within_0_02_angstrom():
+@pytest.mark.parametrize(
+    ("numerator", "expected"),
+    [
+        (1401.157 * u.AA, [0.3 + 0.1, 0.6 + 0.2]),
+        # 1401.157 and 1401.16 Å share both transitions, which count once
+        ([1401.157, 1401.16, 1404.806] * u.AA, [0.3 + 0.1 + 0.05, 0.6 + 0.2 + 0.1]),
+    ],
+    ids=["one", "several"],
+)
+def test_density_diagnostic_adds_transitions_within_0_02_angstrom(numerator, expected):
     # CHIANTI's O IV 1401.149 and 1401.163 Å transitions both lie within 0.02 Å of the catalog's 1401.157 Å
     ion = types.SimpleNamespace(
         transitions=types.SimpleNamespace(
-            wavelength=[1399.776, 1401.163, 1401.149] * u.AA, is_bound_bound=np.array([True, True, True])
+            wavelength=[1399.776, 1401.163, 1401.149, 1404.806] * u.AA, is_bound_bound=np.array([True] * 4)
         ),
-        contribution_function=lambda _density: [[1.0, 0.3, 0.1], [1.0, 0.6, 0.2]] * u.erg * u.cm**3 / u.s,
+        contribution_function=lambda _density: [[1.0, 0.3, 0.1, 0.05], [1.0, 0.6, 0.2, 0.1]] * u.erg * u.cm**3 / u.s,
     )
 
     result = density_diagnostic(
@@ -160,11 +169,11 @@ def test_density_diagnostic_adds_transitions_within_0_02_angstrom():
         1.0,
         [1e10, 1e11] * u.cm**-3,
         ion=ion,
-        numerator=1401.157 * u.angstrom,
+        numerator=numerator,
         denominator=1399.776 * u.angstrom,
     )
 
-    np.testing.assert_allclose(result["theoretical_ratio"].value, [0.3 + 0.1, 0.6 + 0.2])
+    np.testing.assert_allclose(result["theoretical_ratio"].value, expected)
 
 
 def test_density_diagnostic_rejects_wavelength_without_transition():

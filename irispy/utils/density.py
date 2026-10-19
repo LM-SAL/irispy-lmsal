@@ -94,22 +94,25 @@ def map_ratio_to_quantity(observed_ratio, quantity, theoretical_ratio, *, bounds
     )
 
 
-def _transition_indices(transitions, wavelength):
+def _transition_indices(transitions, wavelengths):
     """
-    Indices of the bound-bound transitions within 0.02 Å of ``wavelength``.
+    Indices of the bound-bound transitions within 0.02 Å of any of ``wavelengths``.
     """
-    wavelengths = transitions.wavelength[transitions.is_bound_bound]
-    distance = np.abs(wavelengths - wavelength).to_value(u.AA)
+    lines = transitions.wavelength[transitions.is_bound_bound]
+    wavelengths = np.atleast_1d(wavelengths)
     # 0.02 Å is how far tools/make_line_database.py lets a NIST line without levels lie from CHIANTI, twice
     # NIST's 0.01 Å precision. Each documented IRIS line in CHIANTI 11.0.2 lies within 0.017 Å (Fe XXI 1354.08)
     # of its wavelength in irispy/data/iris_lines.ecsv.gz, while C II 1335.66 and 1335.71 Å, 0.045 Å apart, stay
     # apart. Transitions this close blend into one line, as O IV 1401.149 and 1401.163 Å do
-    indices = np.flatnonzero(distance <= 0.02)
-    if indices.size == 0:
-        lines = ", ".join(f"{value:.3f}" for value in np.sort(wavelengths[np.argsort(distance)[:3]].to_value(u.AA)))
-        msg = f"No transition of the ion lies within 0.02 Å of {wavelength}. The nearest are at {lines} Å."
-        raise ValueError(msg)
-    return indices
+    distance = np.abs(lines[:, np.newaxis] - wavelengths).to_value(u.AA)
+    for wavelength, line_distance in zip(wavelengths, distance.T, strict=True):
+        if line_distance.min() > 0.02:
+            nearest = ", ".join(
+                f"{value:.3f}" for value in np.sort(lines[np.argsort(line_distance)[:3]].to_value(u.AA))
+            )
+            msg = f"No transition of the ion lies within 0.02 Å of {wavelength}. The nearest are at {nearest} Å."
+            raise ValueError(msg)
+    return np.flatnonzero((distance <= 0.02).any(axis=1))
 
 
 def density_diagnostic(
