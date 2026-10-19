@@ -11,7 +11,7 @@ from astropy.nddata import StdDevUncertainty
 from irispy.sji import SJICube
 from irispy.spectrograph import SpectrogramCube, SpectrogramCubeSequence
 from irispy.utils._spectral import _fit_background, check_scaled, make_map_cube, standard_deviation
-from irispy.utils.constants import DN_UNIT, RADIANCE_UNIT, RADIANCE_UNIT_PER_HZ
+from irispy.utils.constants import RADIANCE_UNIT, RADIANCE_UNIT_PER_HZ
 from irispy.utils.response import get_interpolated_effective_area, get_latest_response
 from irispy.utils.utils import _saturated_samples
 
@@ -139,10 +139,9 @@ def _calibrate_sji(cube, line):
             raise ValueError(msg)
         per_photon = constants.h * constants.c / line / line_area
         unit = RADIANCE_UNIT * u.AA
-    # DN_UNIT["SJI"] holds the NUV gain for all passbands; DN2PHOT_SJI has the gain of each
-    photons_per_dn = response["DN2PHOT_SJI"][band] / DN_UNIT["SJI"]
     solid_angle = cube.meta["CDELT1"] * cube.meta["CDELT2"] * u.arcsec**2
-    return (cube.apply_exposure_time_correction() * (photons_per_dn * per_photon / solid_angle)).to(unit)
+    # The cube's unit, DN_IRIS_SJI_<passband>, holds the passband's photons per DN, those of DN2PHOT_SJI
+    return (cube.apply_exposure_time_correction() * (per_photon / u.photon / solid_angle)).to(unit)
 
 
 def radiation_temperature(
