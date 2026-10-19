@@ -123,9 +123,11 @@ mg_spec_crop = mg_ii.crop(lower_corner, upper_corner)
 ###############################################################################
 # By default, the plot shows only spatial coordinates. Include ``"time"`` in
 # ``axes_coordinates`` to add the exposure times to the Mg II k core spectroheliogram.
+# We put the raster steps along x, so that longitude and time run horizontally.
 
 fig = plt.figure()
 mg_spec_crop.plot(
+    plot_axes=["x", "y"],
     axes_coordinates=["custom:pos.helioprojective.lon", "custom:pos.helioprojective.lat", "time"],
 )
 fig.tight_layout()
