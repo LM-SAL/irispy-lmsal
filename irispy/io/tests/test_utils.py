@@ -175,7 +175,7 @@ def test_read_files_raster_file_list(raster_sg_files):
         "Mg II k 2796",
     }
     si_iv = returns["Si IV 1403"]
-    assert si_iv.shape == (13, 8, 109, 29)
+    assert si_iv.shape == (len(raster_sg_files), 8, 109, 29)
 
 
 def test_get_spec_group_key_falls_back_when_metadata_is_missing():

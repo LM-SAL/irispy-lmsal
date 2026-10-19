@@ -73,7 +73,7 @@ def test_spectrogram_cube_remove_cosmic_rays(sns_sg_file, monkeypatch):
 
 @pytest.mark.parametrize(
     ("item", "scan", "index", "segment_index"),
-    [(1, 1, (2, 50, 10), (2, 50, 10)), ((6, 4), 6, (50, 10), (4, 50, 10))],
+    [(1, 1, (2, 50, 10), (2, 50, 10)), ((2, 4), 2, (50, 10), (4, 50, 10))],
     ids=["scan", "scan_and_step"],
 )
 def test_integer_index_slices_segment_fits_wcs(combined_si_iv, item, scan, index, segment_index):
@@ -110,7 +110,7 @@ def test_memmap_raster_and_split_rasters_are_lazy(raster_sg_files):
     rasters = cube.split_rasters()
 
     assert cube.crop([wavelength, None, None, None, None], [wavelength, None, None, None, None]).data.ndim == 3
-    assert len(rasters) == 13
+    assert len(rasters) == len(raster_sg_files)
     assert cube.fits_wcs is None
     assert rasters[0].fits_wcs is not None
     assert rasters[0].shape == (8, 109, 29)
@@ -309,13 +309,13 @@ def test_spectrogram_cube_slice_preserves_coordinates(combined_si_iv):
     ],
     ids=["arithmetic", "to_nddata"],
 )
-def test_derived_combined_cube_keeps_raster_behaviour(combined_si_iv, derive):
+def test_derived_combined_cube_keeps_raster_behaviour(combined_si_iv, raster_sg_files, derive):
     out = derive(combined_si_iv)
 
     assert type(out) is type(combined_si_iv)
     assert out.raster_slice(0).shape == combined_si_iv.raster_slice(0).shape
     assert out.raster_slice(0).fits_wcs is not None
-    assert len(out.split_rasters()) == 13
+    assert len(out.split_rasters()) == len(raster_sg_files)
 
 
 def _fits_wcs_sample(cube):
@@ -326,11 +326,11 @@ def _fits_wcs_sample(cube):
 @pytest.mark.parametrize(
     ("actual", "expected"),
     [
-        (lambda c: len(c[:, 3].split_rasters()), lambda _: 13),
+        (lambda c: len(c[:, 3].split_rasters()), lambda c: c.shape[0]),
         (lambda c: c[:, 3].raster_slice(1).shape, lambda c: c.shape[2:]),
-        (lambda c: len(c.rebin((1, 2, 1, 1)).split_rasters()), lambda _: 13),
+        (lambda c: len(c.rebin((1, 2, 1, 1)).split_rasters()), lambda c: c.shape[0]),
         (lambda c: c.rebin((1, 2, 1, 1)).raster_slice(0).fits_wcs, lambda _: None),
-        (lambda c: _fits_wcs_sample(c[:, 2:6][3]), lambda c: _fits_wcs_sample(c[3][2:6])),
+        (lambda c: _fits_wcs_sample(c[:, 2:6][2]), lambda c: _fits_wcs_sample(c[2][2:6])),
         (
             lambda c: _fits_wcs_sample(c[:, 2:5, 10:60][1]),
             lambda c: (
@@ -375,9 +375,9 @@ def _slice_summary(cube):
     ("negative", "positive"),
     [
         (lambda c: c[-1], lambda c: c[c.shape[0] - 1]),
-        (lambda c: c[1:5][-1], lambda c: c[4]),
+        (lambda c: c[1:3][-1], lambda c: c[2]),
         (lambda c: c[-3:], lambda c: c[c.shape[0] - 3 :]),
-        (lambda c: c[:-2][-2:], lambda c: c[c.shape[0] - 4 : c.shape[0] - 2]),
+        (lambda c: c[:-1][-2:], lambda c: c[c.shape[0] - 3 : c.shape[0] - 1]),
         (lambda c: c[:, -5:], lambda c: c[:, c.shape[1] - 5 :]),
     ],
     ids=["index", "nested_index", "slice", "nested_slice", "second_axis"],

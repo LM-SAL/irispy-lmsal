@@ -31,7 +31,6 @@ SG_METADATA = {
     "sns_sg_file": {
         "keys": ["C II 1336", "Fe XII 1349", "O I 1356", "Si IV 1394", "Si IV 1403", "2832", "2814", "Mg II k 2796"],
         "shape": (187, 40, 29),
-        "n_rasters": 1,
         "campaign_start_start_end": ("2021-09-05T00:18:33.640", "2021-09-05T00:18:33.810", "2021-09-05T05:07:27.400"),
         "distance_to_sun": 1.00827638 * u.AU,
         "exposure_control_triggers_in_observation": 0,
@@ -45,9 +44,8 @@ SG_METADATA = {
     },
     "raster_sg_files": {
         "keys": ["C II 1336", "1343", "Fe XII 1349", "O I 1356", "Si IV 1403", "2832", "2826", "2814", "Mg II k 2796"],
-        "shape": (13, 8, 109, 29),
-        "n_rasters": 13,
-        "campaign_start_start_end": ("2014-03-29T14:09:38.830", "2014-03-29T14:09:39.000", "2014-03-29T14:25:43.280"),
+        "shape": (8, 109, 29),
+        "campaign_start_start_end": ("2014-03-29T14:09:38.830", "2014-03-29T14:09:39.000", "2014-03-29T14:13:14.280"),
         "distance_to_sun": 0.99849015 * u.AU,
         "exposure_control_triggers_in_observation": 526,
         "header_length": 412,
@@ -97,7 +95,9 @@ def _window_header_and_aux(filename, window):
 @pytest.mark.parametrize("files", ["sns_sg_file", "raster_sg_files"])
 def test_read_spectrograph_lvl2_metadata(request, files):
     expected = SG_METADATA[files]
-    raster_collection = read_spectrograph_lvl2(request.getfixturevalue(files))
+    filenames = request.getfixturevalue(files)
+    n_rasters = len(filenames) if isinstance(filenames, list) else 1
+    raster_collection = read_spectrograph_lvl2(filenames)
     assert list(raster_collection.keys()) == expected["keys"]
     assert str(raster_collection)
     # We do not expect any metadata to be present on the collection
@@ -107,7 +107,7 @@ def test_read_spectrograph_lvl2_metadata(request, files):
     assert str(si_iv)
     assert si_iv.time.ravel()[0].isot in str(si_iv[0])
     meta = si_iv.meta
-    assert si_iv.data.shape == expected["shape"]
+    assert si_iv.data.shape == ((n_rasters,) if n_rasters > 1 else ()) + expected["shape"]
     assert np.all(si_iv.data.shape == meta.data_shape)
     # Meta is both a dict with the fits header keys but also provides
     # helper functions for specific values
@@ -150,7 +150,6 @@ def test_read_spectrograph_lvl2_metadata(request, files):
     assert si_iv.wcs.world_axis_physical_types == physical_types
     assert si_iv.time.format == "isot"
     assert si_iv.time.shape == si_iv.shape[:-2]
-    n_rasters = expected["n_rasters"]
     assert (si_iv.fits_wcs is None) == (n_rasters > 1)
     assert len(si_iv.split_rasters()) == n_rasters
     assert si_iv.raster_slice(0).shape == si_iv.raster_slice(-1).shape == si_iv.shape[-3:]
