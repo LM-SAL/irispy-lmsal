@@ -315,12 +315,13 @@ def density_diagnostic(
     density_lower = density_upper = None
     if ratio_uncertainty is not None:
         # A side of the error bar off the curve gives the curve's end, as in iris_ne_oiv.pro
-        error_bar = np.clip(
+        curve_ends = density_grid[[0, -1]] if theoretical_ratio[-1] > theoretical_ratio[0] else density_grid[[-1, 0]]
+        density_minus, density_plus = map_ratio_to_quantity(
             u.Quantity([ratio - ratio_uncertainty, ratio + ratio_uncertainty]),
-            theoretical_ratio.min(),
-            theoretical_ratio.max(),
+            density_grid,
+            theoretical_ratio,
+            fill_value=tuple(curve_ends),
         )
-        density_minus, density_plus = map_ratio_to_quantity(error_bar, density_grid, theoretical_ratio)
         density_lower = np.fmin(density_minus, density_plus)
         density_upper = np.fmax(density_minus, density_plus)
 

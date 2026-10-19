@@ -146,6 +146,21 @@ def test_density_diagnostic_error_bar_off_the_curve_gives_its_end():
     )
 
 
+def test_density_diagnostic_error_bar_off_a_flat_end_gives_the_grid_end():
+    result = density_diagnostic(
+        0.25,
+        1.0,
+        [1, 2, 3, 4] * u.cm**-3,
+        ion=_fake_ion([0.1, 0.2, 0.3, 0.3]),
+        numerator=1399.78 * u.angstrom,
+        denominator=1401.16 * u.angstrom,
+        intensity_numerator_uncertainty=0.1,
+        intensity_denominator_uncertainty=0.0,
+    )
+
+    assert result["density_upper"] == 4 * u.cm**-3
+
+
 def test_density_diagnostic_ignores_temperatures_without_the_ion():
     # CHIANTI's O IV ionization fraction is 0 above 10^8.5 K, so both lines vanish there
     ion = types.SimpleNamespace(
