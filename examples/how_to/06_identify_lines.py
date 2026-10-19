@@ -33,7 +33,7 @@ raster = read_files(raster_filename)
 # every neutral or singly ionized line its strength is only a rough optically
 # thin estimate.
 
-c_ii = raster["C II 1336"][0]
+c_ii = raster["C II 1336"]
 (wavelength,) = c_ii.axis_world_coords("wl")
 lines = get_lines(wavelength[[0, -1]], region="flare", abundance="coronal")
 lines["intensity_flare_coronal"].info.format = ".3f"
@@ -47,7 +47,7 @@ print(lines["ion", "wavelength", "wavelength_source", "intensity_flare_coronal"]
 
 fig, axes = plt.subplots(3, 1, figsize=(10, 11), layout="constrained")
 for ax, window in zip(axes, raster.keys(), strict=True):
-    cube = raster[window][0]
+    cube = raster[window]
     (wavelength,) = cube.axis_world_coords("wl")
     data = np.where(cube.mask | ~np.isfinite(cube.data), np.nan, cube.data)
     valid = np.isfinite(data).any(axis=(0, 1))

@@ -41,7 +41,7 @@ fig, axes = plt.subplots(1, len(raster), sharey=True, layout="constrained")
 for ax, window in zip(axes, raster, strict=True):
     positions, depths = find_fiducials(raster[window])
     print(f"{window}: rows {np.round(positions, 2)}, blocking {np.round(depths, 2)} of the light")
-    cube = raster[window][0]
+    cube = raster[window]
     image = np.ma.masked_array(cube.data, cube.mask).mean(axis=2).T
     vmin, vmax = np.percentile(image.compressed(), [1, 99])
     ax.imshow(image, origin="lower", aspect="auto", cmap="gray", vmin=vmin, vmax=vmax)

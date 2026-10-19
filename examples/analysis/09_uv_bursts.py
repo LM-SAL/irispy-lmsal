@@ -37,7 +37,7 @@ raster_filename = pooch.retrieve(
     "https://github.com/LM-SAL/irispy-data/releases/download/v1/iris_l2_20130902_182935_4000005156_cutout_raster.tar.gz",
     known_hash="caec6a9d7e4d8fac70163f5f11ef992f3efd5a05b9b5fa6f67b79418bc183e1a",
 )
-si_iv = read_files(raster_filename, spectral_windows="Si IV 1403")["Si IV 1403"][0]
+si_iv = read_files(raster_filename, spectral_windows="Si IV 1403")["Si IV 1403"]
 
 ###############################################################################
 # A pixel is part of a burst when its mean Si IV intensity within 50 km/s of the line core
@@ -54,7 +54,7 @@ events
 # the events on the raster at the Si IV line core.
 
 si_iv_core = SpectralCoord(1402.77 * u.AA)
-core_image = si_iv.crop([si_iv_core, None], [si_iv_core, None])
+core_image = si_iv.crop([si_iv_core, None, None, None], [si_iv_core, None, None, None])
 
 fig = plt.figure(figsize=(7, 7))
 ax = fig.add_subplot(111, projection=core_image.wcs)

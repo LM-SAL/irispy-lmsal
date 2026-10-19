@@ -75,8 +75,8 @@ si_iv_1403 = si_iv_1403[:ny, :nx].rebin((2, 2, 1), propagate_uncertainties=True)
 # neighboring O IV lines, which we take from the line catalog.
 
 blue, si_iv_core, red = get_lines([1401, 1405] * u.AA, main_only=True)["wavelength"][:3]
-lower_corner = [SpectralCoord((blue + si_iv_core) / 2), None]
-upper_corner = [SpectralCoord((si_iv_core + red) / 2), None]
+lower_corner = [SpectralCoord((blue + si_iv_core) / 2), None, None, None]
+upper_corner = [SpectralCoord((si_iv_core + red) / 2), None, None, None]
 si_iv_1403 = si_iv_1403.crop(lower_corner, upper_corner)
 
 ###############################################################################

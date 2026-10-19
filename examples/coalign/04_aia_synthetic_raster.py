@@ -48,7 +48,7 @@ aia_filename = pooch.retrieve(
     known_hash="f55401575c6967653e2cab60f79be399d5ee5386023e2316b5fc3d3ae6cc71e8",
 )
 
-raster = read_files(raster_filename, spectral_windows="2832")["2832"][0]
+raster = read_files(raster_filename, spectral_windows="2832")["2832"]
 sji_cube = read_files(sji_filename)
 aia_cube = read_files(aia_filename)
 
@@ -127,7 +127,7 @@ for step, (sji_index, aia_index) in enumerate(zip(sji_indices, aia_indices, stri
     sji_frame, aia_map, shift = alignments[sji_index, aia_index]
     shifts[step] = shift.to_value(u.arcsec)
 
-    _, slit = raster.wcs.pixel_to_world(0, slit_pixels, step)
+    slit = raster.wcs.pixel_to_world(0, slit_pixels, step)[1]
     slit = SkyCoord(slit.Tx + shift[0], slit.Ty + shift[1], frame=sji_frame)
     aia_x, aia_y = aia_map.world_to_pixel(slit)
     aia_image[:, step] = map_coordinates(aia_map.data, [aia_y.value, aia_x.value], order=1, cval=np.nan)

@@ -36,7 +36,7 @@ raster_filename = pooch.retrieve(
     "https://github.com/LM-SAL/irispy-data/releases/download/v1/iris_l2_20200402_224709_3610108077_cutout_2796_raster.fits.gz",
     known_hash="e1c0f4cfaa82a782046b22684b8c657013751abcf57252eeab1f6ced8bd26cb5",
 )
-mg_ii = read_files(raster_filename)["Mg II k 2796"][0]
+mg_ii = read_files(raster_filename)["Mg II k 2796"]
 
 ###############################################################################
 # `~irispy.utils.mg_features.calculate_mg_features` finds the velocity and
@@ -86,8 +86,9 @@ for column, (label, (values, cmap, vmin, vmax)) in enumerate(maps.items()):
     ax = fig.add_subplot(2, 4, column + 1, projection=wcs)
     SpectrogramCube(values, wcs).plot(axes=ax, plot_axes=["x", "y"], cmap=cmap, vmin=vmin, vmax=vmax)
     fig.colorbar(ax.images[0], ax=ax, location="top", label=label, ticks=[vmin, (vmin + vmax) / 2, vmax])
-    # The first world axis is latitude, along the slit (y), and the second is longitude, along the raster (x).
-    for coord, side, name in ((ax.coords[0], "l", "Solar Y" if column == 0 else " "), (ax.coords[1], "b", "Solar X")):
+    # Latitude runs along the slit (y) and longitude along the raster (x).
+    latitude, longitude = ax.coords["custom:pos.helioprojective.lat"], ax.coords["custom:pos.helioprojective.lon"]
+    for coord, side, name in ((latitude, "l", "Solar Y" if column == 0 else " "), (longitude, "b", "Solar X")):
         coord.set_ticks(spacing=30 * u.arcsec)
         coord.set_ticklabel(exclude_overlapping=True, fontsize=8, color="black")
         coord.set_ticks_position(side)
