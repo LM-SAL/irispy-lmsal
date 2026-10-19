@@ -80,6 +80,16 @@ def test_import_optional_preserves_transitive_import_error(monkeypatch):
         utils.utils._import_optional("optional_module", reason="testing", extra="tests")
 
 
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_calculate_uncertainty_keeps_the_data_dtype(dtype):
+    # Level 2 data are float32; the readout noise scalar used to promote the uncertainty to float64
+    data = np.array([0.0, 50.0, 3000.0], dtype=dtype)
+    uncertainty = utils.calculate_uncertainty(data, READOUT_NOISE["SJI"], DN_UNIT["SJI"])
+    assert uncertainty.dtype == dtype
+    expected = utils.calculate_uncertainty(data.astype(np.float64), READOUT_NOISE["SJI"], DN_UNIT["SJI"])
+    np_test.assert_allclose(uncertainty, expected, rtol=1e-6)
+
+
 def test_calculate_uncertainty_of_negative_data():
     data = np.array([-200.0, -3.0, 0.0, 50.0, np.nan])
     uncertainty = utils.calculate_uncertainty(data, READOUT_NOISE["FUV"], DN_UNIT["FUV"])

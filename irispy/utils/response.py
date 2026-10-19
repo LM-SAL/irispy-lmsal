@@ -96,10 +96,12 @@ def get_latest_response(
     iris_response["C_S_TIME"] = Time(iris_response["C_S_TIME"], format="utime")
     iris_response["ELEMENTS"]["DATE"] = parse_time(iris_response["ELEMENTS"]["DATE"].astype(str).tolist())
     iris_response["VERSION_DATE"] = parse_time(iris_response["VERSION_DATE"])
-    iris_response["AREA_SG"] = np.zeros(iris_response["AREA_SG"].shape)
-    iris_response["AREA_SJI"] = np.zeros(iris_response["AREA_SJI"].shape)
-    # Handle multiple observation times by creating a list of responses
-    iris_response = [iris_response.copy() for _ in range(number_of_obs_times)]
+    # One response per observation time, each with its own effective area arrays to fill in
+    area_sg_shape, area_sji_shape = iris_response["AREA_SG"].shape, iris_response["AREA_SJI"].shape
+    iris_response = [
+        {**iris_response, "AREA_SG": np.zeros(area_sg_shape), "AREA_SJI": np.zeros(area_sji_shape)}
+        for _ in range(number_of_obs_times)
+    ]
     # Set DATE_OBS to the observation time.
     for i in range(number_of_obs_times):
         iris_response[i]["DATE_OBS"] = observation_time[i].isot
