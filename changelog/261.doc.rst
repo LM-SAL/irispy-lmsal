@@ -1,0 +1,1 @@
+Added a page on the spectral line catalog and a gallery example that identifies lines in a flare raster.

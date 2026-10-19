@@ -867,7 +867,7 @@ def test_non_thermal_velocity_non_positive_widths():
     ("keywords", "match"),
     [
         ({}, "Pass ion"),
-        ({"ion": "Si IV"}, "temperature"),
+        ({"ion": "O I"}, "no formation temperature"),
         ({"ion": "Xx IV", "temperature": 1e5 * u.K}, "No atomic mass"),
         ({"ion": "Si IV", "wavelength": 1500 * u.AA}, "outside the IRIS passbands"),
     ],
@@ -876,3 +876,10 @@ def test_non_thermal_velocity_errors(keywords, match):
     wavelength = keywords.pop("wavelength", 1402.77 * u.AA)
     with pytest.raises(ValueError, match=match):
         non_thermal_velocity(_width_map(np.array([[0.05, 0.06]])), wavelength, **keywords)
+
+
+def test_non_thermal_velocity_temperature_from_the_catalog():
+    widths = _width_map(np.array([[0.05, 0.06]]))
+    from_catalog = non_thermal_velocity(widths, 1402.77 * u.AA, ion="Si IV")
+    explicit = non_thermal_velocity(widths, 1402.77 * u.AA, ion="Si IV", temperature=10**4.9 * u.K)
+    np.testing.assert_allclose(from_catalog["non_thermal_velocity"].data, explicit["non_thermal_velocity"].data)

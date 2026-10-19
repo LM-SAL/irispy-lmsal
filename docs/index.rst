@@ -37,6 +37,7 @@ These classes also provide methods for applying a number of calibration routines
           :maxdepth: 1
 
           iris
+          line_database
           tutorial/index
           generated/gallery/index
 
