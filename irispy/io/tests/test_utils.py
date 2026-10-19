@@ -235,6 +235,23 @@ def test_read_files_grouped_spectrograph_honors_allow_errors(
     assert list(returns.keys()) == list(expected.keys())
 
 
+def test_read_files_skips_a_bad_tar_member_with_allow_errors(tmp_path, raster_sg_files):
+    tar_path = tmp_path / "obs_raster.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tar:
+        for filename in raster_sg_files:
+            tar.add(filename, arcname=Path(filename).name)
+        info = tarfile.TarInfo("corrupt.fits")  # sorts before the rasters
+        info.size = 3
+        tar.addfile(info, io.BytesIO(b"abc"))
+
+    with pytest.raises(ValueError, match=r"corrupt\.fits is not an IRIS level 2 file"):
+        read_files(tar_path)
+    returns = read_files(tar_path, allow_errors=True)
+
+    # The other members still load
+    assert len(returns["Si IV 1403"]) == len(raster_sg_files)
+
+
 def test_read_files_sji_more_than_one(sns_sji_1330_file, sns_sji_1400_file):
     returns = read_files([sns_sji_1330_file, sns_sji_1400_file])
     assert len(returns) == 2

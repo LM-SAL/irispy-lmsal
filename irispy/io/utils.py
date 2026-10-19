@@ -262,9 +262,9 @@ def read_files(
         if filename.name.startswith("IRISMosaic_"):
             msg = f"{filename} is a full-disk mosaic; read it with irispy.io.read_mosaic"
             raise ValueError(msg)
+        sji_tarfile = filename.name.endswith(("SDO.tar.gz", "SOTFG.tar.gz", "SOTSP.tar.gz"))
+        raster_tarfile = filename.name.endswith("_raster.tar.gz")
         try:
-            sji_tarfile = filename.name.endswith(("SDO.tar.gz", "SOTFG.tar.gz", "SOTSP.tar.gz"))
-            raster_tarfile = filename.name.endswith("_raster.tar.gz")
             # The members of a tarball are classified like loose files, so the rasters of several
             # tarballs are grouped by observation instead of overwriting each other by first window.
             files = (
@@ -272,7 +272,14 @@ def read_files(
                 if sji_tarfile or raster_tarfile
                 else [filename]
             )
-            for file in files:
+        except Exception as e:
+            if allow_errors:
+                log.warning(f"File {filename} failed to load with {e}")
+                continue
+            raise
+        # One member of a tarball failing to load does not stop the others from loading.
+        for file in files:
+            try:
                 try:
                     header = _primary_header(file) if file.name.endswith((".fits", ".fits.gz")) else None
                 except (OSError, EOFError, ValueError, TypeError):
@@ -293,11 +300,11 @@ def read_files(
                     # Keep the first file's description, so the group needs no second header read.
                     group_key = _get_spec_group_key(file, header)
                     spec_groups.setdefault(group_key, (describe, []))[1].append(file)
-        except Exception as e:
-            if allow_errors:
-                log.warning(f"File {filename} failed to load with {e}")
-                continue
-            raise
+            except Exception as e:
+                if allow_errors:
+                    log.warning(f"File {file} failed to load with {e}")
+                    continue
+                raise
     for group_key, (describe, file_group) in spec_groups.items():
         try:
             key = _get_spec_return_key(group_key, describe, returns)
