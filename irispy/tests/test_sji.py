@@ -181,6 +181,17 @@ def test_spatial_slice_fits_wcs_describes_sliced_pixels(sns_sjicube_1330):
     assert sliced.separation(full) < 1e-6 * u.arcsec
 
 
+def test_integer_spatial_index_gives_the_sliced_fits_wcs(sns_sjicube_1330):
+    # No header describes a 1-D image: fits_wcs raised AttributeError, with no map to build
+    row = sns_sjicube_1330[:, 0, :]
+    assert len(row.fits_wcs) == sns_sjicube_1330.shape[0]
+    from_frame, from_cube = row.fits_wcs[3].pixel_to_world(5), row.wcs.pixel_to_world(5, 3)[0]
+    assert u.allclose((from_frame.Tx, from_frame.Ty), (from_cube.Tx, from_cube.Ty), atol=1e-6 * u.arcsec)
+    assert sns_sjicube_1330[3, 0, :].fits_wcs.pixel_n_dim == 1
+    with pytest.raises(ValueError, match="no FITS WCS"):
+        row.to_maps()
+
+
 def test_sliced_frame_headers_keep_the_file_units(sns_sjicube_1330):
     rows, columns = sns_sjicube_1330.data.shape[1:]
     original = sns_sjicube_1330._frame_headers[0]

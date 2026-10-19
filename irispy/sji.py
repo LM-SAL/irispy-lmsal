@@ -170,11 +170,11 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
     celestial_frame = property(_celestial_frame_from_cube)
 
     @cached_property
-    def _frame_headers(self):
+    def _file_frames(self):
         """
-        The FITS header of each frame of this cube, following its slicing: one header
-        for a single frame, a list for a time axis, `None` when the cube has no frame
-        headers.
+        The file's FITS header of each frame of this cube (one header for a single
+        frame, a list for a time axis) and the cube's spatial item in numpy order;
+        `None` when the cube has no frame headers.
         """
         headers = self.meta.get("frame_wcs_headers") if self.meta is not None else None
         low = self.wcs.low_level_wcs
@@ -184,8 +184,18 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         # Any other low-level WCS (e.g. a rebinned one) no longer matches the frame headers.
         if headers is None or not isinstance(low, gwcs.WCS):
             return None
-        frames = headers[item[0]]
-        spatial = tuple(item[1:])
+        return headers[item[0]], tuple(item[1:])
+
+    @cached_property
+    def _frame_headers(self):
+        """
+        The FITS header of each frame of this cube, following its slicing: one header
+        for a single frame, a list for a time axis, `None` when the cube has no frame
+        headers or an integer spatial index left a 1-D image, which no header describes.
+        """
+        if self._file_frames is None or not all(isinstance(axis, slice) for axis in self._file_frames[1]):
+            return None
+        frames, spatial = self._file_frames
         if isinstance(frames, MetaDict):
             return _slice_header(frames, spatial)
         return [_slice_header(h, spatial) for h in frames]
@@ -194,13 +204,16 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
     def fits_wcs(self):
         """
         Returns a standard WCS instead of gWCS.
+
+        One per frame, following the cube's slicing; after an integer spatial index it
+        is the sliced WCS of each frame.
         """
-        headers = self._frame_headers
-        if headers is None:
+        if self._file_frames is None:
             return None
-        if isinstance(headers, MetaDict):
-            return WCS(headers)
-        return [WCS(h) for h in headers]
+        frames, spatial = self._file_frames
+        if isinstance(frames, MetaDict):
+            return WCS(frames).slice(spatial, numpy_order=True)
+        return [WCS(h).slice(spatial, numpy_order=True) for h in frames]
 
     def to_maps(self, index: int | list[int] | None = None):
         """
@@ -225,7 +238,10 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         # The frame headers say DN, which the raw integers of a memmap read are not
         check_scaled(self)
         if self._frame_headers is None:
-            msg = "This cube has no FITS WCS (for example, it was rebinned), so it cannot be converted to maps."
+            msg = (
+                "This cube has no FITS WCS header for its frames (for example, it was rebinned or indexed along a "
+                "spatial axis), so it cannot be converted to maps."
+            )
             raise ValueError(msg)
         if isinstance(index, Integral):
             idx_list = [index]
