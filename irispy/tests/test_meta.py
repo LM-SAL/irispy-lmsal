@@ -42,7 +42,7 @@ def test_sgmeta_rest_wavelength():
 )
 def test_sgmeta_rest_wavelength_from_line_catalog(sns_sg_file, spectral_window, rest_wavelength):
     meta = SGMeta(fits.getheader(sns_sg_file), spectral_window)
-    assert u.isclose(meta.rest_wavelength, rest_wavelength, atol=1 * u.mAA)
+    assert u.isclose(meta.rest_wavelength, rest_wavelength, atol=1 * u.mAA, rtol=0)
 
 
 def test_sgmeta_detector_band_fuv():

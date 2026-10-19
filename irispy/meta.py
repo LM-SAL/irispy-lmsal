@@ -629,8 +629,8 @@ class SGMeta(BaseMeta, SlitSpectrographMetaABC):
         twave = super().rest_wavelength
         if twave is None:
             return None
-        # TWAVE is a rounded planning value. In real files, 1 Å covers its largest offset from its line, 0.152 Å
-        # (Mg II k), and misses the nearest documented line to a continuum window's TWAVE, 5.34 Å (2786 to Mg II 2791.599).
+        # TWAVE is a rounded planning value. In real files it is at most 0.152 Å from its line (Mg II k), and a
+        # continuum window's TWAVE is at least 5.34 Å from a documented line (2786 to Mg II 2791.599).
         lines = get_lines(twave + [-1, 1] * u.AA, main_only=True)["wavelength"]
         if not len(lines):
             return twave
