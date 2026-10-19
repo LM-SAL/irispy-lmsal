@@ -1,0 +1,1 @@
+`irispy.io.read_files` now passes ``revert_v34`` to the raster reader only, so it no longer fails on, or with ``allow_errors=True`` drops, the slit-jaw, AIA and SOT files in the same list.

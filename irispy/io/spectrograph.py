@@ -130,7 +130,7 @@ def read_spectrograph_lvl2(
     ----------
     filenames: `list` of `str` or `str`
         Filename of filenames to be read. They must all be associated with the same
-        OBS number.
+        OBS number. They are read in order of their ``DATE_OBS``, whatever their order here.
     spectral_windows: iterable of `str` or `str`
         Spectral windows to extract from files. Default=None, implies, extract all
         spectral windows.
@@ -159,8 +159,13 @@ def read_spectrograph_lvl2(
     if isinstance(filenames, (str, Path)):
         filenames = [filenames]
     filenames = [str(f) for f in filenames]
+    if len(filenames) > 1:
+        # The sequence follows time whatever the order given, such as that of an unsorted glob.
+        date_obs = Time([fits.getheader(filename)["DATE_OBS"] for filename in filenames])
+        filenames = [filenames[i] for i in date_obs.argsort()]
     for file_index, filename in enumerate(filenames):
-        with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
+        # The extensions are read out of order, which rewinds a gzip stream: inflate it once instead.
+        with fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True) as hdulist:
             if file_index == 0:
                 # After a discussion with the IRIS team, it was decided that instead of the
                 # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.

@@ -212,8 +212,10 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     Parameters
     ----------
     filename : `str`, `pathlib.Path`, file-like, `bytes` or `astropy.io.fits.HDUList`
-        File or decompressed FITS data to read. A supplied HDU list is left open;
-        open it with ``do_not_scale_image_data=True`` when using ``memmap=True``.
+        File or decompressed FITS data to read. A supplied HDU list is left open, its
+        auxiliary table is edited in place (dropped pointing rows are filled) and, with
+        ``memmap=False``, its image is copied before the fill values are replaced; open it
+        with ``do_not_scale_image_data=True`` when using ``memmap=True``.
     uncertainty : `bool`, optional
         If `True` (not the default), will compute the uncertainty for the data (slower and
         uses more memory). If ``memmap=True``, the uncertainty is never computed.
@@ -295,7 +297,8 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             # This is a workaround for the AIA cubes being in int and not float
             mask = np.isnan(data) if is_sot else _fill_mask_values(data, *BAD_PIXEL_VALUES_SCALED)
             mask_value = BAD_PIXEL_VALUE_SCALED if np.issubdtype(data.dtype, np.integer) else np.nan
-            if not data_nan_masked.flags["W"]:
+            # A caller's HDU list keeps its image: the fill values are replaced in a copy.
+            if isinstance(filename, fits.HDUList) or not data_nan_masked.flags["W"]:
                 data_nan_masked = data_nan_masked.copy()
             data_nan_masked[mask] = mask_value
             if instrume in ["IRIS", "SJI"]:
