@@ -24,6 +24,8 @@ These are the five strongest predicted FUV2 lines in the quiet Sun with coronal 
     O IV    1399.78  0.07  chianti
 
 Wavelengths are in vacuum.
+Above 2000 Å most line lists give air wavelengths, which for Mg II are 0.82 Å (88 km/s) shorter (`Morton 2000 <https://doi.org/10.1086/317349>`__).
+To find the window that holds a line, compare its wavelength with ``raster[window][0].meta.spectral_range`` for each window.
 A wavelength range can be given in any spectral unit, and both ends are included.
 Without ``region`` and ``abundance``, lines come in wavelength order.
 With them, lines are ranked strongest first within each passband (FUV1, FUV2, then NUV), and only the documented lines and the stage III and higher lines at least 2% of the passband's strongest are kept.

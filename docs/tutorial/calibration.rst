@@ -10,6 +10,7 @@ Wavelength Calibration
 The wavelength calibration is automatically performed to the best of current knowledge.
 This is accurate to only a few pixels, and should be manually checked.
 There are several photospheric spectral lines that can be used for accurate wavelength calibration, most notably the Ni I 279.9474 nm line in the NUV and the O I 135.560 nm line in the FUV.
+These and all Level 2 wavelengths are in vacuum.
 
 .. note::
 
@@ -18,6 +19,8 @@ There are several photospheric spectral lines that can be used for accurate wave
    In such cases, the user is advised, again, to perform manual wavelength calibration by avoiding such regions under the slit coverage.
 
 A detailed discussion of the wavelength calibration steps for IRIS and how to use them on data can be found in IRIS Technical Note 20 :cite:p:`itn20`.
+`~irispy.utils.wavelength_drift.calculate_wavelength_drift` measures how the NUV and FUV wavelength scales drift during an observation.
+The :ref:`Mg II Dopplergram example <sphx_glr_generated_gallery_analysis_02_mg_ii_dopplergrams.py>` measures this drift and corrects a raster with it.
 
 Radiometric Calibration
 =======================
