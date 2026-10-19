@@ -1,6 +1,9 @@
+import io
+import re
 from types import SimpleNamespace
 
 import dask.array as da
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -486,6 +489,20 @@ def test_spectrogram_cube_plot_defaults(sns_sg_file, item, kwargs, cmaps):
     ax = read_files(sns_sg_file)["Si IV 1403"][item].plot(**kwargs)
     assert [image.get_cmap().name for image in ax.images] == cmaps
     plt.close(ax.figure)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "labels"),
+    [({}, ["283.20", "283.35"]), ({"aspect": "auto"}, ["283.20", "283.25", "283.30", "283.35", "283.40"])],
+)
+def test_spectrogram_plot_labels_narrow_window(sns_sg_file, kwargs, labels):
+    # The 2832 window spans 0.23 nm, which the default equal aspect draws 92 pixels wide
+    ax = read_files(sns_sg_file)["2832"][0].plot(**kwargs)
+    svg = io.StringIO()
+    with mpl.rc_context({"svg.fonttype": "none"}):
+        ax.figure.savefig(svg, format="svg")
+    plt.close(ax.figure)
+    assert re.findall(r">(283\.\d+)</text>", svg.getvalue()) == labels
 
 
 def test_default_colormap_falls_back_to_viridis():

@@ -78,7 +78,9 @@ def set_axis_properties(ax, axes_coordinates=None, slices=None):
         names = {physical_type, default_label}
         if physical_type in WAVELENGTH_LABELS or default_label in WAVELENGTH_LABELS:
             axis.set_format_unit(u.nm)
-            axis.set_major_formatter("x.x")
+            axis.set_major_formatter("x.xx")
+            # A narrow window drawn with equal aspect has no room to label every tick
+            axis.set_ticklabel(exclude_overlapping=True)
             axis.set_axislabel("Wavelength [$\\mathrm{nm}$]")
         elif default_label == "seconds from start (s)":
             axis.set_axislabel("Seconds from Start [$\\mathrm{s}$]")
