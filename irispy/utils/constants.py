@@ -26,23 +26,20 @@ BAD_PIXEL_VALUE_SCALED = -200
 BAD_PIXEL_VALUES_SCALED = (BAD_PIXEL_VALUE_SCALED, -199)
 # The following value is only appropriate for unscaled images
 BAD_PIXEL_VALUE_UNSCALED = -32768
-# Define some properties of IRIS detectors.
-# Source: IRIS instrument paper (https://link.springer.com/article/10.1007/s11207-014-0485-y)
-DETECTOR_GAIN = {"NUV": 18.0, "FUV": 6.0, "SJI": 18.0}
-DETECTOR_YIELD = {"NUV": 1.0, "FUV": 1.5, "SJI": 1.0}
+# Camera gain (electrons per DN), yield (electrons per photon) and read noise (DN) by spectrograph detector and
+# slit-jaw passband: De Pontieu et al. (2014) Sect. 7.1. The photons per DN, 4 (FUV) and 18 (NUV) for the spectrograph
+# and 12 (1330, 1400) and 18 (2796, 2832) for the slit-jaw imager, are those of Wülser et al. (2018) Table 1 and of
+# the response files (DN2PHOT_SG and DN2PHOT_SJI).
+DETECTOR_GAIN = {"NUV": 18.0, "FUV": 6.0, "SJI_1330": 18.0, "SJI_1400": 18.0, "SJI_2796": 18.0, "SJI_2832": 18.0}
+DETECTOR_YIELD = {"NUV": 1.0, "FUV": 1.5, "SJI_1330": 1.5, "SJI_1400": 1.5, "SJI_2796": 1.0, "SJI_2832": 1.0}
 DN_UNIT = {
-    "NUV": u.def_unit("DN_IRIS_NUV", DETECTOR_GAIN["NUV"] / DETECTOR_YIELD["NUV"] * u.photon),
-    "FUV": u.def_unit("DN_IRIS_FUV", DETECTOR_GAIN["FUV"] / DETECTOR_YIELD["FUV"] * u.photon),
-    "SJI": u.def_unit("DN_IRIS_SJI", DETECTOR_GAIN["SJI"] / DETECTOR_YIELD["SJI"] * u.photon),
+    band: u.def_unit(f"DN_IRIS_{band}", DETECTOR_GAIN[band] / DETECTOR_YIELD[band] * u.photon) for band in DETECTOR_GAIN
+} | {
     "SJI_UNSCALED": u.def_unit("DN_IRIS_SJI_UNSCALED", u.ct),
     "NUV_UNSCALED": u.def_unit("DN_IRIS_NUV_UNSCALED", u.ct),
     "FUV_UNSCALED": u.def_unit("DN_IRIS_FUV_UNSCALED", u.ct),
 }
-READOUT_NOISE = {
-    "NUV": 1.2 * DN_UNIT["NUV"],
-    "FUV": 3.1 * DN_UNIT["FUV"],
-    "SJI": 1.2 * DN_UNIT["SJI"],
-}
+READOUT_NOISE = {band: (3.1 if band == "FUV" else 1.2) * DN_UNIT[band] for band in DETECTOR_GAIN}
 # The level 2 clipping ceiling, not a detector saturation level. Level 2 data are int16 with BSCALE 0.25 and BZERO
 # 7992, clipped to -199 to 16182 DN, the top code 32760 (irisl12_savesjidata.pro lines 545-552,
 # irisl12_savespectraldata.pro lines 935-945). Saturated and merely bright samples both end here, and level 2 cannot

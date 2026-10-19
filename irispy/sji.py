@@ -87,7 +87,7 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
     ...     )
     ... )
     >>> cube.shape, cube.unit
-    ((52, 40, 37), Unit("DN_IRIS_SJI"))
+    ((52, 40, 37), Unit("DN_IRIS_SJI_1330"))
     >>> cube.meta.spectral_window, cube.meta.observing_mode_id
     ('1330', 3620258102)
     >>> cube[0, 10:20, 10:20].shape

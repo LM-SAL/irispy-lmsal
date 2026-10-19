@@ -253,7 +253,7 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     ... )
     >>> cube = read_sji_lvl2(filename)
     >>> cube.shape, cube.unit
-    ((62, 40, 37), Unit("DN_IRIS_SJI"))
+    ((62, 40, 37), Unit("DN_IRIS_SJI_1400"))
     >>> cube.axis_world_coords("time")[0][[0, -1]].isot
     array(['2021-09-05T00:18:47.390', '2021-09-05T05:07:22.210'], dtype='<U23')
     """
@@ -327,16 +327,19 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             if isinstance(filename, fits.HDUList) or not data_nan_masked.flags["W"]:
                 data_nan_masked = data_nan_masked.copy()
             data_nan_masked[mask] = mask_value
+            scaled = True
+            unit = u.DN
             if instrume in ["IRIS", "SJI"]:
                 # Level 2 clips at the ceiling, where iris_prep's +Inf saturation flags were lost
                 saturated = data_nan_masked >= SATURATION_LIMIT.value
                 mask |= saturated
-            scaled = True
-            unit = DN_UNIT["SJI"]
-            if uncertainty and instrume in ["IRIS", "SJI"]:
-                out_uncertainty = StdDevUncertainty(
-                    calculate_uncertainty(data_nan_masked, READOUT_NOISE["SJI"], DN_UNIT["SJI"])
-                )
+                # The passband, e.g. SJI_1400, sets the photons per DN
+                passband = hdulist[0].header["TDESC1"]
+                unit = DN_UNIT[passband]
+                if uncertainty:
+                    out_uncertainty = StdDevUncertainty(
+                        calculate_uncertainty(data_nan_masked, READOUT_NOISE[passband], unit)
+                    )
         cube_class = SJICube if instrume in ["IRIS", "SJI"] else AIACube
         if is_sot:
             # Hinode/SOT cubes are floats without FITS scaling

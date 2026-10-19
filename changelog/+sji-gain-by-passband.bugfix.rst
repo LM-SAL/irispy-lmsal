@@ -1,0 +1,2 @@
+`~irispy.io.read_sji_lvl2` now uses 12 photons per DN for the 1330 and 1400 slit-jaw passbands instead of 18, so their uncertainties are up to 22% larger and their DN convert to two thirds as many photons; 2796 and 2832 keep 18 photons per DN.
+Slit-jaw cubes are now in ``DN_IRIS_SJI_1330``, ``DN_IRIS_SJI_1400``, ``DN_IRIS_SJI_2796`` or ``DN_IRIS_SJI_2832`` (``irispy.utils.constants.DN_UNIT["SJI_1400"]`` and so on, which replace ``DN_UNIT["SJI"]``), and AIA cubes in DN.

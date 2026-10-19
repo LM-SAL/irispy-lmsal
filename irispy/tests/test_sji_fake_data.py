@@ -46,7 +46,7 @@ def _fake_sji_cube(data, *, uncertainty, mask, **meta):
         WCS(header=header, naxis=data.ndim),
         uncertainty=uncertainty,
         mask=mask,
-        unit=utils.constants.DN_UNIT["SJI"],
+        unit=utils.constants.DN_UNIT["SJI_1400"],
         meta=NDMeta(
             {"exposure time": 2 * np.ones(2) * u.s, "scaled": True, **meta},
             axes={"exposure time": 0},
