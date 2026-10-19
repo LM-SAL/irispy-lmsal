@@ -18,7 +18,7 @@ from irispy.utils._spectral import check_scaled
 from irispy.utils.utils import _boolean_mask, _import_optional
 from irispy.visualization import LAT_AXIS_LABEL, LON_AXIS_LABEL
 
-__all__ = ["asinh_velocity", "calculate_rgb", "linear_velocity", "plot_rgb"]
+__all__ = ["calculate_rgb", "plot_rgb"]
 
 
 def _colorbar_axes(ax, fraction, pad):
@@ -42,25 +42,6 @@ def _colorbar_axes(ax, fraction, pad):
     return figure.add_subplot(gridspec[1])
 
 
-def linear_velocity(velocity):
-    """
-    ``v`` in km/s, unchanged: color tracks the Doppler velocity directly.
-
-    The default ``velocity_norm``.
-    """
-    return velocity.to_value(u.km / u.s)
-
-
-def asinh_velocity(velocity):
-    """
-    ``arcsinh(v / 25 km/s)``: linear near rest, compressing the wings.
-
-    Pass this as ``velocity_norm`` to bring out small Doppler shifts at the cost of
-    compressing large ones.
-    """
-    return np.arcsinh(velocity.to_value(u.km / u.s) / 25)
-
-
 def _wavelength_limits(wavelength, rest_wavelength, wavelength_min, wavelength_max):
     """
     Default missing limits to +/-100 km/s around a rest wavelength inside
@@ -82,7 +63,7 @@ def calculate_rgb(
     wavelength_min: u.AA = None,
     wavelength_max: u.AA = None,
     rest_wavelength: u.AA = None,
-    velocity_norm=linear_velocity,
+    velocity_norm=None,
     vmin=None,
     vmax=None,
     stretch=None,
@@ -107,9 +88,9 @@ def calculate_rgb(
         ``cube.meta.rest_wavelength``. Required if the metadata has no usable ``TWAVE`` value.
     velocity_norm : `callable`, optional
         Monotonically increasing transform applied to velocity quantities, arrays and
-        scalars alike, returning plain numbers. Defaults to `linear_velocity`;
-        `asinh_velocity` instead applies ``arcsinh(v / 25 km/s)``, making small
-        shifts stand out while compressing the wings.
+        scalars alike, returning plain numbers. Defaults to a linear mapping of the
+        velocity. For example, ``lambda v: np.arcsinh(v.to_value(u.km / u.s) / 25)``
+        makes small shifts stand out while compressing large ones.
     vmin : `float` or `astropy.units.Quantity`, optional
         Intensity mapped to black. Defaults to zero.
     vmax : `float` or `astropy.units.Quantity`, optional
@@ -174,7 +155,7 @@ def calculate_rgb(
         spd_norm=None if stretch is None else (lambda x: stretch(np.clip(x, 0, None))),
         wavelength_min=wavelength_min,
         wavelength_max=wavelength_max,
-        wavelength_norm=wavelength_norm,
+        wavelength_norm=None if velocity_norm is None else wavelength_norm,
     )
     return np.moveaxis(rgb, axis_wavelength, -1), colorbar
 
@@ -186,7 +167,7 @@ def plot_rgb(
     cax=None,
     wavelength_min=None,
     wavelength_max=None,
-    velocity_norm=linear_velocity,
+    velocity_norm=None,
     vmin=None,
     vmax=None,
     stretch=None,
@@ -213,8 +194,8 @@ def plot_rgb(
         Wavelengths mapped to the blue and red ends of the visible range. Default
         to +/-100 km/s around the rest wavelength, as in `calculate_rgb`.
     velocity_norm : `callable`, optional
-        Transform of the Doppler velocity, as in `calculate_rgb` (`linear_velocity`
-        by default).
+        Transform of the Doppler velocity, as in `calculate_rgb`. Defaults to a linear
+        mapping of the velocity.
     vmin, vmax : `float` or `astropy.units.Quantity`, optional
         Intensities mapped to black and to full brightness.
     stretch : `callable`, optional

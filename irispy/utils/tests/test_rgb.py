@@ -8,7 +8,7 @@ import astropy.units as u
 
 from irispy.io.utils import read_files
 from irispy.tests.helpers import figure_test, make_test_spectrogram_cube
-from irispy.utils.rgb import asinh_velocity, calculate_rgb, plot_rgb
+from irispy.utils.rgb import calculate_rgb, plot_rgb
 
 colorsynth = pytest.importorskip("colorsynth")
 
@@ -145,7 +145,7 @@ def test_plot_rgb_rejects_a_singleton_spatial_axis(shape):
     "overrides",
     [
         lambda cube: {"rest_wavelength": cube.meta.rest_wavelength + 0.3 * u.AA},
-        lambda _: {"velocity_norm": asinh_velocity},
+        lambda _: {"velocity_norm": lambda v: np.arcsinh(v.to_value(u.km / u.s) / 25)},
     ],
     ids=["rest_wavelength", "velocity_norm"],
 )
