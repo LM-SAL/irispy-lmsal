@@ -170,7 +170,9 @@ class SpectrogramPlotter(IRISPlotter):
 
 class SJIPlotter(IRISPlotter):
     def _default_cmap_name(self):
-        return _registered_colormap(f"irissji{int(self._ndcube.meta['TWAVE1'])}")
+        # Hinode/SOT cubes have TWAVE1 = 0, and a cube built by hand may have none
+        twave = self._ndcube.meta.get("TWAVE1")
+        return _registered_colormap(f"irissji{int(twave)}") if twave else "viridis"
 
 
 class IRISSequencePlotter(_IRISPlotMixin, MatplotlibSequencePlotter):
