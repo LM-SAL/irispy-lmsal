@@ -41,7 +41,7 @@ def idl():
 
 @pytest.mark.parametrize(("index", "line"), list(enumerate(WINDOWS)))
 def test_matches_idl(raster, idl, index, line):
-    cube = raster[WINDOWS[line]][0]
+    cube = raster[WINDOWS[line]]
     features = calculate_mg_features(cube, lines=(line,))
     missing = (cube.data == -200).any(axis=-1)  # IDL interpolates through the fill
     # Velocity (km/s) and relative intensity tolerances. The line centers differ by at most 1.1e-4 km/s
@@ -67,20 +67,20 @@ def test_matches_idl(raster, idl, index, line):
 
 
 def test_output(raster):
-    features = calculate_mg_features(raster["Mg II k 2796"][0], lines=("k",))
+    features = calculate_mg_features(raster["Mg II k 2796"], lines=("k",))
     velocity = features["k3_velocity"]
     assert velocity.unit == u.km / u.s
     assert velocity.data.shape == (3, 771)
     np.testing.assert_array_equal(velocity.mask, np.isnan(velocity.data))
-    assert features["k3_intensity"].unit == raster["Mg II k 2796"][0].unit
+    assert features["k3_intensity"].unit == raster["Mg II k 2796"].unit
     assert set(features.aligned_axes.values()) == {(0, 1)}
 
 
 @pytest.fixture(scope="module")
 def both_lines(raster):
     # The two windows put back at their place in the file's Mg II window, with zeros between them.
-    k, h = raster["Mg II k 2796"][0], raster["Mg II h 2803"][0]
-    offset = int(k.wcs.wcs.crpix[0] - h.wcs.wcs.crpix[0])
+    k, h = raster["Mg II k 2796"], raster["Mg II h 2803"]
+    offset = int(k.fits_wcs.wcs.crpix[0] - h.fits_wcs.wcs.crpix[0])
     data = np.zeros((*k.data.shape[:2], offset + h.data.shape[-1]), dtype=k.data.dtype)
     mask = np.zeros(data.shape, dtype=bool)
     data[..., : k.data.shape[-1]], data[..., offset:] = k.data, h.data
@@ -99,8 +99,9 @@ def test_both_lines(raster, both_lines):
         ]
     ]
     for line, window in WINDOWS.items():
-        for key, value in calculate_mg_features(raster[window][0], lines=(line,)).items():
-            np.testing.assert_array_equal(features[key].data, value.data)
+        for key, value in calculate_mg_features(raster[window], lines=(line,)).items():
+            # The k window's gWCS puts the h wavelengths 1e-13 nm from the h window's
+            np.testing.assert_allclose(features[key].data.astype(float), value.data, atol=1e-6)
 
 
 def test_saturated(both_lines):
@@ -138,15 +139,25 @@ def test_saturated_ignores_masked_samples(both_lines):
 
 
 def test_dask_data(raster):
-    cube = raster["Mg II k 2796"][0]
+    cube = raster["Mg II k 2796"]
     lazy = SpectrogramCube(da.from_array(cube.data, chunks=(1, 771, 34)), cube.wcs, unit=cube.unit, mask=cube.mask)
     expected = calculate_mg_features(cube, lines=("k",))
     for key, value in calculate_mg_features(lazy, lines=("k",)).items():
         np.testing.assert_array_equal(value.data, expected[key].data)
 
 
+def test_rasters_read_together(raster):
+    # The same file twice reads as two rasters
+    rasters = read_spectrograph_lvl2([get_test_filepath(TEST_FILE)] * 2, spectral_windows="Mg II k 2796")
+    features = calculate_mg_features(rasters["Mg II k 2796"], lines=("k",))
+    expected = calculate_mg_features(raster["Mg II k 2796"], lines=("k",))
+    assert set(features.aligned_axes.values()) == {(0, 1, 2)}
+    for key, value in expected.items():
+        np.testing.assert_array_equal(features[key].data[1], value.data)
+
+
 def test_velocity_range(raster):
-    cube = raster["Mg II k 2796"][0]
+    cube = raster["Mg II k 2796"]
     features = calculate_mg_features(cube, lines=("k",), velocity_range=(-30, 30))
     assert np.nanmax(np.abs(calculate_mg_features(cube, lines=("k",))["k2r_velocity"].data)) > 33
     for key in ("k2v_velocity", "k3_velocity", "k2r_velocity"):
@@ -155,15 +166,15 @@ def test_velocity_range(raster):
 
 def test_skips_uncovered_line(raster):
     with pytest.warns(UserWarning, match="does not cover Mg II h"):
-        features = calculate_mg_features(raster["Mg II k 2796"][0])
+        features = calculate_mg_features(raster["Mg II k 2796"])
     assert {key[0] for key in features} == {"k"}
     with pytest.raises(ValueError, match="does not cover Mg II h"):
-        calculate_mg_features(raster["Mg II k 2796"][0], lines=("h",))
+        calculate_mg_features(raster["Mg II k 2796"], lines=("h",))
 
 
 @pytest.mark.parametrize("fill", [-200, -199])
 def test_missing_data(raster, fill):
-    cube = copy.deepcopy(raster["Mg II k 2796"][0])
+    cube = copy.deepcopy(raster["Mg II k 2796"])
     cube.data[1, 100, 10] = np.nan
     cube.mask[1, 200, 10] = True  # a finite pixel
     cube.data[1, 300, 10] = fill
@@ -174,7 +185,7 @@ def test_missing_data(raster, fill):
 
 def test_good_centers_far_from_slit_end(raster):
     # Extrapolated far beyond the good line centers, the spline through them would overflow.
-    cube = copy.deepcopy(raster["Mg II k 2796"][0])
+    cube = copy.deepcopy(raster["Mg II k 2796"])
     cube.data[:, 20:] = np.linspace(50, 100, cube.data.shape[-1])  # featureless
     cube.mask[:, 20:] = False
     velocity = calculate_mg_features(cube, lines=("k",))["k3_velocity"].data  # warnings are errors
@@ -184,7 +195,7 @@ def test_good_centers_far_from_slit_end(raster):
 
 def test_short_slit(raster):
     # As in IDL, a slit shorter than the 17-pixel kernel is not smoothed, so no line center jumps.
-    cube = copy.deepcopy(raster["Mg II k 2796"][0][:, 100:116])
+    cube = copy.deepcopy(raster["Mg II k 2796"][:, 100:116])
     cube.data[:, 8, 2:] = cube.data[:, 8, :-2]  # its line center moves 5.5 km/s redward
     velocity = calculate_mg_features(cube, lines=("k",))["k3_velocity"].data
     alone = calculate_mg_features(cube[:, 8:9], lines=("k",))["k3_velocity"].data
@@ -194,16 +205,16 @@ def test_short_slit(raster):
 def test_rejects_unscaled_data():
     raster = read_spectrograph_lvl2(get_test_filepath(TEST_FILE), memmap=True)
     with pytest.raises(ValueError, match="unscaled"):
-        calculate_mg_features(raster["Mg II k 2796"][0], lines=("k",))
+        calculate_mg_features(raster["Mg II k 2796"], lines=("k",))
 
 
 def test_rejects_other_input(raster):
-    with pytest.raises(TypeError, match="index it"):
-        calculate_mg_features(raster["Mg II k 2796"])
+    with pytest.raises(TypeError, match="select a window"):
+        calculate_mg_features(raster)
     with pytest.raises(ValueError, match="slice it with ranges"):
-        calculate_mg_features(raster["Mg II k 2796"][0][:, 300])
-    cube = raster["Mg II k 2796"][0]
-    wcs = cube.wcs.deepcopy()
+        calculate_mg_features(raster["Mg II k 2796"][:, 300])
+    cube = raster["Mg II k 2796"]
+    wcs = cube.fits_wcs.deepcopy()
     wcs.wcs.cdelt[0] *= -1
     with pytest.raises(ValueError, match="wavelengths must increase"):
         calculate_mg_features(SpectrogramCube(cube.data[..., ::-1], wcs, unit=cube.unit), lines=("k",))
@@ -222,7 +233,7 @@ def test_rejects_other_input(raster):
 )
 def test_rejects_bad_arguments(raster, keywords, match):
     with pytest.raises(ValueError, match=match):
-        calculate_mg_features(raster["Mg II k 2796"][0], **{"lines": ("k",), **keywords})
+        calculate_mg_features(raster["Mg II k 2796"], **{"lines": ("k",), **keywords})
 
 
 def test_maxima():

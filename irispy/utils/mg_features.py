@@ -34,7 +34,8 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
     Parameters
     ----------
     cube : `~irispy.spectrograph.SpectrogramCube`
-        One raster of a Mg II window, read with ``memmap=False``, with axes (step, slit, wavelength).
+        A Mg II window, read with ``memmap=False``, with axes (step, slit, wavelength), or
+        (raster, step, slit, wavelength) for several rasters read together.
     velocity_range : `~astropy.units.Quantity`, optional
         Doppler velocities from each line's rest wavelength within which to search (km/s if unitless).
     lines : `tuple` of `str`, optional
@@ -43,10 +44,10 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
     Returns
     -------
     `~irispy.spectrograph.RasterCollection`
-        (step, slit) maps keyed ``"{feature}_velocity"`` (km/s) and ``"{feature}_intensity"`` (the
-        unit of ``cube``) for the blue peak, line center and red peak of each measured line:
-        ``"k2v"``, ``"k3"``, ``"k2r"`` and ``"h2v"``, ``"h3"``, ``"h2r"``. Features that are not
-        found are NaN and masked. ``"{line}_saturated"`` is `True` where a sample searched over
+        (step, slit) maps, (raster, step, slit) for several rasters, keyed ``"{feature}_velocity"``
+        (km/s) and ``"{feature}_intensity"`` (the unit of ``cube``) for the blue peak, line center
+        and red peak of each measured line: ``"k2v"``, ``"k3"``, ``"k2r"`` and ``"h2v"``, ``"h3"``,
+        ``"h2r"``. Features that are not found are NaN and masked. ``"{line}_saturated"`` is `True` where a sample searched over
         (``velocity_range`` widened by 3 km/s) is saturated, as the mask and ``cube.meta["saturated"]``
         mark the samples the readers find at the level 2 ceiling; such a line has no features either.
 
@@ -81,10 +82,12 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
     * `iris_get_mg_features.pro <https://sohoftp.nascom.nasa.gov/solarsoft/iris/idl/uio/utils/iris_get_mg_features.pro>`__
     """
     if not isinstance(cube, SpectrogramCube):
-        msg = f"cube must be a SpectrogramCube, not a {type(cube).__name__}; index it, e.g. raster['Mg II k 2796'][0]"
+        msg = f"cube must be a SpectrogramCube, not a {type(cube).__name__}; select a window, e.g. raster['Mg II k 2796']"
         raise TypeError(msg)
-    if cube.data.ndim != 3 or cube.wavelength_axis != 2:
-        msg = "cube must have axes (step, slit, wavelength); slice it with ranges, e.g. cube[:, 300:301]"
+    if cube.data.ndim not in (3, 4) or cube.wavelength_axis != cube.data.ndim - 1:
+        msg = (
+            "cube must have axes ([raster,] step, slit, wavelength); slice it with ranges, e.g. cube[:, 300:301]"
+        )
         raise ValueError(msg)
     check_scaled(cube)
     velocity_range = u.Quantity(velocity_range, u.km / u.s)
@@ -116,12 +119,13 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
         # Masked, so missing, and no features
         saturated = np.any(_saturated_samples(cube)[..., inside], axis=-1)
         grid = np.linspace(velocity[inside][0], velocity[inside][-1], 300)
-        features = np.full((*window.shape[:2], 3, 2), np.nan)  # blue peak, center, red peak
-        for step, (data, bad) in enumerate(zip(window, missing, strict=True)):
-            valid = ~bad.any(axis=-1)
+        features = np.full((*window.shape[:-1], 3, 2), np.nan)  # blue peak, center, red peak
+        # One exposure, along the slit, at a time
+        for exposure in np.ndindex(window.shape[:-2]):
+            valid = ~missing[exposure].any(axis=-1)
             if valid.any():
-                spectra = _spline(velocity[inside], data[valid].T, grid, tension=0).T
-                features[step, valid] = _slit_features(grid, spectra, valid)
+                spectra = _spline(velocity[inside], window[exposure][valid].T, grid, tension=0).T
+                features[exposure][valid] = _slit_features(grid, spectra, valid)
         maps += [
             (f"{line}{feature}_{kind}", make_map_cube(template, features[..., index, part], unit, mask_invalid=True))
             for index, feature in enumerate(("2v", "3", "2r"))
@@ -133,7 +137,7 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
         raise ValueError(msg)
     if skipped:
         warnings.warn(f"{msg}; skipping it", UserWarning, stacklevel=2)
-    return RasterCollection(maps, aligned_axes=(0, 1))
+    return RasterCollection(maps, aligned_axes=tuple(range(cube.data.ndim - 1)))
 
 
 def _slit_features(grid, spectra, valid):
