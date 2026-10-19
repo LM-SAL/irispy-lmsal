@@ -14,7 +14,6 @@ from astropy.coordinates import SkyCoord
 from astropy.table import QTable, vstack
 from astropy.time import Time
 
-from irispy.spectrograph import SpectrogramCubeSequence
 from irispy.utils._spectral import check_scaled, make_map_cube, make_spatial_template
 from irispy.utils.constants import DN_UNIT
 from irispy.utils.response import get_interpolated_effective_area, get_latest_response
@@ -37,8 +36,9 @@ def find_si_iv_bursts(raster, *, threshold=None, velocity_range=50 * u.km / u.s,
 
     Parameters
     ----------
-    raster : `~irispy.SpectrogramCube` or `~irispy.SpectrogramCubeSequence`
-        Level 2 spectra of a window covering 1402.77 Å, in DN with axes (step, slit, wavelength).
+    raster : `~irispy.SpectrogramCube`
+        Level 2 spectra of a window covering 1402.77 Å, in DN with axes (step, slit, wavelength),
+        or (raster, step, slit, wavelength) for several rasters read together.
     threshold : `float` or `~astropy.units.Quantity`, optional
         Burst threshold in DN/s per wavelength bin for data summed by 2 in wavelength and not along
         the slit; it is scaled by the data's spatial summing and half its spectral summing.
@@ -52,7 +52,7 @@ def find_si_iv_bursts(raster, *, threshold=None, velocity_range=50 * u.km / u.s,
 
     Returns
     -------
-    labels : `~irispy.SpectrogramCube` or `~irispy.SpectrogramCubeSequence`
+    labels : `~irispy.SpectrogramCube`
         As `find_bright_spectral_events`.
     events : `~astropy.table.QTable`
         As `find_bright_spectral_events`; ``events.meta["threshold"]`` is the scaled threshold.
@@ -78,7 +78,7 @@ def find_si_iv_bursts(raster, *, threshold=None, velocity_range=50 * u.km / u.s,
     ----------
     * :cite:t:`young2018`
     """
-    meta = (raster.data[0] if isinstance(raster, SpectrogramCubeSequence) else raster).meta
+    meta = raster.meta
     if threshold is None:
         now, then = (
             get_interpolated_effective_area(get_latest_response(time), "FUV", _SI_IV)
@@ -105,8 +105,9 @@ def find_bright_spectral_events(
 
     Parameters
     ----------
-    raster : `~irispy.SpectrogramCube` or `~irispy.SpectrogramCubeSequence`
-        Level 2 spectra of one window, in DN with axes (step, slit, wavelength).
+    raster : `~irispy.SpectrogramCube`
+        Level 2 spectra of one window, in DN with axes (step, slit, wavelength), or
+        (raster, step, slit, wavelength) for several rasters read together.
     threshold : `float` or `~astropy.units.Quantity`
         Threshold in DN/s per wavelength bin of the data, applied as given. A Quantity in
         ``u.DN`` per unit time is read as the data's DN; any other unit must convert to the
@@ -120,17 +121,16 @@ def find_bright_spectral_events(
 
     Returns
     -------
-    labels : `~irispy.SpectrogramCube` or `~irispy.SpectrogramCubeSequence`
+    labels : `~irispy.SpectrogramCube`
         Event labels on the (step, slit) plane of each raster: 0 outside events, and 1 to N
-        for the N events, numbered on through the rasters of a sequence.
+        for the N events, numbered on through the rasters.
     events : `~astropy.table.QTable`
         One row per event: ``label``, ``raster`` index, number of pixels ``npix``, and the
         ``step``, ``y``, ``time``, ``coordinate`` and mean ``intensity`` of its brightest pixel.
-        The coordinates of a sequence are in the frame of its first raster.
+        The coordinates of several rasters are in the frame of the first.
         ``events.meta["threshold"]`` is the threshold.
     """
-    cubes = raster.data if isinstance(raster, SpectrogramCubeSequence) else [raster]
-    meta = cubes[0].meta
+    meta = raster.meta
     if rest_wavelength is None:
         rest_wavelength = meta.rest_wavelength
         if rest_wavelength is None:
@@ -141,7 +141,7 @@ def find_bright_spectral_events(
         threshold = threshold.to(unit, equivalencies=[(u.DN / u.s, unit)])
     threshold = u.Quantity(threshold, unit)
     maps, tables, offset = [], [], 0
-    for index, cube in enumerate(cubes):
+    for index, cube in enumerate(raster.split_rasters()):
         check_scaled(cube)
         if cube.data.ndim != 3 or cube.wavelength_axis != 2:
             msg = "The spectra must have axes (step, slit, wavelength); slice with a range, not an index"
@@ -171,9 +171,9 @@ def find_bright_spectral_events(
         labels[labels > 0] += offset
         template = make_spatial_template(cube, cube.wavelength_axis)
         coordinate = template.wcs.array_index_to_world(step, y)
-        if tables:
-            # Rasters read separately have their own obstime, which vstack rejects
-            coordinate = SkyCoord(tables[0]["coordinate"].frame.realize_frame(coordinate.data))
+        if isinstance(coordinate, list):
+            # A raster's gWCS also gives the time and raster step of each pixel
+            coordinate = next(world for world in coordinate if isinstance(world, SkyCoord))
         table = QTable(
             {
                 "label": label + offset,
@@ -181,18 +181,17 @@ def find_bright_spectral_events(
                 "npix": npix,
                 "step": step,
                 "y": y,
-                "time": cube.axis_world_coords("time", wcs=cube.extra_coords)[0][step],
+                "time": cube.time[step],
                 "coordinate": coordinate,
                 "intensity": intensity[step, y] * cube.unit / u.s,
             },
             meta={"threshold": threshold},
         )
-        maps.append(make_map_cube(template, labels, u.one))
+        maps.append(labels)
         tables.append(table)
         offset += count
-    if not isinstance(raster, SpectrogramCubeSequence):
-        return maps[0], tables[0]
-    return SpectrogramCubeSequence(maps, meta=raster.meta), vstack(tables)
+    template = make_spatial_template(raster, raster.wavelength_axis)
+    return make_map_cube(template, np.reshape(maps, template.data.shape), u.one), vstack(tables)
 
 
 def find_sji_bursts(sji, *, sigma_factor=10, min_pixels=2):
