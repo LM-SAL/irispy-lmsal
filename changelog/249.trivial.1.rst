@@ -1,0 +1,1 @@
+``read_files`` on a raster tarball is now tested offline against the loose-file read.

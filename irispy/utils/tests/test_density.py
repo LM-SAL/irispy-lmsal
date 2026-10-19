@@ -44,12 +44,22 @@ def test_map_ratio_to_quantity_decreasing_curve():
     assert u.allclose(map_ratio_to_quantity(0.35, density, theoretical_ratio), 5.5e9 * u.cm**-3)
 
 
-def test_map_ratio_to_quantity_rejects_non_monotonic_curve():
+@pytest.mark.parametrize(
+    ("observed_ratio", "theoretical_ratio", "kwargs", "message"),
+    [
+        (0.35, [0.2, 0.8], {}, "must have the same shape"),
+        (0.35, [0.2, np.nan, np.nan], {}, "At least two finite samples"),
+        (0.35, [0.5, 0.5, 0.5], {}, "must vary over the provided quantity grid"),
+        (0.35, [0.2, 0.8, 0.5], {}, "must be monotonic"),
+        (1.5, [0.2, 0.5, 0.8], {"bounds_error": True}, "outside the theoretical ratio range"),
+    ],
+    ids=["shape", "finite-samples", "constant", "non-monotonic", "bounds"],
+)
+def test_map_ratio_to_quantity_rejects_bad_curves(observed_ratio, theoretical_ratio, kwargs, message):
     density = [1e8, 1e9, 1e10] * u.cm**-3
-    theoretical_ratio = [0.2, 0.8, 0.5] * u.dimensionless_unscaled
 
-    with pytest.raises(ValueError, match="must be monotonic"):
-        map_ratio_to_quantity(0.35, density, theoretical_ratio)
+    with pytest.raises(ValueError, match=message):
+        map_ratio_to_quantity(observed_ratio, density, theoretical_ratio * u.dimensionless_unscaled, **kwargs)
 
 
 @pytest.mark.parametrize("shape", [(), (2,), (1, 2)])
@@ -276,4 +286,20 @@ def test_density_diagnostic_uncertainty_shape_mismatch(monkeypatch):
             denominator=1401.16 * u.angstrom,
             intensity_numerator_uncertainty=[[0.1], [0.1]] * u.ct,
             intensity_denominator_uncertainty=[[0.2], [0.2]] * u.ct,
+        )
+
+
+def test_density_diagnostic_rejects_ratio_with_other_temperatures(monkeypatch):
+    # Three temperature rows from fiasco for an ion with two temperatures
+    _install_fake_fiasco(monkeypatch, [[0.1, 0.2], [0.2, 0.4], [0.3, 0.6]])
+    fake_ion = types.SimpleNamespace(temperature=[1e5, 2e5] * u.K, formation_temperature=2e5 * u.K)
+
+    with pytest.raises(ValueError, match=r"temperature axis does not match ion\.temperature"):
+        density_diagnostic(
+            [0.4],
+            [1.0],
+            [1, 2] * u.cm**-3,
+            ion=fake_ion,
+            numerator=1399.78 * u.angstrom,
+            denominator=1401.16 * u.angstrom,
         )
