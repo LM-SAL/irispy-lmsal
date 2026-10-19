@@ -1,0 +1,1 @@
+The installation page now covers ``pip``, a table of the optional dependencies and a development install, which the contributing page links to, and the README has a quickstart.

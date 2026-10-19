@@ -22,9 +22,11 @@ IRIS obtains UV spectra and images in two main passbands around 1400 Å and 2800
 
 The IRIS telescope feeds light from three passbands into the spectrograph box:
 
-* Far Ultraviolet (FUV1): 1331.56 -- 1358.40 Å
-* Far Ultraviolet (FUV2): 1390.00 -- 1406.79 Å
-* Near Ultraviolet (NUV): 2782.56 -- 2833.89 Å
+* Far Ultraviolet (FUV1)
+* Far Ultraviolet (FUV2)
+* Near Ultraviolet (NUV)
+
+Their wavelength ranges are in :ref:`Table 1 <iris_table1>`.
 
 In the spectrograph, the light can travel several paths:
 
@@ -40,18 +42,18 @@ In the spectrograph, the light can travel several paths:
 Exposure times are controlled by 3 different shutters (FUV, NUV and SJI).
 Light is collected onto 4 CCDs which are read out by 2 cameras and which cover 3 different spectral bands and the slit-jaw images (:ref:`Table 1 <iris_table1>`, :ref:`2 <iris_table2>`).
 The IRIS spectral lines cover temperatures from 4,500 K to 10 MK, with the images covering temperatures from 4,500 K to 65,000 K (and possibly 10 MK under flaring conditions).
-`IRIS Technical Note 1 <https://www.lmsal.com/iris_science/doc?cmd=dcur&proj_num=IS0109&file_type=pdf>`__ provides more technical details on IRIS.
+IRIS Technical Note 1 :cite:p:`itn1` provides more technical details on IRIS.
 
 .. _iris_table1:
 
-.. table:: Table 1. Overview of spectrograph (SG) channels. These are imaged onto 3 identical 1096 x 2072 pixel CCDs and can all be simultaneously read using two different camera electronics boards (CEB). Ranges, dispersion and effective area are current best estimates based on pre-launch measurements. Spatial pixel size is 0.166", and the maximum spatial extent is 175".
+.. table:: Table 1. Overview of spectrograph (SG) channels. These are imaged onto 3 identical 1096 x 2072 pixel CCDs and can all be simultaneously read using two different camera electronics boards (CEB). The wavelength ranges are those of Table 2 of :cite:t:`depontieu2014`; dispersion and effective area are current best estimates based on pre-launch measurements. Spatial pixel size is 0.166", and the maximum spatial extent is 175".
 
    =====  ==============  ===================  =============================  ===================
    Band   Wavelength (Å)  Dispersion (mÅ/pix)  Effective area (cm\ :sup:`2`)  Temperature (log T)
    =====  ==============  ===================  =============================  ===================
    FUV 1  1331.7--1358.4  12.98                1.6                            3.7--7.0
    FUV 2  1389.0--1407.0  12.72                2.2                            3.7--5.2
-   NUV    2782.7--2851.1  25.46                0.2                            3.7--4.2
+   NUV    2782.7--2835.1  25.46                0.2                            3.7--4.2
    =====  ==============  ===================  =============================  ===================
 
 
@@ -73,7 +75,7 @@ The IRIS spectral lines cover temperatures from 4,500 K to 10 MK, with the image
 IRIS Data Level Definitions
 ===========================
 
-The convention on IRIS Data Levels is shown in :ref:`Table 3 <iris_table3>` and at length in `IRIS Technical Note 11 <https://www.lmsal.com/iris_science/doc?cmd=dcur&proj_num=IS0076&file_type=pdf>`__.
+The convention on IRIS Data Levels is shown in :ref:`Table 3 <iris_table3>` and at length in IRIS Technical Note 11 :cite:p:`itn11`.
 Raw spacecraft telemetry (TLM) is converted into Level 0 image files.
 Level 1 images are reoriented so that wavelength increases left to right.
 This constitutes the lowest level of scientifically-useful data, however since it is uncalibrated, :ref:`Level 2 <irispy-tutorial-lev2>` is the correct data product for most analyses.

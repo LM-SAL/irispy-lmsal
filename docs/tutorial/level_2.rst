@@ -59,7 +59,7 @@ The tables below illustrate the HDU structure for slit-jaw and spectrograph file
     2       Table Extension  Technical metadata            [``nt``, 5]
     ======  ===============  ============================  =========================================
 
-`A description of the level 2 keywords, for primary and extension headers, is available for download. <https://www.lmsal.com/iris_science/doc?cmd=dcur&proj_num=IS0211&file_type=pdf>`__
+A description of the level 2 keywords, for primary and extension headers, is available for download :cite:p:`is0211`.
 
 The auxiliary metadata contain several quantities for each exposure.
 These are parameters that may vary for different exposures and are therefore stored here.
@@ -82,9 +82,11 @@ Their content is only useful for reproducing the exact steps of the data calibra
 Exposure timestamps
 -------------------
 
-For slit-jaw data, ``STARTOBS`` plus the auxiliary ``TIME`` value is the exposure start.
+The time coordinate of the cubes is the midpoint of each exposure, not its start.
+For slit-jaw data, ``STARTOBS`` plus the auxiliary ``TIME`` value is the exposure start :cite:p:`is0211`, and the midpoint adds half of the exposure time.
 For spectrograph data, the shared auxiliary ``TIME`` follows the FUV exposure start and is retained as ``meta["auxiliary times"]``.
 The NUV exposure starts at a different time and is calculated from its source-filename midpoint minus half its NUV exposure duration.
+The time coordinate of the FUV windows is the auxiliary ``TIME`` plus half the FUV exposure time, and that of the NUV windows is the source-filename midpoint.
 
 Full-disk mosaics
 -----------------
@@ -157,7 +159,7 @@ Let us retrieve the header of the raster file and display the description of the
 .. note::
     By default, this will load the data into memory.
     You can pass ``memmap=True`` to avoid this; the data array will be a `numpy.memmap` instead.
-    In this case, the data are not loaded into system memory, but written to a temporary file.
+    In this case, the data stay in the FITS file and are read from the disk when a slice of the cube is used.
     Memmapped data are the raw, unscaled integers stored in the file, not data numbers (DN).
 
 We can print the ``raster`` object to get some basic information about the raster file: what spectral windows were observed, the size of the cube, and the wavelength keys.
@@ -319,14 +321,15 @@ For example, we can access the description of the observation from the primary h
     >>> iris_sji.meta["OBS_DESC"]  # doctest: +REMOTE_DATA
     'Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2'
 
-The time when the observation sequence started onboard IRIS is given by the keyword ``STARTOBS``:
+The time when the observation sequence started onboard IRIS is given by the keyword ``STARTOBS`` :cite:p:`is0211`:
 
 .. code-block:: python
 
     >>> iris_sji.meta['STARTOBS']   # doctest: +REMOTE_DATA
     '2021-10-01T06:09:24.920'
 
-The exposure times are calculated from the auxiliary metadata, are given in seconds, and are therefore a property of the metadata object rather than a header key:
+The exposure time of each exposure is read from the auxiliary metadata and is a property of the cube, ``cube.exposure_time``, in seconds.
+``cube.meta.exposure_time`` is a different quantity, the mean exposure time of the observation from the header keyword ``EXPTIME``:
 
 .. code-block:: python
 
@@ -441,6 +444,25 @@ Both the raster and slit-jaw cubes can be visualized using the ``plot`` method.
 
     plt.show()
 
+A cube with a time axis is shown as an animation, and this is its first frame.
+The slider below the image selects the frame by its time.
+
+The default stretch of the colors runs linearly from the minimum to the maximum of the data, and a few hot pixels, in the thousands of DN, make the rest of the image look black.
+Pass ``clip_interval`` to let the stretch of each frame ignore the extremes:
+
+.. plot::
+    :include-source:
+    :context: close-figs
+
+    import matplotlib.pyplot as plt
+
+    iris_sji.plot(clip_interval=(1, 99.5) * u.percent)
+
+    plt.show()
+
+The colors now run from the 1st to the 99.5th percentile of each frame.
+The same argument works for the raster plot below, in place of ``vmax``.
+
 .. note::
 
     We imported `matplotlib.pyplot` in order to create the figure.
@@ -462,5 +484,39 @@ This only applies to the slit-jaw images, as the raster cubes do not have a sing
 
 Since they are both series of images, the plot method will automatically create a slider to scroll through the different time steps or raster steps.
 Furthermore, the tick and axes labels have been automatically set based on the coordinate system of the cube and are colored according to the axis direction.
+
+The raster plot shows the spectrograms of the Mg II k window, one for each position of the slit.
+In a spectrogram the slit runs along the vertical axis, so the vertical axis is the solar Y coordinate, the helioprojective latitude, and the horizontal axis is the wavelength.
+The sliders step through the raster steps and the repeated scans of the raster, which move the slit along solar X.
+We set ``vmax=255`` because a few hot pixels reach 11,700 DN while 99.9% of the samples are below about 100 DN, so the default stretch, from the minimum to the maximum of the data, would show a nearly black image.
+The value is a choice for this data and not a property of the instrument.
+
+To plot a single image, slice the cube down to two dimensions, here the first frame:
+
+.. plot::
+    :include-source:
+    :context: close-figs
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    frame = iris_sji[0]
+    frame.plot(vmax=np.nanpercentile(frame.data, 99.5))
+
+    plt.show()
+
+A single image has no slider, so we set the upper limit of the stretch to the 99.5th percentile of the frame ourselves.
+
+Slicing a raster down to one dimension gives a single spectrum, here raster step 0 of the first scan at pixel 274 along the slit:
+
+.. plot::
+    :include-source:
+    :context: close-figs
+
+    import matplotlib.pyplot as plt
+
+    raster["Mg II k 2796"][0][0, 274].plot()
+
+    plt.show()
 
 Within the :ref:`irispy-example-index`, there are more examples of how to visualize the data and customize the plots.

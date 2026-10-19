@@ -218,7 +218,7 @@ def fits_info(filename: str) -> None:
             table.add_row(list(map(str, hdu_info[idx])))
 
     sys.stdout.write("\n".join(results) + "\n")
-    table.pprint()
+    table.pprint(max_width=-1)
     sys.stdout.flush()
 
 
@@ -240,11 +240,12 @@ def read_files(
 
     Parameters
     ----------
-    filename : `list` of `str`, `str`, `pathlib.Path`
+    filenames : `list` of `str` or `pathlib.Path`, `str`, `pathlib.Path`
         Filename(s) to load. A file given more than once, by any path or symlink, is read once.
-    spectral_windows: iterable of `str` or `str`
-        Spectral windows to extract from files. Default=None, implies, extract all
-        spectral windows.
+        Tar files are extracted first. Full-disk mosaics are not read here, use `irispy.io.read_mosaic`.
+    spectral_windows : iterable of `str` or `str`, optional
+        Spectral windows to extract from the raster files; slit-jaw, AIA and SOT files have none.
+        Defaults to `None`, which extracts all spectral windows.
     uncertainty : `bool`, optional
         If `True` (not the default), will compute the uncertainty for the data (slower and
         uses more memory). If ``memmap=True``, the uncertainty is never computed.
@@ -271,8 +272,18 @@ def read_files(
 
     Returns
     -------
-    `ndcube.NDCollection`
-        Cubes keyed by band or measured quantity. Repeated names include the filename.
+    `irispy.sji.SJICube`, `irispy.sji.AIACube`, `irispy.sji.SOTCube`, `irispy.spectrograph.RasterCollection` or `ndcube.NDCollection`
+        What the files hold, if they hold one product: an `~irispy.sji.SJICube` (or AIA or SOT cube) for a slit-jaw file,
+        a `~irispy.spectrograph.RasterCollection` of the spectral windows for the raster files of one observation.
+        Several products come back in an `~ndcube.NDCollection` keyed by band or measured quantity, with the
+        filename added to repeated names.
+
+    Raises
+    ------
+    ValueError
+        If ``filenames`` holds a full-disk mosaic, or no supported IRIS file could be loaded.
+    Exception
+        Whatever reading a file raises, unless ``allow_errors=True``, which logs a warning and skips the file.
 
     Examples
     --------
@@ -294,6 +305,18 @@ def read_files(
     >>> raster = read_files(filename)
     >>> len(raster), raster["Si IV 1403"][0].shape
     (8, (187, 40, 29))
+
+    The same on the sample data, reading one spectral window of the rasters:
+
+    >>> import irispy.data.sample as sample_data  # doctest: +REMOTE_DATA
+    >>> type(read_files(sample_data.SJI_1330)).__name__  # doctest: +REMOTE_DATA
+    'SJICube'
+    >>> window = "Mg II k 2796"
+    >>> raster = read_files(
+    ...     sample_data.RASTER_FITS, spectral_windows=window
+    ... )  # doctest: +REMOTE_DATA
+    >>> list(map(str, raster.keys()))  # doctest: +REMOTE_DATA
+    ['Mg II k 2796']
     """
     if isinstance(filenames, (str, Path)):
         filenames = [filenames]

@@ -80,14 +80,13 @@ extensions = [
     "sphinx_design",
     "sphinx_gallery.gen_gallery",
     "sphinx.ext.autodoc",
-    "sphinx.ext.coverage",
     "sphinx.ext.doctest",
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
-    "sphinx.ext.todo",
     "sphinx.ext.viewcode",
     "sphinxcontrib.bibtex",
+    "sphinxext.opengraph",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -155,13 +154,6 @@ bibtex_default_style = "plain"
 # Cite as "Pereira et al. [2013]" with :cite:t: and "[Pereira et al., 2013]" with :cite:p:
 bibtex_reference_style = "author_year"
 
-# -- Options for sphinxext-opengraph ------------------------------------------
-
-ogp_image = "https://lmsal.com/images/lmsal_logo_highres_small.png"
-ogp_use_first_image = True
-ogp_description_length = 160
-ogp_custom_meta_tags = ('<meta property="og:ignore_canonical" content="true" />',)
-
 # -- Options for sphinx-copybutton ---------------------------------------------
 
 # Python Repl + continuation, Bash, ipython and qtconsole + continuation, jupyter-console + continuation
@@ -222,7 +214,7 @@ sphinx_gallery_conf = {
     "abort_on_example_error": False,
     "plot_gallery": "True",
     "remove_config_comments": True,
-    "doc_module": ("sunpy"),
+    "doc_module": ("irispy",),
     "only_warn_on_example_error": True,
     "matplotlib_animations": (True, "html5"),
     "write_computation_times": profile_gallery,
@@ -326,3 +318,13 @@ else:
 def setup(app):
     # Handles the templating for the jinja pages in our docs
     app.connect("source-read", jinja_to_rst)
+
+
+# -- Options for sphinxext-opengraph ------------------------------------------
+
+# Read the Docs supplies the canonical URL of each build; this is the fallback elsewhere
+ogp_site_url = "https://irispy.readthedocs.io/en/stable/"
+ogp_image = "https://lmsal.com/images/lmsal_logo_highres_small.png"
+ogp_use_first_image = True
+ogp_description_length = 160
+ogp_custom_meta_tags = ('<meta property="og:ignore_canonical" content="true" />',)

@@ -1,0 +1,1 @@
+The visualization tutorial and the ``plot`` docstring now show ``clip_interval=(1, 99.5) * u.percent`` and explain that the default stretch makes images with hot pixels look black.
