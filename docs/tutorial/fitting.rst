@@ -150,7 +150,9 @@ The mean leaves out masked and missing samples, and its uncertainty at each wave
 
 .. code-block:: python
 
-    >>> region = raster["Si IV 1394"][0].crop([SpectralCoord(window[0]), None], [SpectralCoord(window[1]), None])  # doctest: +REMOTE_DATA
+    >>> region = raster["Si IV 1394"].crop(  # doctest: +REMOTE_DATA
+    ...     [SpectralCoord(window[0]), None, None, None], [SpectralCoord(window[1]), None, None, None]
+    ... )
     >>> region = region.remove_cosmic_rays()  # doctest: +REMOTE_DATA
     >>> usable = np.isfinite(region.data) & ~region.mask  # doctest: +REMOTE_DATA
     >>> spectra = np.ma.masked_array(region.data, ~usable)  # doctest: +REMOTE_DATA
