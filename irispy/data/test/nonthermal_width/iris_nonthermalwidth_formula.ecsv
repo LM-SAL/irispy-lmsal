@@ -1,0 +1,39 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - {name: ion, datatype: string}
+# - {name: wavelength, unit: Angstrom, datatype: float64}
+# - {name: instrumental_fwhm, unit: Angstrom, datatype: float64}
+# - {name: log_t, datatype: float64}
+# - {name: fwhm, unit: Angstrom, datatype: float64}
+# - {name: velocity, unit: km / s, datatype: float64}
+# meta: !!omap
+# - comments:
+#   - 'iris_nonthermalwidth(element, ion, wavelength, fwhm / (2 sqrt(ln 2)) / wavelength * c, instrumental_fwhm,'
+#   - 'ti_use=log_t) (IDL 9.2, SSW 2026-09-28), with its c = 2.9979e5 km/s; velocity is -1 where fwhm is too narrow.'
+# schema: astropy-2.0
+ion wavelength instrumental_fwhm log_t fwhm velocity
+"Si IV" 1402.77 0.026 4.9 0.05 -1.0
+"Si IV" 1402.77 0.026 4.9 0.08 6.874672642034348
+"Si IV" 1402.77 0.026 4.9 0.15 17.677057868585052
+"Si IV" 1402.77 0.026 4.9 0.3 37.74141033871869
+"O IV" 1401.16 0.026 5.15 0.08 -1.0
+"O IV" 1401.16 0.026 5.15 0.12 8.93207067072623
+"O IV" 1401.16 0.026 5.15 0.2 22.415697173497467
+"O IV" 1401.16 0.026 5.15 0.3 36.441919086429316
+"C II" 1335.71 0.026 4.4 0.04 -1.0
+"C II" 1335.71 0.026 4.4 0.08 8.319905951154654
+"C II" 1335.71 0.026 4.4 0.15 19.01939338553228
+"C II" 1335.71 0.026 4.4 0.3 39.85130279475308
+"Fe XII" 1349.4 0.026 6.15 0.12 -1.0
+"Fe XII" 1349.4 0.026 6.15 0.2 16.716416428048163
+"Fe XII" 1349.4 0.026 6.15 0.3 34.198475947344946
+"Fe XII" 1349.4 0.026 6.15 0.5 63.386486964350766
+"Fe XXI" 1354.08 0.026 7.05 0.4 -1.0
+"Fe XXI" 1354.08 0.026 7.05 0.6 54.877506506023586
+"Fe XXI" 1354.08 0.026 7.05 0.9 104.72409615260304
+"Fe XXI" 1354.08 0.026 7.05 1.2 148.67740294848107
+"Mg II" 2796.35 0.053 4.15 0.06 -1.0
+"Mg II" 2796.35 0.053 4.15 0.15 8.48306912753647
+"Mg II" 2796.35 0.053 4.15 0.3 18.75570664556087
+"Mg II" 2796.35 0.053 4.15 0.5 31.859684750492477

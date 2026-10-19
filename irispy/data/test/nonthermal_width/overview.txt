@@ -1,0 +1,12 @@
+IDL references for the non_thermal_velocity tests in irispy/utils/tests/test_fitting.py.
+There is no observation here: the widths are synthetic.
+
+make_idl_references.pro (IDL 9.2, SolarSoft of 2026-09-28) writes the table; see its header
+for the setup. iris_nonthermalwidth (iris/idl/sao/util/tian) takes the observed 1/e width in
+km/s, so the script converts each FWHM with the routine's own c = 2.9979e5 km/s. It returns -1
+where the observed width is not above the instrumental and thermal widths.
+
+iris_nonthermalwidth_formula.ecsv
+        Si IV 1402.77, O IV 1401.16, C II 1335.71, Fe XII 1349.40, Fe XXI 1354.08 and
+        Mg II k 2796.35 A, four FWHM each, with irispy's INSTRUMENTAL_FWHM and the line
+        catalog's log_t_max passed as instr_fwhm and ti_use.
