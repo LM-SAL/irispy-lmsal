@@ -135,8 +135,12 @@ def test_read_mosaic_wavelength_range(mosaic_file):
 def test_read_mosaic_rejects_other_files(sns_sji_2832_file, mosaic_file):
     with pytest.raises(ValueError, match="is not an IRIS mosaic"):
         read_mosaic(sns_sji_2832_file)
-    with pytest.raises(ValueError, match="read_mosaic"):
+    with pytest.raises(ValueError, match="full-disk mosaic"):
         read_files(mosaic_file)
+    # The name pooch caches a download under.
+    cached = mosaic_file.rename(mosaic_file.with_name(f"d41d8cd98f00b204e9800998ecf8427e-{mosaic_file.name}"))
+    with pytest.raises(ValueError, match="full-disk mosaic"):
+        read_files(cached)
 
 
 def test_mosaic_to_map(mosaic_file):
