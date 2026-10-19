@@ -70,10 +70,10 @@ def find_fiducials(cube, *, min_depth=0.5):
     The fiducial marks are two short gaps in the slit, one in each half, that let no light into the
     spectrograph, so they show up as dark rows across the whole spectrum :cite:p:`depontieu2014`.
     The slit profile is the mean of the data over rasters, raster steps and wavelengths, leaving
-    out masked and non-finite values. It is divided by its running median
-    over 21 rows, and the marks are the dips in this ratio. Each dip is placed to a fraction of a
-    pixel at the center of the Gaussian through its deepest row and the rows either side, as the
-    IRIS team measures the marks (:cite:t:`depontieu2014`, Section 7.6.1).
+    out masked and non-finite values. It is divided by its running median over 21 rows, and the
+    marks are the dips in this ratio. Each dip is placed to a fraction of a pixel at the center of
+    the Gaussian through its deepest row and the rows either side, as the IRIS team measures the
+    marks (:cite:t:`depontieu2014`, Section 7.6.1).
 
     Parameters
     ----------
