@@ -177,7 +177,7 @@ def read_spectrograph_lvl2(
     """
     if isinstance(filenames, (str, Path, fits.HDUList)):
         filenames = [filenames]
-    filenames = [f if isinstance(f, fits.HDUList) else str(f) for f in filenames]
+    filenames = list(filenames)
     if len(filenames) > 1:
         # The sequence follows time whatever the order given, such as that of an unsorted glob.
         date_obs = []
