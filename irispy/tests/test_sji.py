@@ -10,7 +10,6 @@ import sunpy.map
 from sunpy.coordinates import Helioprojective
 
 from irispy.io.spectrograph import read_spectrograph_lvl2
-
 from irispy.io.utils import read_files
 from irispy.tests.helpers import figure_test
 from irispy.utils.dust import calculate_dust_mask

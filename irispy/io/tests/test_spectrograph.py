@@ -185,7 +185,9 @@ def test_read_spectrograph_lvl2_keeps_requested_window_order_and_data_and_report
     for window in requested_windows:
         assert raster_collection[window].meta.spectral_window == window
         np.testing.assert_array_equal(raster_collection[window].data, all_windows[window].data)
-    with pytest.raises(ValueError, match=r"Spectral windows \['NOPE1', 'NOPE2'\] not in file .*, which has \['C II 1336', "):
+    with pytest.raises(
+        ValueError, match=r"Spectral windows \['NOPE1', 'NOPE2'\] not in file .*, which has \['C II 1336', "
+    ):
         read_spectrograph_lvl2(filename, spectral_windows=[*requested_windows, "NOPE1", "NOPE2"])
 
 
@@ -294,11 +296,11 @@ def test_read_spectrograph_flips_v34_data_meta_and_world_coordinates(v34_raster_
         np.testing.assert_array_equal(cube.meta["auxiliary times"].jd, reference.meta["auxiliary times"][::-1].jd)
         for key in ("exposure time", "observer radial velocity", "orbital phase"):
             np.testing.assert_array_equal(cube.meta[key], reference.meta[key][::-1])
-        centre, reference_centre = cube.meta["exposure FOV center"], reference.meta["exposure FOV center"][::-1]
-        np.testing.assert_array_equal(centre.Tx, reference_centre.Tx)
-        np.testing.assert_array_equal(centre.Ty, reference_centre.Ty)
-        assert_quantity_allclose(centre.Tx.to(u.arcsec), aux[::-1, aux_header["XCENIX"]] * u.arcsec)
-        assert_quantity_allclose(centre.Ty.to(u.arcsec), aux[::-1, aux_header["YCENIX"]] * u.arcsec)
+        center, reference_center = cube.meta["exposure FOV center"], reference.meta["exposure FOV center"][::-1]
+        np.testing.assert_array_equal(center.Tx, reference_center.Tx)
+        np.testing.assert_array_equal(center.Ty, reference_center.Ty)
+        assert_quantity_allclose(center.Tx.to(u.arcsec), aux[::-1, aux_header["XCENIX"]] * u.arcsec)
+        assert_quantity_allclose(center.Ty.to(u.arcsec), aux[::-1, aux_header["YCENIX"]] * u.arcsec)
 
         for step, slit, wavelength in ((0, 50, 3), (3, 50, 10), (7, 80, 20)):
             spectral, sky, time, _ = cube.wcs.array_index_to_world(step, slit, wavelength)
@@ -309,7 +311,7 @@ def test_read_spectrograph_flips_v34_data_meta_and_world_coordinates(v34_raster_
             assert_quantity_allclose(sky.Tx.to(u.arcsec), mirrored_sky.Tx.to(u.arcsec), atol=0.01 * u.arcsec)
             assert_quantity_allclose(sky.Ty.to(u.arcsec), mirrored_sky.Ty.to(u.arcsec), atol=0.01 * u.arcsec)
             assert time.isclose(mirrored_time)
-        # Away from an exposure's centre, the sky also depends on the sign of the step column of PC.
+        # Away from an exposure's center, the sky also depends on the sign of the step column of PC.
         _, sky, _, _ = cube.wcs.pixel_to_world(10, 50, 3.3)
         _, mirrored_sky, _, _ = reference.wcs.pixel_to_world(10, 50, cube.shape[0] - 1 - 3.3)
         assert_quantity_allclose(sky.Tx.to(u.arcsec), mirrored_sky.Tx.to(u.arcsec), atol=0.01 * u.arcsec)
@@ -808,7 +810,7 @@ def test_gwcs_partial_sky_crop_sit_and_stare_uses_slit_width(tmp_path, sns_sg_fi
 @pytest.mark.parametrize("case", ["raster", "combined", "v34_flip", "v34_revert", "sit_and_stare"])
 def test_gwcs_slit_centre_matches_aux_pointing_and_fits_wcs(request, case):
     """
-    Each exposure's slit centre must be at its AUX FOV centre (XCENIX, YCENIX), and the
+    Each exposure's slit center must be at its AUX FOV center (XCENIX, YCENIX), and the
     gWCS must agree with the per-exposure FITS-TAB ``fits_wcs`` and invert back to its
     array indices.
     """
@@ -824,10 +826,10 @@ def test_gwcs_slit_centre_matches_aux_pointing_and_fits_wcs(request, case):
     if case == "v34_flip":
         aux = aux[::-1]
     n_steps, n_slit = cube.shape[:2]
-    slit_centre = header["CRPIX2"] - 1
+    slit_center = header["CRPIX2"] - 1
 
     steps = np.arange(n_steps)
-    _, sky, _, _ = cube.wcs.pixel_to_world(np.zeros(n_steps), np.full(n_steps, slit_centre), steps)
+    _, sky, _, _ = cube.wcs.pixel_to_world(np.zeros(n_steps), np.full(n_steps, slit_center), steps)
     # Measured residual is ~1e-10" for every case; 0.01" is far below the smallest real error (~0.17").
     assert_quantity_allclose(sky.Tx, aux[:, aux_header["XCENIX"]] * u.arcsec, atol=0.01 * u.arcsec)
     assert_quantity_allclose(sky.Ty, aux[:, aux_header["YCENIX"]] * u.arcsec, atol=0.01 * u.arcsec)
@@ -836,7 +838,7 @@ def test_gwcs_slit_centre_matches_aux_pointing_and_fits_wcs(request, case):
         # Along the slit, each exposure's pixels are CDELT2 apart in its own roll direction.
         steps, rows = np.meshgrid([0, n_steps // 2, n_steps - 1], [0, n_slit - 1])
         _, edge, _, _ = cube.wcs.pixel_to_world(np.zeros(steps.shape), rows, steps)
-        along_slit = header["CDELT2"] * (rows - slit_centre) * u.arcsec
+        along_slit = header["CDELT2"] * (rows - slit_center) * u.arcsec
         assert_quantity_allclose(
             edge.Tx - sky.Tx[steps], along_slit * aux[steps, aux_header["PC3_2IX"]], atol=0.001 * u.arcsec
         )
@@ -870,7 +872,7 @@ def test_sit_and_stare_pointing_does_not_ramp_between_exposures(sns_sg_file):
 @pytest.mark.parametrize("n_steps", [4, 5], ids=["even", "odd"])
 def test_sit_and_stare_slit_stays_at_the_exposure_pointing(n_steps):
     """
-    With every exposure at the same pointing, the slit centre is there for any step
+    With every exposure at the same pointing, the slit center is there for any step
     pixel, including half pixels and both edges, however dkist rounds a fractional step.
     """
     pc = np.broadcast_to(np.eye(2), (n_steps, 2, 2)) * u.pix
@@ -946,7 +948,7 @@ def test_raster_gwcs_crpix_is_zero_based():
     assert_quantity_allclose(sky.Ty.to(u.arcsec), 20 * u.arcsec)
 
 
-def test_raster_gwcs_far_edge_of_an_even_step_count_is_half_a_step_past_the_last_centre():
+def test_raster_gwcs_far_edge_of_an_even_step_count_is_half_a_step_past_the_last_center():
     pc = np.repeat(np.eye(2)[np.newaxis, :, :], 6, axis=0) * u.pix
     crval = np.repeat([[10.0, 20.0]], 6, axis=0) * u.arcsec
     wcs = _synthetic_raster_gwcs(pc, crval, np.arange(6) * u.s, CDELT2=0.5, CDELT3=2.0, CRPIX2=3.0, CRPIX3=4.0)

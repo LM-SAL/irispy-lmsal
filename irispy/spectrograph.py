@@ -141,9 +141,9 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
     @property
     def fits_wcs(self):
         """
-        The plain FITS WCS built from the window header, the WCS of a cube built on a FITS
-        WCS (such as a mosaic), or `None` when no single FITS WCS describes this cube (for
-        example a combined multi-file cube).
+        The plain FITS WCS built from the window header, the WCS of a cube built on a
+        FITS WCS (such as a mosaic), or `None` when no single FITS WCS describes this
+        cube (for example a combined multi-file cube).
         """
         root, low = self.meta.get("fits_wcs") if hasattr(self.meta, "get") else None, self.wcs.low_level_wcs
         item = [slice(None)] * low.pixel_n_dim

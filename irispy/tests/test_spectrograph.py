@@ -309,7 +309,7 @@ def test_spectrogram_cube_slice_preserves_coordinates(combined_si_iv):
     ],
     ids=["arithmetic", "to_nddata"],
 )
-def test_derived_combined_cube_keeps_raster_behaviour(combined_si_iv, raster_sg_files, derive):
+def test_derived_combined_cube_keeps_raster_behavior(combined_si_iv, raster_sg_files, derive):
     out = derive(combined_si_iv)
 
     assert type(out) is type(combined_si_iv)

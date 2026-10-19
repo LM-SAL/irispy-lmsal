@@ -82,12 +82,12 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
     * `iris_get_mg_features.pro <https://sohoftp.nascom.nasa.gov/solarsoft/iris/idl/uio/utils/iris_get_mg_features.pro>`__
     """
     if not isinstance(cube, SpectrogramCube):
-        msg = f"cube must be a SpectrogramCube, not a {type(cube).__name__}; select a window, e.g. raster['Mg II k 2796']"
+        msg = (
+            f"cube must be a SpectrogramCube, not a {type(cube).__name__}; select a window, e.g. raster['Mg II k 2796']"
+        )
         raise TypeError(msg)
     if cube.data.ndim not in (3, 4) or cube.wavelength_axis != cube.data.ndim - 1:
-        msg = (
-            "cube must have axes ([raster,] step, slit, wavelength); slice it with ranges, e.g. cube[:, 300:301]"
-        )
+        msg = "cube must have axes ([raster,] step, slit, wavelength); slice it with ranges, e.g. cube[:, 300:301]"
         raise ValueError(msg)
     check_scaled(cube)
     velocity_range = u.Quantity(velocity_range, u.km / u.s)

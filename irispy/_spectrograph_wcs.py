@@ -144,7 +144,7 @@ def _interpolate_bad_rows(tables, bad_rows, problem):
         msg = f"Every exposure has {problem} in the AUX data."
         raise ValueError(msg)
     warnings.warn(
-        f"Found {bad_rows.sum()} step(s) with {problem} in raster aux data. Interpolating from neighbouring steps.",
+        f"Found {bad_rows.sum()} step(s) with {problem} in raster aux data. Interpolating from neighboring steps.",
         UserWarning,
         stacklevel=4,
     )
@@ -162,7 +162,7 @@ def _raster_wcs_bad_row_mask(pc, crval, *, pc_only=False):
     bad_rows = np.isclose(pc_values, 0).all(axis=(1, 2))
     if not pc_only:
         # Require BOTH pc and crval to be all-zero: crval=(0,0) alone is valid for
-        # disk-centre pointings.  A truly unfilled row will have an all-zero PC matrix.
+        # disk-center pointings.  A truly unfilled row will have an all-zero PC matrix.
         bad_rows &= np.isclose(crval_values, 0).all(axis=1)
     # A non-finite entry is never usable, whatever the rest of the row holds.
     return bad_rows | ~np.isfinite(pc_values).all(axis=(1, 2)) | ~np.isfinite(crval_values).all(axis=1)
@@ -171,7 +171,7 @@ def _raster_wcs_bad_row_mask(pc, crval, *, pc_only=False):
 def _sanitize_raster_wcs_tables(pc, crval, *, pc_only=False):
     """
     Replace unusable (all-zero or non-finite) PC/crval rows, in place, by interpolating
-    from neighbouring rows.
+    from neighboring rows.
     """
     bad_rows = _raster_wcs_bad_row_mask(pc, crval, pc_only=pc_only)
     _interpolate_bad_rows((pc, crval), bad_rows, "all-zero or non-finite WCS tables")
@@ -181,7 +181,7 @@ def _sanitize_raster_wcs_tables(pc, crval, *, pc_only=False):
 def _sanitize_raster_times(start, offsets, *, fallback_to_start=False):
     """
     Return ``start + offsets``, with the times of non-finite offsets interpolated from
-    neighbouring rows.
+    neighboring rows.
 
     With ``fallback_to_start``, an all-non-finite ``offsets`` gives ``start`` with a
     warning, instead of raising.

@@ -272,7 +272,7 @@ def read_spectrograph_lvl2(
             if flip:
                 # Reversing the step axis reverses its PC column.
                 pc[:, :, 1] *= -1
-            # Every exposure, sit-and-stare included, is pointed at its own FOV centre.
+            # Every exposure, sit-and-stare included, is pointed at its own FOV center.
             crval = np.column_stack((aux_data[:, aux.header["XCENIX"]], aux_data[:, aux.header["YCENIX"]])) * u.arcsec
             # Exposure midpoints (T_OBS); NUV ones come from the source filenames.
             t_obs_fuv = t_obs_nuv = None

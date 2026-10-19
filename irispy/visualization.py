@@ -34,7 +34,7 @@ LON_AXIS_LABEL = "Helioprojective Longitude [arcsec]"
 LAT_AXIS_LABEL = "Helioprojective Latitude [arcsec]"
 # Coordinates a plot only shows when they are asked for with ``axes_coordinates``.
 HIDDEN_BY_DEFAULT = {*TIME_LABEL_PRIORITY, *SLIDER_SCAN_STEP_LABELS, *SLIDER_SCAN_LABELS}
-# The pixel axis each celestial coordinate follows, which decides the edge it is labelled on.
+# The pixel axis each celestial coordinate follows, which decides the edge it is labeled on.
 PRIMARY_PIXEL_AXES = {"spatial along slit": LAT_LABELS, "raster step": LON_LABELS}
 
 
@@ -62,10 +62,10 @@ def set_axis_properties(ax, axes_coordinates=None, slices=None):
 
     The time, raster step and raster scan coordinates are hidden unless they are in
     ``axes_coordinates``; with ``axes_coordinates``, only the requested coordinates are
-    shown. Latitude is labelled on the edge of the slit axis and longitude on the edge
-    of the raster step axis, the other one on the opposite edge, so a raster image is
-    laid out like its FITS WCS. ``slices`` are the WCSAxes slices (``"x"``, ``"y"`` or
-    an index per pixel axis, in WCS order); an animator provides its own.
+    shown. Latitude is labeled on the edge of the slit axis and longitude on the edge of
+    the raster step axis, the other one on the opposite edge, so a raster image is laid
+    out like its FITS WCS. ``slices`` are the WCSAxes slices (``"x"``, ``"y"`` or an
+    index per pixel axis, in WCS order); an animator provides its own.
     """
     pixel_axis_names = getattr(ax, "_iris_pixel_axis_names", None)
     if hasattr(ax, "axes") and not hasattr(ax, "coords"):
