@@ -146,21 +146,36 @@ def test_density_diagnostic_error_bar_off_the_curve_gives_its_end():
     )
 
 
-@pytest.mark.parametrize("wavelength", [1401.15, 1401.155])
-def test_density_diagnostic_rejects_wavelength_near_two_transitions(wavelength):
-    # CHIANTI's O IV 1401.149 Å line is over 1e5 times weaker than its 1401.163 Å line
-    transitions = types.SimpleNamespace(
-        wavelength=[1399.776, 1401.163, 1401.149] * u.AA, is_bound_bound=np.array([True, True, True])
+def test_density_diagnostic_adds_transitions_within_0_02_angstrom():
+    # CHIANTI's O IV 1401.149 and 1401.163 Å transitions both lie within 0.02 Å of the catalog's 1401.157 Å
+    ion = types.SimpleNamespace(
+        transitions=types.SimpleNamespace(
+            wavelength=[1399.776, 1401.163, 1401.149] * u.AA, is_bound_bound=np.array([True, True, True])
+        ),
+        contribution_function=lambda _density: [[1.0, 0.3, 0.1], [1.0, 0.6, 0.2]] * u.erg * u.cm**3 / u.s,
     )
 
-    with pytest.raises(ValueError, match=r"within 0\.02 Å of the transitions at 1401\.149, 1401\.163 Å"):
+    result = density_diagnostic(
+        0.6,
+        1.0,
+        [1e10, 1e11] * u.cm**-3,
+        ion=ion,
+        numerator=1401.157 * u.angstrom,
+        denominator=1399.776 * u.angstrom,
+    )
+
+    np.testing.assert_allclose(result["theoretical_ratio"].value, [0.3 + 0.1, 0.6 + 0.2])
+
+
+def test_density_diagnostic_rejects_wavelength_without_transition():
+    with pytest.raises(ValueError, match=r"No transition .* within 0\.02 Å .* nearest are at 1399\.776, 1401\.163 Å"):
         density_diagnostic(
             1.0,
             1.0,
             [1e10, 1e11] * u.cm**-3,
-            ion=types.SimpleNamespace(transitions=transitions),
-            numerator=1399.776 * u.angstrom,
-            denominator=wavelength * u.angstrom,
+            ion=_fake_ion([0.5, 1.0]),
+            numerator=1404.806 * u.angstrom,
+            denominator=1401.163 * u.angstrom,
         )
 
 
@@ -180,12 +195,13 @@ def test_density_diagnostic_oiv_curve_from_fiasco():
         np.logspace(9, 12, 7) * u.cm**-3,
         ion=ion,
         numerator=1399.776 * u.angstrom,
-        denominator=1401.163 * u.angstrom,
+        denominator=1401.157 * u.angstrom,
         line_ratio_kwargs={"use_two_ion_model": False},
     )
 
-    # fiasco.line_ratio of fiasco 0.9.dev4 with this database; fiasco 0.8.2 gives up to 0.006% less
-    expected = [0.1720966712, 0.1803760573, 0.2014207069, 0.2462971264, 0.3144246782, 0.3746880696, 0.4064822117]
+    # fiasco.line_ratio of fiasco 0.9.dev4 with this database and the 1401.149 and 1401.163 Å transitions;
+    # fiasco 0.8.2 gives up to 0.006% less
+    expected = [0.1720960770, 0.1803754352, 0.2014199870, 0.2462960737, 0.3144225710, 0.3746827316, 0.4064668318]
     np.testing.assert_allclose(result["theoretical_ratio"].value, expected, rtol=1e-4)
 
 

@@ -94,20 +94,21 @@ def map_ratio_to_quantity(observed_ratio, quantity, theoretical_ratio, *, bounds
     )
 
 
-def _transition_index(transitions, wavelength):
+def _transition_indices(transitions, wavelength):
     """
-    Index of the bound-bound transition nearest ``wavelength``.
+    Indices of the bound-bound transitions within 0.02 Å of ``wavelength``.
     """
     wavelengths = transitions.wavelength[transitions.is_bound_bound]
     distance = np.abs(wavelengths - wavelength).to_value(u.AA)
     # The IRIS line catalog and CHIANTI differ by up to 0.006 Å for O IV 1401 and the literature rounds
-    # IRIS lines to 0.01 Å, so a wavelength cannot tell apart transitions within 0.02 Å of it
-    candidates = np.flatnonzero(distance <= 0.02)
-    if candidates.size > 1 and not np.isclose(distance.min(), 0):
-        lines = ", ".join(f"{value:.3f}" for value in np.sort(wavelengths[candidates].to_value(u.AA)))
-        msg = f"{wavelength} is within 0.02 Å of the transitions at {lines} Å. Pass one of these wavelengths."
+    # IRIS lines to 0.01 Å, so a wavelength cannot tell apart transitions within 0.02 Å of it; they blend
+    # into the observed line, as O IV 1401.149 and 1401.163 Å do
+    indices = np.flatnonzero(distance <= 0.02)
+    if indices.size == 0:
+        lines = ", ".join(f"{value:.3f}" for value in np.sort(wavelengths[np.argsort(distance)[:3]].to_value(u.AA)))
+        msg = f"No transition of the ion lies within 0.02 Å of {wavelength}. The nearest are at {lines} Å."
         raise ValueError(msg)
-    return np.argmin(distance)
+    return indices
 
 
 def density_diagnostic(
@@ -137,10 +138,9 @@ def density_diagnostic(
     ion : `fiasco.Ion`
         Ion used to compute the theoretical ratio curve.
     numerator, denominator : `~astropy.units.Quantity`
-        Required wavelengths of the numerator and denominator transitions.
-        Each selects the nearest bound-bound transition of ``ion``. A wavelength
-        within 0.02 Å of more than one transition raises a `ValueError` unless it
-        is the CHIANTI wavelength of one of them.
+        Required wavelengths of the numerator and denominator lines. The lines
+        of ``ion`` within 0.02 Å of each wavelength are added together, and a
+        wavelength with no line of ``ion`` within 0.02 Å raises a `ValueError`.
     intensity_numerator_uncertainty, intensity_denominator_uncertainty :
         array-like or `~astropy.units.Quantity`, optional
         Uncertainties on the measured integrated intensities. They give the
@@ -214,10 +214,10 @@ def density_diagnostic(
             raise ValueError(msg) from exc
         ratio_uncertainty = u.Quantity(ratio_uncertainty, ratio.unit)
 
-    numerator_index = _transition_index(ion.transitions, numerator)
-    denominator_index = _transition_index(ion.transitions, denominator)
+    numerator_indices = _transition_indices(ion.transitions, numerator)
+    denominator_indices = _transition_indices(ion.transitions, denominator)
     contribution = ion.contribution_function(density_grid, **line_ratio_kwargs)
-    theoretical_ratio = contribution[..., numerator_index] / contribution[..., denominator_index]
+    theoretical_ratio = contribution[..., numerator_indices].sum(-1) / contribution[..., denominator_indices].sum(-1)
     theoretical_ratio = u.Quantity(theoretical_ratio, u.dimensionless_unscaled).squeeze()
     if theoretical_ratio.ndim > 1:
         ion_temperature = u.Quantity(ion.temperature)
