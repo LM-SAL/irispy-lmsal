@@ -1,0 +1,1 @@
+``irispy.data.test.get_test_filepath`` no longer takes ``package`` or other keyword arguments, and raises ``FileNotFoundError`` for a file that is not in the packaged test data instead of trying to download it.
