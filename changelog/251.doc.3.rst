@@ -1,1 +1,1 @@
-The API reference now has pages for ``irispy.obsid`` and ``irispy.data.sample``, and no longer lists ``_fit_xput_lite`` or the undocumented ``reshape_1d_wavelength_dimensions_for_broadcast``.
+The API reference now has pages for ``irispy.obsid``, ``irispy.visualization`` and ``irispy.data.sample``, and no longer lists ``_fit_xput_lite``.

@@ -17,7 +17,6 @@ from irispy.utils.utils import _saturated_samples
 
 __all__ = [
     "calculate_dn_to_radiance_factor",
-    "convert_photons_per_sec_to_radiance",
     "radiation_temperature",
     "radiometric_calibration",
     "subtract_background",
@@ -54,7 +53,7 @@ def radiometric_calibration(
     Returns
     -------
     `irispy.spectrograph.SpectrogramCube`, `irispy.spectrograph.SpectrogramCubeSequence` or `irispy.sji.SJICube`
-        New cube in new units.
+        New cube in new units, with the data type of ``cube``.
 
     Raises
     ------
@@ -88,33 +87,23 @@ def radiometric_calibration(
     if line is not None:
         msg = "line is for slit-jaw cubes; spectra are calibrated at each of their wavelengths"
         raise ValueError(msg)
-    detector_type = cube.meta.detector_band
-    spectral_dispersion_per_pixel = cube.spectral_dispersion
-    solid_angle = cube.solid_angle
-    # Get wavelength for each pixel.
-    wavelength_axis_index = cube.wavelength_axis
-    wavelength = cube.axis_world_coords(wavelength_axis_index)[0]
-    time_obs = cube.meta.date_reference
-    iris_response = get_latest_response(time_obs)
-    exp_corrected_cube = cube.apply_exposure_time_correction()
-    # Convert to radiance units.
-    data_quantities = (exp_corrected_cube.data * exp_corrected_cube.unit.to(u.photon / u.s) * (u.photon / u.s),)
-    if exp_corrected_cube.uncertainty is not None:
-        uncertainty = (
-            exp_corrected_cube.uncertainty.array * exp_corrected_cube.unit.to(u.photon / u.s) * (u.photon / u.s)
-        )
-        data_quantities += (uncertainty,)
-    new_data_quantities = convert_photons_per_sec_to_radiance(
-        data_quantities=data_quantities,
-        iris_response=iris_response,
-        wavelength=wavelength,
-        detector_type=detector_type,
-        spectral_dispersion_per_pixel=spectral_dispersion_per_pixel,
-        solid_angle=solid_angle,
+    factor = calculate_dn_to_radiance_factor(
+        iris_response=get_latest_response(cube.meta.date_reference),
+        wavelength=cube.axis_world_coords(cube.wavelength_axis)[0],
+        detector_type=cube.meta.detector_band,
+        spectral_dispersion_per_pixel=cube.spectral_dispersion,
+        solid_angle=cube.solid_angle,
     )
-    new_data = new_data_quantities[0].value
-    new_uncertainty = StdDevUncertainty(new_data_quantities[1].value) if len(new_data_quantities) > 1 else None
-    return make_map_cube(cube, new_data, new_data_quantities[0].unit, uncertainty=new_uncertainty)
+    factor = _sample_factor(cube, factor, RADIANCE_UNIT)
+    uncertainty = None if cube.uncertainty is None else StdDevUncertainty(cube.uncertainty.array * factor)
+    return make_map_cube(cube, cube.data * factor, RADIANCE_UNIT, uncertainty=uncertainty)
+
+
+def _sample_factor(cube, factor, unit):
+    # Turns factor, from photons per second to unit, into one per sample of cube in its data type.
+    # The exposures lie along the first axis: raster step or time.
+    exposure_time = cube.exposure_time.to_value(u.s).reshape(-1, *[1] * (cube.data.ndim - 1))
+    return ((cube.unit / u.s * factor).to_value(unit) / exposure_time).astype(cube.data.dtype)
 
 
 def _calibrate_sji(cube, line):
@@ -141,7 +130,7 @@ def _calibrate_sji(cube, line):
         unit = RADIANCE_UNIT * u.AA
     solid_angle = cube.meta["CDELT1"] * cube.meta["CDELT2"] * u.arcsec**2
     # The cube's unit, DN_IRIS_SJI_<passband>, holds the passband's photons per DN, those of DN2PHOT_SJI
-    return (cube.apply_exposure_time_correction() * (per_photon / u.photon / solid_angle)).to(unit)
+    return cube * u.Quantity(_sample_factor(cube, per_photon / u.photon / solid_angle, unit), unit / cube.unit)
 
 
 def radiation_temperature(
@@ -188,9 +177,7 @@ def radiation_temperature(
     if isinstance(cube, SpectrogramCubeSequence):
         return SpectrogramCubeSequence([radiation_temperature(c) for c in cube])
     check_scaled(cube)
-    wavelength = reshape_1d_wavelength_dimensions_for_broadcast(
-        cube.axis_world_coords(cube.wavelength_axis)[0], cube.data.ndim
-    )
+    wavelength = cube.axis_world_coords(cube.wavelength_axis)[0]
     try:
         to_radiance = cube.unit.to(RADIANCE_UNIT_PER_HZ, equivalencies=u.spectral_density(wavelength))
     except u.UnitConversionError:
@@ -214,72 +201,6 @@ def radiation_temperature(
     return make_map_cube(cube, temperature, u.K, mask_invalid=True, uncertainty=uncertainty)
 
 
-def convert_photons_per_sec_to_radiance(
-    *,
-    data_quantities,
-    iris_response,
-    wavelength,
-    detector_type,
-    spectral_dispersion_per_pixel,
-    solid_angle,
-):
-    """
-    Converts data quantities from counts/s to radiance.
-
-    Parameters
-    ----------
-    data_quantities: iterable of `astropy.units.Quantity`
-        Quantities to be converted.  Must have units of counts/s or
-        radiance equivalent counts, e.g. erg / cm**2 / s / sr / Angstrom.
-    iris_response: dict
-        The IRIS response data loaded from `irispy.utils.response.get_latest_response`.
-    wavelength: `astropy.units.Quantity`
-        Wavelength at each element along spectral axis of data quantities.
-    detector_type: `str`
-        Detector type: 'FUV', 'NUV', or 'SJI'.
-    spectral_dispersion_per_pixel: scalar `astropy.units.Quantity`
-        Spectral dispersion (wavelength width) of a pixel.
-    solid_angle: scalar `astropy.units.Quantity`
-        Solid angle corresponding to a pixel.
-
-    Returns
-    -------
-    `list` of `astropy.units.Quantity`
-        Data quantities converted to radiance.
-
-    Notes
-    -----
-    This is designed to do the same as `nrl/iris_calib.pro <https://hesperia.gsfc.nasa.gov/ssw/iris/idl/nrl/iris_calib.pro>`__ IDL code.
-    The difference is that this function takes into account the spectral dispersion which the IDL code
-    does not.
-    To get the same results as the IDL code, you can multiply the output by the spectral dispersion
-    or set the keyword to have the value of 1 Angstrom.
-    """
-    for i, data in enumerate(data_quantities):
-        if data.unit != u.photon / u.s:
-            msg = (
-                f"Invalid unit provided. Unit must be equivalent to {u.photon / u.s}. "
-                f"Error found for {i}th element of ``data_quantities`` with unit: {data.unit}"
-            )
-            raise ValueError(
-                msg,
-            )
-    photons_per_sec_to_radiance_factor = calculate_dn_to_radiance_factor(
-        iris_response=iris_response,
-        wavelength=wavelength,
-        detector_type=detector_type,
-        spectral_dispersion_per_pixel=spectral_dispersion_per_pixel,
-        solid_angle=solid_angle,
-    )
-    # Change shape of arrays so they are compatible for broadcasting
-    # with data and uncertainty arrays.
-    photons_per_sec_to_radiance_factor = reshape_1d_wavelength_dimensions_for_broadcast(
-        photons_per_sec_to_radiance_factor,
-        data_quantities[0].ndim,
-    )
-    return [(data * photons_per_sec_to_radiance_factor).to(RADIANCE_UNIT) for data in data_quantities]
-
-
 def calculate_dn_to_radiance_factor(
     *,
     iris_response,
@@ -289,15 +210,17 @@ def calculate_dn_to_radiance_factor(
     solid_angle,
 ):
     """
-    Calculates multiplicative factor that converts counts/s to radiance for given
+    Calculates the factor that multiplies photons/s to give radiance at the given
     wavelengths.
+
+    ``cube.unit.to(u.photon)`` gives the photons per DN of a Level 2 spectrograph cube.
 
     Parameters
     ----------
     iris_response: dict
         The IRIS response data loaded from `irispy.utils.response.get_latest_response`.
     wavelength: `astropy.units.Quantity`
-        Wavelengths for which counts/s-to-radiance factor is to be calculated
+        Wavelengths for which the factor is to be calculated.
     detector_type: `str`
         Detector type: 'FUV' or 'NUV'.
     spectral_dispersion_per_pixel: scalar `astropy.units.Quantity`
@@ -308,15 +231,8 @@ def calculate_dn_to_radiance_factor(
     Returns
     -------
     `astropy.units.Quantity`
-        Multiplicative conversion factor from counts/s to radiance units
-        for input wavelengths.
-
-    Notes
-    -----
-    The term "multiplicative" refers to the fact that the conversion factor calculated by the
-    `.calculate_dn_to_radiance_factor` function is used to multiply the counts per
-    second (cps) data to obtain the radiance data. In other words, the conversion factor is a
-    scaling factor that is applied to the cps data to convert it to radiance units.
+        Factor from photons/s to radiance at each wavelength, NaN outside the
+        spectral ranges of the response.
     """
     # Get effective area and interpolate to observed wavelength grid.
     eff_area_interp = get_interpolated_effective_area(
@@ -334,19 +250,6 @@ def calculate_dn_to_radiance_factor(
         / eff_area_interp
         / solid_angle
     )
-
-
-def reshape_1d_wavelength_dimensions_for_broadcast(wavelength, n_data_dim):
-    if n_data_dim == 1:
-        pass
-    elif n_data_dim == 2:
-        wavelength = wavelength[np.newaxis, :]
-    elif n_data_dim == 3:
-        wavelength = wavelength[np.newaxis, np.newaxis, :]
-    else:
-        msg = "IRISSpectrogram dimensions must be 2 or 3."
-        raise ValueError(msg)
-    return wavelength
 
 
 def subtract_background(cube, windows, *, degree=1):
