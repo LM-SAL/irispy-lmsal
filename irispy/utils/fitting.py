@@ -118,7 +118,7 @@ def line_model(lines):
     of 0.05 Å. Mg II k and h get two Gaussians each, for the blue and red emission peaks (k2v
     and k2r, or h2v and h2r) as in the Gaussian decomposition of :cite:t:`itn39`. These start
     0.15 Å either side of the rest wavelength, and their means stay within 40 km/s of it, the
-    search range of :cite:t:`leenaarts2013`. They are a proxy for the peaks, which
+    search range of :cite:t:`leenaarts2013`, and their amplitudes stay positive. They are a proxy for the peaks, which
     :cite:t:`itn39` warns are hard to recover in complex profiles, such as those of flare ribbons.
 
     Pass the wavelengths to the fitter in Å; see :ref:`irispy-tutorial-fitting`.
@@ -132,7 +132,11 @@ def line_model(lines):
         limits = rest * (1 + [-40, 40] * u.km / u.s / _SPEED_OF_LIGHT)
         for peak, offset in (("2v", -0.15), ("2r", 0.15)):
             model += models.Gaussian1D(
-                1, rest + offset * u.AA, 0.05 * u.AA, name=line[-1] + peak, bounds={"mean": limits}
+                1,
+                rest + offset * u.AA,
+                0.05 * u.AA,
+                name=line[-1] + peak,
+                bounds={"mean": limits, "amplitude": (0, None)},
             )
     return model
 
@@ -175,7 +179,8 @@ def starts_from_model(model, cube):
     others are clipped to their bounds. Masked and non-finite samples are left out of the starts.
     A line with no samples left within two widths, or none above the background (below it for a
     negative amplitude), keeps the center and amplitude of ``model``, and a spectrum with no
-    samples at all gets a NaN background.
+    samples at all gets a NaN background. A line centered outside the wavelengths of ``cube``
+    raises a `ValueError`.
     """
     check_scaled(cube)
     if any(np.ndim(getattr(model, name).value) for name in model.param_names):
@@ -206,6 +211,12 @@ def starts_from_model(model, cube):
     centers = [
         fitted(leaf_names[1], u.AA) for leaf, leaf_names in zip(leaves, names, strict=True) if isinstance(leaf, lines)
     ]
+    if outside := [center for center in centers if not wavelength.min() <= center <= wavelength.max()]:
+        msg = (
+            f"model has lines at {', '.join(f'{center:.2f}' for center in outside)} Å, outside the cube's "
+            f"{wavelength.min():.2f}-{wavelength.max():.2f} Å; leave them out of the model or crop the cube to them."
+        )
+        raise ValueError(msg)
     shape = np.zeros_like(wavelength)  # The started background less its value at the middle of the wavelengths.
     constants = {}  # The constant term of each background, and the rest of it at the middle of the wavelengths.
     for leaf, leaf_names in zip(leaves, names, strict=True):
@@ -238,7 +249,7 @@ def starts_from_model(model, cube):
             sign = np.sign(getattr(model, amplitude).value) or 1  # Negative for an absorption line.
             distance = np.abs(wavelength - fitted(center, u.AA))
             # In a blend, each line searches only the samples nearer its own center than any other's.
-            near = (distance <= 2 * fitted(width, u.AA)) & np.all(
+            near = (distance <= 2 * abs(fitted(width, u.AA))) & np.all(
                 [distance <= np.abs(wavelength - other) for other in centers], axis=0
             )
             excess = np.where(near & ~np.isnan(spectra), sign * (spectra - level), -np.inf)
