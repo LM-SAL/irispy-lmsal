@@ -2,6 +2,8 @@
 Classify the files supplied with IRIS observations from their primary header.
 """
 
+import os
+
 __all__ = []
 
 
@@ -39,8 +41,8 @@ def _check_level2(file, header, product=None):
 
     Parameters
     ----------
-    file : `str` or `pathlib.Path`
-        The file, named in the error.
+    file : `str`, `pathlib.Path` or `object`
+        What was read, named in the error: a path as given, anything else by its type.
     header : `astropy.io.fits.Header` or `None`
         Its primary header; `None` for a file that is not FITS.
     product : `str`, optional
@@ -49,6 +51,7 @@ def _check_level2(file, header, product=None):
     found, level = _classify(header) if header is not None else (None, None)
     if found is None or level != 2 or product not in (None, found):
         expected = f"{product} file" if product else "file"
-        msg = f"{file} is not an IRIS level 2 {expected}"
+        name = file if isinstance(file, (str, os.PathLike)) else f"The data given ({type(file).__name__})"
+        msg = f"{name} is not an IRIS level 2 {expected}"
         raise ValueError(msg)
     return found
