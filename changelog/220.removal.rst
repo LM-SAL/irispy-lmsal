@@ -1,2 +1,2 @@
 Removed ``irispy.utils.gaussian1d_on_linear_bg``, whose ``standard_deviation`` was √2 times the Gaussian standard deviation.
-Use `irispy.utils.fitting.profiles_on_background` with ``background="linear"`` instead.
+Use ``irispy.utils.fitting.line_model``, or an astropy ``Linear1D`` plus ``Gaussian1D`` model, with ``irispy.utils.fitting.starts_from_model`` instead.

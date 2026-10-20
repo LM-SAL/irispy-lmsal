@@ -4,7 +4,7 @@ Fit Spectral Models to Spectra - Double Gaussian Fitting
 ========================================================
 
 In this example, we are going to fit the Mg II k line core from IRIS raster data with a double
-Gaussian model, starting from `~irispy.utils.fitting.mg_ii_model`. Then we will use the fitted
+Gaussian model, starting from `~irispy.utils.fitting.line_model`. Then we will use the fitted
 values to make maps of the total flux, the blue-red flux asymmetry and the separation of the two
 components.
 
@@ -27,7 +27,7 @@ from sunpy.coordinates.frames import Helioprojective
 
 from irispy.io import read_files
 from irispy.spectrograph import SpectrogramCube
-from irispy.utils.fitting import FitQualityFlag, maps_from_fit, mg_ii_model
+from irispy.utils.fitting import FitQualityFlag, line_model, maps_from_fit, starts_from_model
 from irispy.utils.lines import get_lines
 
 ###############################################################################
@@ -76,17 +76,18 @@ ny, nx = (n // 2 * 2 for n in mg_ii_k.data.shape[:2])
 mg_ii_k = mg_ii_k[:ny, :nx].rebin((2, 2, 1), propagate_uncertainties=True)
 
 ###############################################################################
-# `~irispy.utils.fitting.mg_ii_model` starts one Gaussian at the k2v peak and one
-# at the k2r peak of every spectrum, where `~irispy.utils.mg_features.calculate_mg_features`
-# finds them, on a constant background. We fit it to every spectrum with
+# `~irispy.utils.fitting.line_model` puts one Gaussian 0.15 Å blue of the Mg II k rest
+# wavelength, for the k2v peak, and one 0.15 Å red of it, for the k2r peak, on a constant
+# background. `~irispy.utils.fitting.starts_from_model` starts each Gaussian in every
+# spectrum at its own peak. We fit the model to every spectrum with
 # `~astropy.modeling.fitting.parallel_fit_dask`, passing the wavelengths in Å and
 # giving the masked samples no weight.
 
-model = mg_ii_model(mg_ii_k)
+model = starts_from_model(line_model(["Mg II k"]), mg_ii_k)
 wavelength = mg_ii_k.axis_world_coords("em.wl")[0].to(u.AA)
 good = np.isfinite(mg_ii_k.data) & ~mg_ii_k.mask
 fitter = TRFLSQFitter()
-mg_ii_model_fit = parallel_fit_dask(
+mg_ii_fit = parallel_fit_dask(
     model=model,
     fitter=fitter,
     data=np.where(good, mg_ii_k.data, 0),
@@ -106,7 +107,7 @@ step, slit = (n // 2 for n in model.mean_1.shape)
 plt.figure()
 ax = mg_ii_k[step, slit].plot(label="Spectrum")
 ax.plot(model(wavelength[:, np.newaxis, np.newaxis])[:, step, slit], label="Starting model")
-ax.plot(mg_ii_model_fit(wavelength[:, np.newaxis, np.newaxis])[:, step, slit], linestyle="--", label="Fitted model")
+ax.plot(mg_ii_fit(wavelength[:, np.newaxis, np.newaxis])[:, step, slit], linestyle="--", label="Fitted model")
 ax.set_title("Mg II k profile")
 plt.legend()
 
@@ -124,7 +125,7 @@ line_core = mg_ii_k.crop([SpectralCoord(mg_ii_core), None], [SpectralCoord(mg_ii
 
 # `~irispy.utils.fitting.maps_from_fit` gives each component's integrated intensity and
 # Doppler velocity as maps, against the Mg II k rest wavelength.
-maps = maps_from_fit(mg_ii_model_fit, mg_ii_k, fitter=fitter)
+maps = maps_from_fit(mg_ii_fit, mg_ii_k, fitter=fitter)
 fluxes = maps["integrated_intensity_1"].data, maps["integrated_intensity_2"].data
 velocities = maps["velocity_1"].data, maps["velocity_2"].data
 # The two Gaussians can swap during the fit, so the blue one is the one at the lower velocity.

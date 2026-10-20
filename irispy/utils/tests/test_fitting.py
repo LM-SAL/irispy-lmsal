@@ -1,5 +1,3 @@
-import copy
-
 import numpy as np
 import pytest
 
@@ -16,16 +14,7 @@ from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.spectrograph import SpectrogramCube
 from irispy.tests.helpers import make_test_spectrogram_cube
 from irispy.utils.constants import ATOMIC_MASS, INSTRUMENTAL_FWHM
-from irispy.utils.fitting import (
-    FitQualityFlag,
-    NonThermalQualityFlag,
-    maps_from_fit,
-    mg_ii_model,
-    non_thermal_velocity,
-    profiles_on_background,
-    si_iv_1403_model,
-    starts_from_model,
-)
+from irispy.utils.fitting import FitQualityFlag, line_model, maps_from_fit, non_thermal_velocity, starts_from_model
 
 SHAPE = (20, 20)
 WAVELENGTH = (1402.0 + 0.026 * np.arange(60)) * u.AA
@@ -86,131 +75,59 @@ def _assert_within_bounds(fitted, model):
         assert upper is None or np.all(values <= upper), name
 
 
-@pytest.mark.parametrize("profile", ["gaussian", "lorentzian"])
-@pytest.mark.parametrize("background", ["constant", "linear"])
-def test_profiles_on_background_recovers_parameters(profile, background):
-    rng = np.random.default_rng(42)
-    centers = np.stack([1402.70 + rng.normal(0, 0.01, SHAPE), 1402.88 + rng.normal(0, 0.01, SHAPE)]) * u.AA
-    amplitudes = rng.uniform(80, 150, (2, *SHAPE)) * u.ct
-    widths = rng.uniform(0.03, 0.05, (2, *SHAPE)) * u.AA
-    level = np.full(SHAPE, 5.0) * u.ct
-    truth = profiles_on_background(
-        centers, amplitudes=amplitudes, widths=widths, background=background, background_level=level, profile=profile
-    )
-    data, sigma = _observe(truth, rng)
-    start = profiles_on_background(
-        centers + 0.01 * u.AA,
-        amplitudes=0.8 * amplitudes,
-        widths=1.2 * widths,
-        background=background,
-        background_level=0.6 * level,
-        profile=profile,
-    )
-    fitted, fitter = _fit(start, data, sigma)
-    _assert_recovered(fitted, truth, _errors(fitter), data, sigma)
-
-
-def test_profiles_on_background_array_starts_broadcast():
-    rng = np.random.default_rng(0)
-    centers = (1402.77 + rng.normal(0, 0.02, SHAPE)) * u.AA
-    truth = profiles_on_background(
-        centers[np.newaxis], amplitudes=[100] * u.ct, widths=[0.04] * u.AA, background_level=2 * u.ct
-    )
-    assert truth.mean_1.shape == SHAPE
-    assert truth.amplitude_1.shape == ()
-    data, sigma = _observe(truth, rng)
-    # Scalar starts mixed with per-spectrum centers.
-    start = profiles_on_background(
-        centers[np.newaxis] + 0.01 * u.AA, amplitudes=[80] * u.ct, widths=[0.05] * u.AA, background_level=1 * u.ct
-    )
-    fitted, _ = _fit(start, data, sigma)
-    assert fitted.mean_1.shape == SHAPE
-    assert fitted.amplitude_1.shape == SHAPE
-    np.testing.assert_allclose(fitted.mean_1.quantity.to_value(u.AA), centers.to_value(u.AA), atol=0.01)
-
-
-def test_profiles_on_background_bounds_hold():
-    rng = np.random.default_rng(1)
-    truth = profiles_on_background(
-        [1402.77] * u.AA, amplitudes=[100] * u.ct, widths=[0.04] * u.AA, background_level=np.full(SHAPE, 2.0) * u.ct
-    )
-    data, sigma = _observe(truth, rng)
-    # Bounds in another unit than the centers are converted to it.
-    bounds = {"mean_1": (140.26, 140.27) * u.nm, "amplitude_1": (0, 50) * u.ct, "amplitude_0": (None, 1 * u.ct)}
-    start = profiles_on_background([1402.65] * u.AA, amplitudes=[40] * u.ct, widths=[0.04] * u.AA, bounds=bounds)
-    np.testing.assert_allclose(start.mean_1.bounds, (1402.6, 1402.7))
-    assert start.stddev_1.bounds[0] > 0
-    fitted, _ = _fit(start, data, sigma)
-    _assert_within_bounds(fitted, start)
-    # The true center lies outside the bounds, so most fits stop on the nearer one.
-    np.testing.assert_allclose(np.median(fitted.mean_1.value), 1402.7)
-
-
-@pytest.mark.parametrize(("keyword", "value"), [("profile", "voigt"), ("background", "quadratic")])
-def test_profiles_on_background_rejects_unknown_options(keyword, value):
-    with pytest.raises(ValueError, match=keyword):
-        profiles_on_background([1402.77] * u.AA, **{keyword: value})
-
-
 def _cube(truth, wavelength, rng):
     data, sigma = _observe(truth, rng, wavelength, u.DN)
     return make_test_spectrogram_cube(data, wavelength, uncertainty=StdDevUncertainty(sigma))
 
 
-@pytest.mark.parametrize("profile", ["gaussian", "lorentzian"])
-def test_si_iv_1403_model_recovers_parameters(profile):
-    rng = np.random.default_rng(7)
-    truth = profiles_on_background(
-        (1402.77 + rng.normal(0, 0.02, SHAPE))[np.newaxis] * u.AA,
-        amplitudes=rng.uniform(100, 300, (1, *SHAPE)) * u.DN,
-        widths=rng.uniform(0.05, 0.09, (1, *SHAPE)) * u.AA,
-        background_level=5 * u.DN,
-        profile=profile,
-    )
-    cube = _cube(truth, WAVELENGTH, rng)
-    model = si_iv_1403_model(cube, profile=profile)
-    assert model.param_names == truth.param_names
-    assert model(WAVELENGTH[:, np.newaxis, np.newaxis]).unit == u.DN
-    assert all(getattr(model, name).shape == SHAPE for name in model.param_names)
+def _si_iv_cube(rng, profile=models.Gaussian1D):
+    center = (1402.77 + rng.normal(0, 0.02, SHAPE)) * u.AA
+    amplitude = rng.uniform(100, 300, SHAPE) * u.DN
+    width = rng.uniform(0.05, 0.09, SHAPE) * u.AA
+    truth = models.Const1D(5 * u.DN) + profile(amplitude, center, width)
+    return truth, _cube(truth, WAVELENGTH, rng)
+
+
+def test_line_model():
+    model = line_model(["Si IV 1394", "C II 1336", "Mg II k", "Mg II h"])
+    assert model.submodel_names == ("background", "Si IV 1394", "C II 1336", "k2v", "k2r", "h2v", "h2r")
+    k, h = 2796.352, 2803.53
+    means = [1393.76, 1335.7079, k - 0.15, k + 0.15, h - 0.15, h + 0.15]
+    np.testing.assert_allclose([getattr(model, f"mean_{index}").value for index in range(1, 7)], means)
+    for index in range(1, 7):
+        assert getattr(model, f"mean_{index}").unit == u.AA
+        assert getattr(model, f"stddev_{index}").quantity == 0.05 * u.AA
+    assert model.bounds["mean_1"] == model.bounds["mean_2"] == (None, None)
+    for index, rest in ((3, k), (4, k), (5, h), (6, h)):
+        np.testing.assert_allclose(model.bounds[f"mean_{index}"], rest * (1 + np.array([-40, 40]) / C_KMS))
+
+
+@pytest.mark.parametrize("line", ["Si IV", "Si IV 1500", "Xx IV 1403"])
+def test_line_model_rejects_unknown_lines(line):
+    with pytest.raises(ValueError, match="No documented line"):
+        line_model([line])
+
+
+def test_line_model_recovers_si_iv():
+    truth, cube = _si_iv_cube(np.random.default_rng(7))
+    model = starts_from_model(line_model(["Si IV 1403"]), cube)
     fitted, fitter = _fit(model, cube.data, cube.uncertainty.array, unit=cube.unit)
     _assert_recovered(fitted, truth, _errors(fitter), cube.data, cube.uncertainty.array, max_local_minima=0.01)
-    _assert_within_bounds(fitted, model)
 
 
-def test_si_iv_1403_model_ignores_clipped_samples():
-    rng = np.random.default_rng(7)
-    truth = profiles_on_background(
-        (1402.77 + rng.normal(0, 0.02, SHAPE))[np.newaxis] * u.AA,
-        amplitudes=rng.uniform(100, 300, (1, *SHAPE)) * u.DN,
-        widths=rng.uniform(0.05, 0.09, (1, *SHAPE)) * u.AA,
-        background_level=5 * u.DN,
-    )
-    clipped = _cube(truth, WAVELENGTH, rng)
-    masked = copy.deepcopy(clipped)
-    clipped.data[3, 4, 30] = np.inf  # left out, like a masked sample
-    masked.mask = np.zeros(masked.data.shape, dtype=bool)
-    masked.mask[3, 4, 30] = True
-    for name in truth.param_names:
-        np.testing.assert_array_equal(
-            getattr(si_iv_1403_model(clipped), name).value, getattr(si_iv_1403_model(masked), name).value, err_msg=name
-        )
-
-
-def test_mg_ii_model_recovers_parameters():
+def test_line_model_recovers_mg_ii_peaks():
     rng = np.random.default_rng(8)
     wavelength = (2795.5 + 0.0254 * np.arange(70)) * u.AA
     # The k2v and k2r peaks 32 km/s apart, as observed in the quiet Sun (Ondratschek et al. 2024), overlapping
     # so that the line center is about 60% of the peaks, as in Level 2 data.
-    truth = profiles_on_background(
-        (np.array([2796.20, 2796.50])[:, None, None] + rng.normal(0, 0.01, (2, *SHAPE))) * u.AA,
-        amplitudes=rng.uniform(400, 600, (2, *SHAPE)) * u.DN,
-        widths=rng.uniform(0.08, 0.1, (2, *SHAPE)) * u.AA,
-        background_level=100 * u.DN,
-    )
+    centers = (np.array([2796.20, 2796.50])[:, None, None] + rng.normal(0, 0.01, (2, *SHAPE))) * u.AA
+    amplitudes = rng.uniform(400, 600, (2, *SHAPE)) * u.DN
+    widths = rng.uniform(0.08, 0.1, (2, *SHAPE)) * u.AA
+    truth = models.Const1D(100 * u.DN)
+    for amplitude, center, width in zip(amplitudes, centers, widths, strict=True):
+        truth += models.Gaussian1D(amplitude, center, width)
     cube = _cube(truth, wavelength, rng)
-    model = mg_ii_model(cube)
-    assert all(getattr(model, name).shape == SHAPE for name in model.param_names)
-    assert all(getattr(model, name).unit == u.AA for name in ("mean_1", "stddev_1", "mean_2", "stddev_2"))
+    model = starts_from_model(line_model(["Mg II k"]), cube)
     fitted, fitter = _fit(model, cube.data, cube.uncertainty.array, wavelength, cube.unit)
     _assert_recovered(
         fitted, truth, _errors(fitter), cube.data, cube.uncertainty.array, wavelength, max_local_minima=0.03
@@ -218,89 +135,41 @@ def test_mg_ii_model_recovers_parameters():
     _assert_within_bounds(fitted, model)
 
 
-def test_mg_ii_model_on_level_2_data():
+def test_line_model_on_level_2_data():
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
     cube = raster["Mg II k 2796"][0]
     wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
-    fitted, _ = _fit(
-        mg_ii_model(cube), np.nan_to_num(cube.data.clip(min=0)), cube.uncertainty.array, wavelength, cube.unit
-    )
+    model = starts_from_model(line_model(["Mg II k"]), cube)
+    fitted, _ = _fit(model, np.nan_to_num(cube.data.clip(min=0)), cube.uncertainty.array, wavelength, cube.unit)
     # IRIS k2 peak separations spread about a mean of 33 km/s (Ondratschek et al. 2024, Fig. 5b), so the median
     # of this disk-center raster should fall well inside 20-50 km/s.
     separation = (fitted.mean_2.quantity - fitted.mean_1.quantity) / (2796.352 * u.AA) * C_KMS * u.km / u.s
     assert 20 < np.nanmedian(separation.value) < 50
 
 
-@pytest.mark.parametrize(
-    ("function", "centers", "start"),
-    [(si_iv_1403_model, [1402.77], 1402.0), (mg_ii_model, [2796.20, 2796.50], 2795.5)],
-)
-def test_presets_accept_scalar_mask(function, centers, start):
-    wavelength = (start + 0.0254 * np.arange(70)) * u.AA
-    truth = profiles_on_background(
-        centers * u.AA,
-        amplitudes=np.full(len(centers), 500) * u.DN,
-        widths=np.full(len(centers), 0.09) * u.AA,
-        background_level=100 * u.DN,
-    )
-    data = np.broadcast_to(truth(wavelength).value, (2, 3, 70)).copy()
-    cube = make_test_spectrogram_cube(data, wavelength)
-    expected = function(cube)
-    cube.mask = False
-    np.testing.assert_allclose(function(cube).parameters, expected.parameters)
+def _background(kind, level):
+    return models.Const1D(level) if kind == "constant" else models.Linear1D(0 * level.unit / u.AA, level)
 
 
-@pytest.mark.parametrize("function", [si_iv_1403_model, mg_ii_model])
-def test_presets_reject_unscaled_data(function):
-    raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), memmap=True)
-    with pytest.raises(ValueError, match="unscaled"):
-        function(raster["Mg II k 2796"][0])
-
-
-@pytest.mark.parametrize(
-    ("function", "start", "match"),
-    [
-        (si_iv_1403_model, 1401.0, "O IV 1401.157"),
-        (mg_ii_model, 2795.5, "Mg II 2798.754"),
-        (mg_ii_model, 2792.0, "neither"),
-    ],
-)
-def test_presets_reject_other_windows(function, start, match):
-    wavelength = (start + 0.0254 * np.arange(140)) * u.AA
-    cube = make_test_spectrogram_cube(np.ones((2, 3, 140)), wavelength)
-    with pytest.raises(ValueError, match=match):
-        function(cube)
-
-
-def _line_cube(rng, *, amplitudes=(100, 300), background="constant", background_level=5, profile="gaussian"):
+def _line_cube(rng, *, amplitudes=(100, 300), background="constant", background_level=5, profile=models.Gaussian1D):
     """
     A cube of one noiseless line on a background, its center, amplitude and width
     different in every spectrum.
     """
-    truth = profiles_on_background(
-        (1402.77 + rng.normal(0, 0.02, SHAPE))[np.newaxis] * u.AA,
-        amplitudes=rng.uniform(*amplitudes, (1, *SHAPE)) * u.DN,
-        widths=rng.uniform(0.05, 0.09, (1, *SHAPE)) * u.AA,
-        background=background,
-        background_level=rng.uniform(background_level, 2 * background_level, SHAPE) * u.DN,
-        profile=profile,
-    )
+    center = (1402.77 + rng.normal(0, 0.02, SHAPE)) * u.AA
+    amplitude = rng.uniform(*amplitudes, SHAPE) * u.DN
+    width = rng.uniform(0.05, 0.09, SHAPE) * u.AA
+    level = rng.uniform(background_level, 2 * background_level, SHAPE) * u.DN
+    truth = _background(background, level) + profile(amplitude, center, width)
     data = np.moveaxis(truth(WAVELENGTH[:, np.newaxis, np.newaxis]).to_value(u.DN), 0, -1)
     return truth, make_test_spectrogram_cube(data, WAVELENGTH)
 
 
-@pytest.mark.parametrize("profile", ["gaussian", "lorentzian"])
+@pytest.mark.parametrize("profile", [models.Gaussian1D, models.Lorentz1D])
 @pytest.mark.parametrize("background", ["constant", "linear"])
 def test_starts_from_model_follows_each_spectrum(profile, background):
     truth, cube = _line_cube(np.random.default_rng(5), background=background, profile=profile)
-    model = profiles_on_background(
-        [1402.75] * u.AA,
-        amplitudes=[150] * u.DN,
-        widths=[0.06] * u.AA,
-        background=background,
-        background_level=5 * u.DN,
-        profile=profile,
-    )
+    model = _background(background, 5 * u.DN) + profile(150 * u.DN, 1402.75 * u.AA, 0.06 * u.AA)
     if background == "linear":
         model.slope_0 = 0.5 * u.DN / u.AA
     starts = starts_from_model(model, cube)
@@ -415,9 +284,7 @@ def test_starts_from_model_keeps_polynomial_constraints(constraint):
 
 def test_starts_from_model_keeps_absorption():
     truth, cube = _line_cube(np.random.default_rng(6), amplitudes=(-60, -20), background_level=100)
-    model = profiles_on_background(
-        [1402.75] * u.AA, amplitudes=[-40] * u.DN, widths=[0.06] * u.AA, background_level=100 * u.DN
-    )
+    model = models.Const1D(100 * u.DN) + models.Gaussian1D(-40 * u.DN, 1402.75 * u.AA, 0.06 * u.AA)
     starts = starts_from_model(model, cube)
     assert np.all(np.abs(starts.mean_1.value - truth.mean_1.value) < np.diff(WAVELENGTH.value)[0] / 2)
     np.testing.assert_allclose(starts.amplitude_1.value, cube.data.min(axis=-1) - np.percentile(cube.data, 10, axis=-1))
@@ -426,12 +293,12 @@ def test_starts_from_model_keeps_absorption():
 
 def test_starts_from_model_keeps_constraints():
     _, cube = _line_cube(np.random.default_rng(7))
-    model = profiles_on_background(
-        [1402.77, 1403.2] * u.AA,
-        amplitudes=[150, 20] * u.DN,
-        widths=[0.06, 0.06] * u.AA,
-        background_level=5 * u.DN,
-        bounds={"mean_1": (1402.76, 1402.78) * u.AA, "amplitude_1": (0, 200) * u.DN},
+    model = (
+        models.Const1D(5 * u.DN)
+        + models.Gaussian1D(
+            150 * u.DN, 1402.77 * u.AA, 0.06 * u.AA, bounds={"mean": (1402.76, 1402.78), "amplitude": (0, 200)}
+        )
+        + models.Gaussian1D(20 * u.DN, 1403.2 * u.AA, 0.06 * u.AA)
     )
     model.amplitude_0.fixed = True
     model.mean_2.tied = lambda model: model.mean_1 + 0.43
@@ -478,30 +345,46 @@ def test_starts_from_model_leaves_out_missing_samples():
 
 def test_starts_from_model_units():
     _, cube = _line_cube(np.random.default_rng(9))
-    in_angstrom = profiles_on_background(
-        [1402.75] * u.AA, amplitudes=[150] * u.DN, widths=[0.06] * u.AA, background_level=5 * u.DN
-    )
-    in_nm = profiles_on_background(
-        [140.275] * u.nm, amplitudes=[150] * u.DN, widths=[0.006] * u.nm, background_level=5 * u.DN
-    )
+    in_angstrom = models.Const1D(5 * u.DN) + models.Gaussian1D(150 * u.DN, 1402.75 * u.AA, 0.06 * u.AA)
+    in_nm = models.Const1D(5 * u.DN) + models.Gaussian1D(150 * u.DN, 140.275 * u.nm, 0.006 * u.nm)
     expected, starts = starts_from_model(in_angstrom, cube), starts_from_model(in_nm, cube)
     assert starts.mean_1.unit == u.nm
     for name in in_nm.param_names:
         assert u.allclose(getattr(starts, name).quantity, getattr(expected, name).quantity), name
     with pytest.raises(ValueError, match="array parameters"):
-        starts_from_model(si_iv_1403_model(cube), cube)
+        starts_from_model(expected, cube)
+
+
+def test_starts_from_model_accepts_a_scalar_mask():
+    _, cube = _line_cube(np.random.default_rng(14))
+    expected = starts_from_model(line_model(["Si IV 1403"]), cube)
+    cube.mask = False
+    np.testing.assert_array_equal(starts_from_model(line_model(["Si IV 1403"]), cube).parameters, expected.parameters)
+
+
+def test_starts_from_model_rejects_unscaled_data():
+    raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), memmap=True)
+    with pytest.raises(ValueError, match="unscaled"):
+        starts_from_model(line_model(["Mg II k"]), raster["Mg II k 2796"][0])
+
+
+def _k2_peaks(unit):
+    """
+    Gaussians for the Mg II k2v and k2r peaks on a constant background, to fit to one
+    spectrum.
+    """
+    return (
+        models.Const1D(10 * unit)
+        + models.Gaussian1D(100 * unit, 2796.20 * u.AA, 0.08 * u.AA)
+        + models.Gaussian1D(100 * unit, 2796.50 * u.AA, 0.08 * u.AA)
+    )
 
 
 def test_starts_from_model_starts_blended_lines_at_their_own_peaks():
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
     cube = raster["Mg II k 2796"][0]
     wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
-    start = profiles_on_background(
-        [2796.20, 2796.50] * u.AA,
-        amplitudes=[100, 100] * cube.unit,
-        widths=[0.08, 0.08] * u.AA,
-        background_level=10 * cube.unit,
-    )
+    start = _k2_peaks(cube.unit)
     mean = np.nanmean(np.where(cube.mask, np.nan, cube.data), axis=(0, 1))
     starts = starts_from_model(TRFLSQFitter()(start, wavelength, mean * cube.unit), cube)
     # The k2v and k2r Gaussians lie within two widths of each other, and would otherwise share the brighter peak.
@@ -514,12 +397,7 @@ def test_starts_from_model_on_level_2_data(background):
     cube = raster["Mg II k 2796"][0][:, 700:740]  # Rows 731 to 739 are masked in full.
     wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
     data = np.where(cube.mask, np.nan, cube.data)
-    start = profiles_on_background(
-        [2796.20, 2796.50] * u.AA,
-        amplitudes=[100, 100] * cube.unit,
-        widths=[0.08, 0.08] * u.AA,
-        background_level=10 * cube.unit,
-    )
+    start = _k2_peaks(cube.unit)
     if background == "polynomial":
         polynomial = models.Polynomial1D(2, c0=10 * cube.unit, c1=0 * cube.unit / u.AA, c2=0 * cube.unit / u.AA**2)
         start = polynomial + start[1] + start[2]
@@ -539,21 +417,12 @@ def test_starts_from_model_on_level_2_data(background):
     assert np.mean(quality[~masked] == FitQualityFlag.OK) > 0.8
 
 
-def _si_iv_cube(rng, profile="gaussian"):
-    truth = profiles_on_background(
-        (1402.77 + rng.normal(0, 0.02, SHAPE))[np.newaxis] * u.AA,
-        amplitudes=rng.uniform(100, 300, (1, *SHAPE)) * u.DN,
-        widths=rng.uniform(0.05, 0.09, (1, *SHAPE)) * u.AA,
-        background_level=5 * u.DN,
-        profile=profile,
-    )
-    return truth, _cube(truth, WAVELENGTH, rng)
-
-
 def test_maps_from_fit_recovers_derived_maps():
     rng = np.random.default_rng(7)
     truth, cube = _si_iv_cube(rng)
-    fitted, fitter = _fit(si_iv_1403_model(cube), cube.data, cube.uncertainty.array, unit=cube.unit)
+    fitted, fitter = _fit(
+        starts_from_model(line_model(["Si IV 1403"]), cube), cube.data, cube.uncertainty.array, unit=cube.unit
+    )
     error = _errors(fitter)
     maps = maps_from_fit(fitted, cube, fitter=fitter)
     derived = ["velocity_1", "fwhm_1", "fwhm_velocity_1", "integrated_intensity_1"]
@@ -590,17 +459,13 @@ def test_maps_from_fit_recovers_derived_maps():
 @pytest.mark.parametrize(
     ("profile", "width", "fwhm", "area"),
     [
-        ("gaussian", 0.1, 0.1 * 2.3548200450309493, 0.1 * 2.5066282746310002 * 50),
-        ("lorentzian", 0.2, 0.2, np.pi * 0.2 * 50 / 2),
+        (models.Gaussian1D, 0.1, 0.1 * 2.3548200450309493, 0.1 * 2.5066282746310002 * 50),
+        (models.Lorentz1D, 0.2, 0.2, np.pi * 0.2 * 50 / 2),
     ],
 )
 def test_maps_from_fit_formulas(profile, width, fwhm, area):
-    model = profiles_on_background(
-        np.full((1, 2, 3), 1402.77) * u.AA,
-        amplitudes=np.full((1, 2, 3), 50) * u.DN,
-        widths=np.full((1, 2, 3), width) * u.AA,
-        background_level=0 * u.DN,
-        profile=profile,
+    model = models.Const1D(0 * u.DN) + profile(
+        np.full((2, 3), 50) * u.DN, np.full((2, 3), 1402.77) * u.AA, np.full((2, 3), width) * u.AA
     )
     cube = make_test_spectrogram_cube(np.zeros((2, 3, 60)), WAVELENGTH)
     maps = maps_from_fit(model, cube)
@@ -612,7 +477,7 @@ def test_maps_from_fit_formulas(profile, width, fwhm, area):
 
 def test_maps_from_fit_takes_absolute_widths():
     # A Lorentzian is even in its width, so a fit started at a negative one ends at a negative one.
-    _, cube = _si_iv_cube(np.random.default_rng(3), "lorentzian")
+    _, cube = _si_iv_cube(np.random.default_rng(3), models.Lorentz1D)
     maps = []
     for width in (0.15, -0.15):
         start = starts_from_model(models.Const1D(5) + models.Lorentz1D(150, 1402.77, width), cube)
@@ -631,11 +496,11 @@ def test_maps_from_fit_flags_no_fit_and_at_bound():
     truth, cube = _si_iv_cube(rng)
     data = cube.data.copy()
     data[0, 0] = np.nan  # no fit
-    model = si_iv_1403_model(cube)
+    model = starts_from_model(line_model(["Si IV 1403"]), cube)
     # Capping the amplitude below that of the brighter lines pins their fits to the cap.
     cap = np.median(truth.amplitude_1.value)
     model.amplitude_1.bounds = (0, cap)
-    model.amplitude_1 = np.minimum(model.amplitude_1.value, cap) * u.DN
+    model.amplitude_1 = np.minimum(model.amplitude_1.value, cap)
     fitted, fitter = _fit(model, data, cube.uncertainty.array, unit=cube.unit)
     maps = maps_from_fit(fitted, cube, fitter=fitter)
     assert np.isnan(maps["mean_1"].uncertainty.array[0, 0])
@@ -656,7 +521,7 @@ def test_maps_from_fit_flags_no_fit_and_at_bound():
 def test_maps_from_fit_flags_convergence(fitter_class, expected):
     _, cube = _si_iv_cube(np.random.default_rng(3))
     fitted, fitter = _fit(
-        si_iv_1403_model(cube),
+        starts_from_model(line_model(["Si IV 1403"]), cube),
         cube.data,
         cube.uncertainty.array,
         unit=cube.unit,
@@ -668,12 +533,11 @@ def test_maps_from_fit_flags_convergence(fitter_class, expected):
 
 def test_maps_from_fit_bound_tolerance_is_relative():
     # In meters the center is 1e-11 from its bounds, which only a relative tolerance leaves unflagged.
-    model = profiles_on_background(
-        np.full((1, 2, 3), 1402.77e-10) * u.m,
-        amplitudes=np.full((1, 2, 3), 50) * u.DN,
-        widths=np.full((1, 2, 3), 0.05e-10) * u.m,
-        background_level=5 * u.DN,
-        bounds={"mean_1": [1402.67, 1402.87] * u.AA, "stddev_1": [0.01, 0.1] * u.AA, "amplitude_1": [0, 100] * u.DN},
+    model = models.Const1D(5 * u.DN) + models.Gaussian1D(
+        np.full((2, 3), 50) * u.DN,
+        np.full((2, 3), 1402.77e-10) * u.m,
+        np.full((2, 3), 0.05e-10) * u.m,
+        bounds={"amplitude": (0, 100), "mean": (1402.67e-10, 1402.87e-10), "stddev": (0.01e-10, 0.1e-10)},
     )
     cube = make_test_spectrogram_cube(np.zeros((2, 3, 60)), WAVELENGTH)
     assert np.all(maps_from_fit(model, cube)["quality"].data == FitQualityFlag.OK)
@@ -690,7 +554,8 @@ def test_maps_from_fit_flags_bounds_per_spectrum(fitter_class):
     cube.data[dips] = 2 * background - cube.data[dips]
     cube.data[0, 0] = background + 1e8 * (cube.data[0, 0] - background)
     cube.uncertainty.array[0, 0] *= 1e8
-    model = si_iv_1403_model(cube)
+    model = starts_from_model(line_model(["Si IV 1403"]), cube)
+    model.amplitude_1.bounds = (0, None)
     for name in ("mean_1", "stddev_1"):
         setattr(model, name, getattr(truth, name).quantity)
         model.fixed[name] = True
@@ -704,23 +569,28 @@ def test_maps_from_fit_flags_bounds_per_spectrum(fitter_class):
 @pytest.mark.parametrize(("wavelength_axis", "wcs_axes"), [(0, [2, 3, 1]), (1, [2, 1, 3])])
 def test_maps_from_fit_aligns_spatial_axes(wavelength_axis, wcs_axes):
     _, cube = _si_iv_cube(np.random.default_rng(3))
-    fitted, _ = _fit(si_iv_1403_model(cube), cube.data, cube.uncertainty.array, unit=cube.unit)
+    fitted, _ = _fit(
+        starts_from_model(line_model(["Si IV 1403"]), cube), cube.data, cube.uncertainty.array, unit=cube.unit
+    )
     cube = type(cube)(np.moveaxis(cube.data, 2, wavelength_axis), cube.wcs.sub(wcs_axes), unit=cube.unit)
     maps = maps_from_fit(fitted, cube)
     map_axes = (0, 1)
     residual_axes = tuple(axis for axis in range(3) if axis != wavelength_axis)
     assert maps.aligned_axes["mean_1"] == map_axes
     assert maps.aligned_axes["residual"] == residual_axes
+    # The WCS of the moved cube gives WAVELENGTH to within 1e-12 Å.
     np.testing.assert_allclose(
         maps["residual"].data,
         cube.data - np.moveaxis(fitted(WAVELENGTH[:, None, None]).to_value(cube.unit), 0, wavelength_axis),
-        atol=1e-9,
+        atol=1e-8,
     )
 
 
 def test_maps_from_fit_preserves_residual_coordinates():
     _, cube = _si_iv_cube(np.random.default_rng(3))
-    fitted, _ = _fit(si_iv_1403_model(cube), cube.data, cube.uncertainty.array, unit=cube.unit)
+    fitted, _ = _fit(
+        starts_from_model(line_model(["Si IV 1403"]), cube), cube.data, cube.uncertainty.array, unit=cube.unit
+    )
     times = Time("2020-01-01") + np.arange(SHAPE[0]) * u.s
     cube.extra_coords.add("time", 0, times, physical_types="time")
     cube.global_coords.add("observer", "custom:observer", "IRIS")
@@ -733,7 +603,9 @@ def test_maps_from_fit_preserves_residual_coordinates():
 
 def test_maps_from_fit_without_residual():
     _, cube = _si_iv_cube(np.random.default_rng(3))
-    fitted, fitter = _fit(si_iv_1403_model(cube), cube.data, cube.uncertainty.array, unit=cube.unit)
+    fitted, fitter = _fit(
+        starts_from_model(line_model(["Si IV 1403"]), cube), cube.data, cube.uncertainty.array, unit=cube.unit
+    )
     maps = maps_from_fit(fitted, cube, fitter=fitter)
     without = maps_from_fit(fitted, cube, fitter=fitter, residual=False)
     assert list(maps.keys()) == [*without.keys(), "residual"]
@@ -747,7 +619,9 @@ def test_maps_from_fit_without_residual():
 
 def test_maps_from_fit_flags_masked_input():
     _, cube = _si_iv_cube(np.random.default_rng(3))
-    fitted, _ = _fit(si_iv_1403_model(cube), cube.data, cube.uncertainty.array, unit=cube.unit)
+    fitted, _ = _fit(
+        starts_from_model(line_model(["Si IV 1403"]), cube), cube.data, cube.uncertainty.array, unit=cube.unit
+    )
     cube.mask = np.zeros(cube.data.shape, dtype=bool)
     cube.mask[0, 1, 5] = True
     quality = maps_from_fit(fitted, cube)["quality"].data
@@ -761,7 +635,10 @@ def test_maps_from_fit_flags_masked_input():
 def test_maps_from_fit_without_any_covariance():
     _, cube = _si_iv_cube(np.random.default_rng(3))
     fitted, fitter = _fit(
-        si_iv_1403_model(cube), np.full_like(cube.data, np.nan), cube.uncertainty.array, unit=cube.unit
+        starts_from_model(line_model(["Si IV 1403"]), cube),
+        np.full_like(cube.data, np.nan),
+        cube.uncertainty.array,
+        unit=cube.unit,
     )
     maps = maps_from_fit(fitted, cube, fitter=fitter)
     assert np.all(maps["quality"].data == FitQualityFlag.NO_FIT)
@@ -772,7 +649,7 @@ def test_maps_from_fit_without_any_covariance():
 def test_maps_from_fit_fixed_parameters_and_rest_wavelength():
     rng = np.random.default_rng(4)
     _, cube = _si_iv_cube(rng)
-    model = si_iv_1403_model(cube)
+    model = starts_from_model(line_model(["Si IV 1403"]), cube)
     model.amplitude_0.fixed = True
     fitted, fitter = _fit(model, cube.data, cube.uncertainty.array, unit=cube.unit)
     maps = maps_from_fit(fitted, cube, fitter=fitter, rest_wavelength=1402.0 * u.AA)
@@ -782,9 +659,9 @@ def test_maps_from_fit_fixed_parameters_and_rest_wavelength():
     np.testing.assert_allclose(np.median(maps["velocity_1"].data), 0.77 / 1402.0 * C_KMS, rtol=0.01)
     wider = make_test_spectrogram_cube(np.zeros((2, 3, 400)), (1395.0 + 0.026 * np.arange(400)) * u.AA)
     with pytest.raises(ValueError, match="pass rest_wavelength"):
-        maps_from_fit(model, wider)
+        maps_from_fit(fitted, wider)
     with pytest.raises(ValueError, match="no unit"):
-        maps_from_fit(profiles_on_background([1402.77] * u.AA), cube)
+        maps_from_fit(line_model(["Si IV 1403"]), cube)
     with pytest.raises(ValueError, match="fit_info=True"):
         maps_from_fit(fitted, cube, fitter=TRFLSQFitter())
 
@@ -793,7 +670,8 @@ def test_maps_from_fit_on_one_spectrum():
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
     cube = raster["Mg II k 2796"][0][1:2, 301:302]
     wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
-    fitted, fitter = _fit(mg_ii_model(cube), cube.data, cube.uncertainty.array, wavelength, cube.unit)
+    model = starts_from_model(line_model(["Mg II k"]), cube)
+    fitted, fitter = _fit(model, cube.data, cube.uncertainty.array, wavelength, cube.unit)
     for maps in (maps_from_fit(fitted, cube), maps_from_fit(fitted, cube, fitter=fitter)):
         for name in fitted.param_names:
             np.testing.assert_array_equal(maps[name].data, [[getattr(fitted, name).value]], strict=True)
@@ -817,13 +695,12 @@ def test_non_thermal_velocity_formula():
     # Standard deviations of 0.05 and 0.01 Å, and one whose width is all instrumental.
     sigma = np.array([[0.05, 0.01, 0.02]])
     widths = 2 * np.sqrt(2 * np.log(2)) * sigma
-    result = non_thermal_velocity(
+    velocity = non_thermal_velocity(
         _width_map(sigma, error=1e-3),
         1402.77 * u.AA,
         instrumental_fwhm=widths[0, 2] * u.AA,
         thermal_fwhm=0.02 * u.AA,
     )
-    velocity = result["non_thermal_velocity"]
     assert velocity.unit == u.km / u.s
     radicand = widths**2 - widths[0, 2] ** 2 - 0.02**2
     expected = C_KMS / (1402.77 * np.sqrt(4 * np.log(2))) * np.sqrt(np.where(radicand > 0, radicand, np.nan))
@@ -836,16 +713,13 @@ def test_non_thermal_velocity_formula():
             1402.77 * u.AA,
             instrumental_fwhm=widths[0, 2] * u.AA,
             thermal_fwhm=0.02 * u.AA,
-        )["non_thermal_velocity"].data
+        ).data
         for sign in (1, -1)
     ]
     # The step is in the standard deviation, so dv/dW is the difference over the step in FWHM.
     derivative = (shifted[0] - shifted[1]) / (2 * step * 2 * np.sqrt(2 * np.log(2)))
     np.testing.assert_allclose(velocity.uncertainty.array[0, 0], derivative[0, 0] * 1e-3, rtol=1e-5)
-    quality = result["quality"].data
-    np.testing.assert_array_equal(
-        quality, [[NonThermalQualityFlag.OK, NonThermalQualityFlag.TOO_NARROW, NonThermalQualityFlag.TOO_NARROW]]
-    )
+    np.testing.assert_array_equal(velocity.mask, [[False, True, True]])
     assert np.isnan(velocity.data[0, 1])
 
 
@@ -863,34 +737,26 @@ def test_non_thermal_velocity_defaults():
     expected = non_thermal_velocity(
         _width_map(sigma), 1402.77 * u.AA, instrumental_fwhm=INSTRUMENTAL_FWHM["FUV2"], thermal_fwhm=thermal
     )
-    np.testing.assert_allclose(result["non_thermal_velocity"].data, expected["non_thermal_velocity"].data)
-    assert result["quality"].data[0, 1] == NonThermalQualityFlag.NO_DATA
+    np.testing.assert_allclose(result.data, expected.data)
+    assert result.mask[0, 1]
     # A hotter ion leaves less width for the non-thermal velocity.
     hotter = non_thermal_velocity(_width_map(sigma), 1402.77 * u.AA, ion="Si IV", temperature=2e5 * u.K)
-    assert hotter["non_thermal_velocity"].data[0, 0] < result["non_thermal_velocity"].data[0, 0]
+    assert hotter.data[0, 0] < result.data[0, 0]
 
 
 def test_non_thermal_velocity_non_positive_widths():
-    widths = _width_map([[0.05, -0.05, 0, np.nan, -0.05]], error=1e-3, mask=[[False, False, False, False, True]])
-    result = non_thermal_velocity(widths, 1402.77 * u.AA, thermal_fwhm=0.03 * u.AA)
-    velocity = result["non_thermal_velocity"]
+    widths = _width_map(
+        [[0.05, -0.05, 0, np.nan, -0.05]], error=1e-3, mask=np.array([[False, False, False, False, True]])
+    )
+    velocity = non_thermal_velocity(widths, 1402.77 * u.AA, thermal_fwhm=0.03 * u.AA)
     assert np.isfinite(velocity.data[0, 0])
     assert np.isfinite(velocity.uncertainty.array[0, 0])
     assert np.all(np.isnan(velocity.data[0, 1:]))
     assert np.all(np.isnan(velocity.uncertainty.array[0, 1:]))
     np.testing.assert_array_equal(velocity.mask, [[False, True, True, True, True]])
-    np.testing.assert_array_equal(
-        result["quality"].data,
-        [
-            [
-                NonThermalQualityFlag.OK,
-                NonThermalQualityFlag.TOO_NARROW,
-                NonThermalQualityFlag.TOO_NARROW,
-                NonThermalQualityFlag.NO_DATA,
-                NonThermalQualityFlag.NO_DATA,
-            ]
-        ],
-    )
+    # The recipe in the docstring for the widths that are too narrow, rather than missing or masked.
+    too_narrow = velocity.mask & ~widths.mask & np.isfinite(widths.data)
+    np.testing.assert_array_equal(too_narrow, [[False, True, True, False, False]])
 
 
 @pytest.mark.parametrize(
@@ -912,7 +778,7 @@ def test_non_thermal_velocity_temperature_from_the_catalog():
     widths = _width_map(np.array([[0.05, 0.06]]))
     from_catalog = non_thermal_velocity(widths, 1402.77 * u.AA, ion="Si IV")
     explicit = non_thermal_velocity(widths, 1402.77 * u.AA, ion="Si IV", temperature=10**4.9 * u.K)
-    np.testing.assert_allclose(from_catalog["non_thermal_velocity"].data, explicit["non_thermal_velocity"].data)
+    np.testing.assert_allclose(from_catalog.data, explicit.data)
 
 
 def test_non_thermal_velocity_matches_iris_nonthermalwidth():
@@ -929,7 +795,7 @@ def test_non_thermal_velocity_matches_iris_nonthermalwidth():
         velocity = row["velocity"].to_value(u.km / u.s)
         # IDL's c of 2.9979e5 km/s and its older masses and Boltzmann constant change the velocities by about 1e-5.
         np.testing.assert_allclose(
-            result["non_thermal_velocity"].data[0, 0],
+            result.data[0, 0],
             np.nan if velocity == -1 else velocity,
             rtol=3e-5,
             err_msg=f"{row['ion']}, FWHM {row['fwhm']}",

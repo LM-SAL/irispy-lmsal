@@ -18,33 +18,19 @@ from irispy.spectrograph import RasterCollection, SpectrogramCube
 from irispy.utils._spectral import _QualityFlag, check_scaled, make_map_cube, make_spatial_template, standard_deviation
 from irispy.utils.constants import ATOMIC_MASS, INSTRUMENTAL_FWHM, PASSBAND_LIMITS
 from irispy.utils.lines import _load_lines, get_lines
-from irispy.utils.mg_features import calculate_mg_features
 from irispy.utils.utils import _boolean_mask
 
 __all__ = [
     "FitQualityFlag",
-    "NonThermalQualityFlag",
+    "line_model",
     "maps_from_fit",
-    "mg_ii_model",
     "non_thermal_velocity",
-    "profiles_on_background",
-    "si_iv_1403_model",
     "starts_from_model",
 ]
 
-_PROFILES = {"gaussian": (models.Gaussian1D, "mean", "stddev"), "lorentzian": (models.Lorentz1D, "x_0", "fwhm")}
-_BACKGROUNDS = ("constant", "linear")
 _SPEED_OF_LIGHT = constants.c.to(u.km / u.s)
-
-
-def _profile(profile):
-    """
-    The astropy model of ``profile`` and the names of its center and width parameters.
-    """
-    if profile not in _PROFILES:
-        msg = f"profile must be one of {tuple(_PROFILES)}, not {profile!r}."
-        raise ValueError(msg)
-    return _PROFILES[profile]
+# The lines fitted as their blue and red emission peaks, k2v and k2r or h2v and h2r.
+_MG_II_PEAKS = {"Mg II k": "Mg II 2796", "Mg II h": "Mg II 2803"}
 
 
 def _wavelength(cube):
@@ -54,14 +40,19 @@ def _wavelength(cube):
     return cube.axis_world_coords(cube.wavelength_axis)[0].to(u.AA)
 
 
-def _documented_wavelength(ion, near):
+def _rest_wavelength(line):
     """
-    The catalog rest wavelength in Å of the documented ``ion`` line within 1 Å of
-    ``near`` Å.
+    The catalog rest wavelength in Å of the documented line named by its ion and a
+    wavelength in Å within 1 Å of it, such as ``"Si IV 1403"``.
     """
-    lines = get_lines([near - 1, near + 1] * u.AA, main_only=True)
-    (wavelength,) = lines["wavelength"][lines["ion"] == ion]
-    return wavelength.to_value(u.AA)
+    ion, _, near = line.rpartition(" ")
+    lines = get_lines(main_only=True)
+    wavelength = lines["wavelength"][lines["ion"] == ion].to_value(u.AA)
+    distance = np.abs(wavelength - float(near)) if near.replace(".", "", 1).isdigit() else np.inf
+    if not np.any(distance <= 1):
+        msg = f"No documented line {line!r}; name one by its ion and wavelength in Å, such as 'Si IV 1403'."
+        raise ValueError(msg)
+    return wavelength[np.argmin(distance)]
 
 
 def _covered_lines(wavelength):
@@ -71,16 +62,6 @@ def _covered_lines(wavelength):
     """
     lines = get_lines([wavelength.min(), wavelength.max()], main_only=True)
     return list(zip(lines["ion"], lines["wavelength"].to_value(u.AA), strict=True))
-
-
-def _check_window(wavelength, rest_wavelength):
-    """
-    Raise if ``wavelength`` covers a documented line other than ``rest_wavelength`` Å.
-    """
-    others = [f"{ion} {line:.3f}" for ion, line in _covered_lines(wavelength) if line != rest_wavelength]
-    if others:
-        msg = f"The cube also covers {', '.join(others)} Å, which the model leaves out; crop it to the line to fit."
-        raise ValueError(msg)
 
 
 def _spectra(cube):
@@ -103,249 +84,51 @@ def _background_level(spectra):
         return np.nanpercentile(spectra, 10, axis=-1)
 
 
-def profiles_on_background(
-    centers,
-    *,
-    amplitudes=None,
-    widths=None,
-    background="constant",
-    background_level=None,
-    profile="gaussian",
-    bounds=None,
-):
+def line_model(lines):
     """
-    A sum of Gaussian or Lorentzian line profiles on a constant or linear background.
+    A starting model for documented IRIS lines: one Gaussian per line on a constant
+    background.
 
-    The model is ready for `astropy.modeling.fitting.parallel_fit_dask`, or for a fitter called on
-    one spectrum. Its first component is the background, so the line parameters are numbered from
-    1: ``amplitude_1``, ``mean_1`` and ``stddev_1`` for the first Gaussian, ``amplitude_1``,
-    ``x_0_1`` and ``fwhm_1`` for the first Lorentzian.
+    Give it a start in every spectrum of a cube with `starts_from_model`.
 
     Parameters
     ----------
-    centers : `~astropy.units.Quantity`
-        Initial line centers, one per component along the first axis. Further axes give a
-        different start in every spectrum of a cube, and must match its spatial axes.
-    amplitudes : `~astropy.units.Quantity`, optional
-        Initial peak values above the background, shaped like ``centers``. Defaults to 1.
-    widths : `~astropy.units.Quantity`, optional
-        Initial widths, shaped like ``centers``: the standard deviation of a Gaussian or the full
-        width at half maximum of a Lorentzian. Defaults to 1.
-    background : `str`, optional
-        ``"constant"`` for a `~astropy.modeling.functional_models.Const1D` (``amplitude_0``) or
-        ``"linear"`` for a `~astropy.modeling.functional_models.Linear1D` (``slope_0`` and
-        ``intercept_0``, the value at zero wavelength) background.
-    background_level : `~astropy.units.Quantity`, optional
-        Initial background level, a scalar or an array over the spatial axes. Defaults to 0.
-    profile : `str`, optional
-        The line profile, ``"gaussian"`` or ``"lorentzian"``.
-    bounds : `dict`, optional
-        ``(lower, upper)`` limits keyed by parameter name, such as ``{"mean_1": (1402, 1403.5) * u.AA}``,
-        with `None` for no limit. Widths are kept positive.
+    lines : `list` of `str`
+        Documented lines of the line catalog (`~irispy.utils.lines.get_lines`), each named by its
+        ion and its wavelength in Å to within 1 Å, such as ``"Si IV 1403"``, or ``"Mg II k"`` or
+        ``"Mg II h"``.
 
     Returns
     -------
     `~astropy.modeling.CompoundModel`
+        A `~astropy.modeling.functional_models.Const1D` background, ``amplitude_0``, plus the
+        Gaussians in the order of ``lines``, numbered from 1, with means and standard deviations
+        in Å. The components are named ``"background"``, after their lines, such as
+        ``"Si IV 1403"``, and ``"k2v"``, ``"k2r"``, ``"h2v"`` and ``"h2r"`` for the Mg II peaks.
 
     Notes
     -----
-    Pass the wavelengths to the fitter in the unit of ``centers``; see :ref:`irispy-tutorial-fitting`.
+    Each Gaussian starts at its line's rest wavelength in the catalog with a standard deviation
+    of 0.05 Å. Mg II k and h get two Gaussians each, for the blue and red emission peaks (k2v
+    and k2r, or h2v and h2r) as in the Gaussian decomposition of :cite:t:`itn39`. These start
+    0.15 Å either side of the rest wavelength, and their means stay within 40 km/s of it, the
+    search range of :cite:t:`leenaarts2013`. They are a proxy for the peaks, which
+    :cite:t:`itn39` warns are hard to recover in complex profiles, such as those of flare ribbons.
+
+    Pass the wavelengths to the fitter in Å; see :ref:`irispy-tutorial-fitting`.
     """
-    line, center_name, width_name = _profile(profile)
-    if background not in _BACKGROUNDS:
-        msg = f"background must be one of {_BACKGROUNDS}, not {background!r}."
-        raise ValueError(msg)
-    centers = u.Quantity(centers)
-    if centers.ndim == 0:
-        centers = centers[np.newaxis]
-    # Unitless starts take the unit of the data when fitted.
-    level = 0 if background_level is None else background_level
-    slope = 0 * level.unit / centers.unit if isinstance(level, u.Quantity) else 0
-    if background == "constant":
-        model = models.Const1D(amplitude=level)
-    else:
-        model = models.Linear1D(slope=slope, intercept=level)
-    for index, center in enumerate(centers):
-        start = {center_name: center}
-        if amplitudes is not None:
-            start["amplitude"] = amplitudes[index]
-        if widths is not None:
-            start[width_name] = widths[index]
-        model += line(**start)
-        # astropy counts the left-hand parameters by their values, not their names, which breaks
-        # array starts once parallel_fit_dask resets them to one spectrum's scalars:
-        # https://github.com/astropy/astropy/issues/20554
-        model.n_left_params = len(model.left.param_names)
-    limits = dict(bounds or {})
-    for name in (f"{width_name}_{index}" for index in range(1, len(centers) + 1)):
-        lower, upper = limits.get(name, (None, None))
-        # Gaussian1D's own lower bound, as zero widths divide by zero.
-        limits[name] = (models.Gaussian1D.stddev.bounds[0] if lower is None else lower, upper)
-    for name, (lower, upper) in limits.items():
-        parameter = getattr(model, name)
-        parameter.bounds = tuple(
-            None if limit is None else u.Quantity(limit, parameter.unit).value for limit in (lower, upper)
-        )
+    model = models.Const1D(0, name="background")
+    for line in lines:
+        rest = _rest_wavelength(_MG_II_PEAKS.get(line, line)) * u.AA
+        if line not in _MG_II_PEAKS:
+            model += models.Gaussian1D(1, rest, 0.05 * u.AA, name=line)
+            continue
+        limits = rest * (1 + [-40, 40] * u.km / u.s / _SPEED_OF_LIGHT)
+        for peak, offset in (("2v", -0.15), ("2r", 0.15)):
+            model += models.Gaussian1D(
+                1, rest + offset * u.AA, 0.05 * u.AA, name=line[-1] + peak, bounds={"mean": limits}
+            )
     return model
-
-
-def si_iv_1403_model(cube, *, profile="gaussian"):
-    """
-    A starting model for Si IV 140.277 nm, with a start for every spectrum of ``cube``.
-
-    One Gaussian or Lorentzian on a constant background.
-
-    Parameters
-    ----------
-    cube : `~irispy.spectrograph.SpectrogramCube`
-        A Si IV 1403 cube cropped to the wavelengths to fit, read with ``memmap=False``. The window
-        must leave out the neighboring documented lines, such as O IV 140.116 and 140.481 nm.
-    profile : `str`, optional
-        The line profile, ``"gaussian"`` or ``"lorentzian"``.
-
-    Returns
-    -------
-    `~astropy.modeling.CompoundModel`
-        The model of `profiles_on_background`, with wavelengths in Å and intensities in the unit of
-        ``cube``, and parameters shaped like the spatial axes of ``cube``.
-
-    Notes
-    -----
-    The line is the run of samples above half maximum around the peak of the mean spectrum,
-    over its 10th percentile. Each spectrum's background starts at its own 10th percentile,
-    its center at its brightest sample in that run, and its amplitude at that sample's height
-    above the background. The starting full width at half maximum is the run's width for every spectrum.
-
-    The center stays within the wavelength window, the width below the window's width, and
-    the amplitude nonnegative.
-
-    The rest wavelength is the vacuum value of :cite:t:`depontieu2014`. For several components,
-    build the model with `profiles_on_background`; see :ref:`irispy-tutorial-fitting`.
-    """
-    _, center_name, width_name = _profile(profile)
-    check_scaled(cube)
-    wavelength = _wavelength(cube)
-    _check_window(wavelength, _documented_wavelength("Si IV", 1403))
-    spectra = _spectra(cube)
-    background = _background_level(spectra)
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", "Mean of empty slice", RuntimeWarning)
-        mean = np.nanmean(spectra, axis=tuple(range(spectra.ndim - 1)))
-    mean_peak = np.nanargmax(mean)
-    # The first samples either side of the peak below half its height bound the line.
-    mean_background = _background_level(mean)
-    below = ~(mean - mean_background >= (mean[mean_peak] - mean_background) / 2)
-    index = np.arange(mean.size)
-    first = index[below & (index < mean_peak)].max(initial=-1)
-    last = index[below & (index > mean_peak)].min(initial=mean.size)
-    line = (index > first) & (index < last)
-    # A fully masked spectrum gets index 0 and a NaN height, so parallel_fit_dask gives it NaN parameters.
-    peak = np.argmax(np.where(line & ~np.isnan(spectra), spectra, -np.inf), axis=-1)
-    height = np.take_along_axis(spectra, peak[..., np.newaxis], axis=-1)[..., 0] - background
-    fwhm = np.full(height.shape, last - first - 1) * np.mean(np.abs(np.diff(wavelength)))
-    width = fwhm if profile == "lorentzian" else fwhm / (2 * np.sqrt(2 * np.log(2)))
-    return profiles_on_background(
-        wavelength[peak][np.newaxis],
-        amplitudes=height[np.newaxis] * cube.unit,
-        widths=width[np.newaxis],
-        background_level=background * cube.unit,
-        profile=profile,
-        bounds={
-            f"{center_name}_1": (wavelength.min(), wavelength.max()),
-            f"{width_name}_1": (None, wavelength.max() - wavelength.min()),
-            "amplitude_1": (0, None),
-        },
-    )
-
-
-def mg_ii_model(cube, *, velocity_range=(-40, 40) * u.km / u.s):
-    """
-    A starting model for the Mg II k or h line core, with a start for every spectrum of
-    ``cube``.
-
-    Two Gaussians, for the blue (k2v or h2v) and red (k2r or h2r) emission peaks, on a constant
-    background, as in the k and h components of the Gaussian decomposition of :cite:t:`itn39`.
-
-    Parameters
-    ----------
-    cube : `~irispy.spectrograph.SpectrogramCube`
-        One raster of a Mg II window, read with ``memmap=False`` and cropped to the k or the h line
-        core: the model has no components for the line wings or for the other documented lines,
-        such as the Mg II triplet at 279.88 nm.
-    velocity_range : `~astropy.units.Quantity`, optional
-        Doppler velocities from the rest wavelength within which to search for the peaks and to keep
-        the Gaussians' centers. The default is the search range of :cite:t:`leenaarts2013`.
-
-    Returns
-    -------
-    `~astropy.modeling.CompoundModel`
-        The model of `profiles_on_background`, with wavelengths in Å and intensities in the unit of
-        ``cube``, and parameters shaped like the spatial axes of ``cube``. ``mean_1`` starts at the
-        blue peak and ``mean_2`` at the red one, but a fit can swap them.
-
-    Notes
-    -----
-    Where `~irispy.utils.mg_features.calculate_mg_features` finds the peaks of a spectrum
-    :cite:p:`pereira2013`, they set its Gaussians' centers and amplitudes; elsewhere these start at
-    the medians over the cube. Each width starts at the median distance of its peak from the line
-    center (k3 or h3) over the cube, and the background at each spectrum's 10th percentile.
-
-    The centers stay within ``velocity_range`` of the rest wavelength and the amplitudes nonnegative.
-
-    The rest wavelengths are the vacuum values of :cite:t:`depontieu2014`. The Gaussians are a
-    proxy for the emission peaks, not a radiative-transfer inversion; :cite:t:`itn39` warns that
-    the peaks are hard to recover from them in complex profiles, such as those of flare ribbons.
-    """
-    check_scaled(cube)
-    wavelength = _wavelength(cube)
-    covered = [
-        (line, rest)
-        for line, rest in (("k", _documented_wavelength("Mg II", 2796)), ("h", _documented_wavelength("Mg II", 2803)))
-        if wavelength.min() <= rest * u.AA <= wavelength.max()
-    ]
-    if not covered:
-        msg = "The cube covers neither the Mg II k nor the h line."
-        raise ValueError(msg)
-    line, rest = covered[0]
-    _check_window(wavelength, rest)
-    rest_wavelength = rest * u.AA
-    velocity_range = u.Quantity(velocity_range, u.km / u.s)
-    features = calculate_mg_features(cube, velocity_range=velocity_range, lines=(line,))
-    background = _background_level(_spectra(cube))
-
-    def start(values, name):
-        if np.all(np.isnan(values)):
-            msg = f"No {name} found in the cube; build a model with profiles_on_background instead."
-            raise ValueError(msg)
-        return np.where(np.isnan(values), np.nanmedian(values), values)
-
-    def peak_wavelength(feature):
-        return rest_wavelength * (1 + features[f"{feature}_velocity"].data * u.km / u.s / _SPEED_OF_LIGHT)
-
-    core = start(peak_wavelength(f"{line}3"), f"{line}3 line center")
-    peaks = [f"{line}2v", f"{line}2r"]
-    centers = u.Quantity([start(peak_wavelength(peak), f"{peak} peak") for peak in peaks])
-    amplitudes = np.clip(
-        [start(features[f"{peak}_intensity"].data, f"{peak} peak") - background for peak in peaks], 0, None
-    )
-    limits = (rest_wavelength * (1 + velocity_range / _SPEED_OF_LIGHT)).to(u.AA)
-    # Per-spectrum widths start the fits in more local minima, as a misplaced peak gives a tiny width.
-    distance = np.abs(centers - core)
-    widths = np.broadcast_to(
-        np.median(distance, axis=tuple(range(1, distance.ndim)), keepdims=True), distance.shape, subok=True
-    )
-    return profiles_on_background(
-        centers,
-        amplitudes=amplitudes * cube.unit,
-        widths=widths,
-        background_level=background * cube.unit,
-        bounds={
-            "mean_1": limits,
-            "mean_2": limits,
-            "amplitude_1": (0, None),
-            "amplitude_2": (0, None),
-        },
-    )
 
 
 def starts_from_model(model, cube):
@@ -355,9 +138,9 @@ def starts_from_model(model, cube):
     Parameters
     ----------
     model : `~astropy.modeling.Model`
-        A model with one value per parameter, such as one fitted to a spectrum of ``cube``, and
-        the sum of its components, such as lines on a background. Parameters without units are
-        taken in Å and the unit of ``cube``.
+        A model with one value per parameter, such as one from `line_model` or one fitted to a
+        spectrum of ``cube``, and the sum of its components, such as lines on a background.
+        Parameters without units are taken in Å and the unit of ``cube``.
     cube : `~irispy.spectrograph.SpectrogramCube`
         The cube to fit, read with ``memmap=False`` and cropped to the wavelengths to fit.
 
@@ -709,16 +492,6 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None, resi
     return RasterCollection(cubes, aligned_axes=(map_axes,) * (len(cubes) - 1) + (residual_axes,))
 
 
-class NonThermalQualityFlag(_QualityFlag):
-    """
-    Quality flags for the non-thermal velocities of `non_thermal_velocity`.
-    """
-
-    OK = (0, "ok")
-    NO_DATA = (1, "the width is NaN or masked")
-    TOO_NARROW = (2, "the width is not above the instrumental and thermal widths")
-
-
 def non_thermal_velocity(fwhm, wavelength, *, instrumental_fwhm=None, thermal_fwhm=None, temperature=None, ion=None):
     r"""
     The non-thermal velocity of a line from a map of its full width at half maximum.
@@ -756,10 +529,12 @@ def non_thermal_velocity(fwhm, wavelength, *, instrumental_fwhm=None, thermal_fw
 
     Returns
     -------
-    `~irispy.spectrograph.RasterCollection`
-        ``"non_thermal_velocity"``, in km/s with the WCS and mask of ``fwhm`` and its uncertainty
-        propagated to first order if ``fwhm`` has one, NaN where the observed width is non-positive
-        or not above the others, and ``"quality"``, a `NonThermalQualityFlag` for each pixel.
+    `~irispy.spectrograph.SpectrogramCube`
+        The non-thermal velocity in km/s, with the WCS of ``fwhm`` and its uncertainty propagated to
+        first order if ``fwhm`` has one. It is masked where the width is masked or missing, or not
+        above the instrumental and thermal widths. For a result ``v``,
+        ``v.mask & ~fwhm.mask & np.isfinite(fwhm.data)`` picks out the pixels where the width is too
+        narrow.
 
     Notes
     -----
@@ -800,25 +575,12 @@ def non_thermal_velocity(fwhm, wavelength, *, instrumental_fwhm=None, thermal_fw
         width**2 - u.Quantity(instrumental_fwhm).to_value(u.AA) ** 2 - u.Quantity(thermal_fwhm).to_value(u.AA) ** 2
     )
     scale = (constants.c / (wavelength * np.sqrt(4 * np.log(2)))).to_value(u.km / u.s / u.AA)
-    broadened = (width > 0) & (radicand > 0)
     with np.errstate(invalid="ignore"):
-        velocity = np.where(broadened, scale * np.sqrt(radicand), np.nan)
-    missing = ~np.isfinite(width) | (False if fwhm.mask is None else np.asarray(fwhm.mask, dtype=bool))
-    quality = np.where(missing, NonThermalQualityFlag.NO_DATA, NonThermalQualityFlag.OK).astype(np.uint8)
-    quality[~missing & ~broadened] = NonThermalQualityFlag.TOO_NARROW
+        velocity = np.where((width > 0) & (radicand > 0), scale * np.sqrt(radicand), np.nan)
     uncertainty = None
     if (sigma := standard_deviation(fwhm)) is not None:
         width_error = sigma * fwhm.unit.to(u.AA)
         # dv/dW = scale**2 W / v
         with np.errstate(invalid="ignore", divide="ignore"):
             uncertainty = StdDevUncertainty(scale**2 * width * width_error / velocity)
-    return RasterCollection(
-        [
-            (
-                "non_thermal_velocity",
-                make_map_cube(fwhm, velocity, u.km / u.s, mask_invalid=True, uncertainty=uncertainty),
-            ),
-            ("quality", make_map_cube(fwhm, quality, u.dimensionless_unscaled)),
-        ],
-        aligned_axes=tuple(range(fwhm.data.ndim)),
-    )
+    return make_map_cube(fwhm, velocity, u.km / u.s, mask_invalid=True, uncertainty=uncertainty)

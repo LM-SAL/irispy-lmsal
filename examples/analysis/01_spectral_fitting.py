@@ -4,7 +4,7 @@ Fit Spectral Models to Spectra
 ==============================
 
 In this example, we are going to fit Si IV 1403 from IRIS with a single Gaussian, starting
-from `~irispy.utils.fitting.si_iv_1403_model`. Then we will use the fitted values to make
+from `~irispy.utils.fitting.line_model`. Then we will use the fitted values to make
 maps of the line's flux, Doppler shift, width and non-thermal velocity.
 
 :ref:`irispy-tutorial-fitting` explains the fitting call and what to watch out for.
@@ -27,7 +27,7 @@ from astropy.wcs.utils import wcs_to_celestial_frame
 from sunpy.coordinates.frames import Helioprojective
 
 from irispy.io import read_files
-from irispy.utils.fitting import maps_from_fit, non_thermal_velocity, si_iv_1403_model
+from irispy.utils.fitting import line_model, maps_from_fit, non_thermal_velocity, starts_from_model
 from irispy.utils.lines import get_lines
 
 ###############################################################################
@@ -84,12 +84,13 @@ si_iv_1403 = si_iv_1403.crop(lower_corner, upper_corner)
 si_iv_spec_crop = si_iv_1403.crop([SpectralCoord(si_iv_core), None], [SpectralCoord(si_iv_core), None])
 
 ###############################################################################
-# `~irispy.utils.fitting.si_iv_1403_model` starts every spectrum's Gaussian from the
-# data, on a constant background. We fit it to every spectrum with
-# `~astropy.modeling.fitting.parallel_fit_dask`, passing the wavelengths in Å and
-# giving the masked samples no weight.
+# `~irispy.utils.fitting.line_model` puts a Gaussian at the rest wavelength of Si IV
+# on a constant background, and `~irispy.utils.fitting.starts_from_model` starts it in
+# every spectrum at that spectrum's peak above its background. We fit it to every
+# spectrum with `~astropy.modeling.fitting.parallel_fit_dask`, passing the wavelengths
+# in Å and giving the masked samples no weight.
 
-model = si_iv_1403_model(si_iv_1403)
+model = starts_from_model(line_model(["Si IV 1403"]), si_iv_1403)
 wavelength = si_iv_1403.axis_world_coords("em.wl")[0].to(u.AA)
 good = np.isfinite(si_iv_1403.data) & ~si_iv_1403.mask
 fitter = TRFLSQFitter()
@@ -180,9 +181,7 @@ fig.tight_layout()
 # equilibrium, log T = 4.9 :cite:p:`dere2023`. Lines narrower than that have no
 # non-thermal velocity.
 
-non_thermal = non_thermal_velocity(maps["fwhm_1"], si_iv_core, ion="Si IV", temperature=10**4.9 * u.K)[
-    "non_thermal_velocity"
-]
+non_thermal = non_thermal_velocity(maps["fwhm_1"], si_iv_core, ion="Si IV", temperature=10**4.9 * u.K)
 
 fig = plt.figure()
 ax = fig.add_subplot(projection=non_thermal.wcs)

@@ -7,12 +7,10 @@ Fitting spectral lines
 ``irispy`` does not provide line fitting as astropy already handles this.
 What ``irispy`` adds, in `irispy.utils.fitting`, are starting models for IRIS lines:
 
-* `~irispy.utils.fitting.profiles_on_background`: any number of Gaussian or Lorentzian lines on a constant or linear background, from user inputs.
-* `~irispy.utils.fitting.si_iv_1403_model`: one line for Si IV 140.277 nm, started for every spectrum from the data.
-* `~irispy.utils.fitting.mg_ii_model`: two Gaussians for the emission peaks of the Mg II k or h line core, started from `~irispy.utils.mg_features.calculate_mg_features`.
-* `~irispy.utils.fitting.starts_from_model`: any model fitted to one spectrum, started for every spectrum from its own background and peaks.
+* `~irispy.utils.fitting.line_model`: a Gaussian for each documented line you name, on a constant background, with two for the emission peaks of Mg II k and h.
+* `~irispy.utils.fitting.starts_from_model`: that model, or any model fitted to one spectrum, started for every spectrum from its own background and peaks.
 
-Every starting parameter can be an array over the spatial axes of a cube, so each spectrum gets its own starting values.
+Build a model with one value per parameter and let `~irispy.utils.fitting.starts_from_model` give each spectrum its own: a compound model built with array parameters fits every spectrum to NaN without an error (`astropy#20554 <https://github.com/astropy/astropy/issues/20554>`__).
 
 Fitting a cube
 ==============
@@ -27,15 +25,14 @@ We use the Si IV 1394 window of the sample raster, which is the sample data of t
     >>> from astropy.modeling.fitting import TRFLSQFitter, parallel_fit_dask
     >>> import irispy.data.sample as sample_data  # doctest: +REMOTE_DATA
     >>> from irispy.io import read_files
-    >>> from irispy.utils.fitting import profiles_on_background
+    >>> from irispy.utils.fitting import line_model, starts_from_model
 
     >>> raster = read_files(sample_data.RASTER_FITS, spectral_windows="Si IV 1394", uncertainty=True)  # doctest: +REMOTE_DATA
     >>> cube = raster["Si IV 1394"][0]  # doctest: +REMOTE_DATA
 
-The starting models of `~irispy.utils.fitting` describe the lines of a few documented windows and no other: `~irispy.utils.fitting.si_iv_1403_model` is for the Si IV 1403 window, which this sample does not have.
-For any other line, `~irispy.utils.fitting.profiles_on_background` builds the model from starting values that you choose.
-The model also describes one line, so the cube has to be cropped to it.
-The Si IV 1394 window holds Fe II, Ni II and O IV lines as well as Si IV 139.376 nm; the :doc:`line catalog </line_database>` lists them.
+`~irispy.utils.fitting.line_model` names the lines by their ion and wavelength in Å, as in the :doc:`line catalog </line_database>`.
+The model has only the lines that you name, so the cube has to be cropped to them.
+The Si IV 1394 window holds Fe II, Ni II and O IV lines as well as Si IV 139.376 nm; the catalog lists them.
 Here we keep the wavelengths halfway to the Ni II and O IV lines on either side of Si IV:
 
 .. code-block:: python
@@ -49,22 +46,17 @@ Here we keep the wavelengths halfway to the Ni II and O IV lines on either side 
     >>> cube = cube.crop([SpectralCoord(window[0]), None], [SpectralCoord(window[1]), None])  # doctest: +REMOTE_DATA
     >>> cube = cube[:, 410:470]  # doctest: +REMOTE_DATA
 
-The line is faint in this quiet part of the sample, a few DN above the background, so the starting values are small.
-They are the line center at its rest wavelength, an amplitude of 5 DN, a standard deviation of 0.1 Å and a background of 0.5 DN, with the center bounded to 0.25 Å of the rest wavelength:
+`~irispy.utils.fitting.line_model` puts a Gaussian at the rest wavelength of Si IV, with a standard deviation of 0.05 Å, on a constant background.
+`~irispy.utils.fitting.starts_from_model` starts it in every spectrum at that spectrum's peak above its background:
 
 .. code-block:: python
 
-    >>> model = profiles_on_background(  # doctest: +REMOTE_DATA
-    ...     si_iv[np.newaxis],
-    ...     amplitudes=[5] * cube.unit,
-    ...     widths=[0.1] * u.AA,
-    ...     background_level=0.5 * cube.unit,
-    ...     bounds={"mean_1": (si_iv - 0.25 * u.AA, si_iv + 0.25 * u.AA)},
-    ... )
+    >>> model = starts_from_model(line_model(["Si IV 1394"]), cube)  # doctest: +REMOTE_DATA
     >>> model.param_names  # doctest: +REMOTE_DATA
     ('amplitude_0', 'amplitude_1', 'mean_1', 'stddev_1')
+    >>> model.mean_1.shape  # doctest: +REMOTE_DATA
+    (16, 60)
 
-Every starting parameter can instead be an array over the spatial axes, as `~irispy.utils.fitting.si_iv_1403_model` does from the data.
 The background is component 0 and the line component 1.
 Now we fit every spectrum:
 
@@ -131,9 +123,9 @@ The signal-to-noise ratio of the line is the fitted amplitude over its 1σ error
     >>> reduced_chi2 = chi2 / (good.sum(axis=-1) - len(fitted.param_names))  # doctest: +REMOTE_DATA
     >>> converged = maps["quality"].data == FitQualityFlag.OK  # doctest: +REMOTE_DATA
     >>> f"{converged.mean():.0%}", int((converged & (snr > 3)).sum())  # doctest: +REMOTE_DATA
-    ('70%', 42)
+    ('80%', 73)
 
-Here the fitter converged for 70% of the 960 spectra, but only 42 of those have a signal-to-noise ratio above 3.
+Here the fitter converged for 80% of the 960 spectra, but only 73 of those have a signal-to-noise ratio above 3.
 There is no universal threshold: choose one for your science case, and keep the fits above it.
 A reduced chi-square near 1 means that the model describes the spectrum within its uncertainties, which a fit to pure noise does as well, so it is a check of the model and of the uncertainties and not of the presence of the line.
 Values well above 1 point to a profile that the model does not describe, such as a blend or a second component, or to uncertainties that are too small.
@@ -159,18 +151,17 @@ The mean leaves out masked and missing samples, and its uncertainty at each wave
 
 ``region.rebin`` with ``propagate_uncertainties=True`` also averages with uncertainties, but its cost grows with the square of the number of pixels in a bin, so it gets slow for large regions.
 
-The model is a narrow core and a broad component on a constant background.
+The model, built with astropy, is a narrow core and a broad component on a constant background.
 The fit may return them in either order, so the narrower one is the core:
 
 .. code-block:: python
 
-    >>> from irispy.utils.fitting import starts_from_model
-    >>> core_and_broad = profiles_on_background(  # doctest: +REMOTE_DATA
-    ...     [si_iv, si_iv],
-    ...     amplitudes=[1, 1] * region.unit,
-    ...     widths=[0.03, 0.1] * u.AA,
-    ...     background_level=0.3 * region.unit,
-    ... )
+    >>> from astropy.modeling import models
+    >>> core_and_broad = (
+    ...     models.Const1D(0.3 * region.unit)
+    ...     + models.Gaussian1D(1 * region.unit, si_iv, 0.03 * u.AA)
+    ...     + models.Gaussian1D(1 * region.unit, si_iv, 0.1 * u.AA)
+    ... )  # doctest: +REMOTE_DATA
     >>> mean_fit = TRFLSQFitter()(core_and_broad, wavelength, spectrum * region.unit, weights=1 / spectrum_error)  # doctest: +REMOTE_DATA
     >>> core, broad = sorted([1, 2], key=lambda i: mean_fit[i].stddev)  # doctest: +REMOTE_DATA
     >>> print(f"{mean_fit[core].stddev.quantity:.2f}, {mean_fit[broad].stddev.quantity:.2f}")  # doctest: +REMOTE_DATA
@@ -211,11 +202,11 @@ The quadrature subtraction assumes Gaussian profiles; do not pass the width of a
 
     >>> from irispy.utils.fitting import non_thermal_velocity
     >>> non_thermal = non_thermal_velocity(maps["fwhm_1"], si_iv, ion="Si IV", temperature=10**4.9 * u.K)  # doctest: +REMOTE_DATA
-    >>> non_thermal["non_thermal_velocity"].unit  # doctest: +REMOTE_DATA
+    >>> non_thermal.unit  # doctest: +REMOTE_DATA
     Unit("km / s")
 
-Where the observed width is non-positive or not above the other two, the velocity is NaN and ``non_thermal["quality"]`` is `~irispy.utils.fitting.NonThermalQualityFlag.TOO_NARROW`.
-Valid pixels are still processed, and missing or masked widths retain the `~irispy.utils.fitting.NonThermalQualityFlag.NO_DATA` flag.
+The velocity is masked where the width is masked or missing, or not above the other two;
+``non_thermal.mask & ~maps["fwhm_1"].mask & np.isfinite(maps["fwhm_1"].data)`` picks out the pixels where it is too narrow.
 
 Things to know
 ==============
@@ -238,11 +229,11 @@ Things to know
   When a line is not much brighter than the noise, its fit is poorly constrained whatever its start.
   Average neighboring spectra first, keeping the uncertainties with ``cube.rebin((2, 2, 1), propagate_uncertainties=True)``.
 * **Two Gaussians can swap**
-  In `~irispy.utils.fitting.mg_ii_model`, ``mean_1`` starts at the blue peak and ``mean_2`` at the red one, but both may move anywhere within the velocity range.
-  In the gallery example about one fit in a thousand ends with them the other way round, so sort the components by velocity before combining their maps.
+  In `~irispy.utils.fitting.line_model`, the k2v Gaussian starts at the blue peak and the k2r one at the red peak, but both may move anywhere within 40 km/s of the rest wavelength.
+  A fit can end with them the other way round, so sort the components by velocity before combining their maps.
 * **Several components**
-  `~irispy.utils.fitting.si_iv_1403_model` offers one component because the layout of several depends on what is observed:
+  `~irispy.utils.fitting.line_model` gives each line one Gaussian because the layout of several depends on what is observed:
   a narrow and a broad Gaussian with one centroid in active-region loops :cite:p:`dudik2017`, a static and a redshifted component in flare ribbons :cite:p:`yu2020`, and components tens of km/s from the line center in UV bursts :cite:p:`peter2014,young2018`.
-  Build such a model with `~irispy.utils.fitting.profiles_on_background` and starts that suit your data.
+  Build such a model with astropy, as for the mean spectrum above, and start it with `~irispy.utils.fitting.starts_from_model`.
 
 The gallery examples :ref:`sphx_glr_generated_gallery_analysis_01_spectral_fitting.py` and :ref:`sphx_glr_generated_gallery_analysis_07_mg_ii_two_gaussian_fitting.py` plot such maps.
