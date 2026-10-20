@@ -14,12 +14,7 @@ from irispy.io.sji import read_sji_lvl2
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.spectrograph import SpectrogramCubeSequence
 from irispy.tests.helpers import mark_saturated
-from irispy.utils.bursts import (
-    find_bright_image_events,
-    find_bright_spectral_events,
-    find_si_iv_bursts,
-    find_sji_bursts,
-)
+from irispy.utils.bursts import find_bright_image_events, find_bright_spectral_events, find_si_iv_bursts
 from irispy.utils.constants import DN_UNIT, SATURATION_LIMIT
 
 IRISPY_DATA = "https://github.com/LM-SAL/irispy-data/releases/download/v1"
@@ -162,7 +157,7 @@ def test_bright_spectral_events_nuv():
 def test_sji_matches_idl_with_updated_fill_mask(bursts_sjicube_1400):
     idl = Table.read(get_test_filepath("bursts/iris_sji_burst_check_4000255147_pixels.ecsv"))
     summary = Table.read(SJI_SUMMARY)
-    labels, events = find_sji_bursts(bursts_sjicube_1400)
+    labels, events = find_bright_image_events(bursts_sjicube_1400)
     for frame in range(len(bursts_sjicube_1400.data)):
         pixels = idl[idl["frame"] == frame]
         if frame == 0:
@@ -193,10 +188,10 @@ def test_sji_edge_and_small_events(bursts_sjicube_1400):
     sji.data[0, :2, :2] = 1e5  # IDL's REGION_GROW leaves edge pixels out of every region
     sji.mask[0, :2, :2] = False  # they are fill in this file
     sji.data[0, 200, 200] = 1e5
-    labels, _ = find_sji_bursts(sji)
+    labels, _ = find_bright_image_events(sji)
     assert labels.data[0, :2, :2].all()
     assert labels.data[0, 200, 200] == 0
-    labels, _ = find_sji_bursts(sji, min_pixels=1)
+    labels, _ = find_bright_image_events(sji, min_pixels=1)
     assert labels.data[0, 200, 200] > 0
 
 
@@ -204,32 +199,22 @@ def test_sji_frames_without_valid_pixels(bursts_sjicube_1400):
     sji = copy.deepcopy(bursts_sjicube_1400)
     sji.mask[1] = True
     sji.meta["saturated"][1] = False  # nor saturated ones, which count at their value though masked
-    _, events = find_sji_bursts(sji)
+    _, events = find_bright_image_events(sji)
     assert 1 not in events["frame"]
     saturated = np.zeros(sji.data.shape, dtype=bool)
     saturated[0, 100, 100:102] = True
     sji.data[saturated] = SATURATION_LIMIT.value
     mark_saturated(sji, saturated)  # as the readers mark clipped pixels: masked, but bright at their value
-    labels, events = find_sji_bursts(sji)
+    labels, events = find_bright_image_events(sji)
     assert np.isfinite(events["threshold"]).all()
     assert labels.data[0, 100, 100] == labels.data[0, 100, 101] > 0
 
 
-def test_sji_errors(sns_sjicube_1330, bursts_sjicube_1400, bursts_sji_1400_file):
-    with pytest.raises(ValueError, match="not 1330"):
-        find_sji_bursts(sns_sjicube_1330)
+def test_sji_errors(bursts_sjicube_1400, bursts_sji_1400_file):
     with pytest.raises(ValueError, match="unscaled"):
-        find_sji_bursts(read_sji_lvl2(bursts_sji_1400_file, memmap=True))
+        find_bright_image_events(read_sji_lvl2(bursts_sji_1400_file, memmap=True))
     with pytest.raises(ValueError, match="slice with a range"):
-        find_sji_bursts(bursts_sjicube_1400[0])
-
-
-def test_bright_image_events_any_band(sns_sjicube_1330):
-    sji = copy.deepcopy(sns_sjicube_1330)
-    sji.data[0, 20:23, 20:23] = 1e5
-    labels, events = find_bright_image_events(sji)
-    assert labels.data[0, 20:23, 20:23].all()
-    assert list(events[events["frame"] == 0]["npix"]) == [9]
+        find_bright_image_events(bursts_sjicube_1400[0])
 
 
 def test_bright_image_events_labels_do_not_share_coordinates(sns_sjicube_1330):
@@ -258,7 +243,7 @@ def test_sji_first_frames_match_idl_with_updated_fill_mask():
     )
     summary = Table.read(SJI_SUMMARY)[:50]
     cube = read_sji_lvl2(filename)
-    labels, events = find_sji_bursts(cube)
+    labels, events = find_bright_image_events(cube)
     np.testing.assert_array_equal(np.bincount(events["frame"], minlength=50), summary["nevents"])
     # IDL included -199 in the statistics. Excluding it lowers the thresholds in
     # frames 0, 37 and 49 from 927.1769, 1115.0644 and 936.1964 DN to
