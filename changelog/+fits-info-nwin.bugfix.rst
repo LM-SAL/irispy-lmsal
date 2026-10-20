@@ -1,0 +1,1 @@
+``irispy.io.fits_info`` now works on AIA and SOT files: it no longer raises ``KeyError: 'TWMIN1'`` and labels their image HDU by its band, such as ``1700`` or ``G band 4305``, instead of "Auxiliary data".
