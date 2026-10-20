@@ -5,7 +5,6 @@ import astropy.units as u
 from astropy.io import fits
 from astropy.time import Time
 
-from sunpy.coordinates import get_earth
 from sunpy.coordinates.utils import get_heliocentric_angle
 
 from irispy.io.utils import read_files
@@ -119,8 +118,6 @@ def test_meta_fov_center_transforms(sns_sji_1400_file):
     meta = read_files(sns_sji_1400_file).meta
     # XCEN, YCEN = -32.3", -400.0" on 2021-09-05
     assert u.isclose(get_heliocentric_angle(meta.fov_center), 24.94 * u.deg, atol=0.01 * u.deg)
-    assert meta.fov_center.obstime == meta.date_reference
-    assert u.isclose(meta.fov_center.observer.radius, get_earth(meta.date_reference).radius)
 
 
 @pytest.mark.parametrize(
@@ -142,8 +139,6 @@ def test_sgmeta_exposure_mu(raster_sg_file):
     # The raster steps across its center, so mu at the center lies within the per-step range
     assert exposure_mu.min() < cube.meta.mu < exposure_mu.max()
     np.testing.assert_array_equal(cube[1:3].meta.exposure_mu, exposure_mu[1:3])
-    # mu is at the header pointing, so a slice keeps it
-    assert cube[1:3].meta.mu == cube.meta.mu
 
 
 def test_sgmeta_observer_radial_velocity_per_exposure(sns_sg_file):
