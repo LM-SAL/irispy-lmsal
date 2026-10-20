@@ -1,6 +1,7 @@
 import shutil
 import subprocess
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -63,6 +64,12 @@ def test_generate_wobble_movie_one_frame(sns_sjicube_2832, tmp_path, figures):
     # The figure is closed, so making more than 20 movies does not trip matplotlib's open-figure warning
     assert not plt.get_fignums()
     np.testing.assert_array_equal(figures[0].axes[0].images[0].get_array(), sns_sjicube_2832[0].data)
+
+
+def test_generate_wobble_movie_without_ffmpeg(sns_sjicube_2832, tmp_path):
+    with mpl.rc_context({"animation.ffmpeg_path": str(tmp_path / "ffmpeg")}), pytest.raises(FileNotFoundError):
+        generate_wobble_movie(sns_sjicube_2832[:1], outdir=tmp_path)
+    assert not plt.get_fignums()
 
 
 def test_generate_wobble_movie_trim_without_common_data(sns_sjicube_2832, tmp_path):

@@ -121,6 +121,8 @@ def generate_wobble_movie(
     anim = animation.FuncAnimation(fig, func=update, frames=frames, blit=True, repeat=False)
     clean_filename = re.sub(r"[^\w\-_\. ]", "_", f"{cube.meta['TDESC1']}_{times[0].isot.split('.')[0]}_wobble.mp4")
     filename = Path(outdir) / clean_filename
-    anim.save(filename, writer=animation.FFMpegWriter(fps=12))
-    plt.close(fig)
+    try:
+        anim.save(filename, writer=animation.FFMpegWriter(fps=12))
+    finally:
+        plt.close(fig)
     return filename
