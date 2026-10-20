@@ -200,7 +200,7 @@ def test_calculate_moments_known_gaussian():
     width = moments["width"]
     velocity = moments["velocity"]
     velocity_width = moments["velocity_width"]
-    # Intensity is the per-pixel sum (default integrated=False)
+    # Intensity is the per-pixel sum
     expected_intensity = np.sum(gauss(wvls.value))
     assert_quantity_allclose(intensity.data[0, 0] * intensity.unit, expected_intensity * u.DN, rtol=0.01)
     # Centroid should be close to the Gaussian mean
@@ -477,23 +477,18 @@ def test_calculate_moments_masks_pixels_without_samples():
     assert moments["intensity"].data[0, 1] == 0
 
 
-def test_calculate_moments_integrated():
-    """
-    Test that integrated=True returns intensity in DN·nm.
-    """
+def test_calculate_moments_integrated_intensity_recipe():
+    # The Notes recipe gives the analytic integral, also on a decreasing axis
     wvls = np.linspace(1402.0, 1403.5, 100) * u.Angstrom
-    gauss = Gaussian1D(amplitude=10.0, mean=1402.77, stddev=0.05)
-    spectrum = gauss(wvls.value)
-    data = spectrum.reshape(1, 1, -1)
-    cube = make_test_spectrogram_cube(data, wvls)
-    moments = calculate_moments(
-        cube, rest_wavelength=1402.77 * u.Angstrom, velocity_range=(-214, 214) * u.km / u.s, integrated=True
-    )
-    intensity = moments["intensity"]
-    assert intensity.unit == u.DN * u.nm
-    # Intensity value should be the analytic integral
-    expected_intensity = np.sqrt(2 * np.pi) * 10.0 * 0.005
-    assert_quantity_allclose(intensity.data[0, 0] * intensity.unit, expected_intensity * u.DN * u.nm, rtol=0.01)
+    spectrum = Gaussian1D(amplitude=10.0, mean=1402.77, stddev=0.05)(wvls.value)
+    for cube in (
+        make_test_spectrogram_cube(spectrum.reshape(1, 1, -1), wvls),
+        make_test_spectrogram_cube(spectrum[::-1].reshape(1, 1, -1), wvls[::-1]),
+    ):
+        moments = calculate_moments(cube, rest_wavelength=1402.77 * u.Angstrom, velocity_range=(-214, 214) * u.km / u.s)
+        intensity = (moments["intensity"] * abs(cube.spectral_dispersion)).to(cube.unit * u.AA)
+        expected_intensity = np.sqrt(2 * np.pi) * 10.0 * 0.05 * u.DN * u.AA
+        assert_quantity_allclose(intensity.data[0, 0] * intensity.unit, expected_intensity, rtol=0.01)
 
 
 def test_calculate_moments_preserves_time_without_spectral_global_coord(sns_sg_file):
@@ -571,27 +566,6 @@ def test_calculate_moments_uncertainty_types_and_invalid_pixels():
         assert np.isnan(moment.uncertainty.array[0, 1])  # below min_intensity
     for moment in calculate_moments(make_test_spectrogram_cube(np.ones((1, 1, 3)), wavelengths)).values():
         assert moment.uncertainty is None
-
-
-def test_calculate_moments_uncertainty_integrated():
-    # integrated=True scales only the intensity and its error, by the step, also on a decreasing axis
-    wavelengths = [500.0, 500.5, 501.0] * u.nm
-    ascending = make_test_spectrogram_cube(
-        [[[1.0, 2.0, 4.0]]], wavelengths, uncertainty=StdDevUncertainty([[[0.1, 0.2, 0.3]]])
-    )
-    descending = make_test_spectrogram_cube(
-        [[[4.0, 2.0, 1.0]]], wavelengths[::-1], uncertainty=StdDevUncertainty([[[0.3, 0.2, 0.1]]])
-    )
-    summed = calculate_moments(ascending, rest_wavelength=500.5 * u.nm)
-    for cube in (ascending, descending):
-        integrated = calculate_moments(cube, rest_wavelength=500.5 * u.nm, integrated=True)
-        for key, moment in summed.items():
-            scale = 0.5 if key == "intensity" else 1
-            np.testing.assert_allclose(integrated[key].data, scale * moment.data, err_msg=key)
-            if key != "saturated":
-                np.testing.assert_allclose(
-                    integrated[key].uncertainty.array, scale * moment.uncertainty.array, err_msg=key
-                )
 
 
 def test_calculate_moments_uncertainty_nan_where_undefined():

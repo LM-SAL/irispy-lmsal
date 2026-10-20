@@ -15,7 +15,7 @@ from irispy.utils.utils import _boolean_mask, _saturated_samples
 __all__ = ["average_window", "calculate_moments"]
 
 
-def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integrated=False, min_intensity=None):
+def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_intensity=None):
     r"""
     Calculate the 0th, 1st and 2nd spectral moments of a spectrogram cube.
 
@@ -34,10 +34,6 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
     velocity_range : `astropy.units.Quantity`, optional
         ``(lower, upper)`` Doppler velocities from ``rest_wavelength`` within which to use the samples
         (km/s if unitless). Defaults to the whole spectrum.
-    integrated : `bool`, optional
-        If `True`, multiply the 0th moment by the mean wavelength spacing, giving
-        :math:`\int I(\lambda) \, d\lambda` in ``cube.unit * nm``; the other moments do not change.
-        Defaults to `False`, a sum in ``cube.unit`` as in Gaussian fitting.
     min_intensity : `float` or `astropy.units.Quantity`, optional
         Pixels whose 0th moment is below this get NaN in every map.
 
@@ -46,7 +42,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
     `irispy.spectrograph.RasterCollection`
         `~irispy.spectrograph.SpectrogramCube` maps with the spatial WCS of ``cube``:
 
-        * ``"intensity"`` — 0th moment
+        * ``"intensity"`` — 0th moment, in ``cube.unit``
         * ``"centroid"`` — 1st moment, in nm
         * ``"width"`` — 2nd moment, in nm
         * ``"velocity"`` — Doppler velocity of the centroid in km/s, if ``rest_wavelength`` is known
@@ -58,6 +54,8 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
 
     Notes
     -----
+    * For :math:`\int I(\lambda) \, d\lambda`, multiply the 0th moment by the wavelength step:
+      ``(moments["intensity"] * abs(cube.spectral_dispersion)).to(cube.unit * u.AA)``.
     * Negative, non-finite and masked samples are set to zero and add no uncertainty.
     * Pixels with a saturated sample within ``velocity_range`` are NaN in every moment map and `True`
       in ``"saturated"``. Saturated samples are those the mask and ``cube.meta["saturated"]`` both
@@ -120,18 +118,8 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
     dropped = (data < 0) | ~np.isfinite(data) | mask
     data[dropped] = 0
 
-    dwvl = np.abs(np.mean(np.diff(wavelengths)))
-    data_moved = np.moveaxis(data, wavelength_axis, -1)
+    weights = np.moveaxis(data, wavelength_axis, -1)
     wvls = wavelengths.value
-    dwvl_value = dwvl.value
-
-    if integrated:
-        weights = data_moved * dwvl_value
-        intensity_unit = cube.unit * dwvl.unit
-    else:
-        weights = data_moved
-        intensity_unit = cube.unit
-
     intensity_value = np.nansum(weights, axis=-1)
     intensity_nonzero = intensity_value != 0
     centroid_numerator = np.nansum(weights * wvls, axis=-1)
@@ -145,7 +133,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
     stddev_value = np.sqrt(variance_value)
 
     if min_intensity is not None:
-        low_intensity = intensity_value < u.Quantity(min_intensity, intensity_unit).value
+        low_intensity = intensity_value < u.Quantity(min_intensity, cube.unit).value
         intensity_value = np.where(low_intensity, np.nan, intensity_value)
         centroid_value = np.where(low_intensity, np.nan, centroid_value)
         stddev_value = np.where(low_intensity, np.nan, stddev_value)
@@ -157,7 +145,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
     errors = {}
     if sigma is not None:
         # First-order propagation of independent sample errors.
-        weight_sigma = np.moveaxis(np.where(dropped, 0, sigma), wavelength_axis, -1) * (dwvl_value if integrated else 1)
+        weight_sigma = np.moveaxis(np.where(dropped, 0, sigma), wavelength_axis, -1)
         weight_variance = weight_sigma**2
         kept = (~dropped).sum(axis=wavelength_axis)
         with np.errstate(invalid="ignore", divide="ignore"):
@@ -170,7 +158,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, integr
             errors["width"] = np.where(np.count_nonzero(weights, axis=-1) > 1, width_error, np.nan)
 
     maps = [
-        ("intensity", intensity_value, intensity_unit),
+        ("intensity", intensity_value, cube.unit),
         ("centroid", centroid_value, wavelengths.unit),
         ("width", stddev_value, wavelengths.unit),
     ]
@@ -222,8 +210,8 @@ def average_window(cube, wavelength_range, *, method="mean"):
       no sample left are NaN and masked, as are pixels with a saturated sample (see `calculate_moments`).
     * Uncertainties are propagated taking the samples as independent, treating an
       `~astropy.nddata.UnknownUncertainty` as a standard deviation, as in `calculate_moments`.
-    * For :math:`\int I(\lambda) \, d\lambda`, multiply a sum by the absolute wavelength step,
-      ``abs(cube.spectral_dispersion)``.
+    * For :math:`\int I(\lambda) \, d\lambda`, multiply a sum by the wavelength step:
+      ``(average_window(cube, wavelength_range, method="sum") * abs(cube.spectral_dispersion)).to(cube.unit * u.AA)``.
     """
     check_scaled(cube)
     if method not in {"mean", "sum"}:
