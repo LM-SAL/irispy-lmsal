@@ -14,7 +14,7 @@ from astropy.coordinates import SkyCoord
 from astropy.table import QTable, vstack
 from astropy.time import Time
 
-from irispy.spectrograph import SpectrogramCubeSequence
+from irispy.spectrograph import MosaicCube, SpectrogramCubeSequence
 from irispy.utils._spectral import check_scaled, make_map_cube, make_spatial_template
 from irispy.utils.constants import DN_UNIT
 from irispy.utils.response import get_interpolated_effective_area, get_latest_response
@@ -129,6 +129,9 @@ def find_bright_spectral_events(
         The coordinates of a sequence are in the frame of its first raster.
         ``events.meta["threshold"]`` is the threshold.
     """
+    if isinstance(raster, MosaicCube):
+        msg = "The burst finders need the exposure time of each raster step, which a mosaic does not have"
+        raise TypeError(msg)
     cubes = raster.data if isinstance(raster, SpectrogramCubeSequence) else [raster]
     meta = cubes[0].meta
     if rest_wavelength is None:
