@@ -1,2 +1,2 @@
 Added ``irispy.utils.bursts.find_bright_spectral_events`` and ``irispy.utils.bursts.find_bright_image_events`` to find compact bright events in the spectra of any line and in slit-jaw or IRIS-aligned AIA images, and ``irispy.utils.bursts.find_si_iv_bursts`` to find UV bursts in Si IV spectra.
-``find_si_iv_bursts`` and ``find_bright_image_events`` are ported from the SolarSoft routines ``iris_burst_check`` and ``iris_sji_burst_check``.
+``find_si_iv_bursts`` and ``find_bright_image_events`` are ported from the SolarSoft routines ``iris_burst_check`` and ``iris_sji_burst_check``, respectively.

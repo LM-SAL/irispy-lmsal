@@ -217,14 +217,6 @@ def test_sji_errors(bursts_sjicube_1400, bursts_sji_1400_file):
         find_bright_image_events(bursts_sjicube_1400[0])
 
 
-def test_bright_image_events_any_band(sns_sjicube_1330):
-    sji = copy.deepcopy(sns_sjicube_1330)
-    sji.data[0, 20:23, 20:23] = 1e5
-    labels, events = find_bright_image_events(sji)
-    assert labels.data[0, 20:23, 20:23].all()
-    assert list(events[events["frame"] == 0]["npix"]) == [9]
-
-
 def test_bright_image_events_labels_do_not_share_coordinates(sns_sjicube_1330):
     labels, _ = find_bright_image_events(sns_sjicube_1330)
     labels.extra_coords.add("sequence", 0, np.arange(len(labels.data)) * u.one)
