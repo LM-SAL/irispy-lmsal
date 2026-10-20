@@ -125,7 +125,7 @@ def test_radiometric_calibration_single_sliced_raster_cube(sns_sg_file):
     assert np.array_equal(calibrated_slice.mask, expected_slice.mask)
 
 
-def test_convert_photons_per_sec_to_radiance_vs_peter_young(sns_sg_file):
+def test_calculate_dn_to_radiance_factor_vs_peter_young(sns_sg_file):
     raster_collection = read_files(sns_sg_file)
     cube = raster_collection["C II 1336"][0]
 
@@ -169,6 +169,7 @@ def test_radiometric_calibration_keeps_a_standard_deviation(sns_sg_file):
     new_cube = radiometric_calibration(cube)
     assert isinstance(new_cube.uncertainty, StdDevUncertainty)
     assert new_cube.uncertainty.array.shape == cube.data.shape
+    assert new_cube.data.dtype == new_cube.uncertainty.array.dtype == np.float32
 
 
 def test_radiometric_calibration_does_not_share_coordinates_or_mask(sns_sg_file):
@@ -318,7 +319,8 @@ def test_radiometric_calibration_of_slit_jaw_images(sns_sji_1330_file):
         (radiometric_calibration(cube), photon_rate * hc / np.trapezoid(area * wavelength, wavelength)),
     ):
         assert isinstance(calibrated, SJICube)
-        assert_quantity_allclose(calibrated.data * calibrated.unit, expected)
+        assert calibrated.data.dtype == calibrated.uncertainty.array.dtype == np.float32
+        assert_quantity_allclose(calibrated.data * calibrated.unit, expected, rtol=1e-6)
         np.testing.assert_allclose(
             calibrated.uncertainty.array * cube.data, calibrated.data * cube.uncertainty.array, rtol=1e-6
         )
