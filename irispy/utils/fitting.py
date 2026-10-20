@@ -629,10 +629,14 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None, resi
         per_angstrom = (_SPEED_OF_LIGHT / rest_wavelength).to_value(u.km / u.s / u.AA)
         width_scale = values[width].unit.to(u.AA)
         velocity = speed * (values[center].value - u.Quantity(rest_wavelength, values[center].unit).value)
-        fwhm = to_fwhm * width_scale * values[width].value
-        area = to_area * values[amplitude] * values[width]
+        # Both profiles are even in their widths, which fits without a lower bound can leave negative.
+        sign = np.sign(values[width].value)
+        fwhm = to_fwhm * width_scale * np.abs(values[width].value)
+        area = to_area * values[amplitude] * np.abs(values[width])
         area_error = scaled(
-            variance({amplitude: to_area * values[width].value, width: to_area * values[amplitude].value}),
+            variance(
+                {amplitude: to_area * np.abs(values[width].value), width: to_area * sign * values[amplitude].value}
+            ),
             (values[amplitude].unit * values[width].unit).to(cube.unit * u.AA),
         )
         maps += [

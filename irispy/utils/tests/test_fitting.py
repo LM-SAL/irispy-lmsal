@@ -610,6 +610,22 @@ def test_maps_from_fit_formulas(profile, width, fwhm, area):
     assert all(maps[name].uncertainty is None for name in maps if name != "residual")
 
 
+def test_maps_from_fit_takes_absolute_widths():
+    # A Lorentzian is even in its width, so a fit started at a negative one ends at a negative one.
+    _, cube = _si_iv_cube(np.random.default_rng(3), "lorentzian")
+    maps = []
+    for width in (0.15, -0.15):
+        start = starts_from_model(models.Const1D(5) + models.Lorentz1D(150, 1402.77, width), cube)
+        fitted, fitter = _fit(start, cube.data, cube.uncertainty.array, unit=cube.unit)
+        maps.append(maps_from_fit(fitted, cube, fitter=fitter))
+    positive, negative = maps
+    for name in ("fwhm_1", "fwhm_velocity_1", "integrated_intensity_1"):
+        np.testing.assert_allclose(negative[name].data, positive[name].data, rtol=1e-4, err_msg=name)
+        np.testing.assert_allclose(
+            negative[name].uncertainty.array, positive[name].uncertainty.array, rtol=1e-4, err_msg=name
+        )
+
+
 def test_maps_from_fit_flags_no_fit_and_at_bound():
     rng = np.random.default_rng(3)
     truth, cube = _si_iv_cube(rng)
