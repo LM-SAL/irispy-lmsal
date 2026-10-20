@@ -5,8 +5,6 @@ Read a full-disk mosaic
 
 In this example we read the Mg II k full-disk mosaic of 2015-02-22 and compare a map at
 the center of the window with a map of its blue end.
-
-The file is 553 MB, so this example is not run when the documentation is built.
 """
 
 import matplotlib.pyplot as plt
@@ -17,18 +15,20 @@ import astropy.units as u
 from irispy.io import read_mosaic
 
 ###############################################################################
-# We start with getting data from the `IRIS mosaic page <https://iris.lmsal.com/mosaic.html>`__.
+# The mosaics are listed on the `IRIS mosaic page <https://iris.lmsal.com/mosaic.html>`__.
+# This one is 553 MB, so we use a copy that keeps every tenth of its 101 wavelengths.
 #
 # In this case, we will use ``pooch`` to keep this example self-contained
 # but you can download the data manually using your browser as well.
 
 mosaic_file = pooch.retrieve(
-    "https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2015/02/22/20150222Mosaic/IRISMosaic_20150222_MgIIk.fits.gz",
-    known_hash="dde33eb7a667817fab8e206f07a05b369bfe10fcca3efa64b4efd6562ee5754d",
+    "https://github.com/LM-SAL/irispy-data/releases/download/v1/IRISMosaic_20150222_MgIIk_subsampled.fits.gz",
+    known_hash="277e895d203e9c91e2090179ad432a95431efebae0986170f902920afd6fdc55",
 )
 
 ###############################################################################
-# The whole cube takes 2.4 GB in memory, so we read only the blue half of the window.
+# A whole mosaic takes 2.4 GB in memory, so ``wavelength_range`` reads only part of the
+# window, here its blue half.
 
 mosaic = read_mosaic(mosaic_file, wavelength_range=[2794.6, 2796.4] * u.AA)
 print(mosaic)
