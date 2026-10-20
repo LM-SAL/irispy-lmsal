@@ -105,4 +105,3 @@ py:class NDDataRef
 py:class NDDataArray
 py:obj NDDataRef
 py:obj NDDataArray
-py:class irispy.visualization.Plot2DMixin
