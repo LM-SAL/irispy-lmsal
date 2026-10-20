@@ -80,28 +80,30 @@ def test_read_mosaic(mosaic_file):
     cube = read_mosaic(mosaic_file)
     assert isinstance(cube, MosaicCube)
     assert str(cube)
-    assert cube.data.shape == (5, 4, 3)
+    # Solar X, solar Y and wavelength, as in level 2 rasters
+    assert cube.data.shape == (3, 4, 5)
+    assert cube.wavelength_axis == 2
     assert cube.data.dtype == np.float32
-    assert cube.data[2, 1, 1] == 28.25
+    assert cube.data[1, 1, 2] == 28.25
     # The uncovered position, the fill value and the clipped sample are masked, the covered zeros are not.
     assert cube.mask.sum() == 7
-    assert cube.mask[:, 0, 0].all()
+    assert cube.mask[0, 0].all()
     assert cube.mask[1, 2, 1]
-    np.testing.assert_array_equal(cube.data[:, 3, 2], 0)
+    np.testing.assert_array_equal(cube.data[2, 3], 0)
     # The clipped sample keeps its value, as in level 2 cubes, and is marked saturated; the others are NaN
     saturated = np.zeros(cube.shape, dtype=bool)
-    saturated[4, 1, 2] = True
+    saturated[2, 1, 4] = True
     np.testing.assert_array_equal(cube.meta["saturated"], saturated)
-    assert cube.data[4, 1, 2] == 16182
-    assert cube.mask[4, 1, 2]
+    assert cube.data[2, 1, 4] == 16182
+    assert cube.mask[2, 1, 4]
     assert np.isnan(cube.data[cube.mask & ~saturated]).all()
 
     # The FITS reference pixel (CRPIX, 1-based) is at the reference value (CRVAL).
-    coord, wavelength = cube.wcs.pixel_to_world(1, 2, 2)
+    wavelength, coord = cube.wcs.pixel_to_world(2, 2, 1)
     assert_quantity_allclose(coord.Tx, -0.389693 * u.arcsec)
     assert_quantity_allclose(coord.Ty, -0.236448 * u.arcsec)
     assert_quantity_allclose(wavelength, 2796.352 * u.AA)
-    assert_quantity_allclose(cube.wcs.pixel_to_world(2, 2, 2)[0].Tx, (-0.389693 + 1.99523) * u.arcsec)
+    assert_quantity_allclose(cube.wcs.pixel_to_world(2, 2, 2)[1].Tx, (-0.389693 + 1.99523) * u.arcsec)
     assert coord.obstime == Time("2015-02-22T20:47:42.140")
     assert_quantity_allclose(coord.observer.radius, get_earth("2015-02-22T20:47:42.140").radius)
 
@@ -110,20 +112,20 @@ def test_read_mosaic(mosaic_file):
     assert_quantity_allclose(meta.rest_wavelength, 2796.352 * u.AA)
     assert meta.fov_center is None
     times = meta["time"]
-    assert times.shape == (4, 3)
+    assert times.shape == (3, 4)
     assert times.mask[0, 0]
     assert times.mask.sum() == 1
-    assert times[1, 2].isot == "2015-02-22T20:56:02.140"
+    assert times[2, 1].isot == "2015-02-22T20:56:02.140"
 
 
 def test_read_mosaic_wavelength_range(mosaic_file):
     full = read_mosaic(mosaic_file)
     cube = read_mosaic(mosaic_file, wavelength_range=[2796.35, 2796.40] * u.AA)
-    assert cube.data.shape == (2, 4, 3)
-    np.testing.assert_array_equal(cube.data, full.data[2:4])
-    np.testing.assert_array_equal(cube.mask, full.mask[2:4])
+    assert cube.data.shape == (3, 4, 2)
+    np.testing.assert_array_equal(cube.data, full.data[..., 2:4])
+    np.testing.assert_array_equal(cube.mask, full.mask[..., 2:4])
     assert_quantity_allclose(cube.axis_world_coords("em.wl")[0], full.axis_world_coords("em.wl")[0][2:4])
-    assert cube.meta.data_shape.tolist() == [2, 4, 3]
+    assert cube.meta.data_shape.tolist() == [3, 4, 2]
     # Bounds typed from the grid are kept despite the rounding of the unit conversion.
     assert read_mosaic(mosaic_file, wavelength_range=[2796.317, 2796.387] * u.AA).data.shape == (3, 4, 3)
     with pytest.raises(ValueError, match="No wavelengths between"):
@@ -146,28 +148,32 @@ def test_read_mosaic_rejects_other_files(sns_sji_2832_file, mosaic_file):
 def test_mosaic_to_map(mosaic_file):
     cube = read_mosaic(mosaic_file)
     core = cube.to_map(2796.36 * u.AA)
-    np.testing.assert_array_equal(core.data, cube.data[2])
+    np.testing.assert_array_equal(core.data, cube.data[..., 2].T)
     assert_quantity_allclose(core.wavelength, 2796.352 * u.AA)
     assert core.observatory == "IRIS"
     assert core.exposure_time == 1.99956 * u.s
     assert core.date == Time("2015-02-22T20:47:42.140")
     assert_quantity_allclose(core.observer_coordinate.radius, get_earth("2015-02-22T20:47:42.140").radius)
-    map_coord, cube_coord = core.pixel_to_world(1 * u.pix, 2 * u.pix), cube.wcs.pixel_to_world(1, 2, 0)[0]
+    map_coord, cube_coord = core.pixel_to_world(1 * u.pix, 2 * u.pix), cube.wcs.pixel_to_world(0, 2, 1)[1]
     assert_quantity_allclose([map_coord.Tx, map_coord.Ty], [cube_coord.Tx, cube_coord.Ty])
+    with pytest.raises(ValueError, match="outside the mosaic wavelengths"):
+        cube.to_map(3000 * u.AA)
 
     # The mean leaves out masked values; the uncovered position stays NaN.
     band = cube.to_map([2796.30, 2796.40] * u.AA)
     assert_quantity_allclose(band.wavelength, 2796.352 * u.AA)
-    assert band.data[1, 1] == pytest.approx(cube.data[1:4, 1, 1].mean())
-    assert band.data[2, 1] == pytest.approx(cube.data[2:4, 2, 1].mean())
+    assert band.data[1, 1] == pytest.approx(cube.data[1, 1, 1:4].mean())
+    assert band.data[2, 1] == pytest.approx(cube.data[1, 2, 2:4].mean())
     assert np.isnan(band.data[0, 0])
+    # A position with a saturated sample is NaN, as in average_window.
+    assert np.isnan(cube.to_map([2796.38, 2796.43] * u.AA).data[1, 2])
     with pytest.raises(ValueError, match="No wavelengths between"):
         cube.to_map([2700, 2701] * u.AA)
 
     # Slicing keeps the cube type, the time tags and the map coordinates.
-    sub = cube[:, 1:, 1:]
+    sub = cube[1:, 1:]
     assert isinstance(sub, MosaicCube)
-    assert sub.meta["time"].shape == (3, 2)
+    assert sub.meta["time"].shape == (2, 3)
     sub_map = sub.to_map(2796.36 * u.AA)
     sub_coord, core_coord = sub_map.pixel_to_world(0 * u.pix, 0 * u.pix), core.pixel_to_world(1 * u.pix, 1 * u.pix)
     assert_quantity_allclose([sub_coord.Tx, sub_coord.Ty], [core_coord.Tx, core_coord.Ty])
@@ -185,9 +191,11 @@ def test_mosaic_detector(tmp_path, keywords, detector, spectral_summing, cmap):
     assert cube.to_map(cube.meta.rest_wavelength).plot_settings["cmap"] == cmap
 
 
-def test_mosaic_rejected_by_raster_helpers(mosaic_file):
-    cube = read_mosaic(mosaic_file)
-    with pytest.raises(ValueError, match="axes"):
-        calculate_mg_features(cube)
-    with pytest.raises(ValueError, match="axes"):
-        find_bright_spectral_events(cube, 100)
+def test_mosaic_mg_features(mosaic_file):
+    features = calculate_mg_features(read_mosaic(mosaic_file), velocity_range=(-5, 5) * u.km / u.s, lines=("k",))
+    assert features["k3_velocity"].data.shape == (3, 4)
+
+
+def test_mosaic_rejected_by_burst_finders(mosaic_file):
+    with pytest.raises(TypeError, match="exposure time"):
+        find_bright_spectral_events(read_mosaic(mosaic_file), 100)

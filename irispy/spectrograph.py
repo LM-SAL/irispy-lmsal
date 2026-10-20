@@ -191,9 +191,13 @@ class MosaicCube(SpectrogramCube):
     """
     An IRIS full-disk mosaic of one spectral window, read by `irispy.io.read_mosaic`.
 
-    The array axes are (wavelength, solar Y, solar X), the reverse of a Level 2 raster,
-    so the raster analysis helpers reject it; use `to_map` and
-    `~irispy.utils.moments.calculate_moments`.
+    The array axes are solar X, solar Y and wavelength, as in a Level 2 raster.
+    `to_map`, `~irispy.utils.moments.calculate_moments`, `~irispy.utils.moments.average_window`,
+    `~irispy.utils.red_blue.calculate_red_blue_asymmetry`, `~irispy.utils.rgb.calculate_rgb`,
+    `~irispy.utils.rgb.plot_rgb`, `~irispy.utils.mg_features.calculate_mg_features` and
+    `~irispy.utils.spectrograph.subtract_background` take a mosaic. The burst finders and
+    `~irispy.utils.spectrograph.radiometric_calibration` do not: they need the exposure time
+    of each raster step, which a mosaic does not have.
     """
 
     def __str__(self) -> str:
@@ -213,8 +217,9 @@ class MosaicCube(SpectrogramCube):
         """
         Return a `sunpy.map.Map` at one wavelength or averaged over a range.
 
-        The color map is that of the nearest slit-jaw passband. Masked values are left
-        out of the average.
+        As in `~irispy.utils.moments.average_window`, masked values are left out of the mean
+        and positions with a saturated sample are NaN. The color map is that of the nearest
+        slit-jaw passband.
 
         Parameters
         ----------
@@ -225,23 +230,33 @@ class MosaicCube(SpectrogramCube):
         Returns
         -------
         `sunpy.map.GenericMap`
+
+        Raises
+        ------
+        ValueError
+            If one wavelength is more than half a wavelength step outside the mosaic,
+            or two have no mosaic wavelength between them.
         """
         from sunpy.map import Map  # NOQA: PLC0415
 
+        from irispy.utils.moments import average_window  # NOQA: PLC0415
+
         wavelength = u.Quantity(wavelength, u.AA)
-        axis = self.wavelength_axis
-        wavelengths = u.Quantity(self.axis_world_coords(axis)[0], u.AA)
+        wavelengths = u.Quantity(self.axis_world_coords(self.wavelength_axis)[0], u.AA)
         if wavelength.isscalar:
-            indices = [np.argmin(np.abs(wavelengths - wavelength))]
-        else:
-            indices = _wavelength_indices(wavelengths, wavelength)
-        data = np.take(self.data, indices, axis=axis)
-        if self.mask is not None:
-            data = np.where(np.take(self.mask, indices, axis=axis), np.nan, data)
-        # A masked mean leaves positions with no unmasked value NaN, without a warning.
-        data = np.ma.masked_invalid(data).mean(axis=axis).filled(np.nan)
-        header = unwrap_wcs_to_fitswcs(self.wcs)[0].celestial.to_header()
-        mean_wavelength = wavelengths[indices].mean()
+            distance = np.abs(wavelengths - wavelength)
+            if distance.min() > np.abs(self.spectral_dispersion) / 2:
+                msg = (
+                    f"{wavelength} is more than half a wavelength step outside the mosaic wavelengths, "
+                    f"{wavelengths[0]:.3f} to {wavelengths[-1]:.3f}"
+                )
+                raise ValueError(msg)
+            nearest = wavelengths[np.argmin(distance)]
+            wavelength = u.Quantity([nearest, nearest])
+        mean_wavelength = wavelengths[_wavelength_indices(wavelengths, wavelength)].mean()
+        # A map is (solar Y, solar X)
+        data = average_window(self, wavelength).data.T
+        header = unwrap_wcs_to_fitswcs(self.wcs)[0].celestial.swapaxes(0, 1).to_header()
         header.update(
             {
                 "TELESCOP": "IRIS",

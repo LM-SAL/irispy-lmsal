@@ -33,9 +33,10 @@ def read_mosaic(filename, *, wavelength_range=None):
     Returns
     -------
     `irispy.spectrograph.MosaicCube`
-        The mosaic in DN. Positions no raster covered, and the Level 2 fill values, are
-        masked and NaN. Samples at the level 2 ceiling, ``irispy.utils.constants.SATURATION_LIMIT``,
-        keep their value and are marked in the mask and, if there are any, in ``meta["saturated"]``.
+        The mosaic in DN, with array axes solar X, solar Y and wavelength, as in a Level 2
+        raster. Positions no raster covered, and the Level 2 fill values, are masked and NaN.
+        Samples at the level 2 ceiling, ``irispy.utils.constants.SATURATION_LIMIT``, keep
+        their value and are marked in the mask and, if there are any, in ``meta["saturated"]``.
 
     Notes
     -----
@@ -46,7 +47,7 @@ def read_mosaic(filename, *, wavelength_range=None):
     Gzipped files cannot be memory-mapped, so every read decompresses the file.
     Decompressing it once, for example with ``gunzip``, makes later reads much faster.
     """
-    with fits.open(filename, memmap=False) as hdulist:
+    with fits.open(filename, memmap=False, do_not_scale_image_data=True) as hdulist:
         header = hdulist[0].header
         axes = [header.get(f"CTYPE{axis}") for axis in (1, 2, 3)]
         if axes != ["Solar X", "Solar Y", "Wavelength"] or "LAMREF" not in header:
@@ -65,19 +66,26 @@ def read_mosaic(filename, *, wavelength_range=None):
             }
         )
         wcs = WCS(wcs_header)
-        _set_wcs_aux_obs_coord(wcs, get_body_heliographic_stonyhurst("Earth", date_obs))
-        selection = slice(None)
+        indices = range(header["NAXIS3"])
         if wavelength_range is not None:
-            wavelengths = wcs.spectral.pixel_to_world(np.arange(header["NAXIS3"]))
+            wavelengths = wcs.spectral.pixel_to_world(indices)
             indices = _wavelength_indices(wavelengths, wavelength_range)
-            selection = slice(indices[0], indices[-1] + 1)
-            wcs = wcs[selection]
-        # A section reads only the selected wavelengths, scaled by BSCALE and BZERO.
-        data = hdulist[0].section[selection]
-        time_offset = hdulist[2].data
+            wcs = wcs[indices[0] : indices[-1] + 1]
+        # The file is (wavelength, solar Y, solar X); rasters are the reverse.
+        wcs = wcs.sub([3, 2, 1])
+        _set_wcs_aux_obs_coord(wcs, get_body_heliographic_stonyhurst("Earth", date_obs))
+        # The stored integers in one read: astropy seeks back after a read, which restarts a gzip decompression.
+        stored = hdulist[0].section[indices[0] : indices[-1] + 1]
+        time_offset = hdulist[2].data.T
+    # A contiguous copy, scaled in place as astropy does; calculate_moments takes over twice as long on a
+    # transposed view.
+    data = stored.T.astype(np.float32, order="C")
+    del stored
+    data *= header["BSCALE"]
+    data += header["BZERO"]
     # The time tags are NaN where no raster covered the mosaic, and the data are 0 there.
     uncovered = np.isnan(time_offset)
-    mask = np.isin(data, BAD_PIXEL_VALUES_SCALED) | uncovered
+    mask = np.isin(data, BAD_PIXEL_VALUES_SCALED) | uncovered[..., np.newaxis]
     data[mask] = np.nan
     # Scaled like level 2, which clips at the ceiling where iris_prep's +Inf saturation flags were lost
     saturated = data >= SATURATION_LIMIT.value
@@ -85,7 +93,7 @@ def read_mosaic(filename, *, wavelength_range=None):
     times = date_obs + np.nan_to_num(time_offset) * u.s
     times[uncovered] = np.ma.masked
     meta = MosaicMeta(header, data_shape=data.shape)
-    meta.add("time", times, "Time of each mosaic position, masked where no raster covered it", (1, 2))
+    meta.add("time", times, "Time of each mosaic position, masked where no raster covered it", (0, 1))
     if saturated.any():
         meta.add("saturated", saturated, "Samples at the level 2 ceiling, also masked", (0, 1, 2))
     return MosaicCube(data, wcs, unit=DN_UNIT[meta.detector], meta=meta, mask=mask)
