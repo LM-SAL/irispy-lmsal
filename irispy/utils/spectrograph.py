@@ -94,16 +94,17 @@ def radiometric_calibration(
         spectral_dispersion_per_pixel=cube.spectral_dispersion,
         solid_angle=cube.solid_angle,
     )
-    factor = _sample_factor(cube, factor, RADIANCE_UNIT)
-    uncertainty = None if cube.uncertainty is None else StdDevUncertainty(cube.uncertainty.array * factor)
-    return make_map_cube(cube, cube.data * factor, RADIANCE_UNIT, uncertainty=uncertainty)
+    return _calibrate(cube, factor, RADIANCE_UNIT)
 
 
-def _sample_factor(cube, factor, unit):
-    # Turns factor, from photons per second to unit, into one per sample of cube in its data type.
-    # The exposures lie along the first axis: raster step or time.
+def _calibrate(cube, factor, unit):
+    # Multiplies cube by factor, from photons per second to unit, divided by each exposure time
+    # and cast to the cube's data type. The exposures lie along the first axis: raster step or time.
     exposure_time = cube.exposure_time.to_value(u.s).reshape(-1, *[1] * (cube.data.ndim - 1))
-    return ((cube.unit / u.s * factor).to_value(unit) / exposure_time).astype(cube.data.dtype)
+    factor = ((cube.unit / u.s * factor).to_value(unit) / exposure_time).astype(cube.data.dtype)
+    uncertainty = None if cube.uncertainty is None else StdDevUncertainty(cube.uncertainty.array * factor)
+    # NDCube arithmetic would deep-copy the meta and, through the coordinates, the whole cube
+    return make_map_cube(cube, cube.data * factor, unit, uncertainty=uncertainty)
 
 
 def _calibrate_sji(cube, line):
@@ -130,7 +131,7 @@ def _calibrate_sji(cube, line):
         unit = RADIANCE_UNIT * u.AA
     solid_angle = cube.meta["CDELT1"] * cube.meta["CDELT2"] * u.arcsec**2
     # The cube's unit, DN_IRIS_SJI_<passband>, holds the passband's photons per DN, those of DN2PHOT_SJI
-    return cube * u.Quantity(_sample_factor(cube, per_photon / u.photon / solid_angle, unit), unit / cube.unit)
+    return _calibrate(cube, per_photon / u.photon / solid_angle, unit)
 
 
 def radiation_temperature(
