@@ -40,3 +40,10 @@ def _memmap_fill_mask(data, header, *, nan_only=False):
     return mapped.map_blocks(
         _fill_mask_values, raw_m200, raw_m199, dtype=bool, meta=np.empty((0,) * data.ndim, dtype=bool)
     )
+
+
+def _check_scaled(header):
+    # astropy drops BSCALE and BZERO once it scales the data, but keeps the identity scaling of the AIA cubes
+    if header.get("BSCALE", 1) != 1 or header.get("BZERO", 0) != 0:
+        msg = "An HDU list opened with do_not_scale_image_data=True needs memmap=True"
+        raise ValueError(msg)

@@ -15,7 +15,7 @@ from sunpy.util import MetaDict
 
 from irispy._interpolation import _time_lookup
 from irispy.io._level2 import _check_level2
-from irispy.io._mask import _fill_mask_values, _memmap_fill_mask
+from irispy.io._mask import _check_scaled, _fill_mask_values, _memmap_fill_mask
 from irispy.meta import SJIMeta
 from irispy.sji import AIACube, SJICube, SOTCube
 from irispy.utils import calculate_uncertainty
@@ -216,11 +216,11 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
 
     Parameters
     ----------
-    filename : `str`, `pathlib.Path`, file-like, `bytes` or `astropy.io.fits.HDUList`
-        File or decompressed FITS data to read. A supplied HDU list is left open, its
-        auxiliary table is edited in place (dropped pointing rows are filled) and, with
-        ``memmap=False``, its image is copied before the fill values are replaced; open it
-        with ``do_not_scale_image_data=True`` when using ``memmap=True``.
+    filename : `str`, `pathlib.Path`, file-like or `astropy.io.fits.HDUList`
+        File to read. A supplied HDU list is left open, its auxiliary table is edited in
+        place (dropped pointing rows are filled) and, with ``memmap=False``, its image is
+        copied before the fill values are replaced. Open it with ``do_not_scale_image_data=True``
+        when using ``memmap=True``, and without it otherwise.
     uncertainty : `bool`, optional
         If `True` (not the default), will compute the uncertainty for the data (slower and
         uses more memory). If ``memmap=True``, the uncertainty is never computed.
@@ -256,11 +256,17 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
     ((62, 40, 37), Unit("DN_IRIS_SJI_1400"))
     >>> cube.axis_world_coords("time")[0][[0, -1]].isot
     array(['2021-09-05T00:18:47.390', '2021-09-05T05:07:22.210'], dtype='<U23')
+
+    FITS data already in memory are read as an HDU list:
+
+    >>> from pathlib import Path
+    >>> from astropy.io import fits
+    >>> content = Path(filename).read_bytes()
+    >>> read_sji_lvl2(fits.HDUList.fromstring(content)).shape
+    (62, 40, 37)
     """
     if isinstance(filename, fits.HDUList):
         context = nullcontext(filename)
-    elif isinstance(filename, bytes):
-        context = fits.HDUList.fromstring(filename, do_not_scale_image_data=memmap)
     else:
         try:
             context = fits.open(filename, memmap=memmap, do_not_scale_image_data=memmap, decompress_in_memory=True)
@@ -268,9 +274,7 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             # A directory or a file that is not FITS: raises the level 2 error, chained to this one
             _check_level2(filename, None, "SJI")
     with context as hdulist:
-        # Bytes and an HDU list made in memory have no filename, so name what was given
-        given = hdulist.filename() or f"The data given ({type(filename).__name__})"
-        _check_level2(given, hdulist[0].header, "SJI")
+        _check_level2(hdulist.filename() or filename, hdulist[0].header, "SJI")
         instrume = hdulist[0].header["INSTRUME"]
         is_sot = instrume.startswith("SOT")
         if hdulist[1].data.ndim == 1:
@@ -320,6 +324,7 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             scaled = False
             unit = DN_UNIT["SJI_UNSCALED"]
         else:
+            _check_scaled(hdulist[0].header)
             # This is a workaround for the AIA cubes being in int and not float
             mask = np.isnan(data) if is_sot else _fill_mask_values(data, *BAD_PIXEL_VALUES_SCALED)
             mask_value = BAD_PIXEL_VALUE_SCALED if np.issubdtype(data.dtype, np.integer) else np.nan

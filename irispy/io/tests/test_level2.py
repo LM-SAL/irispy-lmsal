@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 import pytest
 
@@ -66,9 +67,12 @@ def test_readers_reject_other_products_and_levels(request, level3_file, reader, 
 
 
 @pytest.mark.parametrize("kind", ["bytes", "HDUList"])
-def test_read_sji_lvl2_names_the_data_it_rejects_without_a_filename(level3_file, kind):
-    content = level3_file.read_bytes()
-    data = content if kind == "bytes" else fits.HDUList.fromstring(content)
+def test_read_sji_lvl2_names_the_data_it_rejects_without_a_filename(sns_sji_1400_file, level3_file, kind):
+    # Bytes are refused even when they hold a level 2 file
+    if kind == "bytes":
+        data = Path(sns_sji_1400_file).read_bytes()
+    else:
+        data = fits.HDUList.fromstring(level3_file.read_bytes())
 
     with pytest.raises(ValueError, match=re.escape(f"The data given ({kind}) is not an IRIS level 2 SJI file")):
         read_sji_lvl2(data)
