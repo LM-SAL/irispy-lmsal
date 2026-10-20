@@ -158,7 +158,7 @@ def _get_spec_return_key(group_key, describe, returns):
 
 def fits_info(filename: str) -> None:
     """
-    Prints information about the extension of a raster or SJI level 2 data file.
+    Prints what each extension of a level 2 raster, slit-jaw, AIA or SOT file holds.
 
     Parameters
     ----------
@@ -187,17 +187,17 @@ def fits_info(filename: str) -> None:
      10 ... Auxiliary data
     """
 
-    def get_description(idx, idx_mod):
-        # The last two extensions are reserved for auxiliary data.
-        auxiliary_extension_indices = [num_extensions - 2, num_extensions - 1]
-        if idx == 0 and idx_mod == 0:
+    def get_description(window):
+        # Windows 1 to NWIN of the primary header are the data HDUs; the HDUs after them hold auxiliary data.
+        if window == 0:
             return "Primary Header (no data)"
-        if idx not in auxiliary_extension_indices:
-            text_modifier = (
-                f" ({header[f'TDET{idx + idx_mod}'][:3]})" if "SPEC" in header[f"TDET{idx + idx_mod}"] else ""
-            )
-            return f"{header[f'TDESC{idx + idx_mod}'].replace('_', ' ')} ({header[f'TWMIN{idx + idx_mod}']:.0f} - {header[f'TWMAX{idx + idx_mod}']:.0f} AA{text_modifier})"
-        return "Auxiliary data"
+        if window > header["NWIN"]:
+            return "Auxiliary data"
+        description = header[f"TDESC{window}"].replace("_", " ")
+        # AIA and SOT files give no wavelength range.
+        if f"TWMIN{window}" in header:
+            description += f" ({header[f'TWMIN{window}']:.0f} - {header[f'TWMAX{window}']:.0f} AA)"
+        return description
 
     table = Table(
         names=("No.", "Name", "Ver", "Type", "Cards", "Dimensions", "Format", "Description"),
@@ -211,9 +211,8 @@ def fits_info(filename: str) -> None:
             f"Observation: {header['OBS_DESC']}",
             f"OBS ID: {header['OBSID']}",
         ]
-        num_extensions = len(hdulist)
-        for idx in range(num_extensions):
-            description = get_description(idx, 0 if "SPEC" in header["INSTRUME"] else 1)
+        for idx in range(len(hdulist)):
+            description = get_description(idx if "SPEC" in header["INSTRUME"] else idx + 1)
             hdu_info[idx] = (*hdu_info[idx][:-1], description)
             table.add_row(list(map(str, hdu_info[idx])))
 

@@ -110,6 +110,18 @@ def test_fits_info(capsys, request, monkeypatch, file_fixture):
     assert opens == [1]
 
 
+@pytest.mark.parametrize(
+    ("file_fixture", "description"),
+    [("aia_1700_file", "1700"), ("sot_fg_file", "G band 4305"), ("sot_sp_file", "6302A")],
+)
+def test_fits_info_labels_the_image_of_aia_and_sot_files(capsys, request, file_fixture, description):
+    fits_info(request.getfixturevalue(file_fixture))
+
+    image, auxiliary = capsys.readouterr().out.splitlines()[-2:]
+    assert image.endswith(f" {description}")
+    assert auxiliary.endswith(" Auxiliary data")
+
+
 def test_fits_info_does_not_truncate_to_the_terminal_width(capsys, monkeypatch, sns_sji_1330_file):
     monkeypatch.setenv("COLUMNS", "40")
 
