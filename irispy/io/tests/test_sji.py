@@ -57,7 +57,14 @@ def test_read_sji_lvl2_matches_the_file(request, file_fixture):
 
     meta = cube.meta
     assert len(meta.fits_header) == len(header)
-    assert meta.fov_center == SkyCoord(Tx=header["XCEN"], Ty=header["YCEN"], unit=u.arcsec, frame=Helioprojective)
+    assert meta.fov_center == SkyCoord(
+        Tx=header["XCEN"],
+        Ty=header["YCEN"],
+        unit=u.arcsec,
+        frame=Helioprojective,
+        observer="earth",
+        obstime=header["DATE_OBS"],
+    )
     assert_quantity_allclose(meta.spectral_range, [header["TWMIN1"], header["TWMAX1"]] * u.AA)
     values = {
         "observatory": header["TELESCOP"],
@@ -421,8 +428,9 @@ def test_read_sot_cube(kind, unit, date, memmap, request):
     assert cube.meta.date_reference.isot == date
     # DSUN_OBS and TWAVE1 are 0, so the solar distance and wavelength are missing
     assert cube.meta.distance_to_sun is None
-    assert cube.meta.mu is None
     assert cube.meta.rest_wavelength is None
+    # mu needs only the pointing and the date
+    assert 0 < cube.meta.mu < 1
     times = Time(header["STARTOBS"]) + (aux[:, columns["TIME"]] + aux[:, columns["EXPTIMES"]] / 2) * u.s
     assert_quantity_allclose((cube.axis_world_coords("time")[0] - times).to(u.s), 0 * u.s, atol=1 * u.us)
     # CRVAL is the per-frame XCENIX/YCENIX at the 1-based FITS CRPIX

@@ -81,6 +81,8 @@ def test_sns_read_spectrograph_lvl2(sns_sg_file):
         Ty=meta.get("YCEN"),
         unit=u.arcsec,
         frame=Helioprojective,
+        observer="earth",
+        obstime=meta.date_reference,
     )
     assert meta.key_comments == {}
     assert meta.number_of_unique_raster_positions == 1
@@ -155,6 +157,8 @@ def test_raster_all_files_read_spectrograph_lvl2(raster_sg_files):
         Ty=meta.get("YCEN"),
         unit=u.arcsec,
         frame=Helioprojective,
+        observer="earth",
+        obstime=meta.date_reference,
     )
     assert meta.key_comments == {}
     assert meta.number_of_unique_raster_positions == 8

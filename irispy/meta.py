@@ -1,4 +1,5 @@
 import textwrap
+import warnings
 from functools import cached_property
 
 import numpy as np
@@ -9,7 +10,9 @@ from astropy.coordinates import SkyCoord
 
 from ndcube.meta import NDMeta
 from sunpy.coordinates import Helioprojective, get_earth
+from sunpy.coordinates.utils import get_heliocentric_angle
 from sunpy.time import parse_time
+from sunpy.util.exceptions import SunpyUserWarning
 from sunraster.meta import RemoteSensorMetaABC, SlitSpectrographMetaABC
 
 from irispy.utils.constants import SPECTRAL_BAND
@@ -18,15 +21,14 @@ from irispy.utils.lines import get_lines
 __all__ = ["BaseMeta", "MosaicMeta", "SGMeta", "SJIMeta"]
 
 
-def _mu(center, sun_radius):
+def _mu(center):
     """
-    The `BaseMeta.mu` formula at the helioprojective ``center`` (scalar or array).
+    Cosine of the heliocentric angle at the helioprojective ``center``.
     """
-    # sin^2(rho) / sin^2(R), with sin^2(rho) = 1 - cos^2(Tx) cos^2(Ty) = sin^2(Tx) + cos^2(Tx) sin^2(Ty)
-    ratio = (
-        (np.sin(center.Tx) ** 2 + (np.cos(center.Tx) * np.sin(center.Ty)) ** 2) / np.sin(sun_radius) ** 2
-    ).to_value(u.one)
-    return np.sqrt(np.where(ratio <= 1, 1 - ratio, np.nan))
+    # sunpy warns when every point is off the disk, where mu is NaN
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SunpyUserWarning)
+        return np.cos(get_heliocentric_angle(center)).to_value(u.one)
 
 
 class BaseMeta(NDMeta):
@@ -307,7 +309,8 @@ class BaseMeta(NDMeta):
     @property
     def fov_center(self):
         """
-        Location of the center of the field of view, `None` when the header lacks it.
+        Location of the center of the field of view, seen from Earth at
+        `date_reference`, `None` when the header lacks it.
         """
         if self.get("XCEN") is None:
             return None
@@ -316,25 +319,28 @@ class BaseMeta(NDMeta):
             Ty=self.get("YCEN"),
             unit=u.arcsec,
             frame=Helioprojective,
+            observer="earth",
+            obstime=self.date_reference,
         )
 
     @property
     def mu(self):
-        r"""
+        """
         Cosine of the angle between the line of sight and the local vertical at
         `fov_center`.
 
-        :math:`\mu = \sqrt{1 - (\sin\rho / \sin R)^2}`, where :math:`\rho` is the angular
-        distance of the field-of-view center from disk center,
-        :math:`\cos\rho = \cos T_x \cos T_y` :cite:p:`thompson2006`, and :math:`R` is
-        `sun_angular_radius`. It is 1 at disk center, 0 at the limb and NaN off the disk,
-        and agrees with `sunpy.coordinates.utils.get_heliocentric_angle`.
+        `fov_center` is the pointing of the header (``XCEN``, ``YCEN``), so a cropped or
+        sliced cube keeps the value of the full field of view. It is 1 at disk center, 0 at
+        the limb, NaN off the disk and `None` when the header lacks the pointing.
 
-        `None` when the header lacks the pointing or the solar distance.
+        For mu at each pixel, take the cosine of
+        `sunpy.coordinates.utils.get_heliocentric_angle` of the cube's coordinates. Slice
+        the cube first, as a whole slit-jaw cube is slow::
+
+            np.cos(get_heliocentric_angle(cube[0].axis_world_coords("lon")[0]))
         """
-        if self.get("XCEN") is None or self.sun_angular_radius is None:
-            return None
-        return _mu(self.fov_center, self.sun_angular_radius)
+        center = self.fov_center
+        return None if center is None else _mu(center)
 
     @property
     def automatic_exposure_control_enabled(self):
@@ -653,13 +659,11 @@ class SGMeta(BaseMeta, SlitSpectrographMetaABC):
         `~irispy.meta.BaseMeta.mu` at the field-of-view center of each exposure.
 
         Computed from the per-exposure ``"exposure FOV center"`` entry, so it follows
-        slicing and V34 flipping of the raster step axis. `None` when that entry or the
-        solar distance is missing.
+        slicing and V34 flipping of the raster step axis. `None` when that entry is
+        missing.
         """
         center = self.get("exposure FOV center")
-        if center is None or self.sun_angular_radius is None:
-            return None
-        return _mu(center, self.sun_angular_radius)
+        return None if center is None else _mu(center)
 
     @property
     def number_of_spectral_windows(self):
