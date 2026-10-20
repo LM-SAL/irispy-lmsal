@@ -1,0 +1,1 @@
+Removed the ``integrated`` keyword of ``irispy.utils.moments.calculate_moments``; for the integrated intensity, multiply the ``"intensity"`` map by the wavelength step: ``(moments["intensity"] * abs(cube.spectral_dispersion)).to(cube.unit * u.AA)``.
