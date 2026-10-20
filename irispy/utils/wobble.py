@@ -1,11 +1,11 @@
 import re
 from pathlib import Path
 
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import animation, patheffects
 
+import astropy.units as u
 from astropy.visualization import AsinhStretch, AsymmetricPercentileInterval, ImageNormalize
 
 from sunpy.visualization.colormaps.color_tables import iris_sji_color_table
@@ -15,23 +15,22 @@ from .utils import _boolean_mask, _saturated_samples
 __all__ = ["generate_wobble_movie"]
 
 
+@u.quantity_input
 def generate_wobble_movie(
     cube,
     *,
     outdir: str | Path = "./",
     trim: bool = False,
     timestamp: bool = True,
-    wobble_cadence: int = 180,
-    ffmpeg_path: str | Path | None = None,
-    **kwargs,
+    wobble_cadence: u.s = 180 * u.s,
 ) -> Path:
     """
     Creates a wobble movie from a slit-jaw cube.
 
-    ..note:
+    .. note::
 
-        This requires FFMPEG to be installed and discoverable.
-        If FFMPEG is not found, you can pass it as an argument called ``ffmpeg_path``.
+        This requires FFmpeg. If matplotlib does not find it, set
+        ``matplotlib.rcParams["animation.ffmpeg_path"]`` to the path of the FFmpeg executable.
 
     Parameters
     ----------
@@ -45,16 +44,11 @@ def generate_wobble_movie(
     timestamp : `bool`, optional
         If `True`, will add the time of each frame to the wobble movie.
         Optional, defaults to `True`.
-    wobble_cadence : `int`, optional
-        Sets the cadence of the wobble movie in seconds.
+    wobble_cadence : `astropy.units.Quantity`, optional
+        Sets the cadence of the wobble movie.
         The movie shows every n-th frame of the cube, n being ``wobble_cadence`` divided by the median
         time between frames, rounded down and at least 1.
         Optional, defaults to 180 seconds.
-    ffmpeg_path : Union[str, pathlib.Path], optional
-        Path to FFMPEG executable, by default `None`.
-        In theory you will not need to do this but matplotlib might not be able to find the ffmpeg exe.
-    **kwargs : `dict`, optional
-        Keyword arguments to passed to `matplotlib.animation.FuncAnimation`.
 
     Returns
     -------
@@ -69,10 +63,9 @@ def generate_wobble_movie(
 
     Notes
     -----
-    - 2832 is considered the best wavelength to use for wobble movies.
+    `iris_check_wobble.pro <https://sohoftp.nascom.nasa.gov/solarsoft/iris/idl/ucar/iris_check_wobble.pro>`__
+    recommends the 2832 passband for wobble movies.
     """
-    if ffmpeg_path:
-        mpl.rcParams["animation.ffmpeg_path"] = ffmpeg_path
     # Trim down to the rows and columns that contain data in all frames
     if trim:
         # The reader masks saturated samples, which still hold data
@@ -89,7 +82,7 @@ def generate_wobble_movie(
     step = 1
     if len(times) > 1:
         cadence = np.median((times[1:] - times[:-1]).to_value("s"))
-        step = max(1, int(wobble_cadence // cadence))
+        step = max(1, int(wobble_cadence.to_value(u.s) // cadence))
     frames = range(0, len(times), step)
 
     fig = plt.figure()
@@ -125,8 +118,11 @@ def generate_wobble_movie(
             title.set_text(str(times[i]))
         return image, title
 
-    anim = animation.FuncAnimation(fig, func=update, frames=frames, blit=True, repeat=False, **kwargs)
+    anim = animation.FuncAnimation(fig, func=update, frames=frames, blit=True, repeat=False)
     clean_filename = re.sub(r"[^\w\-_\. ]", "_", f"{cube.meta['TDESC1']}_{times[0].isot.split('.')[0]}_wobble.mp4")
     filename = Path(outdir) / clean_filename
-    anim.save(filename, writer=animation.FFMpegWriter(fps=12))
+    try:
+        anim.save(filename, writer=animation.FFMpegWriter(fps=12))
+    finally:
+        plt.close(fig)
     return filename

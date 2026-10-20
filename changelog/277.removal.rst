@@ -1,0 +1,1 @@
+Removed ``irispy.utils.image_clipping``; use ``astropy.visualization.AsymmetricPercentileInterval`` instead.
