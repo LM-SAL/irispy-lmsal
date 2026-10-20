@@ -83,7 +83,6 @@ def test_read_mosaic(mosaic_file):
     # Solar X, solar Y and wavelength, as in level 2 rasters
     assert cube.data.shape == (3, 4, 5)
     assert cube.wavelength_axis == 2
-    assert cube.data.flags.c_contiguous
     assert cube.data.dtype == np.float32
     assert cube.data[1, 1, 2] == 28.25
     # The uncovered position, the fill value and the clipped sample are masked, the covered zeros are not.

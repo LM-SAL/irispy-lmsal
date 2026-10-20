@@ -77,12 +77,12 @@ def read_mosaic(filename, *, wavelength_range=None):
         # The stored integers in one read: astropy seeks back after a read, which restarts a gzip decompression.
         stored = hdulist[0].section[indices[0] : indices[-1] + 1]
         time_offset = hdulist[2].data.T
-    # Scaled plane by plane into a contiguous array, without holding the floats twice; calculate_moments
-    # takes over twice as long on a transposed view.
-    data = np.empty(stored.shape[::-1], dtype=np.float32)
-    for index in range(data.shape[-1]):
-        data[..., index] = stored[index].T * header["BSCALE"] + header["BZERO"]
+    # A contiguous copy, scaled in place as astropy does; calculate_moments takes over twice as long on a
+    # transposed view.
+    data = stored.T.astype(np.float32, order="C")
     del stored
+    data *= header["BSCALE"]
+    data += header["BZERO"]
     # The time tags are NaN where no raster covered the mosaic, and the data are 0 there.
     uncovered = np.isnan(time_offset)
     mask = np.isin(data, BAD_PIXEL_VALUES_SCALED) | uncovered[..., np.newaxis]
