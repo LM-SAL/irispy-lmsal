@@ -98,8 +98,8 @@ def radiometric_calibration(
 
 
 def _calibrate(cube, factor, unit):
-    # Multiplies cube by factor, from photons per second to unit, divided by each exposure time
-    # and cast to the cube's data type. The exposures lie along the first axis: raster step or time.
+    # Multiplies cube by factor (photons per second to unit) over each exposure time, in the cube's
+    # data type. The exposures lie along the first axis: raster step or time.
     exposure_time = cube.exposure_time.to_value(u.s).reshape(-1, *[1] * (cube.data.ndim - 1))
     factor = ((cube.unit / u.s * factor).to_value(unit) / exposure_time).astype(cube.data.dtype)
     uncertainty = None if cube.uncertainty is None else StdDevUncertainty(cube.uncertainty.array * factor)
