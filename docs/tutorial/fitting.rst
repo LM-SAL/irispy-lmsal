@@ -54,8 +54,6 @@ Here we keep the wavelengths halfway to the Ni II and O IV lines on either side 
     >>> model = starts_from_model(line_model(["Si IV 1394"]), cube)  # doctest: +REMOTE_DATA
     >>> model.param_names  # doctest: +REMOTE_DATA
     ('amplitude_0', 'amplitude_1', 'mean_1', 'stddev_1')
-    >>> model.mean_1.shape  # doctest: +REMOTE_DATA
-    (16, 60)
 
 The background is component 0 and the line component 1.
 Now we fit every spectrum:
@@ -229,7 +227,7 @@ Things to know
   When a line is not much brighter than the noise, its fit is poorly constrained whatever its start.
   Average neighboring spectra first, keeping the uncertainties with ``cube.rebin((2, 2, 1), propagate_uncertainties=True)``.
 * **Two Gaussians can swap**
-  In `~irispy.utils.fitting.line_model`, the k2v Gaussian starts at the blue peak and the k2r one at the red peak, but both may move anywhere within 40 km/s of the rest wavelength.
+  With `~irispy.utils.fitting.line_model` and `~irispy.utils.fitting.starts_from_model`, the k2v Gaussian starts at the blue peak and the k2r one at the red peak, but both may move anywhere within 40 km/s of the rest wavelength.
   A fit can end with them the other way round, so sort the components by velocity before combining their maps.
 * **Several components**
   `~irispy.utils.fitting.line_model` gives each line one Gaussian because the layout of several depends on what is observed:

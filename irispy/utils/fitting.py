@@ -49,8 +49,13 @@ def _rest_wavelength(line):
     lines = get_lines(main_only=True)
     wavelength = lines["wavelength"][lines["ion"] == ion].to_value(u.AA)
     distance = np.abs(wavelength - float(near)) if near.replace(".", "", 1).isdigit() else np.inf
-    if not np.any(distance <= 1):
-        msg = f"No documented line {line!r}; name one by its ion and wavelength in Å, such as 'Si IV 1403'."
+    close = wavelength[distance <= 1]
+    # Lines closer than 0.1 Å, such as C II 1335.66 and 1335.71, are one blended line.
+    if not close.size or np.ptp(close) > 0.1:
+        msg = (
+            f"No single documented line {line!r}; name one by its ion and wavelength in Å, "
+            "such as 'Si IV 1403' or 'C II 1335.71'."
+        )
         raise ValueError(msg)
     return wavelength[np.argmin(distance)]
 
@@ -96,7 +101,8 @@ def line_model(lines):
     lines : `list` of `str`
         Documented lines of the line catalog (`~irispy.utils.lines.get_lines`), each named by its
         ion and its wavelength in Å to within 1 Å, such as ``"Si IV 1403"``, or ``"Mg II k"`` or
-        ``"Mg II h"``.
+        ``"Mg II h"``. A name within 1 Å of separate lines of its ion, such as ``"C II 1335"``,
+        needs more digits, such as ``"C II 1335.71"``.
 
     Returns
     -------
@@ -335,9 +341,9 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None, resi
     covariance diagonal, NaN where a fit failed and for fixed or tied parameters.
 
     The derived maps propagate the covariance to first order. The full width at half
-    maximum is :math:`2\sqrt{2\ln 2}\,\sigma` for a Gaussian and the ``fwhm`` parameter of a
-    Lorentzian, and the integral is :math:`\sqrt{2\pi}\,A\sigma` for a Gaussian and
-    :math:`\pi A\,\mathrm{FWHM}/2` for a Lorentzian.
+    maximum is :math:`2\sqrt{2\ln 2}\,|\sigma|` for a Gaussian and the absolute value of the ``fwhm``
+    parameter of a Lorentzian, and the integral is :math:`\sqrt{2\pi}\,A|\sigma|` for a Gaussian and
+    :math:`\pi A\,|\mathrm{FWHM}|/2` for a Lorentzian.
 
     A spectrum is `FitQualityFlag.AT_BOUND` where a free parameter is at or beyond one of its
     bounds, to within 1e-8 times the larger of their magnitudes in that spectrum, or,

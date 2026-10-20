@@ -87,7 +87,7 @@ model = starts_from_model(line_model(["Mg II k"]), mg_ii_k)
 wavelength = mg_ii_k.axis_world_coords("em.wl")[0].to(u.AA)
 good = np.isfinite(mg_ii_k.data) & ~mg_ii_k.mask
 fitter = TRFLSQFitter()
-mg_ii_fit = parallel_fit_dask(
+mg_ii_model_fit = parallel_fit_dask(
     model=model,
     fitter=fitter,
     data=np.where(good, mg_ii_k.data, 0),
@@ -107,7 +107,7 @@ step, slit = (n // 2 for n in model.mean_1.shape)
 plt.figure()
 ax = mg_ii_k[step, slit].plot(label="Spectrum")
 ax.plot(model(wavelength[:, np.newaxis, np.newaxis])[:, step, slit], label="Starting model")
-ax.plot(mg_ii_fit(wavelength[:, np.newaxis, np.newaxis])[:, step, slit], linestyle="--", label="Fitted model")
+ax.plot(mg_ii_model_fit(wavelength[:, np.newaxis, np.newaxis])[:, step, slit], linestyle="--", label="Fitted model")
 ax.set_title("Mg II k profile")
 plt.legend()
 
@@ -125,7 +125,7 @@ line_core = mg_ii_k.crop([SpectralCoord(mg_ii_core), None], [SpectralCoord(mg_ii
 
 # `~irispy.utils.fitting.maps_from_fit` gives each component's integrated intensity and
 # Doppler velocity as maps, against the Mg II k rest wavelength.
-maps = maps_from_fit(mg_ii_fit, mg_ii_k, fitter=fitter)
+maps = maps_from_fit(mg_ii_model_fit, mg_ii_k, fitter=fitter)
 fluxes = maps["integrated_intensity_1"].data, maps["integrated_intensity_2"].data
 velocities = maps["velocity_1"].data, maps["velocity_2"].data
 # The two Gaussians can swap during the fit, so the blue one is the one at the lower velocity.

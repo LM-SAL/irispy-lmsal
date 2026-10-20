@@ -80,14 +80,6 @@ def _cube(truth, wavelength, rng):
     return make_test_spectrogram_cube(data, wavelength, uncertainty=StdDevUncertainty(sigma))
 
 
-def _si_iv_cube(rng, profile=models.Gaussian1D):
-    center = (1402.77 + rng.normal(0, 0.02, SHAPE)) * u.AA
-    amplitude = rng.uniform(100, 300, SHAPE) * u.DN
-    width = rng.uniform(0.05, 0.09, SHAPE) * u.AA
-    truth = models.Const1D(5 * u.DN) + profile(amplitude, center, width)
-    return truth, _cube(truth, WAVELENGTH, rng)
-
-
 def test_line_model():
     model = line_model(["Si IV 1394", "C II 1336", "Mg II k", "Mg II h"])
     assert model.submodel_names == ("background", "Si IV 1394", "C II 1336", "k2v", "k2r", "h2v", "h2r")
@@ -102,9 +94,9 @@ def test_line_model():
         np.testing.assert_allclose(model.bounds[f"mean_{index}"], rest * (1 + np.array([-40, 40]) / C_KMS))
 
 
-@pytest.mark.parametrize("line", ["Si IV", "Si IV 1500", "Xx IV 1403"])
+@pytest.mark.parametrize("line", ["Si IV", "Si IV 1500", "Xx IV 1403", "C II 1335"])
 def test_line_model_rejects_unknown_lines(line):
-    with pytest.raises(ValueError, match="No documented line"):
+    with pytest.raises(ValueError, match="No single documented line"):
         line_model([line])
 
 
@@ -415,6 +407,14 @@ def test_starts_from_model_on_level_2_data(background):
     masked = np.all(cube.mask, axis=-1)
     assert np.all(quality[masked] == FitQualityFlag.NO_FIT)
     assert np.mean(quality[~masked] == FitQualityFlag.OK) > 0.8
+
+
+def _si_iv_cube(rng, profile=models.Gaussian1D):
+    center = (1402.77 + rng.normal(0, 0.02, SHAPE)) * u.AA
+    amplitude = rng.uniform(100, 300, SHAPE) * u.DN
+    width = rng.uniform(0.05, 0.09, SHAPE) * u.AA
+    truth = models.Const1D(5 * u.DN) + profile(amplitude, center, width)
+    return truth, _cube(truth, WAVELENGTH, rng)
 
 
 def test_maps_from_fit_recovers_derived_maps():
