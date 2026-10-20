@@ -1,1 +1,1 @@
-``irispy.utils.spectrograph.radiometric_calibration`` now returns spectrograph data and uncertainties in the data type of the input cube, float32 for Level 2 data, where it returned float64, which halves the size of the calibrated cube.
+``irispy.utils.spectrograph.radiometric_calibration`` now returns spectrograph data and uncertainties in the input's data type, float32 for Level 2 data, where it returned float64.

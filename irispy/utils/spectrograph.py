@@ -100,8 +100,8 @@ def radiometric_calibration(
 
 
 def _sample_factor(cube, factor, unit):
-    # From the factor that takes photons per second to unit, the one that takes the samples of cube
-    # to unit, in its data type. The exposures are along the first axis, raster step or time.
+    # Turns factor, from photons per second to unit, into one per sample of cube in its data type.
+    # The exposures lie along the first axis: raster step or time.
     exposure_time = cube.exposure_time.to_value(u.s).reshape(-1, *[1] * (cube.data.ndim - 1))
     return ((cube.unit / u.s * factor).to_value(unit) / exposure_time).astype(cube.data.dtype)
 
@@ -213,7 +213,7 @@ def calculate_dn_to_radiance_factor(
     Calculates the factor that multiplies photons/s to give radiance at the given
     wavelengths.
 
-    The unit of a Level 2 spectrograph cube converts its DN to photons.
+    ``cube.unit.to(u.photon)`` gives the photons per DN of a Level 2 spectrograph cube.
 
     Parameters
     ----------
