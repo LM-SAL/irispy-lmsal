@@ -14,5 +14,4 @@ API Reference
    spectrograph
    utils
    obsid
-   visualization
    sample

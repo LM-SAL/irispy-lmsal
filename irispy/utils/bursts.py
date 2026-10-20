@@ -20,7 +20,7 @@ from irispy.utils.constants import DN_UNIT
 from irispy.utils.response import get_interpolated_effective_area, get_latest_response
 from irispy.utils.utils import _boolean_mask, _saturated_samples
 
-__all__ = ["find_bright_image_events", "find_bright_spectral_events", "find_si_iv_bursts", "find_sji_bursts"]
+__all__ = ["find_bright_image_events", "find_bright_spectral_events", "find_si_iv_bursts"]
 
 _SI_IV = 1402.77 * u.AA
 # The 500 DN/s default threshold was set on this observation, summed by 2 in wavelength.
@@ -195,56 +195,6 @@ def find_bright_spectral_events(
     return SpectrogramCubeSequence(maps, meta=raster.meta), vstack(tables)
 
 
-def find_sji_bursts(sji, *, sigma_factor=10, min_pixels=2):
-    """
-    Find UV bursts in 1400 Å slit-jaw images.
-
-    This is `find_bright_image_events` for 1400 Å slit-jaw images.
-
-    Parameters
-    ----------
-    sji : `~irispy.sji.SJICube`
-        A 1400 Å slit-jaw cube with axes (frame, y, x).
-    sigma_factor : `float`, optional
-        Burst threshold, in standard deviations.
-    min_pixels : `int`, optional
-        Events with fewer pixels are dropped.
-
-    Returns
-    -------
-    labels : `~irispy.sji.SJICube`
-        As `find_bright_image_events`.
-    events : `~astropy.table.QTable`
-        As `find_bright_image_events`.
-
-    Notes
-    -----
-    Port of `iris_sji_burst_check.pro <https://sohoftp.nascom.nasa.gov/solarsoft/iris/idl/nrl/iris_sji_burst_check.pro>`__,
-    which fixes the parameters at their defaults. These differences from IDL are deliberate:
-
-    * Edge pixels can belong to events; IDL's ``REGION_GROW`` leaves them out of every region,
-      and an above-threshold edge pixel makes the IDL loop never end.
-    * Masked pixels other than saturated ones, including both -200 and -199 fill values, are left
-      out of the statistics and are never burst pixels. IDL excludes only -200, so the frame
-      thresholds can differ.
-    * The median of an even number of pixels is the mean of the two middle values, not IDL's
-      upper one, and the standard deviation is accumulated in double precision.
-    * Labels are unique through the cube; IDL numbers the events of each frame from 1, in bytes
-      that wrap after 255.
-
-    The 10-sigma default is a quick look: on active-region data it flags events in every frame,
-    and :cite:t:`young2018` recommend a threshold chosen for each data set.
-
-    References
-    ----------
-    * :cite:t:`young2018`
-    """
-    if sji.meta.spectral_window != "1400":
-        msg = f"Bursts are found in 1400 Å slit-jaw images, not {sji.meta.spectral_window}"
-        raise ValueError(msg)
-    return find_bright_image_events(sji, sigma_factor=sigma_factor, min_pixels=min_pixels)
-
-
 def find_bright_image_events(cube, *, sigma_factor=10, min_pixels=2):
     """
     Find compact bright events in images.
@@ -269,6 +219,29 @@ def find_bright_image_events(cube, *, sigma_factor=10, min_pixels=2):
     events : `~astropy.table.QTable`
         One row per event: ``label``, ``frame``, number of pixels ``npix``, the frame's ``threshold``,
         and the ``y``, ``x``, ``time``, ``coordinate`` and ``intensity`` of its brightest pixel.
+
+    Notes
+    -----
+    The defaults are for UV bursts in 1400 Å slit-jaw images.
+    Port of `iris_sji_burst_check.pro <https://sohoftp.nascom.nasa.gov/solarsoft/iris/idl/nrl/iris_sji_burst_check.pro>`__,
+    which fixes the parameters at these defaults. These differences from IDL are deliberate:
+
+    * Edge pixels can belong to events; IDL's ``REGION_GROW`` leaves them out of every region,
+      and an above-threshold edge pixel makes the IDL loop never end.
+    * Masked pixels other than saturated ones, including both -200 and -199 fill values, are left
+      out of the statistics and are never event pixels. IDL excludes only -200, so the frame
+      thresholds can differ.
+    * The median of an even number of pixels is the mean of the two middle values, not IDL's
+      upper one, and the standard deviation is accumulated in double precision.
+    * Labels are unique through the cube; IDL numbers the events of each frame from 1, in bytes
+      that wrap after 255.
+
+    The 10-sigma default is a quick look: on active-region data it flags events in every frame,
+    and :cite:t:`young2018` recommend a threshold chosen for each data set.
+
+    References
+    ----------
+    * :cite:t:`young2018`
     """
     check_scaled(cube)
     if cube.data.ndim != 3:

@@ -17,7 +17,7 @@ from sunpy.coordinates.frames import Helioprojective
 from sunpy.coordinates.wcs_utils import _set_wcs_aux_obs_coord
 
 from irispy.io._level2 import _check_level2
-from irispy.io._mask import _memmap_fill_mask
+from irispy.io._mask import _check_scaled, _memmap_fill_mask
 from irispy.meta import SGMeta
 from irispy.spectrograph import RasterCollection, SpectrogramCube, SpectrogramCubeSequence
 from irispy.utils import calculate_uncertainty
@@ -306,10 +306,8 @@ def read_spectrograph_lvl2(
                     data_mask = _memmap_fill_mask(data, header)
                     if np.issubdtype(data.dtype, np.integer):  # the FITS integers, not DN
                         dn_unit = DN_UNIT[f"{meta.detector_band}_UNSCALED"]
-                elif "BSCALE" in header or "BZERO" in header:  # astropy drops them once it scales the data
-                    msg = "An HDU list opened with do_not_scale_image_data=True needs memmap=True"
-                    raise ValueError(msg)
                 else:
+                    _check_scaled(header)
                     # Level 2 clips at the ceiling, where iris_prep's +Inf saturation flags were lost
                     saturated = data >= SATURATION_LIMIT.value
                     data_mask = np.isin(data, BAD_PIXEL_VALUES_SCALED) | saturated

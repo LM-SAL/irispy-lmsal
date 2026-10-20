@@ -7,7 +7,7 @@ import sunpy.visualization.colormaps as cm  # NOQA: F401
 from ndcube.visualization.mpl_plotter import MatplotlibPlotter
 from ndcube.visualization.mpl_sequence_plotter import MatplotlibSequencePlotter, SequenceAnimator
 
-__all__ = ["IRISArrayAnimatorWCS", "IRISPlotter", "IRISSequencePlotter", "SJIPlotter"]
+__all__ = []
 
 
 LAT_LABELS = [

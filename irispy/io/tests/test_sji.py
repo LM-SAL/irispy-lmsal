@@ -106,8 +106,7 @@ def test_read_sji_lvl2_matches_the_file(request, file_fixture):
         assert getattr(meta, name).isot == Time(header[keyword]).isot, name
 
 
-@pytest.mark.parametrize("from_bytes", [False, True])
-def test_read_sji_lvl2_masks_explicit_float_bad_pixels(tmp_path, sns_sji_1330_file, from_bytes):
+def test_read_sji_lvl2_masks_explicit_float_bad_pixels(tmp_path, sns_sji_1330_file):
     with fits.open(sns_sji_1330_file) as hdul:
         data = hdul[0].data.astype("float32")
         data.flat[:3] = [-200, -199, -198]
@@ -116,7 +115,7 @@ def test_read_sji_lvl2_masks_explicit_float_bad_pixels(tmp_path, sns_sji_1330_fi
         float_file = tmp_path / "sji_float_bad_pixels.fits"
         hdul.writeto(float_file)
 
-    cube = read_sji_lvl2(float_file.read_bytes() if from_bytes else float_file)
+    cube = read_sji_lvl2(float_file)
 
     np.testing.assert_array_equal(cube.mask, expected_mask)
     assert np.isnan(cube.data[cube.mask]).all()
@@ -131,6 +130,14 @@ def test_read_sji_lvl2_keeps_the_image_of_a_supplied_hdulist(bursts_sji_1400_fil
     # The fill values were replaced in the returned cube only
     assert np.isnan(cube.data).any()
     assert not np.isnan(original).any()
+
+
+def test_read_sji_lvl2_unscaled_opened_file_needs_memmap(bursts_sji_1400_file):
+    with (
+        fits.open(bursts_sji_1400_file, do_not_scale_image_data=True) as hdulist,
+        pytest.raises(ValueError, match="needs memmap=True"),
+    ):
+        read_sji_lvl2(hdulist)
 
 
 @pytest.mark.parametrize("memmap", [False, True])
@@ -185,12 +192,11 @@ def test_read_sji_lvl2_other_passband_stays_in_dn(tmp_path, sns_sji_1400_file):
         read_sji_lvl2(filename, uncertainty=True)
 
 
-@pytest.mark.parametrize("input_kind", ["bytes", "file-like", "hdulist"])
+@pytest.mark.parametrize("input_kind", ["file-like", "hdulist"])
 @pytest.mark.parametrize("memmap", [False, True])
 def test_read_sji_lvl2_accepts_decompressed_data(input_kind, memmap):
     filename = get_test_filepath("bursts/iris_l2_20130902_163935_4000255147_SJI_1400_t000_test.fits")
     expected = read_sji_lvl2(filename, memmap=memmap)
-    content = Path(filename).read_bytes()
     if input_kind == "hdulist":
         with fits.open(filename, mode="denywrite", memmap=memmap, do_not_scale_image_data=memmap) as hdulist:
             original = hdulist[0].data
@@ -200,7 +206,7 @@ def test_read_sji_lvl2_accepts_decompressed_data(input_kind, memmap):
                 assert np.shares_memory(cube.data, original)
                 assert not cube.data.flags["W"]
     else:
-        cube = read_sji_lvl2(content if input_kind == "bytes" else io.BytesIO(content), memmap=memmap)
+        cube = read_sji_lvl2(io.BytesIO(Path(filename).read_bytes()), memmap=memmap)
 
     np.testing.assert_array_equal(cube.data, expected.data)
     np.testing.assert_array_equal(cube.mask, expected.mask)
@@ -245,8 +251,7 @@ def test_read_sji_lvl2_unrotated_pointing(tmp_path, sns_sji_1330_file):
             assert header[f"PC{key[2]}_{key[4]}"] == 0.0
 
 
-@pytest.mark.parametrize("from_bytes", [False, True])
-def test_read_sji_lvl2_fills_dropped_pointing_rows(tmp_path, sns_sji_1330_file, from_bytes):
+def test_read_sji_lvl2_fills_dropped_pointing_rows(tmp_path, sns_sji_1330_file):
     # A dropped exposure zeroes its whole pointing row; those rows are filled
     # with the average of the neighboring exposures.
     keys = ("XCENIX", "YCENIX", "PC1_1IX", "PC1_2IX", "PC2_1IX", "PC2_2IX")
@@ -257,7 +262,7 @@ def test_read_sji_lvl2_fills_dropped_pointing_rows(tmp_path, sns_sji_1330_file, 
         hdulist[1].data[1, columns] = 0.0
         hdulist.writeto(filename)
 
-    cube = read_sji_lvl2(filename.read_bytes() if from_bytes else filename)
+    cube = read_sji_lvl2(filename)
     header = cube.meta["frame_wcs_headers"][1]
     np.testing.assert_allclose(header["CRVAL1"], expected["XCENIX"])
     np.testing.assert_allclose(header["CRVAL2"], expected["YCENIX"])

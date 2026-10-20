@@ -21,7 +21,7 @@ from astropy.coordinates import SpectralCoord
 from astropy.time import Time
 
 from irispy.io import read_files
-from irispy.utils.bursts import find_si_iv_bursts, find_sji_bursts
+from irispy.utils.bursts import find_bright_image_events, find_si_iv_bursts
 
 ###############################################################################
 # `We start with getting data from the IRIS data archive <https://www.lmsal.com/hek/hcr?cmd=view-event&event-id=ivo%3A%2F%2Fsot.lmsal.com%2FVOEvent%23VOEvent_IRIS_20130902_182935_4000005156_2013-09-02T18%3A29%3A352013-09-02T18%3A29%3A35.xml>`__.
@@ -80,7 +80,7 @@ sji_1400 = read_files(sji_filename)
 # Here, a pixel is part of a burst when it is at least 10 standard deviations (``sigma_factor``)
 # above the median of its frame. The burst of Figure 3 is the brightest event at 09:53:21.
 
-sji_labels, sji_events = find_sji_bursts(sji_1400)
+sji_labels, sji_events = find_bright_image_events(sji_1400)
 frame = np.argmin(np.abs(sji_1400.time - Time("2016-10-26T09:53:21")))
 in_frame = sji_events[sji_events["frame"] == frame]
 burst = in_frame[np.argmax(in_frame["intensity"])]
