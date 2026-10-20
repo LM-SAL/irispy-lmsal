@@ -1,1 +1,1 @@
-``import irispy`` is faster: the analysis modules under `irispy.utils`, such as ``irispy.utils.bursts`` and ``irispy.utils.fiducials``, and the sample data downloader ``irispy.data.sample.download_all`` are now imported on first use; ``irispy.utils.bursts`` and ``from irispy.utils import bursts`` work as before.
+``import irispy`` is faster: the analysis modules under ``irispy.utils``, such as ``irispy.utils.bursts`` and ``irispy.utils.fiducials``, are now imported on first use; ``irispy.utils.bursts`` and ``from irispy.utils import bursts`` work as before.

@@ -4,8 +4,6 @@ This package contains all of irispy's test data.
 
 from pathlib import Path
 
-from astropy.utils.data import get_pkg_data_filename
-
 import irispy
 
 __all__ = [
@@ -16,28 +14,27 @@ __all__ = [
 ROOTDIR = Path(irispy.__file__).parent / "data" / "test"
 
 
-def get_test_filepath(filename, package="irispy.data.test", **kwargs):
+def get_test_filepath(filename):
     """
     Return the full path to a test file in the ``data/test`` directory.
 
     Parameters
     ----------
-    filename : `str`
+    filename : `str` or `pathlib.Path`
         The name of the file inside the ``data/test`` directory.
-    package : `str`, optional
-        The package in which to look for the file. Defaults to "irispy.data.test".
 
     Returns
     -------
     filepath : `str`
         The full path to the file.
 
-    Notes
-    -----
-    This is a wrapper around `astropy.utils.data.get_pkg_data_filename` which
-    sets the ``package`` kwarg to be 'sunpy.data.test`.
+    Raises
+    ------
+    FileNotFoundError
+        If the file is not in the ``data/test`` directory.
     """
-    if isinstance(filename, Path):
-        # NOTE: get_pkg_data_filename does not accept Path objects
-        filename = filename.as_posix()
-    return get_pkg_data_filename(filename, package=package, **kwargs)
+    filepath = ROOTDIR / filename
+    if not filepath.is_file():
+        msg = f"No test file {filepath}"
+        raise FileNotFoundError(msg)
+    return str(filepath)
