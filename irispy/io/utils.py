@@ -187,9 +187,8 @@ def fits_info(filename: str) -> None:
      10 ... Auxiliary data
     """
 
-    def get_description(idx, idx_mod):
+    def get_description(window):
         # Windows 1 to NWIN of the primary header are the data HDUs; the HDUs after them hold auxiliary data.
-        window = idx + idx_mod
         if window == 0:
             return "Primary Header (no data)"
         if window > header["NWIN"]:
@@ -212,9 +211,8 @@ def fits_info(filename: str) -> None:
             f"Observation: {header['OBS_DESC']}",
             f"OBS ID: {header['OBSID']}",
         ]
-        num_extensions = len(hdulist)
-        for idx in range(num_extensions):
-            description = get_description(idx, 0 if "SPEC" in header["INSTRUME"] else 1)
+        for idx in range(len(hdulist)):
+            description = get_description(idx if "SPEC" in header["INSTRUME"] else idx + 1)
             hdu_info[idx] = (*hdu_info[idx][:-1], description)
             table.add_row(list(map(str, hdu_info[idx])))
 
