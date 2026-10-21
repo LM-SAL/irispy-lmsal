@@ -172,14 +172,11 @@ Not every package is available on conda-forge; the ``rsliding`` package, the def
    * - ``cosmic-rays``
      - ``rsliding``, ``astroscrappy``
      - `~irispy.utils.cosmic_rays.remove_cosmic_rays` with the ``"rsliding"`` (default) or ``"astroscrappy"`` method
-   * - ``density``
-     - ``fiasco``
-     - The density diagnostics in `irispy.utils.density`
    * - ``rgb``
      - ``colorsynth``
      - The false-color images of `irispy.utils.rgb`
    * - ``all``
-     - The three extras above
+     - The two extras above
      - Everything above
    * - ``tests``, ``docs``, ``dev``
      - Test, documentation and all of the above
