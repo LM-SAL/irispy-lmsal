@@ -70,8 +70,8 @@ ny, nx = (n // 2 * 2 for n in si_iv_1403.data.shape[:2])
 si_iv_1403 = si_iv_1403[:ny, :nx].rebin((2, 2, 1), propagate_uncertainties=True)
 
 ###############################################################################
-# The model describes Si IV alone, so we keep the wavelengths halfway to the
-# neighboring O IV lines, which we take from the line catalog.
+# We keep the wavelengths halfway to the O IV lines on either side of Si IV,
+# from the line catalog.
 
 blue, si_iv_core, red = get_lines([1401, 1405] * u.AA, main_only=True)["wavelength"][:3]
 lower_corner = [SpectralCoord((blue + si_iv_core) / 2), None]
@@ -84,11 +84,8 @@ si_iv_1403 = si_iv_1403.crop(lower_corner, upper_corner)
 si_iv_spec_crop = si_iv_1403.crop([SpectralCoord(si_iv_core), None], [SpectralCoord(si_iv_core), None])
 
 ###############################################################################
-# `~irispy.utils.fitting.line_model` puts a Gaussian at the rest wavelength of Si IV
-# on a constant background, and `~irispy.utils.fitting.starts_from_model` starts it in
-# every spectrum at that spectrum's peak above its background. We fit it to every
-# spectrum with `~astropy.modeling.fitting.parallel_fit_dask`, passing the wavelengths
-# in Å and giving the masked samples no weight.
+# We start a Gaussian at Si IV in every spectrum and fit them all, as
+# :ref:`irispy-tutorial-fitting` explains.
 
 model = starts_from_model(line_model(["Si IV 1403"]), si_iv_1403)
 wavelength = si_iv_1403.axis_world_coords("em.wl")[0].to(u.AA)
@@ -107,9 +104,7 @@ iris_model_fit = parallel_fit_dask(
 )
 
 ###############################################################################
-# `~irispy.utils.fitting.maps_from_fit` turns the fitted parameters into maps with the
-# spatial coordinates of the cube and uncertainties from the fit. It also derives
-# the Doppler velocity, width and integrated intensity against the Si IV rest wavelength.
+# We turn the fit into maps, with the Doppler velocities against the Si IV rest wavelength.
 
 maps = maps_from_fit(iris_model_fit, si_iv_1403, fitter=fitter)
 print(list(maps.keys()))
@@ -130,7 +125,7 @@ ax.set_title("Si IV 1403 profile")
 plt.legend()
 
 ###############################################################################
-# Now we plot them next to the line-core image.
+# Now we plot the intensity, Doppler shift and width maps next to the line-core image.
 
 fig, ax_dict = plt.subplot_mosaic(
     [["fov", "intensity"], ["velocity", "width"]],
@@ -175,11 +170,9 @@ for ax in ax_dict.values():
 fig.tight_layout()
 
 ###############################################################################
-# The fitted width also holds the instrumental and thermal broadening of the line.
-# `~irispy.utils.fitting.non_thermal_velocity` removes both, taking the thermal width
-# at the temperature we give, here the peak of Si IV in CHIANTI's ionization
-# equilibrium, log T = 4.9 :cite:p:`dere2023`. Lines narrower than that have no
-# non-thermal velocity.
+# We take the non-thermal velocity from the fitted width, as
+# :ref:`irispy-tutorial-fitting` explains, with the thermal width at log T = 4.9,
+# the peak of Si IV in CHIANTI's ionization equilibrium :cite:p:`dere2023`.
 
 non_thermal = non_thermal_velocity(maps["fwhm_1"], si_iv_core, ion="Si IV", temperature=10**4.9 * u.K)
 

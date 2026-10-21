@@ -76,12 +76,10 @@ ny, nx = (n // 2 * 2 for n in mg_ii_k.data.shape[:2])
 mg_ii_k = mg_ii_k[:ny, :nx].rebin((2, 2, 1), propagate_uncertainties=True)
 
 ###############################################################################
-# `~irispy.utils.fitting.line_model` puts one Gaussian 0.15 Å blue of the Mg II k rest
-# wavelength, for the k2v peak, and one 0.15 Å red of it, for the k2r peak, on a constant
-# background. `~irispy.utils.fitting.starts_from_model` starts each Gaussian in every
-# spectrum at its own peak. We fit the model to every spectrum with
-# `~astropy.modeling.fitting.parallel_fit_dask`, passing the wavelengths in Å and
-# giving the masked samples no weight.
+# For Mg II k, `~irispy.utils.fitting.line_model` gives one Gaussian 0.15 Å blue of the
+# rest wavelength, for the k2v peak, and one 0.15 Å red of it, for the k2r peak, with their
+# centers kept within 40 km/s of the rest wavelength and their amplitudes not negative.
+# We start and fit them in every spectrum, as :ref:`irispy-tutorial-fitting` explains.
 
 model = starts_from_model(line_model(["Mg II k"]), mg_ii_k)
 wavelength = mg_ii_k.axis_world_coords("em.wl")[0].to(u.AA)
@@ -123,21 +121,20 @@ plt.legend()
 (mg_ii_core,) = get_lines([wavelength[0], wavelength[-1]], main_only=True)["wavelength"]
 line_core = mg_ii_k.crop([SpectralCoord(mg_ii_core), None], [SpectralCoord(mg_ii_core), None])
 
-# `~irispy.utils.fitting.maps_from_fit` gives each component's integrated intensity and
-# Doppler velocity as maps, against the Mg II k rest wavelength.
+# We turn the fit into maps, with the Doppler velocities against the Mg II k rest wavelength.
 maps = maps_from_fit(mg_ii_model_fit, mg_ii_k, fitter=fitter)
 fluxes = maps["integrated_intensity_1"].data, maps["integrated_intensity_2"].data
 velocities = maps["velocity_1"].data, maps["velocity_2"].data
-# The two Gaussians can swap during the fit, so the blue one is the one at the lower velocity.
+# The blue component is the one at the lower velocity.
 swapped = velocities[0] > velocities[1]
 blue_flux, red_flux = np.where(swapped, fluxes[1], fluxes[0]), np.where(swapped, fluxes[0], fluxes[1])
-# We leave out the fits that failed or stopped at a bound.
+# We keep only the fits flagged OK.
 valid = maps["quality"].data == FitQualityFlag.OK
 total_flux = np.where(valid, blue_flux + red_flux, np.nan)
 flux_asymmetry = np.where(valid, (blue_flux - red_flux) / total_flux, np.nan)
 component_separation = np.where(valid, np.abs(velocities[1] - velocities[0]), np.nan)
 
-# The combined maps are plain arrays, so we wrap them in `~irispy.spectrograph.SpectrogramCube`
+# The combined maps are plain arrays, so we wrap them in SpectrogramCube
 # objects with the spatial WCS of the maps; they then plot with the same orientation and coordinates.
 map_wcs = maps["velocity_1"].wcs
 fig, ax_dict = plt.subplot_mosaic(
