@@ -89,6 +89,9 @@ def get_lines(
     selected = np.ones(len(table), dtype=bool)
     if wavelength_range is not None:
         endpoints = u.Quantity(wavelength_range)
+        if not endpoints.unit.is_equivalent(u.AA, equivalencies=u.spectral()):
+            msg = f"wavelength_range must be in a spectral unit, such as [1400, 1405] * u.AA, not {endpoints}"
+            raise u.UnitConversionError(msg)
         if endpoints.shape != (2,) or not np.all(np.isfinite(endpoints.value)) or np.any(endpoints.value <= 0):
             msg = "wavelength_range must contain two finite, positive spectral endpoints."
             raise ValueError(msg)

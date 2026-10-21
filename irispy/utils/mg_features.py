@@ -11,7 +11,7 @@ from scipy.ndimage import gaussian_filter1d
 import astropy.units as u
 
 from irispy.spectrograph import RasterCollection, SpectrogramCube
-from irispy.utils._spectral import check_scaled, make_map_cube, make_spatial_template
+from irispy.utils._spectral import check_scaled, check_velocity_range, make_map_cube, make_spatial_template
 from irispy.utils.constants import BAD_PIXEL_VALUES_SCALED
 from irispy.utils.utils import _boolean_mask, _saturated_samples
 
@@ -23,7 +23,8 @@ _MIDDLE_MINIMUM = [(1, 2), (3, 1), (3, 2), (3, 4), (5, 4), (7, 6)]
 _BETWEEN_MAXIMA = [(2, 2), (2, 3), (3, 3), (4, 2), (4, 3), (4, 4)]
 
 
-def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=("k", "h")):
+@u.quantity_input
+def calculate_mg_features(cube, *, velocity_range: u.km / u.s = (-40, 40) * u.km / u.s, lines=("k", "h")):
     """
     Find the line centers and emission peaks of the Mg II h and k lines.
 
@@ -36,7 +37,7 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
     cube : `~irispy.spectrograph.SpectrogramCube`
         One raster of a Mg II window, read with ``memmap=False``, with axes (step, slit, wavelength).
     velocity_range : `~astropy.units.Quantity`, optional
-        Doppler velocities from each line's rest wavelength within which to search (km/s if unitless).
+        ``(lower, upper)`` Doppler velocities from each line's rest wavelength within which to search.
     lines : `tuple` of `str`, optional
         The lines to measure, ``"k"`` (279.635 nm) and/or ``"h"`` (280.353 nm, both in vacuum).
 
@@ -87,14 +88,11 @@ def calculate_mg_features(cube, *, velocity_range=(-40, 40) * u.km / u.s, lines=
         msg = "cube must have axes (step, slit, wavelength); slice it with ranges, e.g. cube[:, 300:301]"
         raise ValueError(msg)
     check_scaled(cube)
-    velocity_range = u.Quantity(velocity_range, u.km / u.s)
-    if velocity_range.shape != (2,) or not velocity_range[0] < velocity_range[1]:
-        msg = f"velocity_range must be two increasing velocities, not {velocity_range}"
-        raise ValueError(msg)
+    check_velocity_range(velocity_range)
     if not lines or not set(lines) <= set(_REST_WAVELENGTH) or len(set(lines)) < len(lines):
         msg = f"lines must be 'k', 'h' or both, not {lines!r}"
         raise ValueError(msg)
-    low, high = velocity_range.value
+    low, high = velocity_range.to_value(u.km / u.s)
     wavelength = cube.axis_world_coords(cube.wavelength_axis)[0]
     if not np.all(np.diff(wavelength) > 0):
         msg = "The wavelengths must increase along the cube, as in level 2 data"

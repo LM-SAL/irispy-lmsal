@@ -152,6 +152,9 @@ def test_read_mosaic_wavelength_range(mosaic_file):
         read_mosaic(mosaic_file, wavelength_range=[2700, 2701] * u.AA)
     with pytest.raises(ValueError, match="two wavelengths"):
         read_mosaic(mosaic_file, wavelength_range=2796.35 * u.AA)
+    np.testing.assert_array_equal(read_mosaic(mosaic_file, wavelength_range=[2796.40, 2796.35] * u.AA).data, cube.data)
+    with pytest.raises(TypeError, match="wavelength_range"):
+        read_mosaic(mosaic_file, wavelength_range=[2796.35, 2796.40])
 
 
 def test_read_mosaic_rejects_other_files(sns_sji_2832_file, mosaic_file):
@@ -189,6 +192,8 @@ def test_mosaic_to_map(mosaic_file):
     assert np.isnan(cube.to_map([2796.38, 2796.43] * u.AA).data[1, 2])
     with pytest.raises(ValueError, match="No wavelengths between"):
         cube.to_map([2700, 2701] * u.AA)
+    with pytest.raises(TypeError, match="wavelength"):
+        cube.to_map(2796.36)
 
     # Slicing keeps the cube type, the time tags and the map coordinates.
     sub = cube[1:, 1:]

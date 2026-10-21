@@ -274,7 +274,11 @@ def test_subtract_background_integer_mask():
 
 @pytest.mark.parametrize(
     ("windows", "match"),
-    [([1333, 1334, 1335] * u.AA, r"shape \(2,\) or \(n, 2\)"), ([1340, 1341] * u.AA, "No wavelengths between")],
+    [
+        ([1333, 1334, 1335] * u.AA, r"shape \(2,\) or \(n, 2\)"),
+        ([1340, 1341] * u.AA, "No wavelengths between"),
+        ([1333, 1334], "windows must be wavelengths"),
+    ],
 )
 def test_subtract_background_rejects_bad_windows(windows, match):
     cube = make_test_spectrogram_cube(np.ones((1, 1, 5)), np.linspace(1333, 1337, 5) * u.AA)
@@ -331,6 +335,20 @@ def test_radiometric_calibration_rejects_line_outside_slit_jaw_passband(sns_sji_
     cube = read_files(sns_sji_1330_file)
     with pytest.raises(ValueError, match="1330 slit-jaw passband has no effective area"):
         radiometric_calibration(cube, line=line)
+
+
+def test_radiometric_calibration_needs_data_in_dn(sns_sg_file, aia_1700_file):
+    cube = read_files(sns_sg_file, spectral_windows="C II 1336")["C II 1336"][0]
+    for done in (cube.apply_exposure_time_correction(), radiometric_calibration(cube)):
+        with pytest.raises(ValueError, match="must be in DN"):
+            radiometric_calibration(done)
+    with pytest.raises(ValueError, match="no IRIS slit-jaw response for 1700"):
+        radiometric_calibration(read_files(aia_1700_file))
+
+
+def test_radiometric_calibration_needs_one_line_wavelength(sns_sji_1330_file):
+    with pytest.raises(ValueError, match="line must be one wavelength"):
+        radiometric_calibration(read_files(sns_sji_1330_file), line=[1335, 1336] * u.AA)
 
 
 def test_radiometric_calibration_rejects_line_for_spectra(sns_sg_file):

@@ -387,9 +387,22 @@ def test_calculate_red_blue_asymmetry_flags_low_signal():
     velocity = np.arange(-200, 201, 10) * u.km / u.s
     wavelengths = _wavelengths_from_velocity(velocity)
     cube = make_test_spectrogram_cube(_flat_wing_profile(velocity, red_excess=2).reshape(1, 1, -1), wavelengths)
-    result = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH, spline_degree=1, min_intensity=15)
+    result = calculate_red_blue_asymmetry(
+        cube, rest_wavelength=REST_WAVELENGTH, spline_degree=1, min_intensity=15 * u.DN
+    )
     assert RBAQualityFlag(result["quality"].data[0, 0]) is RBAQualityFlag.LOW_SIGNAL
     assert np.isnan(result["red_blue_asymmetry"].data[0, 0])
+
+
+def test_calculate_red_blue_asymmetry_min_intensity_in_dn(sns_sg_file):
+    cube = read_files(sns_sg_file, spectral_windows="Si IV 1403")["Si IV 1403"][0]
+    with pytest.raises(TypeError, match="min_intensity"):
+        calculate_red_blue_asymmetry(cube, min_intensity=75, return_profiles=False)
+    for data, threshold in ((cube, 75 * u.DN), (cube.apply_exposure_time_correction(), 75 * u.DN / u.s)):
+        quality = calculate_red_blue_asymmetry(data, min_intensity=threshold, return_profiles=False)["quality"]
+        expected = calculate_red_blue_asymmetry(data, min_intensity=75 * data.unit, return_profiles=False)
+        assert 0 < np.count_nonzero(quality.data == RBAQualityFlag.LOW_SIGNAL) < quality.data.size
+        np.testing.assert_array_equal(quality.data, expected["quality"].data)
 
 
 def test_calculate_red_blue_asymmetry_flags_saturated():
@@ -516,9 +529,9 @@ def test_calculate_red_blue_asymmetry_default_rest_wavelength(raster_sg_file, li
         ({"rest_wavelength": [140, 141] * u.nm}, "rest_wavelength must be a positive finite scalar"),
         ({"rest_wavelength": np.nan * u.nm}, "rest_wavelength must be a positive finite scalar"),
         ({"rest_wavelength": -140 * u.nm}, "rest_wavelength must be a positive finite scalar"),
-        ({"velocity_range": [50] * u.km / u.s}, "velocity_range must contain two velocities"),
-        ({"velocity_range": [-50, 150] * u.km / u.s}, "velocity_range must be positive and increasing"),
-        ({"velocity_range": [150, 50] * u.km / u.s}, "velocity_range must be positive and increasing"),
+        ({"velocity_range": [50] * u.km / u.s}, "velocity_range must be two increasing velocities"),
+        ({"velocity_range": [-50, 150] * u.km / u.s}, "velocity_range must be positive"),
+        ({"velocity_range": [150, 50] * u.km / u.s}, "velocity_range must be two increasing velocities"),
         ({"dv": 0 * u.km / u.s}, "dv must be positive"),
         ({"spline_degree": -1}, "spline_degree must be a non-negative integer"),
     ],

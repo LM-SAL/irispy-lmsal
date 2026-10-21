@@ -10,7 +10,9 @@ from astropy.nddata import NDDataArray, StdDevUncertainty
 
 from irispy.spectrograph import RasterCollection, _wavelength_indices
 from irispy.utils._spectral import (
+    _to_unit,
     check_scaled,
+    check_velocity_range,
     default_rest_wavelength,
     make_map_cube,
     make_spatial_template,
@@ -21,7 +23,10 @@ from irispy.utils.utils import _boolean_mask, _saturated_samples
 __all__ = ["average_window", "calculate_moments"]
 
 
-def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_intensity=None):
+@u.quantity_input
+def calculate_moments(
+    cube, *, rest_wavelength: u.AA = None, velocity_range: u.Quantity[u.km / u.s] | None, min_intensity=None
+):
     r"""
     Calculate the 0th, 1st and 2nd spectral moments of a spectrogram cube.
 
@@ -39,11 +44,11 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_in
         Rest wavelength of the line. Defaults to ``cube.meta.rest_wavelength``, or to the one
         documented line the cube covers (`~irispy.utils.lines.get_lines`) if it does not cover
         ``cube.meta.rest_wavelength``.
-    velocity_range : `astropy.units.Quantity`, optional
-        ``(lower, upper)`` Doppler velocities from ``rest_wavelength`` within which to use the samples
-        (km/s if unitless). Defaults to the whole spectrum.
-    min_intensity : `float` or `astropy.units.Quantity`, optional
-        Pixels whose 0th moment is below this get NaN in every map.
+    velocity_range : `astropy.units.Quantity` or `None`
+        ``(lower, upper)`` Doppler velocities from ``rest_wavelength`` within which to use the samples,
+        such as ``(-100, 100) * u.km / u.s``, or `None` to use the whole window.
+    min_intensity : `astropy.units.Quantity`, optional
+        Pixels whose 0th moment is below this get NaN in every map. ``u.DN`` stands for the data's DN.
 
     Returns
     -------
@@ -93,6 +98,8 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_in
     * :cite:t:`cheung2022`, Appendix C
     """
     check_scaled(cube)
+    if min_intensity is not None:
+        min_intensity = _to_unit(min_intensity, cube.unit, "min_intensity")
     if rest_wavelength is None:
         rest_wavelength = default_rest_wavelength(cube)
     wavelength_axis = cube.wavelength_axis
@@ -105,11 +112,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_in
         if rest_wavelength is None:
             msg = "rest_wavelength must be provided (or detectable from cube metadata) when velocity_range is given"
             raise ValueError(msg)
-        rest_wavelength = u.Quantity(rest_wavelength)
-        velocity_range = u.Quantity(velocity_range, u.km / u.s)
-        if velocity_range.shape != (2,) or not velocity_range[0] < velocity_range[1]:
-            msg = f"velocity_range must be two increasing velocities, not {velocity_range}"
-            raise ValueError(msg)
+        check_velocity_range(velocity_range)
         limits = rest_wavelength * (1 + (velocity_range / constants.c).to_value(u.one))
         crop_indices = _wavelength_indices(wavelengths, limits)
         slicer = [slice(None)] * data.ndim
@@ -142,7 +145,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_in
     stddev_value = np.sqrt(variance_value)
 
     if min_intensity is not None:
-        low_intensity = intensity_value < u.Quantity(min_intensity, cube.unit).value
+        low_intensity = intensity_value < min_intensity.value
         intensity_value = np.where(low_intensity, np.nan, intensity_value)
         centroid_value = np.where(low_intensity, np.nan, centroid_value)
         stddev_value = np.where(low_intensity, np.nan, stddev_value)
@@ -172,7 +175,6 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_in
         ("width", stddev_value, wavelengths.unit),
     ]
     if rest_wavelength is not None:
-        rest_wavelength = u.Quantity(rest_wavelength)
 
         def to_velocity(delta_wavelength):
             with np.errstate(invalid="ignore"):
@@ -186,7 +188,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_in
     template = make_spatial_template(cube, wavelength_axis)
     if rest_wavelength is not None:
         # The maps share the template's meta
-        template.meta["moments_rest_wavelength"] = u.Quantity(rest_wavelength).to(u.nm)
+        template.meta["moments_rest_wavelength"] = rest_wavelength.to(u.nm)
 
     def _make_cube(name, values, unit):
         uncertainty = None if sigma is None else StdDevUncertainty(np.where(np.isnan(values), np.nan, errors[name]))
@@ -197,7 +199,8 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_in
     return RasterCollection(cubes, aligned_axes=tuple(range(len(template.shape))))
 
 
-def average_window(cube, wavelength_range, *, method="mean"):
+@u.quantity_input
+def average_window(cube, wavelength_range: u.AA, *, method="mean"):
     r"""
     Average or sum a spectrogram cube over a wavelength window, giving an intensity map.
 
@@ -206,7 +209,7 @@ def average_window(cube, wavelength_range, *, method="mean"):
     cube : `irispy.spectrograph.SpectrogramCube`
         Input cube with a wavelength axis.
     wavelength_range : `astropy.units.Quantity`
-        The ``(lower, upper)`` wavelengths of the window, ends included.
+        The two wavelengths, in either order, at the ends of the window, which are included.
     method : `str`, optional
         ``"mean"`` (the default) or ``"sum"`` of the samples in the window.
 

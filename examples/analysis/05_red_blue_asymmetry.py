@@ -59,7 +59,7 @@ selected_pixel_index = (
 
 velocity_range = (25, 75) * u.km / u.s
 # Ignore pixels where the line peak is too weak for a useful wing comparison.
-min_intensity = 75 * si_iv.unit
+min_intensity = 75 * u.DN
 
 # rest_wavelength defaults to si_iv.meta.rest_wavelength, the catalog wavelength of the window's line.
 # You can also pass it explicitly, for example rest_wavelength=140.277 * u.nm.

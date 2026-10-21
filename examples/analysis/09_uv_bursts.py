@@ -46,7 +46,7 @@ si_iv = read_files(raster_filename, spectral_windows="Si IV 1403")["Si IV 1403"]
 # in wavelength, so it is halved for this raster. Each row of the table is one event and its
 # brightest pixel.
 
-labels, events = find_si_iv_bursts(si_iv, threshold=80)
+labels, events = find_si_iv_bursts(si_iv, threshold=80 * u.DN / u.s)
 events
 
 ###############################################################################

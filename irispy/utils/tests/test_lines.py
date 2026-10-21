@@ -84,5 +84,5 @@ def test_invalid_arguments(kwargs):
 
 @pytest.mark.parametrize("wavelength_range", [[1, 2] * u.s, [1402, 1404]])
 def test_non_spectral_units(wavelength_range):
-    with pytest.raises(u.UnitConversionError):
+    with pytest.raises(u.UnitConversionError, match="wavelength_range must be in a spectral unit"):
         get_lines(wavelength_range)

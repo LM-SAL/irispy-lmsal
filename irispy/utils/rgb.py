@@ -14,7 +14,7 @@ import numpy as np
 
 import astropy.units as u
 
-from irispy.utils._spectral import check_scaled, default_rest_wavelength
+from irispy.utils._spectral import _to_unit, check_scaled, default_rest_wavelength
 from irispy.utils.utils import _boolean_mask, _import_optional
 from irispy.visualization import LAT_AXIS_LABEL, LON_AXIS_LABEL
 
@@ -95,11 +95,11 @@ def calculate_rgb(
         scalars alike, returning plain numbers. Defaults to a linear mapping of the
         velocity. For example, ``lambda v: np.arcsinh(v.to_value(u.km / u.s) / 25)``
         makes small shifts stand out while compressing large ones.
-    vmin : `float` or `astropy.units.Quantity`, optional
-        Intensity mapped to black. Defaults to zero.
-    vmax : `float` or `astropy.units.Quantity`, optional
+    vmin : `astropy.units.Quantity`, optional
+        Intensity mapped to black. Defaults to zero. ``u.DN`` stands for the data's DN.
+    vmax : `astropy.units.Quantity`, optional
         Intensity mapped to full brightness. Defaults to the 99.9th percentile of the
-        finite data.
+        finite data. ``u.DN`` stands for the data's DN.
     stretch : `callable`, optional
         Applied to the intensity once scaled to [0, 1], for example `numpy.sqrt` to
         brighten faint structure.
@@ -138,17 +138,14 @@ def calculate_rgb(
     shape = [1] * data.ndim
     shape[axis_wavelength] = wavelength.size
     wavelength = wavelength.reshape(shape)
-    if isinstance(vmin, u.Quantity):
-        vmin = vmin.to_value(cube.unit or u.one)
-    if isinstance(vmax, u.Quantity):
-        vmax = vmax.to_value(cube.unit or u.one)
-    if vmin is None:
-        vmin = 0
+    vmin = 0 if vmin is None else _to_unit(vmin, cube.unit, "vmin").value
     if vmax is None:
         if not np.any(np.isfinite(data)):
             msg = "Every sample is masked or non-finite, so there is no intensity range to map"
             raise ValueError(msg)
         vmax = np.nanpercentile(data, 99.9)
+    else:
+        vmax = _to_unit(vmax, cube.unit, "vmax").value
     rgb, colorbar = colorsynth.rgb_and_colorbar(
         spd=data,
         wavelength=wavelength,
@@ -200,8 +197,8 @@ def plot_rgb(
     velocity_norm : `callable`, optional
         Transform of the Doppler velocity, as in `calculate_rgb`. Defaults to a linear
         mapping of the velocity.
-    vmin, vmax : `float` or `astropy.units.Quantity`, optional
-        Intensities mapped to black and to full brightness.
+    vmin, vmax : `astropy.units.Quantity`, optional
+        Intensities mapped to black and to full brightness, as in `calculate_rgb`.
     stretch : `callable`, optional
         Applied to the intensity once scaled to [0, 1], for example `numpy.sqrt`.
     coordinates : ``{"helioprojective", "time"}``, optional
@@ -239,9 +236,7 @@ def plot_rgb(
     mapping_rest = (
         default_rest_wavelength(cube) if rest_wavelength is None or rest_wavelength is False else rest_wavelength
     )
-    wavelength_min, wavelength_max = _wavelength_limits(
-        cube.spectral_axis, mapping_rest, wavelength_min, wavelength_max
-    )
+    # calculate_rgb checks the units of the arguments, so it comes before _wavelength_limits
     rgb, (intensity, wavelength, rgb_colorbar) = calculate_rgb(
         cube,
         wavelength_min=wavelength_min,
@@ -251,6 +246,9 @@ def plot_rgb(
         vmin=vmin,
         vmax=vmax,
         stretch=stretch,
+    )
+    wavelength_min, wavelength_max = _wavelength_limits(
+        cube.spectral_axis, mapping_rest, wavelength_min, wavelength_max
     )
     coords = cube.celestial
     latitude = coords.Ty.to_value(u.arcsec)

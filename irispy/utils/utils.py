@@ -57,7 +57,8 @@ def _saturated_samples(cube):
     return _boolean_mask(cube) & np.asarray(saturated, dtype=bool)
 
 
-def calculate_uncertainty(data: np.ndarray, readout_noise: u.Quantity, unit: u.Quantity) -> np.ndarray:
+@u.quantity_input
+def calculate_uncertainty(data: np.ndarray, readout_noise: u.photon, unit: u.UnitBase) -> np.ndarray:
     """
     Calculates the uncertainty of a given data array.
 
@@ -67,8 +68,8 @@ def calculate_uncertainty(data: np.ndarray, readout_noise: u.Quantity, unit: u.Q
         The data array.
     readout_noise : astropy.units.Quantity
         The readout noise, needs to be a unit that is convertible to photon.
-    unit : astropy.units.Quantity
-        The final unit that the value should be converted to.
+    unit : astropy.units.Unit
+        The unit of ``data``, and of the result.
 
     Returns
     -------

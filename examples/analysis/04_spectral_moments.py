@@ -81,7 +81,7 @@ moments = calculate_moments(
     si_iv_1403,
     rest_wavelength=si_iv_core,
     velocity_range=(-100, 100) * u.km / u.s,
-    min_intensity=200 * si_iv_1403.unit,
+    min_intensity=200 * u.DN,
 )
 # The result is a `~irispy.spectrograph.RasterCollection` of 2D maps with the spatial
 # WCS of the input, one per moment; it also has the "centroid" and "width" in wavelength units.

@@ -15,7 +15,9 @@ from astropy.wcs import WCS
 from irispy.spectrograph import RasterCollection, SpectrogramCube
 from irispy.utils._spectral import (
     _QualityFlag,
+    _to_unit,
     check_scaled,
+    check_velocity_range,
     default_rest_wavelength,
     drop_extra_coords_dependent_on_axis,
     make_map_cube,
@@ -104,12 +106,13 @@ def _prepare_data(cube, wavelength_axis):
     return data, errors
 
 
+@u.quantity_input
 def calculate_red_blue_asymmetry(
     cube,
     *,
-    rest_wavelength=None,
-    velocity_range=(50, 150) * u.km / u.s,
-    dv=10 * u.km / u.s,
+    rest_wavelength: u.AA = None,
+    velocity_range: u.km / u.s = (50, 150) * u.km / u.s,
+    dv: u.km / u.s = 10 * u.km / u.s,
     spline_degree=3,
     min_intensity=None,
     return_profiles=True,
@@ -138,10 +141,10 @@ def calculate_red_blue_asymmetry(
         Velocity spacing for the interpolated profile.
     spline_degree : `int`, optional
         Spline degree for `scipy.interpolate.make_interp_spline`.
-    min_intensity : `float` or `astropy.units.Quantity`, optional
+    min_intensity : `astropy.units.Quantity`, optional
         Minimum peak intensity required for a pixel to be processed.
         Pixels below this threshold are assigned quality flag
-        `~irispy.utils.red_blue.RBAQualityFlag.LOW_SIGNAL`.
+        `~irispy.utils.red_blue.RBAQualityFlag.LOW_SIGNAL`. ``u.DN`` stands for the data's DN.
     return_profiles : `bool`, optional
         If `True`, include 3D ``"observed_profile"`` and
         ``"interpolated_profile"`` cubes in the output.
@@ -182,6 +185,8 @@ def calculate_red_blue_asymmetry(
     sits on one.
     """
     check_scaled(cube)
+    if min_intensity is not None:
+        min_intensity = _to_unit(min_intensity, cube.unit, "min_intensity")
     if rest_wavelength is None:
         rest_wavelength = default_rest_wavelength(cube)
         if rest_wavelength is None:
@@ -190,21 +195,17 @@ def calculate_red_blue_asymmetry(
                 "Pass rest_wavelength explicitly or provide a cube with SGMeta containing TWAVE keywords."
             )
             raise ValueError(msg)
-    rest_wavelength = u.Quantity(rest_wavelength).to(u.nm)
+    rest_wavelength = rest_wavelength.to(u.nm)
     if rest_wavelength.shape != () or not np.isfinite(rest_wavelength.value) or rest_wavelength <= 0 * u.nm:
         msg = "rest_wavelength must be a positive finite scalar wavelength"
         raise ValueError(msg)
 
-    velocity_range = u.Quantity(velocity_range).to(u.km / u.s)
-    if velocity_range.shape != (2,):
-        msg = "velocity_range must contain two velocities"
-        raise ValueError(msg)
-    velocity_low, velocity_high = velocity_range
-    if velocity_low < 0 or velocity_high <= velocity_low:
-        msg = "velocity_range must be positive and increasing"
+    check_velocity_range(velocity_range)
+    if velocity_range[0] < 0:
+        msg = f"velocity_range must be positive, not {velocity_range}"
         raise ValueError(msg)
 
-    dv = u.Quantity(dv).to_value(u.km / u.s)
+    dv = dv.to_value(u.km / u.s)
     if dv <= 0:
         msg = "dv must be positive"
         raise ValueError(msg)
@@ -217,10 +218,10 @@ def calculate_red_blue_asymmetry(
     wavelengths = cube.axis_world_coords(wavelength_axis)[0].to(u.nm)
     rest_wavelength = rest_wavelength.to(wavelengths.unit)
     velocity = ((wavelengths - rest_wavelength) / rest_wavelength * constants.c).to_value(u.km / u.s)
-    interp_extent = velocity_high.to_value(u.km / u.s) + dv
-    interp_velocity = np.arange(-interp_extent, interp_extent + dv, dv)
-    velocity_range_kms = (velocity_low.to_value(u.km / u.s), velocity_high.to_value(u.km / u.s))
+    velocity_range_kms = tuple(velocity_range.to_value(u.km / u.s))
     low, high = velocity_range_kms
+    interp_extent = high + dv
+    interp_velocity = np.arange(-interp_extent, interp_extent + dv, dv)
     red_mask = (interp_velocity >= low) & (interp_velocity <= high)
     blue_mask = (interp_velocity >= -high) & (interp_velocity <= -low)
     if not (red_mask.any() and blue_mask.any()):
@@ -238,7 +239,7 @@ def calculate_red_blue_asymmetry(
         warnings.simplefilter("ignore", RuntimeWarning)
         raw_peak = np.nanmax(profiles, axis=-1)
     if min_intensity is not None:
-        quality[raw_peak < u.Quantity(min_intensity, cube.unit).value] = RBAQualityFlag.LOW_SIGNAL
+        quality[raw_peak < min_intensity.value] = RBAQualityFlag.LOW_SIGNAL
     quality[_saturated_samples(cube).any(axis=wavelength_axis).ravel()] = RBAQualityFlag.SATURATED
 
     min_points = spline_degree + 1

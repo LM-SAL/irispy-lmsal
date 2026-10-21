@@ -51,7 +51,7 @@ def assert_si_iv_matches_idl(labels, events, idl, y_offset):
         assert np.isclose(event["intensity"].value, group["intensity"].max(), rtol=1e-6)
 
 
-@pytest.mark.parametrize("threshold", [80, 80 * u.DN / u.s, 4800 * DN_UNIT["FUV"] / u.min])
+@pytest.mark.parametrize("threshold", [80 * u.DN / u.s, 4800 * DN_UNIT["FUV"] / u.min])
 def test_si_iv_matches_idl(bursts_si_iv_raster, idl_si_iv, threshold):
     # IDL ran with 40 DN/s on data not summed in wavelength, which is 80 DN/s here
     labels, events = find_si_iv_bursts(bursts_si_iv_raster, threshold=threshold)
@@ -77,7 +77,7 @@ def test_si_iv_default_threshold(si_iv_cube, idl_si_iv):
 def test_si_iv_sequence_numbers_events_on(si_iv_cube):
     later = copy.deepcopy(si_iv_cube)
     later.wcs.wcs.dateobs = "2013-09-02T18:40:00"  # its own obstime, as a separate read gives
-    labels, events = find_si_iv_bursts(SpectrogramCubeSequence([si_iv_cube, later]), threshold=80)
+    labels, events = find_si_iv_bursts(SpectrogramCubeSequence([si_iv_cube, later]), threshold=80 * u.DN / u.s)
     assert list(events["label"]) == [1, 2, 3, 4, 5, 6]
     assert list(events["raster"]) == [0, 0, 0, 1, 1, 1]
     first, second = (cube.data for cube in labels.data)
@@ -88,15 +88,15 @@ def test_si_iv_sequence_numbers_events_on(si_iv_cube):
 def test_si_iv_threshold_scales_with_summing(si_iv_cube):
     si_iv_cube.meta["SUMSPAT"] = 2
     si_iv_cube.meta["SUMSPTRF"] = 4
-    _, events = find_si_iv_bursts(si_iv_cube, threshold=80)
+    _, events = find_si_iv_bursts(si_iv_cube, threshold=80 * u.DN / u.s)
     assert events.meta["threshold"] == 80 * 2 * 4 / 2 * DN_UNIT["FUV"] / u.s
 
 
 def test_si_iv_median_test_rejects_spikes(si_iv_cube):
     si_iv_cube.data[5, 100, 20] = 1e5  # a one-bin spike, like a particle hit
-    _, events = find_si_iv_bursts(si_iv_cube, threshold=80)
+    _, events = find_si_iv_bursts(si_iv_cube, threshold=80 * u.DN / u.s)
     assert 5 not in events["step"]
-    _, events = find_si_iv_bursts(si_iv_cube, threshold=80, median_factor=None)
+    _, events = find_si_iv_bursts(si_iv_cube, threshold=80 * u.DN / u.s, median_factor=None)
     assert list(events[events["step"] == 5]["y"]) == [100]
 
 
@@ -105,14 +105,18 @@ def test_si_iv_ignores_missing_data(si_iv_cube):
     si_iv_cube.meta["exposure time"][3:5] = 0 * u.s  # step 4 keeps its data
     si_iv_cube.data[10, :, ::2] = -150  # iris_getwindata.pro treats values below -10 as missing too
     si_iv_cube.data[10, :, 21] = np.nan
-    labels, _ = find_si_iv_bursts(si_iv_cube, threshold=1)
+    labels, _ = find_si_iv_bursts(si_iv_cube, threshold=1 * u.DN / u.s)
     assert not labels.data[3:5].any()
     assert labels.data[10].any()
 
 
 def test_si_iv_errors(bursts_si_iv_raster, bursts_si_iv_file):
-    with pytest.raises(ValueError, match="no wavelength bins"):
+    with pytest.raises(ValueError, match=r"no wavelength bins between -50\.0 km / s and 50\.0 km / s"):
         find_si_iv_bursts(bursts_si_iv_raster[0][:, :, :3])
+    with pytest.raises(ValueError, match="two increasing velocities"):
+        find_si_iv_bursts(bursts_si_iv_raster[0], velocity_range=50 * u.km / u.s)
+    with pytest.raises(TypeError, match="threshold"):
+        find_si_iv_bursts(bursts_si_iv_raster[0], threshold=80)
     with pytest.raises(ValueError, match="unscaled"):
         find_si_iv_bursts(read_spectrograph_lvl2(bursts_si_iv_file, memmap=True)["Si IV 1403"])
     with pytest.raises(ValueError, match="slice with a range"):
@@ -123,8 +127,8 @@ def test_si_iv_errors(bursts_si_iv_raster, bursts_si_iv_file):
 
 def test_bright_spectral_events_match_si_iv_bursts(si_iv_cube):
     # The rest wavelength is that of the window, and the threshold is applied as given
-    labels, events = find_bright_spectral_events(si_iv_cube, 40)
-    burst_labels, bursts = find_si_iv_bursts(si_iv_cube, threshold=80)
+    labels, events = find_bright_spectral_events(si_iv_cube, 40 * u.DN / u.s)
+    burst_labels, bursts = find_si_iv_bursts(si_iv_cube, threshold=80 * u.DN / u.s)
     assert events.meta["threshold"] == 40 * DN_UNIT["FUV"] / u.s
     np.testing.assert_array_equal(labels.data, burst_labels.data)
     assert events.pformat(max_lines=-1, max_width=-1) == bursts.pformat(max_lines=-1, max_width=-1)
@@ -136,8 +140,8 @@ def test_bright_spectral_events_average_saturated_samples(si_iv_cube):
     si_iv_cube.data[saturated] = SATURATION_LIMIT.value
     unmasked = copy.deepcopy(si_iv_cube)
     mark_saturated(si_iv_cube, saturated)  # as the readers mark clipped samples: masked, but averaged at their value
-    _, events = find_bright_spectral_events(si_iv_cube, 40, median_factor=None)
-    _, expected = find_bright_spectral_events(unmasked, 40, median_factor=None)
+    _, events = find_bright_spectral_events(si_iv_cube, 40 * u.DN / u.s, median_factor=None)
+    _, expected = find_bright_spectral_events(unmasked, 40 * u.DN / u.s, median_factor=None)
     assert list(events[events["step"] == 5]["y"]) == [100]
     assert events.pformat(max_lines=-1, max_width=-1) == expected.pformat(max_lines=-1, max_width=-1)
 
@@ -151,7 +155,7 @@ def test_bright_spectral_events_nuv():
     assert events.meta["threshold"] == 100 * DN_UNIT["NUV"] / u.s
     assert labels.data.shape == mg_ii.data.shape[:2]
     with pytest.raises(ValueError, match="no wavelength bins"):
-        find_bright_spectral_events(mg_ii, 100, rest_wavelength=1402.77 * u.AA)
+        find_bright_spectral_events(mg_ii, 100 * u.DN / u.s, rest_wavelength=1402.77 * u.AA)
 
 
 def test_sji_matches_idl_with_updated_fill_mask(bursts_sjicube_1400):
@@ -230,7 +234,7 @@ def test_si_iv_whole_file_matches_idl(idl_si_iv):
         f"{IRISPY_DATA}/iris_l2_20130902_182935_4000005156_raster_t000_r00000_si_iv.fits.gz",
         known_hash="ac50a0255b73af1610702653e17d3b3b9c8fc37bc487a313e1c9fb3a2983428a",
     )
-    labels, events = find_si_iv_bursts(read_spectrograph_lvl2(filename)["Si IV 1403"], threshold=80)
+    labels, events = find_si_iv_bursts(read_spectrograph_lvl2(filename)["Si IV 1403"], threshold=80 * u.DN / u.s)
     assert_si_iv_matches_idl(labels.data[0].data, events, idl_si_iv, 0)
 
 

@@ -15,7 +15,7 @@ from astropy.table import QTable, vstack
 from astropy.time import Time
 
 from irispy.spectrograph import MosaicCube, SpectrogramCubeSequence
-from irispy.utils._spectral import check_scaled, make_map_cube, make_spatial_template
+from irispy.utils._spectral import _to_unit, check_scaled, check_velocity_range, make_map_cube, make_spatial_template
 from irispy.utils.constants import DN_UNIT
 from irispy.utils.response import get_interpolated_effective_area, get_latest_response
 from irispy.utils.utils import _boolean_mask, _saturated_samples
@@ -28,7 +28,8 @@ _REFERENCE_TIME = Time("2013-10-22T21:00")
 _EIGHT_CONNECTED = np.ones((3, 3), dtype=bool)
 
 
-def find_si_iv_bursts(raster, *, threshold=None, velocity_range=50 * u.km / u.s, median_factor=10):
+@u.quantity_input
+def find_si_iv_bursts(raster, *, threshold=None, velocity_range: u.km / u.s = (-50, 50) * u.km / u.s, median_factor=10):
     """
     Find UV bursts in Si IV 1402.77 Å spectra.
 
@@ -39,14 +40,15 @@ def find_si_iv_bursts(raster, *, threshold=None, velocity_range=50 * u.km / u.s,
     ----------
     raster : `~irispy.SpectrogramCube` or `~irispy.SpectrogramCubeSequence`
         Level 2 spectra of a window covering 1402.77 Å, in DN with axes (step, slit, wavelength).
-    threshold : `float` or `~astropy.units.Quantity`, optional
-        Burst threshold in DN/s per wavelength bin for data summed by 2 in wavelength and not along
+    threshold : `~astropy.units.Quantity`, optional
+        Burst threshold per wavelength bin for data summed by 2 in wavelength and not along
         the slit; it is scaled by the data's spatial summing and half its spectral summing.
         Defaults to 500 DN/s times the ratio of the 1402.77 Å effective area at the observation
-        date to that on 2013-10-22 21:00. A Quantity in ``u.DN`` per unit time is read as the
-        data's DN; any other unit must convert to ``DN_UNIT["FUV"] / u.s`` from `irispy.utils.constants`.
+        date to that on 2013-10-22 21:00. ``u.DN`` stands for the data's DN; any other unit
+        must convert to ``DN_UNIT["FUV"] / u.s`` from `irispy.utils.constants`.
     velocity_range : `~astropy.units.Quantity`, optional
-        Half-width of the averaged wavelength range, as a Doppler velocity.
+        ``(lower, upper)`` Doppler velocities from 1402.77 Å of the averaged wavelength bins,
+        ends included.
     median_factor : `float` or `None`, optional
         Particle-hit test factor; `None` switches the test off.
 
@@ -79,26 +81,33 @@ def find_si_iv_bursts(raster, *, threshold=None, velocity_range=50 * u.km / u.s,
     * :cite:t:`young2018`
     """
     meta = (raster.data[0] if isinstance(raster, SpectrogramCubeSequence) else raster).meta
+    unit = DN_UNIT["FUV"] / u.s
     if threshold is None:
         now, then = (
             get_interpolated_effective_area(get_latest_response(time), "FUV", _SI_IV)
             for time in (meta.date_reference, _REFERENCE_TIME)
         )
-        threshold = 500 * (now / then).to_value(u.one)
-    threshold = threshold * meta.spatial_summing_factor * meta.spectral_summing_factor / 2
+        threshold = 500 * (now / then).to_value(u.one) * unit
+    threshold = _to_unit(threshold, unit, "threshold") * meta.spatial_summing_factor * meta.spectral_summing_factor / 2
     return find_bright_spectral_events(
         raster, threshold, rest_wavelength=_SI_IV, velocity_range=velocity_range, median_factor=median_factor
     )
 
 
+@u.quantity_input
 def find_bright_spectral_events(
-    raster, threshold, *, rest_wavelength=None, velocity_range=50 * u.km / u.s, median_factor=10
+    raster,
+    threshold,
+    *,
+    rest_wavelength: u.AA = None,
+    velocity_range: u.km / u.s = (-50, 50) * u.km / u.s,
+    median_factor=10,
 ):
     """
     Find compact bright events in the spectra of one line.
 
     A pixel (raster step, slit position) is part of an event when the mean intensity of the
-    wavelength bins within ``velocity_range`` of ``rest_wavelength`` reaches ``threshold`` and
+    wavelength bins within ``velocity_range`` from ``rest_wavelength`` reaches ``threshold`` and
     stays below ``median_factor`` times their median, which rejects particle hits. Pixels that
     touch, diagonally included, form one event. For sit-and-stare data the step axis is time,
     so events also link in time.
@@ -107,14 +116,15 @@ def find_bright_spectral_events(
     ----------
     raster : `~irispy.SpectrogramCube` or `~irispy.SpectrogramCubeSequence`
         Level 2 spectra of one window, in DN with axes (step, slit, wavelength).
-    threshold : `float` or `~astropy.units.Quantity`
-        Threshold in DN/s per wavelength bin of the data, applied as given. A Quantity in
-        ``u.DN`` per unit time is read as the data's DN; any other unit must convert to the
-        DN of the window's detector per second, ``DN_UNIT[band] / u.s`` from `irispy.utils.constants`.
+    threshold : `~astropy.units.Quantity`
+        Threshold per wavelength bin of the data, applied as given, such as ``80 * u.DN / u.s``.
+        ``u.DN`` stands for the data's DN; any other unit must convert to the DN of the
+        window's detector per second, ``DN_UNIT[band] / u.s`` from `irispy.utils.constants`.
     rest_wavelength : `~astropy.units.Quantity`, optional
         Rest wavelength of the line. Defaults to that of the window, ``meta.rest_wavelength``.
     velocity_range : `~astropy.units.Quantity`, optional
-        Half-width of the averaged wavelength range, as a Doppler velocity.
+        ``(lower, upper)`` Doppler velocities from ``rest_wavelength`` of the averaged wavelength
+        bins, ends included.
     median_factor : `float` or `None`, optional
         Particle-hit test factor; `None` switches the test off.
 
@@ -139,10 +149,8 @@ def find_bright_spectral_events(
         if rest_wavelength is None:
             msg = f"The {meta.spectral_window} window has no rest wavelength; pass rest_wavelength"
             raise ValueError(msg)
-    unit = DN_UNIT[meta.detector_band] / u.s
-    if isinstance(threshold, u.Quantity):
-        threshold = threshold.to(unit, equivalencies=[(u.DN / u.s, unit)])
-    threshold = u.Quantity(threshold, unit)
+    threshold = _to_unit(threshold, DN_UNIT[meta.detector_band] / u.s, "threshold")
+    check_velocity_range(velocity_range)
     maps, tables, offset = [], [], 0
     for index, cube in enumerate(cubes):
         check_scaled(cube)
@@ -153,9 +161,13 @@ def find_bright_spectral_events(
             msg = f"The spectra must be in DN, not {cube.unit}; do not correct or calibrate them first"
             raise ValueError(msg)
         wavelength = u.Quantity(cube.axis_world_coords(cube.wavelength_axis)[0])
-        bins = np.abs(wavelength.to(u.km / u.s, equivalencies=u.doppler_optical(rest_wavelength))) <= velocity_range
+        velocity = wavelength.to(u.km / u.s, equivalencies=u.doppler_optical(rest_wavelength))
+        bins = (velocity >= velocity_range[0]) & (velocity <= velocity_range[1])
         if not bins.any():
-            msg = f"The spectral window has no wavelength bins within {velocity_range} of {rest_wavelength}"
+            msg = (
+                f"The spectral window has no wavelength bins between {velocity_range[0]} and {velocity_range[1]} "
+                f"from {rest_wavelength}"
+            )
             raise ValueError(msg)
         data = cube.data[..., bins]
         # NaN, the -200 fill and, as in iris_getwindata.pro, any other value below -10

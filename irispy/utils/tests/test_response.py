@@ -283,6 +283,12 @@ def test_get_interpolated_effective_area_uncovered_wavelengths_are_nan():
     assert nuv_area[0] > 0 * u.cm**2
 
 
+def test_get_interpolated_effective_area_rejects_other_detectors():
+    iris_response = get_latest_response("2025-08-05")
+    with pytest.raises(ValueError, match="detector_type must be 'FUV' or 'NUV', not 'SJI'"):
+        get_interpolated_effective_area(iris_response, "SJI", [1394, 1403] * u.AA)
+
+
 @figure_test
 def test_plot_get_interpolated_effective_area():
     # The idea is that this plot should look the same as the plot for test_plot_idl_vs_python_fuv_sg
