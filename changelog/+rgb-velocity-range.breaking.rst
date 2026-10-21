@@ -1,0 +1,3 @@
+``irispy.utils.rgb.calculate_rgb`` and ``irispy.utils.rgb.plot_rgb`` take ``velocity_range``, the Doppler velocities from ``rest_wavelength`` mapped to the blue and red ends of the visible range, such as ``(-200, 200) * u.km / u.s``, in place of ``wavelength_min`` and ``wavelength_max``.
+It defaults to ``(-100, 100) * u.km / u.s`` as before, also for a window that does not cover the rest wavelength, which fell back to the whole window and now raises a ``ValueError`` when no sample lies within that range; ``None`` maps the whole window.
+A range with no wavelength of the window now raises a ``ValueError``, where limits outside the window gave a black image.

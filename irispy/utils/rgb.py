@@ -14,7 +14,8 @@ import numpy as np
 
 import astropy.units as u
 
-from irispy.utils._spectral import _to_unit, check_scaled, default_rest_wavelength
+from irispy.spectrograph import _wavelength_indices
+from irispy.utils._spectral import _to_unit, check_scaled, check_velocity_range, default_rest_wavelength
 from irispy.utils.utils import _boolean_mask, _import_optional
 from irispy.visualization import LAT_AXIS_LABEL, LON_AXIS_LABEL
 
@@ -42,28 +43,34 @@ def _colorbar_axes(ax, fraction, pad):
     return figure.add_subplot(gridspec[1])
 
 
-def _wavelength_limits(wavelength, rest_wavelength, wavelength_min, wavelength_max):
+def _wavelength_limits(wavelength, rest_wavelength, velocity_range):
     """
-    Default missing limits to +/-100 km/s around a rest wavelength inside
-    ``wavelength``.
+    The wavelengths ``velocity_range`` from ``rest_wavelength`` maps to the ends of the
+    visible range, or the ends of ``wavelength`` if it is `None`.
     """
     if rest_wavelength is None:
         msg = "The cube metadata has no usable TWAVE value. Pass rest_wavelength explicitly."
         raise ValueError(msg)
-    lower, upper = wavelength.min(), wavelength.max()
-    # The cube covers its pixels' full width, as in default_rest_wavelength
-    half = np.abs(np.diff(wavelength)).max() / 2 if wavelength.size > 1 else 0 * wavelength.unit
-    if lower - half <= rest_wavelength <= upper + half:
-        lower, upper = ([-100, 100] * u.km / u.s).to(u.AA, equivalencies=u.doppler_optical(rest_wavelength))
-    return lower if wavelength_min is None else wavelength_min, upper if wavelength_max is None else wavelength_max
+    wavelength = u.Quantity(wavelength).to(u.AA)
+    if velocity_range is None:
+        return wavelength.min(), wavelength.max()
+    check_velocity_range(velocity_range)
+    lower, upper = velocity_range.to(u.AA, equivalencies=u.doppler_optical(rest_wavelength))
+    if not _wavelength_indices(wavelength, (lower, upper), allow_empty=True).size:
+        msg = (
+            f"No wavelength of the window, {wavelength.min():.3f} to {wavelength.max():.3f}, lies within "
+            f"velocity_range={velocity_range} of rest_wavelength={rest_wavelength.to(u.AA):.3f}; "
+            "pass velocity_range=None to map the whole window"
+        )
+        raise ValueError(msg)
+    return lower, upper
 
 
 @u.quantity_input
 def calculate_rgb(
     cube,
     *,
-    wavelength_min: u.AA = None,
-    wavelength_max: u.AA = None,
+    velocity_range: u.Quantity[u.km / u.s] | None = (-100, 100) * u.km / u.s,
     rest_wavelength: u.AA = None,
     velocity_norm=None,
     vmin=None,
@@ -80,11 +87,11 @@ def calculate_rgb(
     ----------
     cube : `irispy.spectrograph.SpectrogramCube`
         A three dimensional cube with one spectral axis.
-    wavelength_min, wavelength_max : `astropy.units.Quantity`, optional
-        Wavelengths mapped to the blue and red ends of the visible range. Omitted
-        limits default to +/-100 km/s around the rest wavelength when it is within
-        the cube's wavelength range. Otherwise, they default to the ends of that
-        range. Wavelengths outside contribute no color.
+    velocity_range : `astropy.units.Quantity` or `None`, optional
+        ``(lower, upper)`` Doppler velocities from ``rest_wavelength`` mapped to the blue
+        and red ends of the visible range, or `None` to map the whole window. Wavelengths
+        outside contribute no color. A range with no wavelength of the window raises a
+        `ValueError`. Defaults to ``(-100, 100) * u.km / u.s``.
     rest_wavelength : `astropy.units.Quantity`, optional
         Rest wavelength the Doppler velocities are measured from. Defaults to
         ``cube.meta.rest_wavelength``, or to the one documented line the cube covers
@@ -128,7 +135,7 @@ def calculate_rgb(
         raise ValueError(msg)
     if rest_wavelength is None:
         rest_wavelength = default_rest_wavelength(cube)
-    wavelength_min, wavelength_max = _wavelength_limits(wavelength, rest_wavelength, wavelength_min, wavelength_max)
+    wavelength_min, wavelength_max = _wavelength_limits(wavelength, rest_wavelength, velocity_range)
     doppler = u.doppler_optical(rest_wavelength)
 
     def wavelength_norm(w):
@@ -166,8 +173,7 @@ def plot_rgb(
     *,
     ax=None,
     cax=None,
-    wavelength_min=None,
-    wavelength_max=None,
+    velocity_range=(-100, 100) * u.km / u.s,
     velocity_norm=None,
     vmin=None,
     vmax=None,
@@ -191,9 +197,9 @@ def plot_rgb(
     cax : `matplotlib.axes.Axes`, optional
         Axes for the two dimensional colorbar. If not given, it is split off ``ax``,
         which must then sit in a gridspec cell, as axes from `matplotlib.pyplot.subplots` do.
-    wavelength_min, wavelength_max : `astropy.units.Quantity`, optional
-        Wavelengths mapped to the blue and red ends of the visible range. Default
-        to +/-100 km/s around the rest wavelength, as in `calculate_rgb`.
+    velocity_range : `astropy.units.Quantity` or `None`, optional
+        Doppler velocities mapped to the blue and red ends of the visible range, or `None`
+        to map the whole window, as in `calculate_rgb`.
     velocity_norm : `callable`, optional
         Transform of the Doppler velocity, as in `calculate_rgb`. Defaults to a linear
         mapping of the velocity.
@@ -239,17 +245,14 @@ def plot_rgb(
     # calculate_rgb checks the units of the arguments, so it comes before _wavelength_limits
     rgb, (intensity, wavelength, rgb_colorbar) = calculate_rgb(
         cube,
-        wavelength_min=wavelength_min,
-        wavelength_max=wavelength_max,
+        velocity_range=velocity_range,
         rest_wavelength=mapping_rest,
         velocity_norm=velocity_norm,
         vmin=vmin,
         vmax=vmax,
         stretch=stretch,
     )
-    wavelength_min, wavelength_max = _wavelength_limits(
-        cube.spectral_axis, mapping_rest, wavelength_min, wavelength_max
-    )
+    wavelength_min, wavelength_max = _wavelength_limits(cube.spectral_axis, mapping_rest, velocity_range)
     coords = cube.celestial
     latitude = coords.Ty.to_value(u.arcsec)
     if 1 in latitude.shape:
