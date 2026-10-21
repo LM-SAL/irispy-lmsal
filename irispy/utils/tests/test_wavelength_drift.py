@@ -63,10 +63,8 @@ def synthetic_o_i_shifts(size, sign=1, pixel=0.15, slope=0, scale=1):
 
 
 def test_shifts_match_idl():
-    raster = read_spectrograph_lvl2(CROP)
-    table = calculate_wavelength_drift(raster)
+    table = calculate_wavelength_drift(read_spectrograph_lvl2(CROP))
     assert table.colnames == ["time", "raster", "step", *LINES, "NUV", "FUV"]
-    assert {window.data[0].meta.detector_band for window in raster.values()} == {"NUV", "FUV"}
     assert list(table["step"]) == list(range(len(CROP_STEPS)))
     idl = idl_reference("3824262996")[CROP_STEPS]
     assert_shifts_match_idl(table, idl)

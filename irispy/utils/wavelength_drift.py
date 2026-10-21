@@ -60,8 +60,8 @@ def calculate_wavelength_drift(raster):
         NaN if the line is in no window, too faint, has too few pixels, or its fit is rejected.
         ``"NUV"`` and ``"FUV"`` hold the drifts in Å, NaN if their line is in no window or, with a
         warning, if no more shifts remain than the fit has parameters; adding a drift to its
-        detector's wavelengths corrects them, so ``table[cube.meta.detector_band]`` is the drift
-        of ``cube``.
+        detector's wavelengths corrects them. The drift of a window ``cube`` is the column
+        ``cube.meta.detector_band``, at the ``raster`` and ``step`` of each row.
 
     Raises
     ------

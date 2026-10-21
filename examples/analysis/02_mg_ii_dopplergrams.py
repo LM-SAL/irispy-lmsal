@@ -119,7 +119,7 @@ fig.legend(loc="outside upper center", ncols=5)
 # bad pixels stay invalid. We work on one floating-point step at a time, mask
 # invalid results and store them as the FITS fill value in the integer array.
 # The rows of the first raster give the drift of each ``step`` of ``mg_ii``, in
-# the column named after its detector band.
+# the column named by its ``meta.detector_band``: the ``"NUV"`` column plotted above.
 
 for i, shift in drift[drift["raster"] == 0].iterrows("step", mg_ii.meta.detector_band):
     data = np.where(mg_ii.mask[i], np.nan, mg_ii.data[i])
