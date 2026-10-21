@@ -134,7 +134,7 @@ def test_remove_cosmic_rays_astroscrappy_backend(sns_sjicube_1330, monkeypatch, 
         assert kwargs == {"verbose": False}
     assert type(cleaned) is type(cube)
     assert isinstance(cleaned.data, np.ndarray)
-    np.testing.assert_array_equal(cleaned.data, expected_frames - 1)
+    np.testing.assert_array_equal(cleaned.data, np.where(expected_mask, data, data - 1))
     np.testing.assert_array_equal(cleaned.mask, mask)
     assert cleaned.unit == cube.unit
     assert cleaned.meta["scaled"] == cube.meta["scaled"]
@@ -150,7 +150,7 @@ def test_remove_cosmic_rays_astroscrappy_inmask_combined(sns_sjicube_1330, monke
 
     def fake_detect_cosmics(frame, *, inmask=None, **kwargs):  # NOQA: ARG001
         calls.append(inmask.copy())
-        return np.zeros_like(frame, dtype=bool), frame.copy()
+        return np.zeros_like(frame, dtype=bool), frame - 1
 
     monkeypatch.setitem(sys.modules, "astroscrappy", types.SimpleNamespace(detect_cosmics=fake_detect_cosmics))
     cube = sns_sjicube_1330[:2, :3, :4]
@@ -164,10 +164,12 @@ def test_remove_cosmic_rays_astroscrappy_inmask_combined(sns_sjicube_1330, monke
         inmask[1, 2, 3] = True
     method_kwargs = {"inmask": inmask}
 
-    remove_cosmic_rays(cube, method="astroscrappy", method_kwargs=method_kwargs)
+    cleaned = remove_cosmic_rays(cube, method="astroscrappy", method_kwargs=method_kwargs)
 
     assert len(calls) == 2
-    np.testing.assert_array_equal(calls, mask | np.broadcast_to(inmask, cube.shape))
+    kept = mask | np.broadcast_to(inmask, cube.shape)
+    np.testing.assert_array_equal(calls, kept)
+    np.testing.assert_array_equal(cleaned.data, np.where(kept, 1.0, 0.0))
     assert method_kwargs["inmask"] is inmask
 
 
@@ -176,12 +178,27 @@ def test_remove_cosmic_rays_rejects_unscaled_data(sns_sji_1330_file):
         remove_cosmic_rays(read_sji_lvl2(sns_sji_1330_file, memmap=True))
 
 
-def test_remove_cosmic_rays_rsliding_rejects_dask_cube(sns_sjicube_1330):
-    cube = sns_sjicube_1330[:2, :3, :4]
-    cube = cube.to_nddata(data=da.ones(cube.shape, chunks=(1, 3, 4)), nddata_type=type(cube))
+@pytest.mark.parametrize("method", ["rsliding", "astroscrappy"])
+def test_remove_cosmic_rays_keeps_masked_and_nan_samples(sns_sg_file, sns_sjicube_1330, method):
+    pytest.importorskip(method)
+    spectrogram = read_spectrograph_lvl2(sns_sg_file)["Si IV 1403"][0, 0]  # masked -200 fills
+    for cube in (spectrogram, sns_sjicube_1330[0]):  # NaN outside the field of view
+        kept = np.asarray(cube.mask) | ~np.isfinite(cube.data)
+        assert kept.any()
 
-    with pytest.raises(ValueError, match="requires the full cube in memory"):
-        remove_cosmic_rays(cube, method="rsliding")
+        cleaned = remove_cosmic_rays(cube, method=method)
+
+        np.testing.assert_array_equal(cleaned.data[kept], cube.data[kept])
+
+
+def test_remove_cosmic_rays_rsliding_sot_memmap(sot_fg_file):
+    pytest.importorskip("rsliding")
+    lazy = read_sji_lvl2(sot_fg_file, memmap=True)
+    assert isinstance(lazy.mask, da.Array)
+
+    cleaned = remove_cosmic_rays(lazy)
+
+    np.testing.assert_array_equal(cleaned.data, remove_cosmic_rays(read_sji_lvl2(sot_fg_file)).data)
 
 
 def test_remove_cosmic_rays_rejects_unknown_method(sns_sjicube_1330):
