@@ -21,14 +21,17 @@ def figures(monkeypatch):
     return figures
 
 
-# The median time between frames is about 1834 s, so 1.4 hours is 2.75 frames, 1.1 hours 2.16 and 180 s 0.1
+# The wobble cadence as a number of frames: a half rounds up, 2.2 down, and less than one frame shows every frame
 @pytest.mark.parametrize(
-    ("wobble_cadence", "frames"),
-    [(1.4 * u.hour, [0, 3, 6, 9]), (1.1 * u.hour, [0, 2, 4, 6, 8]), (180 * u.s, list(range(10)))],
+    ("frames_per_cadence", "frames"), [(2.5, [0, 3, 6, 9]), (2.2, [0, 2, 4, 6, 8]), (0.1, range(10))]
 )
 @pytest.mark.parametrize(("trim", "spatial"), [(False, np.s_[:, :]), (True, np.s_[1:38, 1:36])])
-def test_generate_wobble_movie(sns_sjicube_2832, tmp_path, figures, trim, spatial, wobble_cadence, frames):
-    movie = generate_wobble_movie(sns_sjicube_2832, outdir=tmp_path, trim=trim, wobble_cadence=wobble_cadence)
+def test_generate_wobble_movie(sns_sjicube_2832, tmp_path, figures, trim, spatial, frames_per_cadence, frames):
+    times = sns_sjicube_2832.time
+    time_between_frames = np.median((times[1:] - times[:-1]).to_value("s")) * u.s
+    movie = generate_wobble_movie(
+        sns_sjicube_2832, outdir=tmp_path, trim=trim, wobble_cadence=frames_per_cadence * time_between_frames
+    )
 
     assert movie.parent == tmp_path
     ffmpeg = shutil.which(animation.FFMpegWriter.bin_path())
