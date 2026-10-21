@@ -26,7 +26,7 @@ _LINES = {
     "Fe II": (1392.82, (1392.6, 1393.1), 0.5, 1),
 }
 # Drift: the line it is fitted to, and the outlier distance from the median (Å)
-_DRIFTS = {"nuv": ("Ni I", 0.08), "fuv": ("O I", 0.05)}
+_DRIFTS = {"NUV": ("Ni I", 0.08), "FUV": ("O I", 0.05)}
 _ORBIT = 5856  # IRIS orbital period in seconds
 _SMOOTHING = 300  # running mean width in seconds
 
@@ -58,9 +58,10 @@ def calculate_wavelength_drift(raster):
         One row per exposure, sorted by exposure start ``time``, with its ``raster`` and ``step``
         indices. Each line's column (``"Ni I"`` ... ``"Fe II"``) holds its unsmoothed shift in Å,
         NaN if the line is in no window, too faint, has too few pixels, or its fit is rejected.
-        ``"nuv"`` and ``"fuv"`` hold the drifts in Å, NaN if their line is in no window or, with a
+        ``"NUV"`` and ``"FUV"`` hold the drifts in Å, NaN if their line is in no window or, with a
         warning, if no more shifts remain than the fit has parameters; adding a drift to its
-        detector's wavelengths corrects them.
+        detector's wavelengths corrects them, so ``table[cube.meta.detector_band]`` is the drift
+        of ``cube``.
 
     Raises
     ------
@@ -215,11 +216,11 @@ def _fit_drift(seconds, shifts, outlier, name):
         order = min(int(coverage // _ORBIT), 3)
         design = np.column_stack([np.sin(phase), np.cos(phase), *((seconds / _ORBIT) ** np.arange(order + 1)[:, None])])
     if np.count_nonzero(measured) <= design.shape[1]:
-        msg = f"Too few shifts to fit the {name.upper()} drift"
+        msg = f"Too few shifts to fit the {name} drift"
         warnings.warn(msg, UserWarning, stacklevel=3)
         return np.full(len(seconds), np.nan)
     if design.shape[1] == 1:
-        msg = f"The measured coverage is too short for an orbital fit, so the {name.upper()} drift is constant"
+        msg = f"The measured coverage is too short for an orbital fit, so the {name} drift is constant"
         warnings.warn(msg, UserWarning, stacklevel=3)
     fitted = ~outliers & np.isfinite(smoothed)
     coefficients = np.linalg.lstsq(design[fitted], smoothed[fitted])[0]

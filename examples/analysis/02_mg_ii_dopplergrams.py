@@ -105,7 +105,7 @@ orbital = (v_obs / constants.c * 279.9474 * u.nm).to_value(u.AA)
 fig, ax = plt.subplots(layout="constrained")
 for name in ("Ni I", "Mn I", "Fe I"):
     ax.plot(minutes, drift[name].to_value(u.AA), ".", label=name)
-ax.plot(minutes, drift["nuv"].to_value(u.AA), "k", label="NUV drift")
+ax.plot(minutes, drift["NUV"].to_value(u.AA), "k", label="NUV drift")
 ax.plot(minutes, orbital, "k--", label="Orbital velocity alone")
 ax.set_xlabel("Time since the first step (min)")
 ax.set_ylabel("Wavelength shift (Å)")
@@ -118,9 +118,10 @@ fig.legend(loc="outside upper center", ncols=5)
 # the original wavelength grid. Unsupported wavelengths and interpolation through
 # bad pixels stay invalid. We work on one floating-point step at a time, mask
 # invalid results and store them as the FITS fill value in the integer array.
-# The rows of the first raster give the drift of each ``step`` of ``mg_ii``.
+# The rows of the first raster give the drift of each ``step`` of ``mg_ii``, in
+# the column named after its detector band.
 
-for i, shift in drift[drift["raster"] == 0].iterrows("step", "nuv"):
+for i, shift in drift[drift["raster"] == 0].iterrows("step", mg_ii.meta.detector_band):
     data = np.where(mg_ii.mask[i], np.nan, mg_ii.data[i])
     corrected = make_interp_spline((mg_wave + shift).to_value(u.nm), data, k=1, axis=-1, check_finite=False)(
         mg_wave.to_value(u.nm), extrapolate=False
