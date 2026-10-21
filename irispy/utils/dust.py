@@ -52,6 +52,8 @@ def calculate_dust_mask(cube):
         `True` at the bad pixels and their neighbors, with the shape of the cube's
         data. Pixels without a value (not finite) stay `False`.
     """
+    # The fill values of a memmap read are finite raw integers
+    check_scaled(cube)
     channel = cube.meta.get("TDESC1")
     pixels, pointing, level2_cdelt = _badpix_table()
     if channel not in pixels:

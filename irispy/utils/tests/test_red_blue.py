@@ -14,7 +14,7 @@ from irispy.io.utils import read_files
 from irispy.meta import SGMeta
 from irispy.spectrograph import RasterCollection, SpectrogramCube
 from irispy.tests.helpers import figure_test, make_test_spectrogram_cube, mark_saturated
-from irispy.utils.constants import SATURATION_LIMIT
+from irispy.utils.constants import DN_UNIT, SATURATION_LIMIT
 from irispy.utils.red_blue import RBAQualityFlag, calculate_red_blue_asymmetry
 from irispy.utils.spectrograph import subtract_background
 
@@ -101,7 +101,7 @@ def test_calculate_red_blue_asymmetry_requires_wavelength_axis():
 
 
 def test_calculate_red_blue_asymmetry_rejects_unscaled_data():
-    cube = make_test_spectrogram_cube(np.ones((1, 1, 5), dtype=np.int16), np.arange(5) * u.nm)
+    cube = make_test_spectrogram_cube(np.ones((1, 1, 5)), np.arange(5) * u.nm, unit=DN_UNIT["FUV_UNSCALED"])
     with pytest.raises(ValueError, match="unscaled"):
         calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH)
 

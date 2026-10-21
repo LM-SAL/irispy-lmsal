@@ -324,7 +324,8 @@ def test_sji_slit_positions_are_zero_based_pixels(sns_sji_1400_file):
         assert_quantity_allclose(position, (aux[:, columns[column]] - 1) * u.pix)
 
 
-def test_read_aia_cube(aia_1700_file):
+@pytest.mark.parametrize("memmap", [False, True])
+def test_read_aia_cube(aia_1700_file, memmap):
     # Three frames of the AIA 1700 Å cube the IRIS team co-aligned with OBS 3620106076
     with fits.open(aia_1700_file) as hdulist:
         data = hdulist[0].data
@@ -333,12 +334,14 @@ def test_read_aia_cube(aia_1700_file):
             (aux[:, columns["TIME"]] + aux[:, columns["EXPTIMES"]] / 2) * u.s
         )
 
-    aia = read_sji_lvl2(aia_1700_file)
+    # The file stores DN as integers without scaling, so memmap=True maps the same values
+    aia = read_sji_lvl2(aia_1700_file, memmap=memmap)
 
     assert isinstance(aia, AIACube)
     assert "AIACube" in str(aia)
     assert aia.shape == (3, 382, 320)
     assert aia.unit == u.DN
+    assert aia.meta["scaled"]
     assert aia.meta.instrument == "AIA_3"
     assert aia.meta.observing_mode_id == 3620106076
     # The cube keeps the file's integers: no fill values, so nothing to replace or mask

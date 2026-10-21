@@ -11,11 +11,11 @@ from irispy.tests.helpers import figure_test
 from irispy.visualization import LAT_AXIS_LABEL, LON_AXIS_LABEL
 
 
-def test_to_maps_rejects_unscaled_data(sns_sji_1330_file):
+def test_to_maps_rejects_unscaled_data(bursts_sji_1400_file):
     # The frame headers say DN, which the raw integers of a memmap read are not
     with pytest.raises(ValueError, match=r"unscaled.*memmap=False"):
-        read_files(sns_sji_1330_file, memmap=True).to_maps(0)
-    assert read_files(sns_sji_1330_file).to_maps(0).unit == u.DN
+        read_files(bursts_sji_1400_file, memmap=True).to_maps(0)
+    assert read_files(bursts_sji_1400_file).to_maps(0).unit == u.DN
 
 
 AXIS = [

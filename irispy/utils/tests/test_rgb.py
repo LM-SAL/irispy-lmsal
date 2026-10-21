@@ -9,6 +9,7 @@ from astropy.coordinates import SpectralCoord
 
 from irispy.io.utils import read_files
 from irispy.tests.helpers import figure_test, make_test_spectrogram_cube
+from irispy.utils.constants import DN_UNIT
 from irispy.utils.rgb import calculate_rgb, plot_rgb
 
 colorsynth = pytest.importorskip("colorsynth")
@@ -135,7 +136,7 @@ def test_calculate_rgb_rejects_a_cube_that_is_not_three_dimensional(si_iv_cube):
 
 
 def test_calculate_rgb_rejects_unscaled_data():
-    cube = make_test_spectrogram_cube(np.ones((1, 1, 5), dtype=np.int16), np.arange(5) * u.nm)
+    cube = make_test_spectrogram_cube(np.ones((1, 1, 5)), np.arange(5) * u.nm, unit=DN_UNIT["NUV_UNSCALED"])
     with pytest.raises(ValueError, match="unscaled"):
         calculate_rgb(cube)
 

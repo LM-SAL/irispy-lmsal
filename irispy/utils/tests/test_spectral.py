@@ -7,16 +7,17 @@ from astropy.time import Time
 
 from irispy.tests.helpers import make_test_spectrogram_cube
 from irispy.utils._spectral import check_scaled, in_windows, make_map_cube, standard_deviation
+from irispy.utils.constants import DN_UNIT
 
 
 def test_check_scaled():
     wavelengths = np.arange(3) * u.nm
-    check_scaled(make_test_spectrogram_cube(np.ones((1, 1, 3)), wavelengths))
-    integer = make_test_spectrogram_cube(np.ones((1, 1, 3), dtype=np.int16), wavelengths)
-    with pytest.raises(ValueError, match="unscaled"):
-        check_scaled(integer)
-    integer.meta["scaled"] = True  # as the slit-jaw reader gives scaled AIA data
-    check_scaled(integer)
+    # Integers in DN, as AIA cubes are stored
+    check_scaled(make_test_spectrogram_cube(np.ones((1, 1, 3), dtype=np.int16), wavelengths))
+    for band in ("SJI", "FUV", "NUV"):
+        for unit in (DN_UNIT[f"{band}_UNSCALED"], DN_UNIT[f"{band}_UNSCALED"] / u.s):
+            with pytest.raises(ValueError, match="unscaled"):
+                check_scaled(make_test_spectrogram_cube(np.ones((1, 1, 3)), wavelengths, unit=unit))
 
 
 @pytest.mark.parametrize("windows", [[[1, 2], [10, 11]], [[10, 11], [1, 2]]])
