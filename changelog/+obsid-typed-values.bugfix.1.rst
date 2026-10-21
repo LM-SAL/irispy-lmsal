@@ -1,0 +1,1 @@
+For table version 40 OBS IDs, ``irispy.obsid.ObsID`` gives ``raster_fov``, ``sji_fov`` and ``raster_fulldesc`` as ``126x120`` like the other versions instead of ``126 x120``.

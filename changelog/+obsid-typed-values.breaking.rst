@@ -1,0 +1,1 @@
+``irispy.obsid.ObsID`` now gives ``raster_step`` as a ``Quantity`` in arcsec instead of a float (a string for table version 40 OBS IDs), with one value per sub-raster for sparse/dense/sparse rasters; ``spec_cadence`` as a ``Quantity`` in seconds instead of a string such as ``"64s"``; and ``obsid`` as an ``int`` also when given a string, such as the ``OBSID`` header keyword.
