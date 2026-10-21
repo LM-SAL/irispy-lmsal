@@ -5,10 +5,9 @@ Utilities for removing cosmic rays from IRIS data.
 from typing import Any
 from collections.abc import Mapping
 
-import dask.array as da
 import numpy as np
 
-from irispy.utils.utils import _boolean_mask, _import_optional, _saturated_samples
+from irispy.utils.utils import _boolean_mask, _import_optional
 
 __all__ = ["remove_cosmic_rays"]
 
@@ -24,23 +23,14 @@ def _remove_cosmic_rays_rsliding(
     ).SlidingSigmaClipping
     method_kwargs = dict(method_kwargs)
     method_kwargs["masked_array"] = True
+    data = np.asarray(data)
+    mask = mask | ~np.isfinite(data)
     working_data = data.astype(np.float64, copy=True)
     working_data[mask] = np.nan
     cleaned = np.ma.getdata(slidingsigmaclipping(data=working_data, **method_kwargs).clipped)
-    # +Inf stays +Inf; it was masked, not cleaned
-    cleaned[np.isposinf(data)] = np.inf
+    # rsliding fills the NaN it was given with its window's median
+    cleaned[mask] = data[mask]
     return cleaned
-
-
-def _mask_for_frame(mask, index, data_shape, frame_shape):
-    if mask is None:
-        return np.zeros(frame_shape, dtype=bool)
-    mask_shape = getattr(mask, "shape", np.shape(mask))
-    if mask_shape == frame_shape:
-        return np.asarray(mask, dtype=bool)
-    if mask_shape == data_shape:
-        return np.asarray(mask[index], dtype=bool)
-    return np.asarray(np.broadcast_to(mask, data_shape)[index], dtype=bool)
 
 
 def _remove_cosmic_rays_astroscrappy(
@@ -52,21 +42,16 @@ def _remove_cosmic_rays_astroscrappy(
     astroscrappy = _import_optional("astroscrappy", reason="method='astroscrappy'", extra="cosmic-rays")
     method_kwargs = dict(method_kwargs)
     method_kwargs.setdefault("verbose", False)
-    inmask = method_kwargs.pop("inmask", None)
-    data_shape = data.shape
-    cleaned_data = np.empty(data_shape, dtype=data.dtype)
-    for index in np.ndindex(data_shape[:-2]):
-        frame = np.asarray(data[index]).copy()
-        frame_mask = _mask_for_frame(mask, index, data_shape, frame.shape)
-        clipped = np.isposinf(frame)  # masked, not cleaned
-        if np.issubdtype(frame.dtype, np.floating):
-            frame_mask = frame_mask | ~np.isfinite(frame)
-        if inmask is not None:
-            frame_mask = frame_mask | _mask_for_frame(inmask, index, data_shape, frame.shape)
-        frame[frame_mask] = 0.0
-        _, cleaned_frame = astroscrappy.detect_cosmics(frame, inmask=frame_mask, **method_kwargs)
-        cleaned_frame[clipped] = np.inf
-        cleaned_data[index] = cleaned_frame
+    inmask = np.broadcast_to(np.asarray(method_kwargs.pop("inmask", False), dtype=bool), data.shape)
+    cleaned_data = np.empty(data.shape, dtype=data.dtype)
+    for index in np.ndindex(data.shape[:-2]):
+        frame = np.asarray(data[index])
+        frame_mask = mask[index] | inmask[index] | ~np.isfinite(frame)
+        _, cleaned_frame = astroscrappy.detect_cosmics(
+            np.where(frame_mask, 0.0, frame), inmask=frame_mask, **method_kwargs
+        )
+        # astroscrappy returns the zeros it was given at the masked samples
+        cleaned_data[index] = np.where(frame_mask, frame, cleaned_frame)
     return cleaned_data
 
 
@@ -89,13 +74,13 @@ def remove_cosmic_rays(
         Keyword arguments passed to the selected backend, under its own names: for
         example ``sigma`` and ``max_iters`` for ``rsliding``, ``sigclip`` and ``niter``
         for ``astroscrappy``.
-        For dask-backed inputs, ``method="astroscrappy"`` processes one frame
-        at a time but returns an in-memory NumPy array.
 
     Returns
     -------
     `~irispy.sji.SJICube` or `~irispy.spectrograph.SpectrogramCube`
-        A new cube with cleaned data and copied metadata/coordinates.
+        A new cube with cleaned data and copied metadata/coordinates. Masked and
+        non-finite samples, and those ``inmask`` marks for ``astroscrappy``, keep their
+        value. The cleaned data are in memory.
     """
     # Avoid circular imports
     from irispy.utils._spectral import check_scaled  # NOQA: PLC0415
@@ -103,19 +88,6 @@ def remove_cosmic_rays(
     check_scaled(cube)
     method = method.lower()
     kwargs = dict(method_kwargs or {})
-    dask_backed = isinstance(cube.data, da.Array) or isinstance(cube.mask, da.Array)
-    if dask_backed and method == "rsliding":
-        msg = (
-            "remove_cosmic_rays(method='rsliding') requires the full cube in memory. "
-            "Slice the cube first, load it without memmap=True, or use method='astroscrappy'."
-        )
-        raise ValueError(msg)
-
-    working_mask = cube.mask
-    if not dask_backed:
-        working_mask = _boolean_mask(cube)
-        if np.issubdtype(cube.data.dtype, np.floating):
-            working_mask = working_mask | ~np.isfinite(cube.data)
     backends = {
         "rsliding": _remove_cosmic_rays_rsliding,
         "astroscrappy": _remove_cosmic_rays_astroscrappy,
@@ -123,11 +95,7 @@ def remove_cosmic_rays(
     if method not in backends:
         msg = f"Unsupported method {method!r}. Supported methods are: {sorted(backends)}."
         raise ValueError(msg)
-    cleaned_data = backends[method](cube.data, working_mask, method_kwargs=kwargs)
-    # Saturated samples keep their value; they were masked, not cleaned
-    saturated = _saturated_samples(cube)
-    if saturated.any():
-        cleaned_data[saturated] = np.asarray(cube.data)[saturated]
+    cleaned_data = backends[method](cube.data, _boolean_mask(cube), method_kwargs=kwargs)
     return cube.to_nddata(
         data=cleaned_data, mask="copy", nddata_type=type(cube), extra_coords="copy", global_coords="copy"
     )
