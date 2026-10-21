@@ -45,6 +45,7 @@ def test_sns_read_spectrograph_lvl2(sns_sg_file):
         "2814",
         "Mg II k 2796",
     ]
+    assert {type(key) for key in raster_collection} == {str}
     # Simple repr check
     assert str(raster_collection)
     # We do not expect any metadata to be present on the collection
