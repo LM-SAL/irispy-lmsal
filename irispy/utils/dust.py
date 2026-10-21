@@ -172,7 +172,8 @@ def remove_dust(
     Returns
     -------
     `~irispy.sji.SJICube`
-        A new cube with repaired dust pixels.
+        A new cube with repaired dust pixels, in the floating-point type of the data:
+        float32 for Level 2 data.
 
     Notes
     -----
@@ -183,7 +184,7 @@ def remove_dust(
         raise ValueError(msg)
 
     check_scaled(cube)
-    clean_data = np.asarray(cube.data, dtype=float).copy()
+    clean_data = np.array(cube.data, dtype=np.promote_types(cube.data.dtype, np.float32))
     original_mask = _boolean_mask(cube)
     dust_mask = _coerce_dust_mask(cube, clean_data, dust_mask)
     filled_mask = np.zeros_like(dust_mask, dtype=bool)
@@ -194,27 +195,25 @@ def remove_dust(
         exposure_times = None
         if u.s not in cube.unit.decompose().bases:
             exposure_times = np.broadcast_to(cube.exposure_time.to_value(u.s), clean_data.shape[:1])
-        for frame_index in range(clean_data.shape[0]):
-            target_mask = dust_mask[frame_index]
-            if not np.any(target_mask):
+        n_frames = clean_data.shape[0]
+        for frame_index in range(n_frames):
+            rows, cols = np.nonzero(dust_mask[frame_index])
+            if not rows.size:
                 continue
-            candidate_frames = []
-            for offset in range(1, temporal_window + 1):
-                for neighbor_index in (frame_index - offset, frame_index + offset):
-                    if 0 <= neighbor_index < clean_data.shape[0]:
-                        candidate = clean_data[neighbor_index].copy()
-                        invalid = original_mask[neighbor_index] | dust_mask[neighbor_index] | ~np.isfinite(candidate)
-                        candidate[invalid] = np.nan
-                        if exposure_times is not None:
-                            candidate = candidate / exposure_times[neighbor_index] * exposure_times[frame_index]
-                        candidate_frames.append(candidate)
-            if candidate_frames:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", category=RuntimeWarning)
-                    temporal_fill = np.nanmedian(np.stack(candidate_frames), axis=0)
-                can_fill = target_mask & np.isfinite(temporal_fill)
-                clean_data[frame_index, can_fill] = temporal_fill[can_fill]
-                filled_mask[frame_index, can_fill] = True
+            window = np.arange(max(frame_index - temporal_window, 0), min(frame_index + temporal_window + 1, n_frames))
+            # The neighbors' samples at this frame's dust pixels only, one row per neighbor
+            neighbors = window[window != frame_index, np.newaxis]
+            candidates = clean_data[neighbors, rows, cols]
+            invalid = original_mask[neighbors, rows, cols] | dust_mask[neighbors, rows, cols] | ~np.isfinite(candidates)
+            candidates[invalid] = np.nan
+            if exposure_times is not None:
+                candidates = candidates / exposure_times[neighbors] * exposure_times[frame_index]
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                temporal_fill = np.nanmedian(candidates, axis=0)
+            can_fill = np.isfinite(temporal_fill)
+            clean_data[frame_index, rows[can_fill], cols[can_fill]] = temporal_fill[can_fill]
+            filled_mask[frame_index, rows[can_fill], cols[can_fill]] = True
 
     if fallback == "spatial":
         if clean_data.ndim == 2:
