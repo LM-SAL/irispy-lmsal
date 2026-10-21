@@ -1,0 +1,1 @@
+``irispy.io.read_files`` and ``irispy.io.read_spectrograph_lvl2`` now read the raster files the archive writes with no data, such as during a data gap, and those with no NUV exposure, instead of raising; a file with no data reads with every sample masked and a NaN pointing and roll.

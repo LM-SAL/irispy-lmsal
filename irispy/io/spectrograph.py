@@ -34,13 +34,13 @@ def _nuv_t_obs_from_source_filenames(source_data, exposure_times, auxiliary_time
     exposure midpoint. Rows with an exposure time of 0 s have no usable source filename,
     so they fall back to their planned ``auxiliary_times``.
     """
-    if source_data is None or len(source_data) != len(exposure_times):
-        found = 0 if source_data is None else len(source_data)
-        msg = f"Expected {len(exposure_times)} NUV source filename rows, found {found}"
-        raise ValueError(msg)
     valid_rows = exposure_times > 0 * u.s
     t_obs = auxiliary_times.copy()
     if np.any(valid_rows):
+        if source_data is None or len(source_data) != len(exposure_times):
+            found = 0 if source_data is None else len(source_data)
+            msg = f"Expected {len(exposure_times)} NUV source filename rows, found {found}"
+            raise ValueError(msg)
         try:
             timestamps = [
                 Path(source_filename).name[4:21] for source_filename in source_data["NUVfilename"][valid_rows]
@@ -57,6 +57,24 @@ def _nuv_t_obs_from_source_filenames(source_data, exposure_times, auxiliary_time
     return t_obs
 
 
+def _auxiliary_times(hdulist):
+    """
+    Return the time of each exposure of a raster file: ``STARTOBS`` plus the auxiliary ``TIME``.
+    """
+    auxiliary = hdulist[-2]
+    return Time(hdulist[0].header["STARTOBS"]) + TimeDelta(auxiliary.data[:, auxiliary.header["TIME"]], format="sec")
+
+
+def _exposure_pointing(auxiliary_data, auxiliary_header):
+    """
+    Return the ``XCENIX`` and ``YCENIX`` of each exposure, NaN for an exposure missing
+    on both detectors, which has them as 0.
+    """
+    x, y = auxiliary_data[:, auxiliary_header["XCENIX"]], auxiliary_data[:, auxiliary_header["YCENIX"]]
+    unknown = (x == 0) & (y == 0)
+    return np.where(unknown, np.nan, x), np.where(unknown, np.nan, y)
+
+
 def _create_tabular_wcs(header, auxiliary_hdu, *, date_obs, flip=False):
     """
     Create a FITS-TAB WCS from the per-step pointing in the auxiliary table.
@@ -69,10 +87,11 @@ def _create_tabular_wcs(header, auxiliary_hdu, *, date_obs, flip=False):
     spatial_offsets = spatial_pixels - header["CRPIX2"]
     longitude_scale = header["CDELT3"] or header["CDELT2"]
 
-    longitude = auxiliary_data[:, auxiliary_hdu.header["XCENIX"], None] + longitude_scale * (
+    x, y = _exposure_pointing(auxiliary_data, auxiliary_hdu.header)
+    longitude = x[:, None] + longitude_scale * (
         auxiliary_data[:, auxiliary_hdu.header["PC3_2IX"], None] * spatial_offsets
     )
-    latitude = auxiliary_data[:, auxiliary_hdu.header["YCENIX"], None] + header["CDELT2"] * (
+    latitude = y[:, None] + header["CDELT2"] * (
         auxiliary_data[:, auxiliary_hdu.header["PC2_2IX"], None] * spatial_offsets
     )
     coordinates = np.stack((latitude, longitude), axis=-1) * arcsec_to_deg
@@ -188,6 +207,9 @@ def read_spectrograph_lvl2(
             except (OSError, ValueError, TypeError):
                 # A directory or a file that is not FITS: raises the level 2 error, chained to this one
                 _check_level2(filename, None, "raster")
+            if not date_obs[-1]:  # a file with no data
+                with nullcontext(filename) if isinstance(filename, fits.HDUList) else fits.open(filename) as hdulist:
+                    date_obs[-1] = _auxiliary_times(hdulist)[0].isot
         filenames = [filenames[i] for i in Time(date_obs).argsort()]
     for file_index, filename in enumerate(filenames):
         if isinstance(filename, fits.HDUList):
@@ -203,6 +225,16 @@ def read_spectrograph_lvl2(
             # An HDU list made in memory has no filename, so name what was given
             given = hdulist.filename() or f"The data given ({type(filename).__name__})"
             _check_level2(given, hdulist[0].header, "raster")
+            aux_times = _auxiliary_times(hdulist)
+            # The archive writes a file with no data with DATE_OBS and DATE_END empty and its pointing and roll as 0
+            no_data = {}
+            if not hdulist[0].header["DATE_OBS"]:
+                no_data = {
+                    "DATE_OBS": (aux_times[0].isot, "STARTOBS plus the auxiliary TIME of the first exposure"),
+                    "DATE_END": (aux_times[-1].isot, "STARTOBS plus the auxiliary TIME of the last exposure"),
+                    **dict.fromkeys(("XCEN", "YCEN", "SAT_ROT"), (np.nan, "Unknown: the file has no data")),
+                }
+                logger.warning(f"{given} has no data: its exposures are masked and its pointing and roll are NaN.")
             if file_index == 0:
                 # After a discussion with the IRIS team, it was decided that instead of the
                 # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.
@@ -235,17 +267,11 @@ def read_spectrograph_lvl2(
                     ]
                 spectral_windows_req = spectral_windows_req.tolist()  # the keys are str, not numpy.str_
                 data_dict = {window_name: [] for window_name in spectral_windows_req}
-                base_time = Time(hdulist[0].header["DATE_OBS"])
+                base_time = Time(hdulist[0].header["DATE_OBS"] or aux_times[0])
                 observer = get_body_heliographic_stonyhurst("Earth", base_time)
             # Extract axis-aligned metadata.
-            aux_times = Time(hdulist[0].header["STARTOBS"]) + TimeDelta(
-                hdulist[-2].data[:, hdulist[-2].header["TIME"]],
-                format="sec",
-            )
-            source_data = hdulist[-1].data
             fov_center = SkyCoord(
-                Tx=hdulist[-2].data[:, hdulist[-2].header["XCENIX"]],
-                Ty=hdulist[-2].data[:, hdulist[-2].header["YCENIX"]],
+                *_exposure_pointing(hdulist[-2].data, hdulist[-2].header),
                 unit=u.arcsec,
                 frame=Helioprojective,
                 observer=observer,
@@ -262,6 +288,8 @@ def read_spectrograph_lvl2(
                     window_name,
                     data_shape=hdulist[window_fits_indices[i]].data.shape,
                 )
+                for key, (value, comment) in no_data.items():
+                    meta.add(key, value, comment, overwrite=True)
                 meta.add("auxiliary times", aux_times[steps], None, 0)
                 if "FUV" in meta.detector:
                     exposure_times = exposure_times_fuv
@@ -272,9 +300,14 @@ def read_spectrograph_lvl2(
                     exposure_times = exposure_times_nuv
                     dn_unit = DN_UNIT["NUV"]
                     readout_noise = READOUT_NOISE["NUV"]
-                    if t_obs_nuv is None:
+                    if no_data:
+                        # Its own warning covers the missing NUV exposures
+                        t_obs_nuv = aux_times
+                    elif t_obs_nuv is None:
+                        # The archive writes the NUV source filenames of a file without NUV exposures as A0 columns,
+                        # which astropy cannot read
                         t_obs_nuv = _nuv_t_obs_from_source_filenames(
-                            source_data,
+                            hdulist[-1].data if np.any(exposure_times > 0 * u.s) else None,
                             exposure_times,
                             aux_times,
                             filename=given,

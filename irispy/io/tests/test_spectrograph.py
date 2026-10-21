@@ -275,6 +275,32 @@ def test_read_spectrograph_retains_missing_nuv_exposure(raster_sg_file, tmp_path
     assert abs((times[0] - cube.meta["auxiliary times"][0]).to_value(u.s)) < 1e-6
 
 
+def test_read_spectrograph_reads_files_with_no_data_or_no_nuv_exposure(caplog):
+    # Real files of a data gap, r00066 with no data and r00067 with no NUV exposure (see data_gap/overview.txt).
+    # Given in reverse, the file with no data is ordered first.
+    no_data, no_nuv = (
+        get_test_filepath(f"data_gap/iris_l2_20140329_140938_3860258481_raster_t000_r0006{step}_test.fits")
+        for step in (6, 7)
+    )
+    with caplog.at_level("WARNING", logger="sunpy"):
+        raster = read_spectrograph_lvl2([no_nuv, no_data], spectral_windows=["C II 1336", "2832"])
+
+    assert sum(str(no_data) in record.getMessage() for record in caplog.records) == 1
+    auxiliary = fits.getdata(no_data, -2)[:, fits.getheader(no_data, -2)["TIME"]]
+    times = Time(fits.getheader(no_data)["STARTOBS"]) + auxiliary * u.s
+    for window, has_data in [("C II 1336", True), ("2832", False)]:
+        empty, after = raster[window]
+        assert np.all(empty.mask)
+        empty_times = empty.axis_world_coords("time", wcs=empty.extra_coords)[0]
+        assert_quantity_allclose((empty_times - times).to(u.s), 0 * u.s, atol=1 * u.us)
+        assert empty.meta["DATE_OBS"] == times[0].isot < after.meta["DATE_OBS"]
+        assert np.all(np.isnan(empty.wcs.pixel_to_world_values(0, 0, np.arange(empty.shape[0]))[1:]))
+        assert np.all(np.isnan(empty.meta["exposure FOV center"].Tx))
+        assert np.isnan(empty.meta.fov_center.Tx)
+        assert np.isnan(empty.meta.satellite_rotation)
+        assert np.all(after.mask) != has_data
+
+
 def test_read_spectrograph_flips_v34_mask_uncertainty_and_meta(raster_sg_file, tmp_path):
     # STEPS_AV < -0.01 marks a V34 raster, which is read flipped along the step axis
     filename = tmp_path / "v34.fits"
