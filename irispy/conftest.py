@@ -13,7 +13,7 @@ from astropy.config.paths import temporary_cache_dir_path
 from irispy.data.test import get_test_filepath
 from irispy.io.sji import read_sji_lvl2
 from irispy.io.spectrograph import read_spectrograph_lvl2
-from irispy.utils import record_to_dict
+from irispy.utils.response import _record_to_dict
 
 console_logger = logging.getLogger()
 console_logger.setLevel("INFO")
@@ -67,7 +67,7 @@ def idl_response():
     idl_response = readsav(
         get_test_filepath("iris_response_2025_08_05T22_25_04_723.sav"), python_dict=True, verbose=False
     )
-    return record_to_dict(idl_response["iris_response"][0])
+    return _record_to_dict(idl_response["iris_response"][0])
 
 
 @pytest.fixture
