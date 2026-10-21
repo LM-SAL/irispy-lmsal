@@ -125,6 +125,17 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
             """,
         )
 
+    @property
+    def exposure_time(self):
+        """
+        The exposure time of each frame; a single value for one frame.
+        """
+        # Indexing one frame moves the exposure time from the extra coordinates to the global
+        # coordinates, where sunraster does not look
+        if "exposure time" in self.global_coords:
+            return self.global_coords["exposure time"]
+        return super().exposure_time
+
     def _get_axis_coord_index(self, axis_name, coord_loc):
         # The exposure time of a slit-jaw cube is an extra coordinate, whose axis sunraster
         # gives as a pixel axis int, where apply_exposure_time_correction unpacks a tuple

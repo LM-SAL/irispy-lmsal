@@ -139,6 +139,9 @@ def test_apply_exposure_time_correction(sns_sjicube_1330):
     undone = corrected.apply_exposure_time_correction(undo=True)
     assert undone.unit == sns_sjicube_1330.unit
     np.testing.assert_allclose(undone.data, sns_sjicube_1330.data)
+    frame = sns_sjicube_1330[1]
+    assert frame.exposure_time == sns_sjicube_1330.exposure_time[1]
+    np.testing.assert_allclose(frame.apply_exposure_time_correction().data, corrected.data[1])
 
 
 def test_array_index_raises_index_error(sns_sjicube_1330):
