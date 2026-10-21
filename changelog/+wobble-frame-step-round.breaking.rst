@@ -1,0 +1,1 @@
+``irispy.utils.wobble.generate_wobble_movie`` now shows every n-th frame with n the ratio of ``wobble_cadence`` to the time between frames rounded to the nearest integer, as SolarSoft's ``iris_check_wobble.pro`` does, instead of rounded down.

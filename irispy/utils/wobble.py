@@ -47,7 +47,7 @@ def generate_wobble_movie(
     wobble_cadence : `astropy.units.Quantity`, optional
         Sets the cadence of the wobble movie.
         The movie shows every n-th frame of the cube, n being ``wobble_cadence`` divided by the median
-        time between frames, rounded down and at least 1.
+        time between frames, rounded to the nearest integer and at least 1.
         Optional, defaults to 180 seconds.
 
     Returns
@@ -82,7 +82,7 @@ def generate_wobble_movie(
     step = 1
     if len(times) > 1:
         cadence = np.median((times[1:] - times[:-1]).to_value("s"))
-        step = max(1, int(wobble_cadence.to_value(u.s) // cadence))
+        step = max(1, round(wobble_cadence.to_value(u.s) / cadence))
     frames = range(0, len(times), step)
 
     fig = plt.figure()
