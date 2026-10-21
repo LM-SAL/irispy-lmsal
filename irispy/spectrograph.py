@@ -30,19 +30,19 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
         The array holding the actual data in this object.
     wcs: `astropy.wcs.WCS`
         The WCS object containing the axes' information
-    unit : `astropy.units.Unit` or `str`, optional
-        Unit for the dataset. Strings that can be converted to a Unit are allowed.
-        Defaults to None, which takes the unit of ``data`` if it is a `~astropy.units.Quantity`.
-    meta : `dict` object, optional
-        Additional meta information about the dataset, such as the
-        `~irispy.meta.SGMeta` of the observation the data comes from.
-        Defaults to None.
     uncertainty : any type, optional
         Uncertainty in the dataset. Should have an attribute uncertainty_type
         that defines what kind of uncertainty is stored, for example "std"
         for standard deviation or "var" for variance. A metaclass defining
         such an interface is NDUncertainty - but isn't mandatory. If the uncertainty
         has no such attribute the uncertainty is stored as UnknownUncertainty.
+        Defaults to None.
+    unit : `astropy.units.Unit` or `str`, optional
+        Unit for the dataset. Strings that can be converted to a Unit are allowed.
+        Defaults to None, which takes the unit of ``data`` if it is a `~astropy.units.Quantity`.
+    meta : `dict` object, optional
+        Additional meta information about the dataset, such as the
+        `~irispy.meta.SGMeta` of the observation the data comes from.
         Defaults to None.
     mask : any type, optional
         Mask for the dataset. Masks should follow the numpy convention
