@@ -4,6 +4,7 @@ import pytest
 
 import astropy.units as u
 from astropy import constants
+from astropy.coordinates import SpectralCoord
 from astropy.modeling.models import Gaussian1D
 from astropy.nddata import StdDevUncertainty, VarianceUncertainty
 from astropy.tests.helper import assert_quantity_allclose
@@ -152,11 +153,34 @@ def test_calculate_moments_velocity_range_no_meta_no_rest_wavelength():
     """
     velocity_range with no rest_wavelength and no detectable meta should raise.
     """
-    cube = make_test_spectrogram_cube(np.ones((1, 1, 5)), np.arange(5) * u.nm)
+    cube = make_test_spectrogram_cube(np.ones((1, 1, 5)), np.arange(1, 6) * u.nm)
     # Simulate meta without rest_wavelength attribute
     del cube.meta["TWAVE1"]
     with pytest.raises((ValueError, AttributeError), match="rest_wavelength must be provided"):
         calculate_moments(cube, velocity_range=(-100, 100) * u.km / u.s)
+
+
+@pytest.mark.parametrize(
+    ("limits", "rest_wavelength"),
+    [
+        (None, 2796.352 * u.AA),  # The window's line
+        ((2793, 2796.352), 2796.352 * u.AA),  # Ends in the pixel holding it, whose center is short of it
+        ((2802, 2805), 2803.53 * u.AA),  # Mg II h
+        ((2800, 2802), 2796.352 * u.AA),  # A wing between documented lines keeps the window's line
+    ],
+)
+def test_calculate_moments_default_rest_wavelength(raster_sg_file, limits, rest_wavelength):
+    """
+    The default rest wavelength is the one documented line the cube covers if it does
+    not cover the window's line.
+    """
+    cube = read_files(raster_sg_file)["Mg II k 2796"][0]
+    if limits is not None:
+        cube = cube.crop(*([SpectralCoord(wavelength * u.AA), None] for wavelength in limits))
+    moments = calculate_moments(cube)
+    assert_quantity_allclose(moments["velocity"].meta["moments_rest_wavelength"], rest_wavelength)
+    expected = calculate_moments(cube, rest_wavelength=rest_wavelength)
+    np.testing.assert_allclose(moments["velocity"].data, expected["velocity"].data, rtol=1e-12)
 
 
 def test_calculate_moments_ignores_negative_nonfinite_and_masked_values():

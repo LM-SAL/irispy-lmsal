@@ -4,6 +4,7 @@ import pytest
 
 import astropy.units as u
 from astropy import constants
+from astropy.coordinates import SpectralCoord
 from astropy.io import fits
 from astropy.nddata import StdDevUncertainty, VarianceUncertainty
 from astropy.tests.helper import assert_quantity_allclose
@@ -485,9 +486,28 @@ def test_calculate_red_blue_asymmetry_real_cube_shape_and_coords(sns_sg_file):
 
 
 def test_calculate_red_blue_asymmetry_rest_wavelength_required_without_meta():
-    cube = make_test_spectrogram_cube(np.ones((1, 1, 5)), np.arange(5) * u.nm)
+    cube = make_test_spectrogram_cube(np.ones((1, 1, 5)), np.arange(1, 6) * u.nm)
+    del cube.meta["TWAVE1"]
     with pytest.raises(ValueError, match="rest_wavelength"):
         calculate_red_blue_asymmetry(cube, spline_degree=1)
+
+
+@pytest.mark.parametrize(
+    ("limits", "rest_wavelength"),
+    [((2802, 2805), 2803.53 * u.AA), ((2800, 2802), 2796.352 * u.AA)],
+    ids=["Mg II h", "wing"],
+)
+def test_calculate_red_blue_asymmetry_default_rest_wavelength(raster_sg_file, limits, rest_wavelength):
+    """
+    A crop of the Mg II k window to Mg II h is measured from Mg II h, a wing crop from
+    Mg II k.
+    """
+    cube = read_files(raster_sg_file)["Mg II k 2796"][0]
+    cube = cube.crop(*([SpectralCoord(wavelength * u.AA), None] for wavelength in limits))
+    result = calculate_red_blue_asymmetry(cube, return_profiles=False)["red_blue_asymmetry"]
+    expected = calculate_red_blue_asymmetry(cube, rest_wavelength=rest_wavelength, return_profiles=False)
+    assert_quantity_allclose(result.meta["rba_rest_wavelength"] * u.nm, rest_wavelength)
+    np.testing.assert_allclose(result.data, expected["red_blue_asymmetry"].data, rtol=1e-12)
 
 
 @pytest.mark.parametrize(

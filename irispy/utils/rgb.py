@@ -14,7 +14,7 @@ import numpy as np
 
 import astropy.units as u
 
-from irispy.utils._spectral import check_scaled
+from irispy.utils._spectral import check_scaled, default_rest_wavelength
 from irispy.utils.utils import _boolean_mask, _import_optional
 from irispy.visualization import LAT_AXIS_LABEL, LON_AXIS_LABEL
 
@@ -51,7 +51,9 @@ def _wavelength_limits(wavelength, rest_wavelength, wavelength_min, wavelength_m
         msg = "The cube metadata has no usable TWAVE value. Pass rest_wavelength explicitly."
         raise ValueError(msg)
     lower, upper = wavelength.min(), wavelength.max()
-    if lower <= rest_wavelength <= upper:
+    # The cube covers its pixels' full width, as in default_rest_wavelength
+    half = np.abs(np.diff(wavelength)).max() / 2 if wavelength.size > 1 else 0 * wavelength.unit
+    if lower - half <= rest_wavelength <= upper + half:
         lower, upper = ([-100, 100] * u.km / u.s).to(u.AA, equivalencies=u.doppler_optical(rest_wavelength))
     return lower if wavelength_min is None else wavelength_min, upper if wavelength_max is None else wavelength_max
 
@@ -85,7 +87,9 @@ def calculate_rgb(
         range. Wavelengths outside contribute no color.
     rest_wavelength : `astropy.units.Quantity`, optional
         Rest wavelength the Doppler velocities are measured from. Defaults to
-        ``cube.meta.rest_wavelength``. Required if the metadata has no usable ``TWAVE`` value.
+        ``cube.meta.rest_wavelength``, or to the one documented line the cube covers
+        (`~irispy.utils.lines.get_lines`) if it does not cover ``cube.meta.rest_wavelength``.
+        Required if there is neither.
     velocity_norm : `callable`, optional
         Monotonically increasing transform applied to velocity quantities, arrays and
         scalars alike, returning plain numbers. Defaults to a linear mapping of the
@@ -123,7 +127,7 @@ def calculate_rgb(
         msg = f"The wavelength coordinate must be one dimensional, got shape {wavelength.shape}"
         raise ValueError(msg)
     if rest_wavelength is None:
-        rest_wavelength = cube.meta.rest_wavelength
+        rest_wavelength = default_rest_wavelength(cube)
     wavelength_min, wavelength_max = _wavelength_limits(wavelength, rest_wavelength, wavelength_min, wavelength_max)
     doppler = u.doppler_optical(rest_wavelength)
 
@@ -208,8 +212,8 @@ def plot_rgb(
         coordinates and ``"auto"`` for time; use ``"auto"`` for a raster with few steps too.
     rest_wavelength : `astropy.units.Quantity` or `False`, optional
         Rest wavelength for the color mapping and the optical Doppler velocity axis,
-        as in `calculate_rgb`. Defaults to ``cube.meta.rest_wavelength``. `False` hides
-        the velocity axis while retaining the metadata color mapping.
+        as in `calculate_rgb`, whose default it shares. `False` hides the velocity axis while
+        keeping the default color mapping.
     cbar_fraction : `float`, optional
         Fraction of ``ax`` given to the colorbar when ``cax`` is not given.
     cbar_pad : `float`, optional
@@ -232,7 +236,9 @@ def plot_rgb(
     if coordinates not in {"helioprojective", "time"}:
         msg = f"`coordinates` must be 'helioprojective' or 'time', got {coordinates!r}"
         raise ValueError(msg)
-    mapping_rest = cube.meta.rest_wavelength if rest_wavelength is None or rest_wavelength is False else rest_wavelength
+    mapping_rest = (
+        default_rest_wavelength(cube) if rest_wavelength is None or rest_wavelength is False else rest_wavelength
+    )
     wavelength_min, wavelength_max = _wavelength_limits(
         cube.spectral_axis, mapping_rest, wavelength_min, wavelength_max
     )

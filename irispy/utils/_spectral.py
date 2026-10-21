@@ -14,6 +14,7 @@ from astropy.nddata import StdDevUncertainty, UnknownUncertainty
 from ndcube import ExtraCoords
 
 from irispy.spectrograph import SpectrogramCube, _wavelength_indices
+from irispy.utils.lines import get_lines
 from irispy.utils.utils import _boolean_mask
 
 
@@ -90,6 +91,23 @@ def _fit_background(cube, windows, degree):
     coefficients = np.linalg.solve(normal, rhs[..., np.newaxis])[..., 0]
     background = np.where(enough[..., np.newaxis], anchor + coefficients @ vander.T, np.nan)
     return np.moveaxis(background, -1, wavelength_axis)
+
+
+def default_rest_wavelength(cube):
+    """
+    ``cube.meta.rest_wavelength``, or the one documented line ``cube`` covers if it does
+    not cover ``cube.meta.rest_wavelength``.
+    """
+    # A crop of a window can leave out its line, as a crop to Mg II h leaves out Mg II k. The cube covers
+    # its pixels' full width, as a crop at a line keeps the pixel holding it although its center can be past it.
+    wavelengths = cube.axis_world_coords(cube.wavelength_axis)[0]
+    half = abs(cube.spectral_dispersion) / 2
+    low, high = wavelengths.min() - half, wavelengths.max() + half
+    rest = getattr(cube.meta, "rest_wavelength", None)
+    if rest is not None and low <= rest <= high:
+        return rest
+    lines = get_lines([low, high], main_only=True)["wavelength"]
+    return lines[0] if len(lines) == 1 else rest
 
 
 def standard_deviation(cube):

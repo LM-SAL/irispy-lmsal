@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 import astropy.units as u
+from astropy.coordinates import SpectralCoord
 
 from irispy.io.utils import read_files
 from irispy.tests.helpers import figure_test, make_test_spectrogram_cube
@@ -65,6 +66,23 @@ def test_rgb_explicit_rest_wavelength_without_metadata(si_iv_cube, render):
     rest_wavelength = si_iv_cube.meta.pop(f"TWAVE{si_iv_cube.meta._iwin}") * u.AA
     render(si_iv_cube, rest_wavelength=rest_wavelength)
     plt.close("all")
+
+
+def test_rgb_defaults_to_the_line_the_cube_covers(raster_sg_file):
+    """
+    A crop of the Mg II k window to Mg II h is colored around Mg II h, and a crop ending
+    in the pixel that holds Mg II k, whose center is short of it, around Mg II k.
+    """
+    cube = read_files(raster_sg_file)["Mg II k 2796"][0]
+    for limits, rest_wavelength in (((2802, 2805), 2803.53 * u.AA), ((2793, 2796.352), 2796.352 * u.AA)):
+        crop = cube.crop(*([SpectralCoord(wavelength * u.AA), None] for wavelength in limits))
+        lower, upper = ([-100, 100] * u.km / u.s).to(u.AA, equivalencies=u.doppler_optical(rest_wavelength))
+        expected, _ = calculate_rgb(crop, rest_wavelength=rest_wavelength, wavelength_min=lower, wavelength_max=upper)
+        np.testing.assert_allclose(calculate_rgb(crop)[0], expected)
+        fig, ax = plt.subplots()
+        plot_rgb(crop, ax=ax)
+        np.testing.assert_allclose(_velocity_axis(fig).get_ylim(), (-100, 100))
+        plt.close(fig)
 
 
 def test_calculate_rgb_ignores_wavelengths_outside_the_window(si_iv_cube):

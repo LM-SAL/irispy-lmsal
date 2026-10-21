@@ -9,7 +9,13 @@ from astropy import constants
 from astropy.nddata import NDDataArray, StdDevUncertainty
 
 from irispy.spectrograph import RasterCollection, _wavelength_indices
-from irispy.utils._spectral import check_scaled, make_map_cube, make_spatial_template, standard_deviation
+from irispy.utils._spectral import (
+    check_scaled,
+    default_rest_wavelength,
+    make_map_cube,
+    make_spatial_template,
+    standard_deviation,
+)
 from irispy.utils.utils import _boolean_mask, _saturated_samples
 
 __all__ = ["average_window", "calculate_moments"]
@@ -30,7 +36,9 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_in
     cube : `irispy.spectrograph.SpectrogramCube`
         Input cube with a wavelength axis.
     rest_wavelength : `astropy.units.Quantity`, optional
-        Rest wavelength of the line. Defaults to ``cube.meta.rest_wavelength``, if present.
+        Rest wavelength of the line. Defaults to ``cube.meta.rest_wavelength``, or to the one
+        documented line the cube covers (`~irispy.utils.lines.get_lines`) if it does not cover
+        ``cube.meta.rest_wavelength``.
     velocity_range : `astropy.units.Quantity`, optional
         ``(lower, upper)`` Doppler velocities from ``rest_wavelength`` within which to use the samples
         (km/s if unitless). Defaults to the whole spectrum.
@@ -50,7 +58,8 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_in
         * ``"saturated"`` — `True` where a sample used is saturated
 
         Each moment map has a `~astropy.nddata.StdDevUncertainty` if ``cube`` has an uncertainty
-        (e.g. read with ``uncertainty=True``).
+        (e.g. read with ``uncertainty=True``). With velocity maps, ``meta["moments_rest_wavelength"]``
+        of each map is the rest wavelength they are measured from.
 
     Notes
     -----
@@ -85,7 +94,7 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_in
     """
     check_scaled(cube)
     if rest_wavelength is None:
-        rest_wavelength = getattr(cube.meta, "rest_wavelength", None)
+        rest_wavelength = default_rest_wavelength(cube)
     wavelength_axis = cube.wavelength_axis
     wavelengths = cube.axis_world_coords(wavelength_axis)[0].to(u.nm)
     data = np.asarray(cube.data)
@@ -175,6 +184,9 @@ def calculate_moments(cube, *, rest_wavelength=None, velocity_range=None, min_in
         maps += [("velocity", velocity, u.km / u.s), ("velocity_width", to_velocity(stddev_value), u.km / u.s)]
 
     template = make_spatial_template(cube, wavelength_axis)
+    if rest_wavelength is not None:
+        # The maps share the template's meta
+        template.meta["moments_rest_wavelength"] = u.Quantity(rest_wavelength).to(u.nm)
 
     def _make_cube(name, values, unit):
         uncertainty = None if sigma is None else StdDevUncertainty(np.where(np.isnan(values), np.nan, errors[name]))
