@@ -1,0 +1,42 @@
+Test data for the IRIS full-disk mosaics (https://iris.lmsal.com/mosaic.html), read with
+irispy.io.read_mosaic. The whole file is below; examples/how_to/08_full_disk_mosaic.py
+reads a copy of it that keeps every tenth wavelength.
+
+https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2015/02/22/20150222Mosaic/IRISMosaic_20150222_MgIIk.fits.gz
+sha256 dde33eb7a667817fab8e206f07a05b369bfe10fcca3efa64b4efd6562ee5754d
+
+OBS 3801604195, Mg II k 2796, 2015-02-22T20:47:42 to 2015-02-23T14:11:37: 1002 solar X by
+6011 solar Y positions of 1.99523" by 0.332719" and 101 wavelengths of 0.035 A centered on
+LAMREF = 2796.352 A, stored as int16 with BSCALE = 0.25 and BZERO = 7992.
+
+IRISMosaic_20150222_MgIIk_test.fits
+-----------------------------------
+
+Kept:   solar X columns 540-542 (0-based, of 1002), solar Y rows 5626-5645 (of 6011) and
+        wavelengths 43-58 (of 101), 2796.107-2796.632 A, Mg II k2v to k2r, in all 4 HDUs:
+        the data (3 x 20 x 16, FITS order), the integrated spectrum (REF_PROF) at the kept
+        wavelengths and the time tags (T_MASK) and Level 2 rows (Y_MASK) of the kept
+        positions. The data values are unchanged, raw int16 with the same BSCALE and BZERO.
+        The positions are near the north limb, about 79" west and 875" north of disk center.
+        No raster covered column 540 (data 0, time NaN, Y_MASK -1); columns 541 and 542 were
+        observed at 21:17:41.270 and 21:17:44.280. One sample is the Level 2 fill value -199:
+        column 542, row 5645, wavelength 57. No sample is at the Level 2 ceiling.
+Header: NAXISn and CRPIX1 = -38, CRPIX2 = -2620 and CRPIX3 = 8 follow the cut.
+Made:   python cut_mosaic.py IRISMosaic_20150222_MgIIk.fits.gz IRISMosaic_20150222_MgIIk_test.fits
+        with cut_mosaic.py:
+
+            import sys
+
+            from astropy.io import fits
+
+            wavelengths, rows, columns = slice(43, 59), slice(5626, 5646), slice(540, 543)
+            with fits.open(sys.argv[1], do_not_scale_image_data=True) as hdus:
+                hdus[0].data = hdus[0].data[wavelengths, rows, columns]
+                hdus[1].data = hdus[1].data[wavelengths]
+                for hdu in hdus[2:]:
+                    hdu.data = hdu.data[rows, columns]
+                for axis, cut in ((1, columns), (2, rows), (3, wavelengths)):
+                    hdus[0].header[f"CRPIX{axis}"] -= cut.start
+                hdus.writeto(sys.argv[2])
+
+        sha256 c04547fbda6321930e914f205bfbf46d92c1e8032494d318a949ad4d6343d0d6

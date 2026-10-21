@@ -46,6 +46,24 @@ def read_mosaic(filename, *, wavelength_range=None):
 
     Gzipped files cannot be memory-mapped, so every read decompresses the file.
     Decompressing it once, for example with ``gunzip``, makes later reads much faster.
+
+    Examples
+    --------
+    A cut of the Mg II k mosaic of 2015-02-22, in which no raster covered the first solar X position:
+
+    >>> import astropy.units as u
+    >>> from irispy.data.test import get_test_filepath
+    >>> from irispy.io import read_mosaic
+    >>> filename = get_test_filepath("mosaic/IRISMosaic_20150222_MgIIk_test.fits")
+    >>> mosaic = read_mosaic(filename)
+    >>> mosaic.shape, mosaic.unit, mosaic.wavelength_axis
+    ((3, 20, 16), Unit("DN_IRIS_NUV"), 2)
+    >>> mosaic.data[:, 0, 7]  # at the Mg II k rest wavelength, 2796.352 Å
+    array([ nan, 32.5, 28. ], dtype=float32)
+    >>> mosaic.meta["time"].mask[:, 0]
+    array([ True, False, False])
+    >>> read_mosaic(filename, wavelength_range=[2796.3, 2796.4] * u.AA).shape
+    (3, 20, 3)
     """
     with fits.open(filename, memmap=False, do_not_scale_image_data=True) as hdulist:
         header = hdulist[0].header

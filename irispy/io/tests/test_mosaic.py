@@ -8,6 +8,7 @@ from astropy.time import Time
 
 from sunpy.coordinates import get_earth
 
+from irispy.data.test import get_test_filepath
 from irispy.io import read_files, read_mosaic
 from irispy.spectrograph import MosaicCube
 from irispy.utils.bursts import find_bright_spectral_events
@@ -116,6 +117,25 @@ def test_read_mosaic(mosaic_file):
     assert times.mask[0, 0]
     assert times.mask.sum() == 1
     assert times[2, 1].isot == "2015-02-22T20:56:02.140"
+
+
+def test_read_mosaic_archive_cut():
+    # A cut of the archive file, see data/test/mosaic/overview.txt
+    cube = read_mosaic(get_test_filepath("mosaic/IRISMosaic_20150222_MgIIk_test.fits"))
+    # The position no raster covered (raw -31968, 0 DN) and the one Level 2 fill value (raw -32764, -199 DN)
+    assert cube.mask.sum() == 20 * 16 + 1
+    assert cube.mask[0].all()
+    assert cube.mask[2, 19, 14]
+    assert "saturated" not in cube.meta
+    assert cube.meta["time"][2, 19].isot == "2015-02-22T21:17:44.280"
+    # Column 541 and row 5626 (0-based) of the whole file, whose header grid is within 0.01 arcsec of the WCS
+    wavelength, coord = cube.wcs.pixel_to_world(7, 0, 1)
+    assert_quantity_allclose(wavelength, 2796.352 * u.AA)
+    assert_quantity_allclose(
+        [coord.Tx, coord.Ty],
+        [-0.389693 + (541 + 1 - 502) * 1.99523, -0.236448 + (5626 + 1 - 3006) * 0.332719] * u.arcsec,
+        atol=0.01 * u.arcsec,
+    )
 
 
 def test_read_mosaic_wavelength_range(mosaic_file):
