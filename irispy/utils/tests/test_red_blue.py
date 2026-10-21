@@ -46,12 +46,7 @@ def test_calculate_red_blue_asymmetry_red_and_blue_signs():
     result = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH, spline_degree=1)
 
     assert isinstance(result, RasterCollection)
-    assert set(result.keys()) == {
-        "red_blue_asymmetry",
-        "quality",
-        "observed_profile",
-        "interpolated_profile",
-    }
+    assert set(result.keys()) == {"red_blue_asymmetry", "quality", "interpolated_profile"}
     assert_quantity_allclose(result["red_blue_asymmetry"].data[0, 0] * u.one, 0.2 * u.one)
     assert_quantity_allclose(result["red_blue_asymmetry"].data[0, 1] * u.one, -0.3 * u.one)
     assert result["quality"].unit == u.dimensionless_unscaled
@@ -118,7 +113,7 @@ def test_calculate_red_blue_asymmetry_with_uncertainty():
         rest_wavelength=REST_WAVELENGTH,
         spline_degree=1,
     )
-    assert set(result) == {"red_blue_asymmetry", "quality", "observed_profile", "interpolated_profile"}
+    assert set(result) == {"red_blue_asymmetry", "quality", "interpolated_profile"}
     assert isinstance(result["red_blue_asymmetry"].uncertainty, StdDevUncertainty)
     numerator = 2
     peak = 10
@@ -239,16 +234,11 @@ def test_calculate_red_blue_asymmetry_return_profiles():
     cube = make_test_spectrogram_cube(data, wavelengths, uncertainty=StdDevUncertainty(np.full(data.shape, 0.1)))
 
     result = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH, spline_degree=1)
-    observed_cube = result["observed_profile"]
     interp_cube = result["interpolated_profile"]
-    assert isinstance(observed_cube, SpectrogramCube)
     assert isinstance(interp_cube, SpectrogramCube)
-    assert observed_cube.data.shape == cube.shape
     assert interp_cube.data.shape == (1, 2, 33)
-    assert "spect.dopplerVeloc" in observed_cube.wcs.world_axis_physical_types
     assert "spect.dopplerVeloc" in interp_cube.wcs.world_axis_physical_types
     assert interp_cube.uncertainty.array.shape == interp_cube.shape
-    assert_quantity_allclose(observed_cube[0, 0].axis_world_coords(0)[0], velocity)
     assert np.isfinite(interp_cube[0, 1].data).all()
 
 
@@ -260,7 +250,6 @@ def test_calculate_red_blue_asymmetry_return_profiles_on_sliced_cube():
     cube = make_test_spectrogram_cube(data, wavelengths)[:, :1, :]
 
     result = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH, spline_degree=1)
-    assert result["observed_profile"].shape == cube.shape
     assert result["interpolated_profile"].shape == (2, 1, 33)
     assert_quantity_allclose(
         result["interpolated_profile"][0, 0].axis_world_coords(0)[0],
@@ -280,8 +269,7 @@ def test_calculate_red_blue_asymmetry_can_skip_profile_outputs():
         spline_degree=1,
         return_profiles=False,
     )
-    assert "observed_profile" not in result
-    assert "interpolated_profile" not in result
+    assert set(result) == {"red_blue_asymmetry", "quality"}
     assert np.isfinite(result["red_blue_asymmetry"].data[0, 0])
 
 
@@ -321,25 +309,21 @@ def test_calculate_red_blue_asymmetry_continuum_figure():
         * wavelengths.unit
     )
 
+    subtracted = subtract_background(cube, continuum_wavelengths, degree=0)
+
     result_without = calculate_red_blue_asymmetry(cube, rest_wavelength=REST_WAVELENGTH, spline_degree=1)
-    result_with = calculate_red_blue_asymmetry(
-        subtract_background(cube, continuum_wavelengths, degree=0),
-        rest_wavelength=REST_WAVELENGTH,
-        spline_degree=1,
-    )
+    result_with = calculate_red_blue_asymmetry(subtracted, rest_wavelength=REST_WAVELENGTH, spline_degree=1)
     rba_without = float(result_without["red_blue_asymmetry"].data[0, 0])
     rba_with = float(result_with["red_blue_asymmetry"].data[0, 0])
     assert_quantity_allclose(rba_without * u.one, (2 / 15) * u.one)
     assert_quantity_allclose(rba_with * u.one, (2 / 9) * u.one)
 
-    raw_profile = result_without["observed_profile"][0, 0]
-    continuum_profile = result_with["observed_profile"][0, 0]
-    velocities = raw_profile.axis_world_coords(0)[0].to_value(u.km / u.s)
+    velocities = velocity.to_value(u.km / u.s)
     v_low, v_high = 50, 150
 
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.5), constrained_layout=True)
-    axes[0].plot(velocities, raw_profile.data, "o-", color="0.2", markersize=3, label="Input + continuum")
-    axes[0].plot(velocities, continuum_profile.data, "o-", color="C3", markersize=3, label="Continuum subtracted")
+    axes[0].plot(velocities, cube.data[0, 0], "o-", color="0.2", markersize=3, label="Input + continuum")
+    axes[0].plot(velocities, subtracted.data[0, 0], "o-", color="C3", markersize=3, label="Continuum subtracted")
     axes[0].axvspan(-v_high, -v_low, color="C0", alpha=0.12)
     axes[0].axvspan(v_low, v_high, color="C3", alpha=0.12)
     axes[0].set(xlabel="Velocity [km/s]", ylabel="Intensity [DN]", title="Profiles")
@@ -487,6 +471,9 @@ def test_calculate_red_blue_asymmetry_real_cube_shape_and_coords(sns_sg_file):
         velocity_range=(20, 60) * u.km / u.s,
         spline_degree=1,
     )
+    assert set(result) == {"red_blue_asymmetry", "quality", "interpolated_profile"}
+    result["interpolated_profile"].meta["exposure time"][0] = 0 * u.s
+    assert cube.meta["exposure time"][0] > 0 * u.s
     assert result["red_blue_asymmetry"].shape == cube.shape[:-1]
     assert "time" in tuple(result["red_blue_asymmetry"].extra_coords.keys())
     # The "red_blue_asymmetry_error" map this uncertainty replaced had these values

@@ -3,6 +3,7 @@ Red-blue asymmetry utilities for IRIS spectrogram cubes.
 """
 
 import warnings
+from copy import deepcopy
 
 import numpy as np
 from scipy.interpolate import BSpline, make_interp_spline
@@ -146,8 +147,7 @@ def calculate_red_blue_asymmetry(
         Pixels below this threshold are assigned quality flag
         `~irispy.utils.red_blue.RBAQualityFlag.LOW_SIGNAL`. ``u.DN`` stands for the data's DN.
     return_profiles : `bool`, optional
-        If `True`, include 3D ``"observed_profile"`` and
-        ``"interpolated_profile"`` cubes in the output.
+        If `True`, include the 3D ``"interpolated_profile"`` cube in the output.
 
     Returns
     -------
@@ -155,11 +155,9 @@ def calculate_red_blue_asymmetry(
         Always contains ``"red_blue_asymmetry"`` and ``"quality"`` 2D maps.
         When the input cube has uncertainty, the ``"red_blue_asymmetry"`` map carries
         its error as a `~astropy.nddata.StdDevUncertainty`.
-        ``"observed_profile"`` and ``"interpolated_profile"`` 3D cubes are added
-        when ``return_profiles=True``. The interpolated profile velocity axis is
-        measured from the peak of each profile; the observed profile velocity axis is
-        relative to ``rest_wavelength``. Slicing the collection slices the spatial axes
-        of every cube.
+        The ``"interpolated_profile"`` 3D cube is added when ``return_profiles=True``;
+        its velocity axis is measured from the peak of each profile. Slicing the
+        collection slices the spatial axes of every cube.
 
     Raises
     ------
@@ -407,46 +405,25 @@ def calculate_red_blue_asymmetry(
         map_cube.meta.update(meta)
 
     if return_profiles:
-        observed_data = np.moveaxis(data, -1, wavelength_axis)
         interpolated_data = np.moveaxis(interpolated.reshape(*output_shape, -1), -1, wavelength_axis)
-        observed_mask = ~np.isfinite(observed_data)
-        interpolated_mask = ~np.isfinite(interpolated_data)
-        observed_uncertainty = (
-            StdDevUncertainty(np.moveaxis(errors, -1, wavelength_axis)) if errors is not None else None
-        )
         interpolated_uncertainty = (
             StdDevUncertainty(np.moveaxis(interpolated_errors.reshape(*output_shape, -1), -1, wavelength_axis))
             if interpolated_errors is not None
             else None
         )
-
-        result_cubes.extend(
-            [
-                (
-                    "observed_profile",
-                    _make_profile_cube(
-                        cube,
-                        data=observed_data,
-                        velocity_grid=velocity,
-                        wavelength_axis=wavelength_axis,
-                        meta={**cube.meta, **meta, "rba_profile": "observed"},
-                        uncertainty=observed_uncertainty,
-                        mask=observed_mask,
-                    ),
+        result_cubes.append(
+            (
+                "interpolated_profile",
+                _make_profile_cube(
+                    cube,
+                    data=interpolated_data,
+                    velocity_grid=interp_velocity,
+                    wavelength_axis=wavelength_axis,
+                    meta=deepcopy({**cube.meta, **meta, "rba_profile": "interpolated_peak_centered"}),
+                    uncertainty=interpolated_uncertainty,
+                    mask=~np.isfinite(interpolated_data),
                 ),
-                (
-                    "interpolated_profile",
-                    _make_profile_cube(
-                        cube,
-                        data=interpolated_data,
-                        velocity_grid=interp_velocity,
-                        wavelength_axis=wavelength_axis,
-                        meta={**cube.meta, **meta, "rba_profile": "interpolated_peak_centered"},
-                        uncertainty=interpolated_uncertainty,
-                        mask=interpolated_mask,
-                    ),
-                ),
-            ]
+            )
         )
 
     map_axes = tuple(range(len(output_shape)))
