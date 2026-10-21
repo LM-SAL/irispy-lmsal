@@ -49,10 +49,10 @@ print(aia_collection)
 print(aia_collection["304_THIN"])
 
 ###############################################################################
-# We will now plot the AIA data in the same manner as the SJI data, with the AIA 304
-# color map. ``get_animation`` lets Sphinx Gallery render the sequence as an animation.
+# We will now plot the AIA data in the same manner as the SJI data, which uses the AIA 304
+# color table by default. ``get_animation`` lets Sphinx Gallery render the sequence as an animation.
 
 fig = plt.figure()
-animation = aia_collection["304_THIN"].plot(fig=fig, cmap="sdoaia304").get_animation()
+animation = aia_collection["304_THIN"].plot(fig=fig).get_animation()
 
 plt.show()
