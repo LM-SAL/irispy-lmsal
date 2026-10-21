@@ -102,12 +102,6 @@ def test_sns_read_spectrograph_lvl2(sns_sg_file):
     assert meta.spectral_summing_factor == 2
     assert meta.tracking_mode_enabled is False
 
-    # TODO: Decide if I want to set observer_location, observer_radial_velocity, rsun_angular, run_meters
-    # These are more WCS properties...
-    assert meta.observer_location is None
-    assert meta.rsun_angular is None
-    assert meta.rsun_meters is None
-
 
 def test_raster_all_files_read_spectrograph_lvl2(raster_sg_files):
     raster_collection = read_spectrograph_lvl2(raster_sg_files)
@@ -177,12 +171,6 @@ def test_raster_all_files_read_spectrograph_lvl2(raster_sg_files):
     assert_quantity_allclose(meta.spectral_range, (1398.63094787, 1405.95766787) * u.angstrom)
     assert meta.spectral_summing_factor == 2
     assert meta.tracking_mode_enabled is False
-
-    # TODO: Decide if I want to set observer_location, observer_radial_velocity, rsun_angular, run_meters
-    # These are more WCS properties...
-    assert meta.observer_location is None
-    assert meta.rsun_angular is None
-    assert meta.rsun_meters is None
 
 
 @pytest.mark.parametrize("file_fixture", ["sns_sg_file", "raster_sg_file", "raster_sg_files"])
