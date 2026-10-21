@@ -90,9 +90,6 @@ def get_latest_response(
     >>> response["VERSION"]
     9
     """
-    # Avoid circular imports
-    from irispy.utils import record_to_dict  # NOQA: PLC0415
-
     if observation_time is None:
         observation_time = parse_time("now")
 
@@ -100,7 +97,7 @@ def get_latest_response(
     if observation_time.size == 1:
         observation_time = [observation_time]
     raw_response_data = scipy.io.readsav(ROOTDIR / "iris_sra_c_20231106.geny", python_dict=True)
-    iris_response = record_to_dict(raw_response_data["p0"])
+    iris_response = _record_to_dict(raw_response_data["p0"])
     iris_response = {
         k: val[0] if isinstance(val, np.ndarray) and val.ndim == 1 else val for k, val in iris_response.items()
     }
@@ -421,3 +418,14 @@ def get_interpolated_effective_area(iris_response, detector_type, obs_wavelength
     supported = make_interp_spline(response_wavelength, (eff_area > 0).astype(float), k=1)(obs_wavelength) > 0.999
     eff_area_interp[~supported] = np.nan
     return eff_area_interp * u.cm**2
+
+
+def _record_to_dict(arr: np.ndarray):
+    """
+    Convert a structured numpy array to a regular dictionary.
+    """
+    new_arr = arr.copy()
+    for name in arr.dtype.names:
+        if isinstance(arr[name], np.ndarray) and arr[name].dtype == np.object_:
+            new_arr[name] = arr[name].tolist()
+    return {name: new_arr[name] for name in new_arr.dtype.names}

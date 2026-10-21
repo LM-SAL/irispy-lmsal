@@ -8,10 +8,7 @@ import numpy as np
 
 import astropy.units as u
 
-__all__ = [
-    "calculate_uncertainty",
-    "record_to_dict",
-]
+__all__ = ["calculate_uncertainty"]
 
 
 def _import_optional(module_name: str, *, reason: str, extra: str):
@@ -58,17 +55,6 @@ def _saturated_samples(cube):
     if saturated is None or cube.mask is None or np.shape(saturated) != cube.data.shape:
         return np.zeros(cube.data.shape, dtype=bool)
     return _boolean_mask(cube) & np.asarray(saturated, dtype=bool)
-
-
-def record_to_dict(arr: np.ndarray):
-    """
-    Convert a structured numpy array to a regular dictionary.
-    """
-    new_arr = arr.copy()
-    for name in arr.dtype.names:
-        if isinstance(arr[name], np.ndarray) and arr[name].dtype == np.object_:
-            new_arr[name] = arr[name].tolist()
-    return {name: new_arr[name] for name in new_arr.dtype.names}
 
 
 def calculate_uncertainty(data: np.ndarray, readout_noise: u.Quantity, unit: u.Quantity) -> np.ndarray:
