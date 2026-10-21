@@ -48,11 +48,6 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         The array holding the actual data in this object.
     wcs : `astropy.wcs.WCS`
         The WCS object containing the axes information
-    unit : `astropy.units.Unit` or `str`
-        Unit for the dataset.
-        Strings that can be converted to a Unit are allowed.
-    meta : `dict` object
-        Additional meta information about the dataset.
     uncertainty : any type, optional
         Uncertainty in the dataset. Should have an attribute uncertainty_type
         that defines what kind of uncertainty is stored, for example "std"
@@ -61,6 +56,11 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         uncertainty has no such attribute the uncertainty is stored as
         UnknownUncertainty.
         Defaults to None.
+    unit : `astropy.units.Unit` or `str`
+        Unit for the dataset.
+        Strings that can be converted to a Unit are allowed.
+    meta : `dict` object
+        Additional meta information about the dataset.
     mask : any type, optional
         Mask for the dataset. Masks should follow the numpy convention
         that valid data points are marked by False and invalid ones with True.
@@ -94,6 +94,9 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
     """
 
     plotter = PlotterDescriptor(default_type=SJIPlotter)
+
+    def __init__(self, data, wcs, *, uncertainty=None, unit=None, meta=None, mask=None, copy=False, **kwargs) -> None:
+        super().__init__(data, wcs, uncertainty=uncertainty, unit=unit, meta=meta, mask=mask, copy=copy, **kwargs)
 
     def __repr__(self) -> str:
         return f"{object.__repr__(self)}\n{self!s}"

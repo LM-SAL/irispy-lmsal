@@ -74,6 +74,11 @@ def cube_2d():
     return _fake_sji_cube(data, uncertainty=np.sqrt(data), mask=data >= 0)
 
 
+def test_sjicube_takes_only_data_and_wcs_positionally(cube):
+    with pytest.raises(TypeError, match="positional"):
+        SJICube(cube.data, cube.wcs, cube.unit)
+
+
 @pytest.mark.parametrize(
     ("item", "expected_len"),
     [
