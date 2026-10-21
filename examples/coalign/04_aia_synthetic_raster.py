@@ -129,8 +129,8 @@ for step, (sji_index, aia_index) in enumerate(zip(sji_indices, aia_indices, stri
 
     _, slit = raster.wcs.pixel_to_world(0, slit_pixels, step)
     slit = SkyCoord(slit.Tx + shift[0], slit.Ty + shift[1], frame=sji_frame)
-    aia_x, aia_y = aia_map.world_to_pixel(slit)
-    aia_image[:, step] = map_coordinates(aia_map.data, [aia_y.value, aia_x.value], order=1, cval=np.nan)
+    aia_x, aia_y = aia_map.wcs.world_to_pixel(slit)
+    aia_image[:, step] = map_coordinates(aia_map.data, [aia_y, aia_x], order=1, cval=np.nan)
 
 print(f"Aligned {len(alignments)} exposure pairs for {raster.shape[0]} raster steps.")
 
