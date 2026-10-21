@@ -115,6 +115,8 @@ def calculate_rgb(
     -------
     rgb : `numpy.ndarray`
         Shape ``(*spatial_shape, 3)``, values in [0, 1], spatial axes in cube order.
+        NaN for a spectrum with no unmasked, finite sample within ``velocity_range``,
+        which `plot_rgb` leaves blank.
     colorbar : `tuple`
         ``(intensity, wavelength, rgb)`` for the two dimensional colorbar, ready for
         `matplotlib.pyplot.pcolormesh`. Each entry represents a spectrum with signal
@@ -136,6 +138,10 @@ def calculate_rgb(
     if rest_wavelength is None:
         rest_wavelength = default_rest_wavelength(cube)
     wavelength_min, wavelength_max = _wavelength_limits(wavelength, rest_wavelength, velocity_range)
+    mapped = _wavelength_indices(wavelength, (wavelength_min, wavelength_max))
+    mapped_slice = [slice(None)] * data.ndim
+    mapped_slice[axis_wavelength] = slice(mapped[0], mapped[-1] + 1)
+    no_data = ~np.isfinite(data[tuple(mapped_slice)]).any(axis=axis_wavelength)
     doppler = u.doppler_optical(rest_wavelength)
 
     def wavelength_norm(w):
@@ -165,7 +171,9 @@ def calculate_rgb(
         wavelength_max=wavelength_max,
         wavelength_norm=None if velocity_norm is None else wavelength_norm,
     )
-    return np.moveaxis(rgb, axis_wavelength, -1), colorbar
+    rgb = np.moveaxis(rgb, axis_wavelength, -1)
+    rgb[no_data] = np.nan
+    return rgb, colorbar
 
 
 def plot_rgb(

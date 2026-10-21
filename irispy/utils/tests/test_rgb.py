@@ -37,11 +37,29 @@ def shifted_line_cube():
 def test_calculate_rgb_shape_and_range(si_iv_cube):
     rgb, (intensity, wavelength, rgb_colorbar) = calculate_rgb(si_iv_cube)
     assert rgb.shape == (*si_iv_cube.shape[:-1], 3)
-    assert np.all(rgb >= 0)
-    assert np.all(np.isfinite(rgb))
+    assert np.nanmin(rgb) >= 0
+    assert np.nanmax(rgb) <= 1
     assert rgb_colorbar.shape == (intensity.shape[0], si_iv_cube.shape[-1], 3)
     assert wavelength.shape == intensity.shape
     assert wavelength.unit.is_equivalent(u.AA)
+
+
+def test_calculate_rgb_leaves_spectra_without_data_blank(si_iv_cube):
+    """
+    A spectrum with no unmasked, finite sample within ``velocity_range`` is NaN, not black
+    like a spectrum without signal: the 748 spectra of this sit-and-stare without data, and
+    one whose samples within the range are masked.
+    """
+    no_data = np.all(si_iv_cube.mask | ~np.isfinite(si_iv_cube.data), axis=-1)
+    assert no_data.sum() == 748
+    lower, upper = ([-100, 100] * u.km / u.s).to(u.AA, equivalencies=u.doppler_optical(si_iv_cube.meta.rest_wavelength))
+    wavelength = si_iv_cube.spectral_axis.to(u.AA)
+    si_iv_cube.mask[100, 20, (wavelength >= lower) & (wavelength <= upper)] = True
+    assert not no_data[100, 20]
+    no_data[100, 20] = True
+    rgb, _ = calculate_rgb(si_iv_cube)
+    np.testing.assert_array_equal(np.isnan(rgb), np.repeat(no_data[..., np.newaxis], 3, axis=-1))
+    assert np.all(np.isfinite(calculate_rgb(si_iv_cube, velocity_range=None)[0][100, 20]))
 
 
 def test_calculate_rgb_metadata_defaults(si_iv_cube):
@@ -127,7 +145,7 @@ def test_calculate_rgb_stretch_survives_data_below_vmin(si_iv_cube):
     `numpy.sqrt` would return NaN for the samples that ``vmin`` maps below zero.
     """
     rgb, _ = calculate_rgb(si_iv_cube, vmin=np.nanmedian(si_iv_cube.data) * si_iv_cube.unit, stretch=np.sqrt)
-    assert np.all(np.isfinite(rgb))
+    np.testing.assert_array_equal(np.isnan(rgb), np.isnan(calculate_rgb(si_iv_cube)[0]))
 
 
 def test_calculate_rgb_colors_the_short_wavelength_line_blue(shifted_line_cube):
@@ -157,7 +175,7 @@ def test_calculate_rgb_entirely_masked_cube():
     with pytest.raises(ValueError, match="no intensity range to map"):
         calculate_rgb(cube)
     rgb, _ = calculate_rgb(cube, vmax=1 * u.DN)
-    assert np.all(rgb == 0)
+    assert np.all(np.isnan(rgb))
 
 
 @pytest.mark.parametrize("shape", [(1, 5), (5, 1)])
@@ -187,7 +205,7 @@ def test_plot_rgb_options_update_image_and_colorbar(si_iv_cube, overrides):
     kwargs = {"vmax": 100 * u.DN, **overrides(si_iv_cube)}
     rgb, (_, _, colorbar) = calculate_rgb(si_iv_cube, **kwargs)
     default_rgb, (_, _, default_colorbar) = calculate_rgb(si_iv_cube, vmax=100 * u.DN)
-    assert not np.allclose(rgb, default_rgb)
+    assert not np.allclose(rgb, default_rgb, equal_nan=True)
     assert not np.allclose(colorbar, default_colorbar)
 
     fig, (ax, cax) = plt.subplots(ncols=2)
