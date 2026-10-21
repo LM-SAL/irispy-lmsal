@@ -64,6 +64,14 @@ def test_to_maps_are_sji_maps_with_the_frame_metadata(sns_sjicube_1330):
     assert sliced_map.wcs.pixel_to_world(0, 0).separation(sji_map.wcs.pixel_to_world(20, 10)) < 1e-6 * u.arcsec
 
 
+def test_aia_cube_and_maps_plot_with_the_sdoaia_color_table(aia_1700_file):
+    # The maps asked matplotlib for the unknown aia1700, so plotting them raised, and the cube plotted in viridis
+    aia = read_files(aia_1700_file)
+    assert aia[0].plot().images[0].get_cmap().name == "sdoaia1700"
+    plt.close("all")
+    assert aia.to_maps(0).plot().get_cmap().name == "sdoaia1700"
+
+
 def test_to_map(sns_sjicube_1330):
     # Basic smoke tests
     output = sns_sjicube_1330.to_maps(0)

@@ -2,8 +2,6 @@ import textwrap
 from numbers import Integral
 from functools import cached_property
 
-import matplotlib as mpl
-
 import gwcs
 from astropy.wcs import WCS
 from astropy.wcs.wcsapi import SlicedLowLevelWCS
@@ -14,7 +12,7 @@ from sunraster import SpectrogramCube
 
 from irispy._wcs import _celestial_frame_from_cube, _ResolveNegativeIndicesMixin
 from irispy.utils._spectral import check_scaled
-from irispy.visualization import SJIPlotter
+from irispy.visualization import SJIPlotter, _sji_cmap_name
 
 __all__ = ["AIACube", "SJICube", "SOTCube"]
 
@@ -209,7 +207,8 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
             A single Map if index is an int, otherwise a MapSequence.
             Each map is built from its frame's FITS header, so sunpy picks the map class
             from the instrument (`~sunpy.map.sources.SJIMap` for slit-jaw images) and the
-            map has the data unit and the frame's own exposure time.
+            map has the data unit and the frame's own exposure time. Slit-jaw and AIA maps
+            plot with the color table of their passband, such as ``irissji1330`` or ``sdoaia304``.
 
         Examples
         --------
@@ -252,9 +251,9 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
             frames = [(self.data[i], self._frame_headers[i]) for i in idx_list]
         # Keep the requested order; a MapSequence sorts by date by default
         maps = Map(frames, sequence=True, sortby=None)
-        # Hinode/SOT cubes and most AIA channels have no IRIS colormap
-        cmap = f"irissji{int(self.meta['TWAVE1'])}"
-        if cmap in mpl.colormaps:
+        # Hinode/SOT cubes have no passband and keep the color table sunpy gives their maps
+        if self.meta["TWAVE1"]:
+            cmap = _sji_cmap_name(self.meta)
             for m in maps:
                 m.plot_settings["cmap"] = cmap
         return maps[0] if is_2d or isinstance(index, Integral) else maps

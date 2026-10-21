@@ -104,6 +104,20 @@ def _registered_colormap(name):
     return name if name in mpl.colormaps else "viridis"
 
 
+def _sji_cmap_name(meta):
+    """
+    The sunpy color table of a slit-jaw or AIA cube's passband, viridis without one.
+    """
+    # Hinode/SOT cubes have TWAVE1 = 0, and a cube built by hand may have none
+    twave = meta.get("TWAVE1")
+    if not twave:
+        return "viridis"
+    # sunpy registers the AIA tables as sdoaia<channel>. Its AIA maps build that name from TELESCOP,
+    # which is blank in the AIA files supplied with IRIS, and ask for the unregistered aia<channel>.
+    prefix = "sdoaia" if meta.get("INSTRUME", "").startswith("AIA") else "irissji"
+    return _registered_colormap(f"{prefix}{int(twave)}")
+
+
 class _IRISPlotMixin:
     """
     Shared IRIS plot behavior for cube and sequence plotters.
@@ -117,12 +131,12 @@ class _IRISPlotMixin:
         """
         Plot the cube with IRIS defaults.
 
-        If ``cmap`` is falsey, the IRIS color table of the data is used: the passband
-        table for slit-jaw images and the FUV or NUV table for spectrograms, with
-        viridis for data without one (AIA and Hinode/SOT cubes). For one-dimensional
-        cubes ``cmap`` is dropped entirely, even when given. IRIS axis styling is
-        applied to the result; all other arguments are passed to the parent plotter's
-        ``plot``.
+        If ``cmap`` is falsey, the color table of the data is used: the IRIS passband
+        table for slit-jaw images, the sunpy ``sdoaia`` table of the channel for AIA
+        cubes and the IRIS FUV or NUV table for spectrograms, with viridis for
+        Hinode/SOT cubes. For one-dimensional cubes ``cmap`` is dropped entirely, even
+        when given. IRIS axis styling is applied to the result; all other arguments are
+        passed to the parent plotter's ``plot``.
 
         The colors run linearly from the minimum to the maximum of the data by default,
         which a few hot pixels turn into a nearly black image. For a cube with more than
@@ -164,9 +178,7 @@ class IRISPlotter(_IRISPlotMixin, MatplotlibPlotter):
 
 class SJIPlotter(IRISPlotter):
     def _default_cmap_name(self):
-        # Hinode/SOT cubes have TWAVE1 = 0, and a cube built by hand may have none
-        twave = self._ndcube.meta.get("TWAVE1")
-        return _registered_colormap(f"irissji{int(twave)}") if twave else "viridis"
+        return _sji_cmap_name(self._ndcube.meta)
 
 
 class IRISSequencePlotter(_IRISPlotMixin, MatplotlibSequencePlotter):
