@@ -1,0 +1,1 @@
+Removed ``exposure_normalize`` from ``irispy.utils.dust.remove_dust``; drop the argument. A cube of counts is scaled to the exposure time of the frame being repaired, as the default was, and a cube divided by its exposure times or calibrated is not, where the default put the fills off by the ratio of the exposure times.

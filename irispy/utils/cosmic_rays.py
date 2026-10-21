@@ -17,18 +17,12 @@ def _remove_cosmic_rays_rsliding(
     data,
     mask,
     *,
-    sigma: float | None,
-    max_iters: int | None,
     method_kwargs: dict[str, Any],
 ) -> np.ndarray:
     slidingsigmaclipping = _import_optional(
         "rsliding", reason="method='rsliding'", extra="cosmic-rays"
     ).SlidingSigmaClipping
     method_kwargs = dict(method_kwargs)
-    if sigma is not None:
-        method_kwargs["sigma"] = sigma
-    if max_iters is not None:
-        method_kwargs["max_iters"] = max_iters
     method_kwargs["masked_array"] = True
     working_data = data.astype(np.float64, copy=True)
     working_data[mask] = np.nan
@@ -53,17 +47,11 @@ def _remove_cosmic_rays_astroscrappy(
     data: np.ndarray,
     mask: np.ndarray,
     *,
-    sigma: float | None,
-    max_iters: int | None,
     method_kwargs: dict[str, Any],
 ) -> np.ndarray:
     astroscrappy = _import_optional("astroscrappy", reason="method='astroscrappy'", extra="cosmic-rays")
     method_kwargs = dict(method_kwargs)
     method_kwargs.setdefault("verbose", False)
-    if sigma is not None:
-        method_kwargs["sigclip"] = sigma
-    if max_iters is not None:
-        method_kwargs["niter"] = max_iters
     inmask = method_kwargs.pop("inmask", None)
     data_shape = data.shape
     cleaned_data = np.empty(data_shape, dtype=data.dtype)
@@ -86,8 +74,6 @@ def remove_cosmic_rays(
     cube,
     *,
     method: str = "rsliding",
-    sigma: float | None = None,
-    max_iters: int | None = None,
     method_kwargs: Mapping[str, Any] | None = None,
 ):
     """
@@ -99,14 +85,10 @@ def remove_cosmic_rays(
         Cube object to clean.
     method : ``{"rsliding", "astroscrappy"}``, optional
         Cosmic ray removal backend.
-    sigma : `float`, optional
-        Shared clipping threshold override. This maps to ``sigma`` for
-        ``rsliding`` and ``sigclip`` for ``astroscrappy``.
-    max_iters : `int`, optional
-        Shared iteration-count override. This maps to ``max_iters`` for
-        ``rsliding`` and ``niter`` for ``astroscrappy``.
     method_kwargs : `dict`, optional
-        Additional keyword arguments passed to the selected backend.
+        Keyword arguments passed to the selected backend, under its own names: for
+        example ``sigma`` and ``max_iters`` for ``rsliding``, ``sigclip`` and ``niter``
+        for ``astroscrappy``.
         For dask-backed inputs, ``method="astroscrappy"`` processes one frame
         at a time but returns an in-memory NumPy array.
 
@@ -141,7 +123,7 @@ def remove_cosmic_rays(
     if method not in backends:
         msg = f"Unsupported method {method!r}. Supported methods are: {sorted(backends)}."
         raise ValueError(msg)
-    cleaned_data = backends[method](cube.data, working_mask, sigma=sigma, max_iters=max_iters, method_kwargs=kwargs)
+    cleaned_data = backends[method](cube.data, working_mask, method_kwargs=kwargs)
     # Saturated samples keep their value; they were masked, not cleaned
     saturated = _saturated_samples(cube)
     if saturated.any():

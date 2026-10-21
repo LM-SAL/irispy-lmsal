@@ -130,44 +130,11 @@ def _local_median_fill(frame, invalid_mask, spatial_box, target_mask):
     return spatial_fill
 
 
-def _resolve_exposure_times(cube, frame_count, *, exposure_normalize):
-    """
-    Resolve per-frame exposure times for temporal normalization.
-
-    Returns
-    -------
-    `numpy.ndarray` or None
-        Per-frame exposure times in seconds when available and valid.
-        Returns None when normalization is disabled or metadata are unusable.
-    """
-    if not exposure_normalize:
-        return None
-    try:
-        exposure_times = u.Quantity(cube.exposure_time, copy=False).to_value(u.s)
-    except (AttributeError, TypeError, ValueError):
-        return None
-    exposure_times = np.atleast_1d(np.asarray(exposure_times, dtype=float))
-    if exposure_times.size == 1:
-        return np.repeat(exposure_times, frame_count)
-    if exposure_times.size != frame_count:
-        warnings.warn(
-            "exposure_normalize=True but the number of exposure_time values "
-            f"({exposure_times.size}) does not match the number of frames "
-            f"in the cube ({frame_count}). Temporal exposure "
-            "normalization has been skipped.",
-            UserWarning,
-            stacklevel=3,
-        )
-        return None
-    return exposure_times
-
-
 def remove_dust(
     cube,
     *,
     dust_mask=None,
     temporal_window=2,
-    exposure_normalize=True,
     fallback="spatial",
     spatial_box=5,
 ):
@@ -189,11 +156,9 @@ def remove_dust(
     temporal_window : `int`, optional
         Number of neighboring frames on either side to consider when computing the
         replacement value. Defaults to 2, which mirrors the neighboring frames used
-        in the IDL implementation.
-    exposure_normalize : `bool`, optional
-        If `True`, normalize candidate replacement pixels by the frame exposure time
-        before taking the median and scale the result back to the target frame.
-        If no usable exposure time metadata are available this step is skipped.
+        in the IDL implementation. In a cube of counts, which must carry its exposure
+        times, the neighboring frames are scaled to the exposure time of the frame they
+        repair; an exposure-corrected or calibrated cube is not scaled.
     fallback : {``"spatial"``, None}, optional
         Fallback to use when temporal replacement is unavailable.
         ``"spatial"`` applies a local median filter to the frame.
@@ -222,11 +187,11 @@ def remove_dust(
     filled_mask = np.zeros_like(dust_mask, dtype=bool)
 
     if clean_data.ndim == 3 and temporal_window > 0 and np.any(dust_mask):
-        exposure_times = _resolve_exposure_times(
-            cube,
-            clean_data.shape[0],
-            exposure_normalize=exposure_normalize,
-        )
+        # Counts scale with the exposure time and a rate does not, the test sunraster's
+        # exposure time correction makes
+        exposure_times = None
+        if u.s not in cube.unit.decompose().bases:
+            exposure_times = np.broadcast_to(cube.exposure_time.to_value(u.s), clean_data.shape[:1])
         for frame_index in range(clean_data.shape[0]):
             target_mask = dust_mask[frame_index]
             if not np.any(target_mask):

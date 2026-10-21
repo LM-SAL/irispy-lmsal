@@ -59,7 +59,7 @@ raster = raster["Si IV 1403"][0][4]
 
 # These settings smooth more around each spike (thanks to Juraj).
 method_kwargs = {"kernel": 5, "center_choice": "median", "borders": "reflect"}
-raster_rsliding = remove_cosmic_rays(raster, method="rsliding", sigma=3, method_kwargs=method_kwargs)
+raster_rsliding = remove_cosmic_rays(raster, method="rsliding", method_kwargs=method_kwargs)
 
 ###############################################################################
 # One reason to always be cautious when removing cosmic rays is that you can
