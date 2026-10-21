@@ -509,7 +509,9 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None, resi
     return RasterCollection(cubes, aligned_axes=(map_axes,) * (len(cubes) - 1) + (residual_axes,))
 
 
-def non_thermal_velocity(fwhm, wavelength, *, instrumental_fwhm=None, thermal_fwhm=None, temperature=None, ion=None):
+def non_thermal_velocity(
+    fwhm, rest_wavelength, *, instrumental_fwhm=None, thermal_fwhm=None, temperature=None, ion=None
+):
     r"""
     The non-thermal velocity of a line from a map of its full width at half maximum.
 
@@ -529,10 +531,10 @@ def non_thermal_velocity(fwhm, wavelength, *, instrumental_fwhm=None, thermal_fw
     fwhm : `~irispy.spectrograph.SpectrogramCube`
         A map of the Gaussian full width at half maximum, such as ``"fwhm_1"`` from a Gaussian
         fit processed by `maps_from_fit`.
-    wavelength : `~astropy.units.Quantity`
+    rest_wavelength : `~astropy.units.Quantity`
         The rest wavelength :math:`\lambda` of the line.
     instrumental_fwhm : `~astropy.units.Quantity`, optional
-        The instrumental width. Defaults to the spectral resolution of the passband of ``wavelength``
+        The instrumental width. Defaults to the spectral resolution of the passband of ``rest_wavelength``
         in ``irispy.utils.constants.INSTRUMENTAL_FWHM``, 26 mÅ in the FUV and 53 mÅ in the NUV
         :cite:p:`depontieu2014`.
     thermal_fwhm : `~astropy.units.Quantity`, optional
@@ -562,11 +564,11 @@ def non_thermal_velocity(fwhm, wavelength, *, instrumental_fwhm=None, thermal_fw
     :cite:p:`dere2023`, assumes optically thin lines and does not suit chromospheric lines such as
     Mg II.
     """
-    wavelength = u.Quantity(wavelength, u.AA)
+    rest_wavelength = u.Quantity(rest_wavelength, u.AA)
     if instrumental_fwhm is None:
-        band = next((band for band, (low, high) in PASSBAND_LIMITS.items() if low <= wavelength <= high), None)
+        band = next((band for band, (low, high) in PASSBAND_LIMITS.items() if low <= rest_wavelength <= high), None)
         if band is None:
-            msg = f"{wavelength} is outside the IRIS passbands; pass instrumental_fwhm."
+            msg = f"{rest_wavelength} is outside the IRIS passbands; pass instrumental_fwhm."
             raise ValueError(msg)
         instrumental_fwhm = INSTRUMENTAL_FWHM[band]
     if thermal_fwhm is None:
@@ -586,12 +588,12 @@ def non_thermal_velocity(fwhm, wavelength, *, instrumental_fwhm=None, thermal_fw
                 raise ValueError(msg)
             temperature = 10 ** lines["log_t_max"][0] * u.K
         speed = np.sqrt(2 * constants.k_B * u.Quantity(temperature, u.K) / ATOMIC_MASS[element])
-        thermal_fwhm = np.sqrt(4 * np.log(2)) * wavelength * speed / constants.c
+        thermal_fwhm = np.sqrt(4 * np.log(2)) * rest_wavelength * speed / constants.c
     width = u.Quantity(fwhm.data, fwhm.unit).to_value(u.AA)
     radicand = (
         width**2 - u.Quantity(instrumental_fwhm).to_value(u.AA) ** 2 - u.Quantity(thermal_fwhm).to_value(u.AA) ** 2
     )
-    scale = (constants.c / (wavelength * np.sqrt(4 * np.log(2)))).to_value(u.km / u.s / u.AA)
+    scale = (constants.c / (rest_wavelength * np.sqrt(4 * np.log(2)))).to_value(u.km / u.s / u.AA)
     with np.errstate(invalid="ignore"):
         velocity = np.where((width > 0) & (radicand > 0), scale * np.sqrt(radicand), np.nan)
     uncertainty = None
