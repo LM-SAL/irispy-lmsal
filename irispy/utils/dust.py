@@ -4,6 +4,7 @@ Utilities for repairing dust-darkened pixels in IRIS image cubes.
 
 import warnings
 import functools
+from copy import deepcopy
 
 import numpy as np
 from scipy import ndimage
@@ -239,6 +240,13 @@ def remove_dust(
     output_mask = original_mask.copy()
     output_mask[dust_mask] = True
     output_mask[filled_mask] = False
+    # Coordinates point back to their cube; copy them without copying its data.
+    memo = {id(cube): None}
     return cube.to_nddata(
-        data=clean_data, mask=output_mask, nddata_type=type(cube), extra_coords="copy", global_coords="copy"
+        data=clean_data,
+        mask=output_mask,
+        meta=deepcopy(cube.meta),
+        nddata_type=type(cube),
+        extra_coords=deepcopy(cube.extra_coords, memo),
+        global_coords=deepcopy(cube.global_coords, memo),
     )

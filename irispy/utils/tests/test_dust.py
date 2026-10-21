@@ -69,6 +69,21 @@ def test_remove_dust_preserves_sjicube_state(sns_sjicube_1330):
     assert cleaned.to_maps(0).wcs is not None
 
 
+def test_remove_dust_does_not_share_meta_or_coordinates(sns_sjicube_1330):
+    cube = sns_sjicube_1330
+    image = cube[0]
+    cleaned, cleaned_image = remove_dust(cube), remove_dust(image)
+    # The copied coordinates still place the dust in each frame
+    np.testing.assert_array_equal(calculate_dust_mask(cleaned), calculate_dust_mask(cube))
+    np.testing.assert_array_equal(calculate_dust_mask(cleaned_image), calculate_dust_mask(image))
+    cleaned.meta["note"] = "changed"
+    cleaned.extra_coords.add("sequence", 0, np.arange(len(cleaned.data)) * u.one)
+    cleaned_image.global_coords.add("note", "time", image.global_coords["Time (UTC)"])
+    assert "note" not in cube.meta
+    assert "sequence" not in tuple(cube.extra_coords.keys())
+    assert "note" not in image.global_coords
+
+
 @pytest.mark.parametrize(
     ("unit", "values", "expected"),
     [(u.DN, [10, 20, 40, 80], 20), (u.DN / u.s, [10, 10, 10, 10], 10)],

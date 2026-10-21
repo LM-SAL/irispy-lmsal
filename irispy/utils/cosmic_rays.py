@@ -83,7 +83,7 @@ def remove_cosmic_rays(
         value. The cleaned data are in memory.
     """
     # Avoid circular imports
-    from irispy.utils._spectral import check_scaled  # NOQA: PLC0415
+    from irispy.utils._spectral import check_scaled, make_map_cube  # NOQA: PLC0415
 
     check_scaled(cube)
     method = method.lower()
@@ -96,6 +96,4 @@ def remove_cosmic_rays(
         msg = f"Unsupported method {method!r}. Supported methods are: {sorted(backends)}."
         raise ValueError(msg)
     cleaned_data = backends[method](cube.data, _boolean_mask(cube), method_kwargs=kwargs)
-    return cube.to_nddata(
-        data=cleaned_data, mask="copy", nddata_type=type(cube), extra_coords="copy", global_coords="copy"
-    )
+    return make_map_cube(cube, cleaned_data, cube.unit, uncertainty=cube.uncertainty)

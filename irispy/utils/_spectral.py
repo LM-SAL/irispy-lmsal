@@ -187,7 +187,7 @@ def make_map_cube(template, values, unit, *, mask=None, mask_invalid=False, unce
         wcs=template.wcs,
         uncertainty=uncertainty,
         unit=unit,
-        meta=template.meta,
+        meta=deepcopy(template.meta),
         mask=combined_mask,
         extra_coords=deepcopy(template.extra_coords, coordinate_memo),
         global_coords=deepcopy(template.global_coords, coordinate_memo),

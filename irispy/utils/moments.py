@@ -187,7 +187,7 @@ def calculate_moments(
 
     template = make_spatial_template(cube, wavelength_axis)
     if rest_wavelength is not None:
-        # The maps share the template's meta
+        # Each map copies the template's meta
         template.meta["moments_rest_wavelength"] = rest_wavelength.to(u.nm)
 
     def _make_cube(name, values, unit):
