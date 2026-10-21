@@ -48,12 +48,9 @@ def test_main_only():
     assert np.all(documented["reference"] != "")
 
 
-def test_categories():
-    assert set(get_lines(categories="cool_metal")["category"]) == {"cool_metal"}
-    assert set(get_lines(categories=["flare", "transition_region"])["category"]) == {"flare", "transition_region"}
-    assert len(get_lines(categories=[])) == 0
+def test_uncategorized_lines():
     # Uncategorized lines hold empty strings, not masked values.
-    assert (get_lines()["category"] == "").any()
+    assert set(get_lines()["category"]) == {"", "flare", "coronal", "transition_region", "chromospheric", "cool_metal"}
 
 
 def test_results_are_independent():
@@ -73,7 +70,6 @@ def test_results_are_independent():
         {"abundance": "coronal"},
         {"abundance": "feldman"},
         {"minimum_strength": 0.1},
-        {"categories": "unknown"},
         {"wavelength_range": [1, 2, 3] * u.angstrom},
         {"wavelength_range": [0, 1] * u.angstrom},
         {"wavelength_range": [np.nan, 1] * u.angstrom},
@@ -82,7 +78,7 @@ def test_results_are_independent():
     ],
 )
 def test_invalid_arguments(kwargs):
-    with pytest.raises(ValueError, match=r"region|abundance|minimum_strength|categories|wavelength_range"):
+    with pytest.raises(ValueError, match=r"region|abundance|minimum_strength|wavelength_range"):
         get_lines(**kwargs)
 
 

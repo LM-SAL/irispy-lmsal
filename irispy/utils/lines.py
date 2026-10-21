@@ -15,7 +15,6 @@ __all__ = ["get_lines"]
 
 _REGIONS = ("quiet_sun", "active_region", "flare", "flare_1e16")
 _ABUNDANCES = ("coronal", "photospheric")
-_CATEGORIES = ("flare", "coronal", "transition_region", "chromospheric", "cool_metal")
 _PASSBANDS = ("FUV1", "FUV2", "NUV")
 # The share of a passband's strongest predicted line below which a ranked query leaves a line out
 _MINIMUM_STRENGTH = 0.02
@@ -34,7 +33,6 @@ def get_lines(
     abundance=None,
     minimum_strength=None,
     main_only=False,
-    categories=None,
 ):
     """
     Query the packaged IRIS spectral line catalog.
@@ -58,15 +56,15 @@ def get_lines(
         Pass 0 for every line, with unpredicted lines last.
     main_only : `bool`, optional
         Only the documented IRIS lines; ``reference`` holds their citation keys.
-    categories : `str` or iterable of `str`, optional
-        Only ions in these categories: ``'flare'``, ``'coronal'``,
-        ``'transition_region'``, ``'chromospheric'`` or ``'cool_metal'``.
 
     Returns
     -------
     `~astropy.table.QTable`
         A copy of the selected lines. Strengths (``intensity_<region>_<abundance>``)
         are relative to the strongest stage III or higher line in each passband.
+        ``category`` is ``'flare'``, ``'coronal'``, ``'transition_region'``,
+        ``'chromospheric'``, ``'cool_metal'`` or ``''``; filter on it to keep a
+        category, as in ``lines[lines["category"] == "cool_metal"]``.
 
     Notes
     -----
@@ -102,12 +100,6 @@ def get_lines(
         selected &= (wavelength >= low) & (wavelength <= high)
     if main_only:
         selected &= table["main"]
-    if categories is not None:
-        categories = [categories] if isinstance(categories, str) else list(categories)
-        if any(category not in _CATEGORIES for category in categories):
-            msg = f"categories must be drawn from {_CATEGORIES}."
-            raise ValueError(msg)
-        selected &= np.isin(table["category"], categories)
 
     intensity_column = f"intensity_{region}_{abundance}" if region is not None else None
     if intensity_column and minimum_strength > 0:

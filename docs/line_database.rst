@@ -30,7 +30,8 @@ A wavelength range can be given in any spectral unit, and both ends are included
 Without ``region`` and ``abundance``, lines come in wavelength order.
 With them, lines are ranked strongest first within each passband (FUV1, FUV2, then NUV), and only the documented lines and the stage III and higher lines at least 2% of the passband's strongest are kept.
 Pass ``minimum_strength=0`` to rank every line; lines without a prediction come last.
-``main_only=True`` returns only the :ref:`documented IRIS lines <documented-lines>`, and ``categories`` filters by :ref:`category <line-categories>`.
+``main_only=True`` returns only the :ref:`documented IRIS lines <documented-lines>`.
+To keep one :ref:`category <line-categories>`, filter on the ``category`` column, as in ``lines[lines["category"] == "cool_metal"]``; for several, use `numpy.isin`, as in ``lines[np.isin(lines["category"], ["flare", "coronal"])]``.
 
 The :ref:`gallery example <sphx_glr_generated_gallery_how_to_06_identify_lines.py>` marks candidate lines on an observation.
 
