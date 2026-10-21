@@ -1,0 +1,2 @@
+Removed ``observer_location``, ``rsun_angular``, ``rsun_meters`` and ``version`` from ``irispy.meta.SJIMeta`` and ``irispy.meta.SGMeta``, which were always ``None``; ``SJIMeta`` is no longer a subclass of ``sunraster.meta.RemoteSensorMetaABC``, nor ``SGMeta`` of ``sunraster.meta.SlitSpectrographMetaABC``.
+Use ``sun_angular_radius`` for the apparent radius of the Sun, ``astropy.constants.R_sun`` for its radius, ``SGMeta.observer`` for the observer of a raster, and ``reformat_version`` or ``build_version`` for the data version.

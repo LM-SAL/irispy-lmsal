@@ -13,7 +13,6 @@ from sunpy.coordinates import Helioprojective, get_earth
 from sunpy.coordinates.utils import get_heliocentric_angle
 from sunpy.time import parse_time
 from sunpy.util.exceptions import SunpyUserWarning
-from sunraster.meta import RemoteSensorMetaABC, SlitSpectrographMetaABC
 
 from irispy.utils.constants import SPECTRAL_BAND
 from irispy.utils.lines import get_lines
@@ -535,7 +534,7 @@ class BaseMeta(NDMeta):
         return self.get("DATAMAX")
 
 
-class SJIMeta(BaseMeta, RemoteSensorMetaABC):
+class SJIMeta(BaseMeta):
     """
     Metadata of an IRIS slit-jaw image file (also AIA and Hinode/SOT files).
 
@@ -573,7 +572,7 @@ class SJIMeta(BaseMeta, RemoteSensorMetaABC):
         return super().spectral_window.replace("SJI_", "")
 
 
-class SGMeta(BaseMeta, SlitSpectrographMetaABC):
+class SGMeta(BaseMeta):
     """
     Metadata of one spectral window of an IRIS raster file.
 
@@ -824,7 +823,7 @@ class SGMeta(BaseMeta, SlitSpectrographMetaABC):
         )
 
 
-class MosaicMeta(BaseMeta, SlitSpectrographMetaABC):
+class MosaicMeta(BaseMeta):
     """
     Metadata of an IRIS full-disk mosaic.
 
