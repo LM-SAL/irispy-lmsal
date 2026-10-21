@@ -154,7 +154,7 @@ def test_mosaic_to_map(mosaic_file):
     assert core.exposure_time == 1.99956 * u.s
     assert core.date == Time("2015-02-22T20:47:42.140")
     assert_quantity_allclose(core.observer_coordinate.radius, get_earth("2015-02-22T20:47:42.140").radius)
-    map_coord, cube_coord = core.pixel_to_world(1 * u.pix, 2 * u.pix), cube.wcs.pixel_to_world(0, 2, 1)[1]
+    map_coord, cube_coord = core.wcs.pixel_to_world(1, 2), cube.wcs.pixel_to_world(0, 2, 1)[1]
     assert_quantity_allclose([map_coord.Tx, map_coord.Ty], [cube_coord.Tx, cube_coord.Ty])
     with pytest.raises(ValueError, match="outside the mosaic wavelengths"):
         cube.to_map(3000 * u.AA)
@@ -175,7 +175,7 @@ def test_mosaic_to_map(mosaic_file):
     assert isinstance(sub, MosaicCube)
     assert sub.meta["time"].shape == (2, 3)
     sub_map = sub.to_map(2796.36 * u.AA)
-    sub_coord, core_coord = sub_map.pixel_to_world(0 * u.pix, 0 * u.pix), core.pixel_to_world(1 * u.pix, 1 * u.pix)
+    sub_coord, core_coord = sub_map.wcs.pixel_to_world(0, 0), core.wcs.pixel_to_world(1, 1)
     assert_quantity_allclose([sub_coord.Tx, sub_coord.Ty], [core_coord.Tx, core_coord.Ty])
 
 
