@@ -15,7 +15,8 @@ from irispy.utils.constants import BAD_PIXEL_VALUES_SCALED, DN_UNIT, SATURATION_
 __all__ = ["read_mosaic"]
 
 
-def read_mosaic(filename, *, wavelength_range=None):
+@u.quantity_input
+def read_mosaic(filename, *, wavelength_range: u.AA = None):
     """
     Reads an IRIS full-disk mosaic of one spectral window.
 
@@ -27,7 +28,7 @@ def read_mosaic(filename, *, wavelength_range=None):
     filename : `str` or `pathlib.Path`
         The mosaic file, gzipped or not.
     wavelength_range : `astropy.units.Quantity`, optional
-        Two wavelengths: only the mosaic wavelengths between them (inclusive) are read.
+        Two wavelengths, in either order: only the mosaic wavelengths between them (inclusive) are read.
         Defaults to `None`, which reads every wavelength.
 
     Returns

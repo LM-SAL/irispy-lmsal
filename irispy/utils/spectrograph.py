@@ -23,10 +23,11 @@ __all__ = [
 ]
 
 
+@u.quantity_input
 def radiometric_calibration(
     cube: SpectrogramCube | SpectrogramCubeSequence | SJICube,
     *,
-    line=None,
+    line: u.AA = None,
 ) -> SpectrogramCube | SpectrogramCubeSequence | SJICube:
     """
     Performs radiometric calibration on the input cube or cube sequence.
@@ -43,7 +44,7 @@ def radiometric_calibration(
     Parameters
     ----------
     cube : `irispy.spectrograph.SpectrogramCube` | `irispy.spectrograph.SpectrogramCubeSequence` | `irispy.sji.SJICube`
-        The input cube to be calibrated.
+        The input cube to be calibrated, in DN.
     line : `astropy.units.Quantity`, optional
         Slit-jaw cubes only: the wavelength of the one line all the counts come from, which gives the
         line intensity in :math:`erg s^{-1} sr^{-1} cm^{-2}`. Defaults to `None`, a continuum flat across
@@ -58,8 +59,9 @@ def radiometric_calibration(
     Raises
     ------
     ValueError
-        If ``line`` is given for a spectrograph cube or lies where the slit-jaw passband has no
-        effective area, or if the cube is not from an IRIS slit-jaw passband, such as an AIA cube.
+        If ``line`` is given for a spectrograph cube, is not one wavelength or lies where the slit-jaw
+        passband has no effective area, if the cube is already corrected for exposure time or
+        calibrated, or if it is not from an IRIS slit-jaw passband, such as an AIA cube.
 
     Notes
     -----
@@ -82,6 +84,13 @@ def radiometric_calibration(
     if isinstance(cube, SpectrogramCubeSequence):
         return SpectrogramCubeSequence([radiometric_calibration(c, line=line) for c in cube])
     check_scaled(cube)
+    # As sunraster's apply_exposure_time_correction tells corrected data apart
+    if u.s in cube.unit.decompose().bases:
+        msg = f"The cube must be in DN, not {cube.unit}; do not correct or calibrate it first"
+        raise ValueError(msg)
+    if line is not None and not line.isscalar:
+        msg = f"line must be one wavelength, not {line}"
+        raise ValueError(msg)
     if isinstance(cube, SJICube):
         return _calibrate_sji(cube, line)
     if line is not None:

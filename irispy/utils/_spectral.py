@@ -40,6 +40,37 @@ def check_scaled(cube):
         raise ValueError(msg)
 
 
+def _to_unit(value, unit, name):
+    """
+    The `~astropy.units.Quantity` ``value`` in ``unit``, reading ``u.DN`` as the DN of
+    ``unit``, such as ``DN_IRIS_FUV``.
+
+    Raise a `TypeError` naming ``name`` if ``value`` is not a Quantity, and a
+    `~astropy.units.UnitConversionError` if it does not convert.
+    """
+    target = unit.to_string() or "dimensionless"
+    if not isinstance(value, u.Quantity):
+        msg = f"{name} must be an astropy Quantity convertible to {target}, not {value!r}"
+        raise TypeError(msg)
+    # u.DN stands for the DN_IRIS_* unit of unit, in DN, DN/s or DN Å alike
+    dn = next((base for base in unit.bases if base.name.startswith("DN_IRIS")), None)
+    equivalencies = [] if dn is None else [(u.DN * unit / dn, unit)]
+    try:
+        return value.to(unit, equivalencies=equivalencies)
+    except u.UnitConversionError:
+        msg = f"{name} must be in units convertible to {target}, not {value.unit.to_string() or 'dimensionless'}"
+        raise u.UnitConversionError(msg) from None
+
+
+def check_velocity_range(velocity_range):
+    """
+    Raise a `ValueError` unless ``velocity_range`` is two increasing velocities.
+    """
+    if velocity_range.shape != (2,) or not velocity_range[0] < velocity_range[1]:
+        msg = f"velocity_range must be two increasing velocities, (lower, upper), not {velocity_range}"
+        raise ValueError(msg)
+
+
 def in_windows(wavelengths, windows):
     """
     `True` for the ``wavelengths`` within any of the ``(lower, upper)`` ``windows``,
@@ -48,6 +79,9 @@ def in_windows(wavelengths, windows):
     Windows without samples are ignored. Raise a `ValueError` if none contain samples.
     """
     windows = u.Quantity(windows)
+    if not windows.unit.is_equivalent(u.AA):
+        msg = f"windows must be wavelengths, such as [1401.5, 1402.0] * u.AA, not {windows}"
+        raise u.UnitConversionError(msg)
     if windows.shape == (2,):
         windows = windows[np.newaxis]
     if windows.ndim != 2 or windows.shape[1] != 2:

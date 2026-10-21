@@ -169,17 +169,17 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
 
 def _wavelength_indices(wavelengths, wavelength_range, *, allow_empty=False):
     """
-    Indices of the ``wavelengths`` between two wavelengths, inclusive.
+    Indices of the ``wavelengths`` between two wavelengths, in either order, inclusive.
 
     The bounds are widened by 1e-6 Å, so that a wavelength typed from the grid is kept
     despite the rounding of the WCS unit conversion. With ``allow_empty=True``, a range
     without samples returns an empty array.
     """
-    wavelength_range = u.Quantity(wavelength_range, u.AA)
+    wavelength_range = u.Quantity(wavelength_range)
     if wavelength_range.shape != (2,):
         msg = f"Expected two wavelengths, got {wavelength_range}"
         raise ValueError(msg)
-    low, high = wavelength_range + [-1e-6, 1e-6] * u.AA
+    low, high = np.sort(wavelength_range) + [-1e-6, 1e-6] * u.AA
     indices = np.flatnonzero((wavelengths >= low) & (wavelengths <= high))
     if not indices.size and not allow_empty:
         msg = f"No wavelengths between {wavelength_range[0]} and {wavelength_range[1]}"
@@ -213,7 +213,8 @@ class MosaicCube(SpectrogramCube):
             """,
         )
 
-    def to_map(self, wavelength):
+    @u.quantity_input
+    def to_map(self, wavelength: u.AA):
         """
         Return a `sunpy.map.Map` at one wavelength or averaged over a range.
 
@@ -241,7 +242,6 @@ class MosaicCube(SpectrogramCube):
 
         from irispy.utils.moments import average_window  # NOQA: PLC0415
 
-        wavelength = u.Quantity(wavelength, u.AA)
         wavelengths = u.Quantity(self.axis_world_coords(self.wavelength_axis)[0], u.AA)
         if wavelength.isscalar:
             distance = np.abs(wavelengths - wavelength)

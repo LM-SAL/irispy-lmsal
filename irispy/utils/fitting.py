@@ -309,7 +309,8 @@ def _fit_property(fit_info, name, fill):
     return np.reshape(np.asarray(values, dtype=float), fit_info.shape + template.shape)
 
 
-def maps_from_fit(fitted_model, cube, *, fitter, rest_wavelength=None, residual=True):
+@u.quantity_input
+def maps_from_fit(fitted_model, cube, *, fitter, rest_wavelength: u.AA = None, residual=True):
     r"""
     Maps of the parameters of a model fitted to every spectrum of a cube.
 
@@ -448,7 +449,7 @@ def maps_from_fit(fitted_model, cube, *, fitter, rest_wavelength=None, residual=
         speed = (_SPEED_OF_LIGHT / rest_wavelength).to_value(u.km / u.s / values[center].unit)
         per_angstrom = (_SPEED_OF_LIGHT / rest_wavelength).to_value(u.km / u.s / u.AA)
         width_scale = values[width].unit.to(u.AA)
-        velocity = speed * (values[center].value - u.Quantity(rest_wavelength, values[center].unit).value)
+        velocity = speed * (values[center].value - rest_wavelength.to_value(values[center].unit))
         # Both profiles are even in their widths, which fits without a lower bound can leave negative.
         sign = np.sign(values[width].value)
         fwhm = to_fwhm * width_scale * np.abs(values[width].value)
@@ -529,8 +530,15 @@ def maps_from_fit(fitted_model, cube, *, fitter, rest_wavelength=None, residual=
     return RasterCollection(cubes, aligned_axes=(map_axes,) * (len(cubes) - 1) + (residual_axes,))
 
 
+@u.quantity_input
 def non_thermal_velocity(
-    fwhm, rest_wavelength, *, instrumental_fwhm=None, thermal_fwhm=None, temperature=None, ion=None
+    fwhm,
+    rest_wavelength: u.AA,
+    *,
+    instrumental_fwhm: u.AA = None,
+    thermal_fwhm: u.AA = None,
+    temperature: u.K = None,
+    ion=None,
 ):
     r"""
     The non-thermal velocity of a line from a map of its full width at half maximum.
@@ -584,7 +592,6 @@ def non_thermal_velocity(
     :cite:p:`dere2023`, assumes optically thin lines and does not suit chromospheric lines such as
     Mg II.
     """
-    rest_wavelength = u.Quantity(rest_wavelength, u.AA)
     if instrumental_fwhm is None:
         band = next((band for band, (low, high) in PASSBAND_LIMITS.items() if low <= rest_wavelength <= high), None)
         if band is None:
@@ -607,12 +614,10 @@ def non_thermal_velocity(
                 msg = f"The line catalog has no formation temperature for {ion!r}; pass temperature."
                 raise ValueError(msg)
             temperature = 10 ** lines["log_t_max"][0] * u.K
-        speed = np.sqrt(2 * constants.k_B * u.Quantity(temperature, u.K) / ATOMIC_MASS[element])
+        speed = np.sqrt(2 * constants.k_B * temperature / ATOMIC_MASS[element])
         thermal_fwhm = np.sqrt(4 * np.log(2)) * rest_wavelength * speed / constants.c
     width = u.Quantity(fwhm.data, fwhm.unit).to_value(u.AA)
-    radicand = (
-        width**2 - u.Quantity(instrumental_fwhm).to_value(u.AA) ** 2 - u.Quantity(thermal_fwhm).to_value(u.AA) ** 2
-    )
+    radicand = width**2 - instrumental_fwhm.to_value(u.AA) ** 2 - thermal_fwhm.to_value(u.AA) ** 2
     scale = (constants.c / (rest_wavelength * np.sqrt(4 * np.log(2)))).to_value(u.km / u.s / u.AA)
     with np.errstate(invalid="ignore"):
         velocity = np.where((width > 0) & (radicand > 0), scale * np.sqrt(radicand), np.nan)

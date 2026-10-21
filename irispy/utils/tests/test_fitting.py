@@ -844,6 +844,20 @@ def test_non_thermal_velocity_errors(keywords, match):
         non_thermal_velocity(_width_map(np.array([[0.05, 0.06]])), **{"rest_wavelength": 1402.77 * u.AA, **keywords})
 
 
+@pytest.mark.parametrize(
+    ("keywords", "name"),
+    [
+        # A log T read as kelvin gave 14.7 km/s instead of 13.0 km/s
+        ({"rest_wavelength": 1402.77 * u.AA, "temperature": 4.9}, "temperature"),
+        # 140.277 for nm, read as Å, gave 147 km/s instead of 13.0 km/s
+        ({"rest_wavelength": 140.277, "instrumental_fwhm": 0.026 * u.AA}, "rest_wavelength"),
+    ],
+)
+def test_non_thermal_velocity_needs_quantities(keywords, name):
+    with pytest.raises(TypeError, match=name):
+        non_thermal_velocity(_width_map(np.array([[0.05]])), ion="Si IV", **keywords)
+
+
 def test_non_thermal_velocity_temperature_from_the_catalog():
     widths = _width_map(np.array([[0.05, 0.06]]))
     from_catalog = non_thermal_velocity(widths, 1402.77 * u.AA, ion="Si IV")

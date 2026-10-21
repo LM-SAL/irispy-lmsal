@@ -147,10 +147,12 @@ def test_dask_data(raster):
 
 def test_velocity_range(raster):
     cube = raster["Mg II k 2796"][0]
-    features = calculate_mg_features(cube, lines=("k",), velocity_range=(-30, 30))
+    features = calculate_mg_features(cube, lines=("k",), velocity_range=(-30_000, 30_000) * u.m / u.s)
     assert np.nanmax(np.abs(calculate_mg_features(cube, lines=("k",))["k2r_velocity"].data)) > 33
     for key in ("k2v_velocity", "k3_velocity", "k2r_velocity"):
         assert np.nanmax(np.abs(features[key].data)) <= 33  # the grid reaches 3 km/s beyond the range
+    with pytest.raises(TypeError, match="velocity_range"):
+        calculate_mg_features(cube, lines=("k",), velocity_range=(-30, 30))
 
 
 def test_skips_uncovered_line(raster):
@@ -212,9 +214,9 @@ def test_rejects_other_input(raster):
 @pytest.mark.parametrize(
     ("keywords", "match"),
     [
-        ({"velocity_range": (40, -40)}, "two increasing velocities"),
+        ({"velocity_range": (40, -40) * u.km / u.s}, "two increasing velocities"),
         ({"velocity_range": 40 * u.km / u.s}, "two increasing velocities"),
-        ({"velocity_range": (-0.1, 0.1)}, "Too few wavelength points of Mg II k"),
+        ({"velocity_range": (-0.1, 0.1) * u.km / u.s}, "Too few wavelength points of Mg II k"),
         ({"lines": ()}, "lines must be"),
         ({"lines": ("K",)}, "lines must be"),
         ({"lines": ("k", "k")}, "lines must be"),

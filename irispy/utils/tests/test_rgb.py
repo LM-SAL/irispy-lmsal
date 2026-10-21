@@ -100,17 +100,25 @@ def test_calculate_rgb_rejects_wavelength_limits_without_units(si_iv_cube):
         calculate_rgb(si_iv_cube, wavelength_max=1 * u.s)
 
 
-def test_calculate_rgb_vmax_accepts_a_quantity(si_iv_cube):
-    expected, _ = calculate_rgb(si_iv_cube, vmax=100)
-    result, _ = calculate_rgb(si_iv_cube, vmax=100 * si_iv_cube.unit)
+def test_calculate_rgb_intensity_limits_in_dn(si_iv_cube):
+    expected, _ = calculate_rgb(si_iv_cube, vmin=5 * si_iv_cube.unit, vmax=100 * si_iv_cube.unit)
+    result, _ = calculate_rgb(si_iv_cube, vmin=5 * u.DN, vmax=100 * u.DN)
     np.testing.assert_allclose(result, expected)
+    for name in ("vmin", "vmax"):
+        with pytest.raises(TypeError, match=name):
+            calculate_rgb(si_iv_cube, **{name: 100})
+
+
+def test_plot_rgb_rejects_a_rest_wavelength_without_units(si_iv_cube):
+    with pytest.raises(TypeError, match="rest_wavelength"):
+        plot_rgb(si_iv_cube, rest_wavelength=1402.77)
 
 
 def test_calculate_rgb_stretch_survives_data_below_vmin(si_iv_cube):
     """
     `numpy.sqrt` would return NaN for the samples that ``vmin`` maps below zero.
     """
-    rgb, _ = calculate_rgb(si_iv_cube, vmin=np.nanmedian(si_iv_cube.data), stretch=np.sqrt)
+    rgb, _ = calculate_rgb(si_iv_cube, vmin=np.nanmedian(si_iv_cube.data) * si_iv_cube.unit, stretch=np.sqrt)
     assert np.all(np.isfinite(rgb))
 
 
@@ -140,7 +148,7 @@ def test_calculate_rgb_entirely_masked_cube():
     cube = make_test_spectrogram_cube(np.full((4, 4, wavelengths.size), np.nan), wavelengths)
     with pytest.raises(ValueError, match="no intensity range to map"):
         calculate_rgb(cube)
-    rgb, _ = calculate_rgb(cube, vmax=1)
+    rgb, _ = calculate_rgb(cube, vmax=1 * u.DN)
     assert np.all(rgb == 0)
 
 
@@ -168,9 +176,9 @@ def test_plot_rgb_rejects_a_singleton_spatial_axis(shape):
     ids=["rest_wavelength", "velocity_norm"],
 )
 def test_plot_rgb_options_update_image_and_colorbar(si_iv_cube, overrides):
-    kwargs = {"vmax": 100, **overrides(si_iv_cube)}
+    kwargs = {"vmax": 100 * u.DN, **overrides(si_iv_cube)}
     rgb, (_, _, colorbar) = calculate_rgb(si_iv_cube, **kwargs)
-    default_rgb, (_, _, default_colorbar) = calculate_rgb(si_iv_cube, vmax=100)
+    default_rgb, (_, _, default_colorbar) = calculate_rgb(si_iv_cube, vmax=100 * u.DN)
     assert not np.allclose(rgb, default_rgb)
     assert not np.allclose(colorbar, default_colorbar)
 
@@ -249,7 +257,7 @@ def test_plot_rgb_colorbar_matches_the_image_height(si_iv_cube):
 
 def _colorbar_geometry(cube, **kwargs):
     fig, ax = plt.subplots(figsize=(6, 4))
-    plot_rgb(cube, ax=ax, vmax=100, **kwargs)
+    plot_rgb(cube, ax=ax, vmax=100 * u.DN, **kwargs)
     fig.canvas.draw()
     cax = next(a for a in fig.axes if a.get_ylabel().startswith("Wavelength"))
     width = cax.get_window_extent().width
@@ -306,11 +314,13 @@ def test_plot_rgb_figure():
     cube.meta["TWAVE1"] = 1402.77
 
     fig, axes = plt.subplots(ncols=2, figsize=(14, 5), layout="constrained")
-    plot_rgb(cube, ax=axes[0], vmax=100)
+    plot_rgb(cube, ax=axes[0], vmax=100 * u.DN)
     axes[0].set_title("Default: +/-100 km/s, linear velocity")
     doppler = u.doppler_optical(1402.77 * u.AA)
     wavelength_min, wavelength_max = ([-50, 50] * u.km / u.s).to(u.AA, equivalencies=doppler)
-    plot_rgb(cube, ax=axes[1], vmax=100, stretch=np.sqrt, wavelength_min=wavelength_min, wavelength_max=wavelength_max)
+    plot_rgb(
+        cube, ax=axes[1], vmax=100 * u.DN, stretch=np.sqrt, wavelength_min=wavelength_min, wavelength_max=wavelength_max
+    )
     axes[1].set_title("+/-50 km/s, sqrt stretch")
     return fig
 

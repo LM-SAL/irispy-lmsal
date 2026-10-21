@@ -15,7 +15,7 @@ from irispy.tests.helpers import figure_test, make_test_spectrogram_cube, mark_s
 from irispy.utils import calculate_uncertainty
 from irispy.utils.constants import DN_UNIT, READOUT_NOISE, SATURATION_LIMIT
 from irispy.utils.moments import average_window, calculate_moments
-from irispy.utils.spectrograph import subtract_background
+from irispy.utils.spectrograph import radiometric_calibration, subtract_background
 
 SI_IV_WAVELENGTHS = np.linspace(1401, 1405, 161) * u.AA
 SI_IV_WINDOWS = [[1401, 1401.8], [1404, 1405]] * u.AA
@@ -89,7 +89,7 @@ def test_calculate_moments_sliced_cube(sns_sg_file):
     raster_collection = read_files(sns_sg_file)
     cube = raster_collection["C II 1336"][0]
     cube_slice = cube[10, :, :]
-    moments = calculate_moments(cube_slice)
+    moments = calculate_moments(cube_slice, velocity_range=None)
     assert "intensity" in moments
     assert "centroid" in moments
     assert "width" in moments
@@ -98,15 +98,10 @@ def test_calculate_moments_sliced_cube(sns_sg_file):
     assert moments["width"].shape == cube_slice.shape[:-1]
 
 
-@pytest.mark.parametrize(
-    "velocity_range",
-    [(-1.1 / 3 * constants.c, 0.1 / 3 * constants.c), np.array([-1.1, 0.1]) / 3 * constants.c, (-110000, 10000)],
-)
+@pytest.mark.parametrize("velocity_range", [np.array([-1.1, 0.1]) / 3 * constants.c, (-110000, 10000) * u.km / u.s])
 def test_calculate_moments_asymmetric_velocity_range(velocity_range):
     """
-    An asymmetric range, as a tuple of Quantities, a Quantity, or a bare pair in km/s:
-
-    1.9 to 3.1 nm.
+    An asymmetric range, in m/s or km/s: 1.9 to 3.1 nm.
     """
     wvls = np.linspace(1.0, 5.0, 5) * u.nm
     cube = make_test_spectrogram_cube(np.ones((1, 1, len(wvls))), wvls)
@@ -122,10 +117,45 @@ def test_calculate_moments_velocity_range_must_be_increasing(velocity_range):
         calculate_moments(cube, rest_wavelength=3 * u.nm, velocity_range=velocity_range)
 
 
+def test_calculate_moments_needs_velocity_range(sns_sg_file):
+    cube = read_files(sns_sg_file, spectral_windows="Si IV 1403")["Si IV 1403"][0]
+    with pytest.raises(TypeError, match="velocity_range"):
+        calculate_moments(cube)
+    # None is the whole window
+    whole = calculate_moments(cube, velocity_range=None)
+    wider = calculate_moments(cube, velocity_range=(-5000, 5000) * u.km / u.s)
+    for name, moment in whole.items():
+        np.testing.assert_allclose(moment.data, wider[name].data, atol=1e-6, err_msg=name)
+
+
+@pytest.mark.parametrize(
+    ("keywords", "name"),
+    [
+        ({"velocity_range": (-100, 100)}, "velocity_range"),
+        ({"velocity_range": None, "min_intensity": 75}, "min_intensity"),
+    ],
+)
+def test_calculate_moments_needs_quantities(sns_sg_file, keywords, name):
+    cube = read_files(sns_sg_file, spectral_windows="Si IV 1403")["Si IV 1403"][0]
+    with pytest.raises(TypeError, match=name):
+        calculate_moments(cube, **keywords)
+
+
+def test_calculate_moments_min_intensity_in_dn(sns_sg_file):
+    cube = read_files(sns_sg_file, spectral_windows="Si IV 1403")["Si IV 1403"][0]
+    for data, threshold in ((cube, 75 * u.DN), (cube.apply_exposure_time_correction(), 75 * u.DN / u.s)):
+        intensity = calculate_moments(data, velocity_range=None, min_intensity=threshold)["intensity"]
+        expected = calculate_moments(data, velocity_range=None, min_intensity=75 * data.unit)["intensity"]
+        assert 0 < np.isnan(intensity.data).sum() < intensity.data.size
+        np.testing.assert_array_equal(intensity.data, expected.data)
+    with pytest.raises(u.UnitConversionError, match="min_intensity"):
+        calculate_moments(radiometric_calibration(cube), velocity_range=None, min_intensity=75 * u.DN)
+
+
 def test_calculate_moments_rejects_unscaled_data():
     cube = make_test_spectrogram_cube(np.ones((1, 1, 3), dtype=np.int16), [500.0, 501.0, 502.0] * u.nm)
     with pytest.raises(ValueError, match="unscaled"):
-        calculate_moments(cube)
+        calculate_moments(cube, velocity_range=None)
 
 
 def test_calculate_moments_velocity_range_without_rest_wavelength(sns_sg_file):
@@ -146,7 +176,7 @@ def test_calculate_moments_requires_wavelength_axis():
     cube.wcs.wcs.set()
 
     with pytest.raises(ValueError, match="Could not identify a spectral wavelength axis"):
-        calculate_moments(cube)
+        calculate_moments(cube, velocity_range=None)
 
 
 def test_calculate_moments_velocity_range_no_meta_no_rest_wavelength():
@@ -177,9 +207,9 @@ def test_calculate_moments_default_rest_wavelength(raster_sg_file, limits, rest_
     cube = read_files(raster_sg_file)["Mg II k 2796"][0]
     if limits is not None:
         cube = cube.crop(*([SpectralCoord(wavelength * u.AA), None] for wavelength in limits))
-    moments = calculate_moments(cube)
+    moments = calculate_moments(cube, velocity_range=None)
     assert_quantity_allclose(moments["velocity"].meta["moments_rest_wavelength"], rest_wavelength)
-    expected = calculate_moments(cube, rest_wavelength=rest_wavelength)
+    expected = calculate_moments(cube, rest_wavelength=rest_wavelength, velocity_range=None)
     np.testing.assert_allclose(moments["velocity"].data, expected["velocity"].data, rtol=1e-12)
 
 
@@ -194,8 +224,8 @@ def test_calculate_moments_ignores_negative_nonfinite_and_masked_values():
     )
     dirty_cube.mask = np.array([[[False, False, False, False, True]]])
 
-    clean_moments = calculate_moments(clean_cube, rest_wavelength=501 * u.nm)
-    dirty_moments = calculate_moments(dirty_cube, rest_wavelength=501 * u.nm)
+    clean_moments = calculate_moments(clean_cube, rest_wavelength=501 * u.nm, velocity_range=None)
+    dirty_moments = calculate_moments(dirty_cube, rest_wavelength=501 * u.nm, velocity_range=None)
 
     assert clean_moments.keys() == dirty_moments.keys()
     for key in clean_moments:
@@ -314,7 +344,7 @@ def test_calculate_moments_zero_intensity():
     spectrum = np.zeros_like(wvls.value)
     data = spectrum.reshape(1, 1, -1)
     cube = make_test_spectrogram_cube(data, wvls)
-    moments = calculate_moments(cube)
+    moments = calculate_moments(cube, velocity_range=None)
     intensity = moments["intensity"]
     centroid = moments["centroid"]
     width = moments["width"]
@@ -331,8 +361,10 @@ def test_calculate_moments_min_intensity():
     spectrum = Gaussian1D(amplitude=10.0, mean=1402.77, stddev=0.05)(wvls.value)
     # Pixels above, at and below the threshold
     cube = make_test_spectrogram_cube(np.stack([2 * spectrum, spectrum, 0.5 * spectrum]).reshape(1, 3, -1), wvls)
-    threshold = calculate_moments(cube)["intensity"].data[0, 1] * u.DN
-    moments = calculate_moments(cube, rest_wavelength=1402.77 * u.Angstrom, min_intensity=threshold)
+    threshold = calculate_moments(cube, velocity_range=None)["intensity"].data[0, 1] * u.DN
+    moments = calculate_moments(
+        cube, rest_wavelength=1402.77 * u.Angstrom, min_intensity=threshold, velocity_range=None
+    )
     for key in ("intensity", "centroid", "width", "velocity", "velocity_width"):
         np.testing.assert_array_equal(moments[key].mask[0], [False, False, True], err_msg=key)
         assert np.isfinite(moments[key].data[0, :2]).all(), key
@@ -404,7 +436,7 @@ def test_calculate_moments_saturated():
     data[1, 2], data[2, 0], data[3, 0], data[3, 4] = SATURATION_LIMIT.value, SATURATION_LIMIT.value, -np.inf, np.nan
     cube = make_test_spectrogram_cube(data[np.newaxis], wvls)
     mark_saturated(cube, cube.data >= SATURATION_LIMIT.value)
-    moments = calculate_moments(cube, rest_wavelength=502 * u.nm)
+    moments = calculate_moments(cube, rest_wavelength=502 * u.nm, velocity_range=None)
     np.testing.assert_array_equal(moments["saturated"].data, [[False, True, True, False]])
     for key, moment in moments.items():
         if key == "saturated":
@@ -424,7 +456,7 @@ def test_calculate_moments_saturated_needs_mask_and_mark():
     mark_saturated(cube, cube.data >= SATURATION_LIMIT.value)
     cube.meta["saturated"][0, 0] = False  # masked, but not marked, so left out
     cube.mask[0, 1] = False  # marked, but unmasked, so used at its value
-    moments = calculate_moments(cube)
+    moments = calculate_moments(cube, velocity_range=None)
     assert not moments["saturated"].data.any()
     np.testing.assert_array_equal(moments["intensity"].data, [[2010, 2010 + SATURATION_LIMIT.value]])
 
@@ -434,7 +466,7 @@ def test_calculate_moments_rebinned_has_no_saturated():
     data = np.tile([1.0, 2.0, SATURATION_LIMIT.value, 2.0, 1.0], (1, 4, 1))
     cube = make_test_spectrogram_cube(data, (500 + np.arange(5)) * u.nm)
     mark_saturated(cube, cube.data >= SATURATION_LIMIT.value)
-    assert not calculate_moments(cube.rebin((1, 2, 1)))["saturated"].data.any()
+    assert not calculate_moments(cube.rebin((1, 2, 1)), velocity_range=None)["saturated"].data.any()
 
 
 def test_calculate_moments_saturated_survives_exposure_time_correction(sns_sg_file):
@@ -442,7 +474,7 @@ def test_calculate_moments_saturated_survives_exposure_time_correction(sns_sg_fi
     cube.data[0, 3, 5] = SATURATION_LIMIT.value
     mark_saturated(cube, cube.data >= SATURATION_LIMIT.value)
     for unit_cube in (cube, cube.apply_exposure_time_correction()):
-        saturated = calculate_moments(unit_cube)["saturated"].data
+        saturated = calculate_moments(unit_cube, velocity_range=None)["saturated"].data
         assert saturated[0, 3]
         assert saturated.sum() == 1
 
@@ -474,9 +506,11 @@ def test_calculate_moments_constant_background_preserves_uncertainties():
     corrected = subtract_background(cube, [500, 530] * u.nm, degree=0)
     np.testing.assert_array_equal(corrected.data[..., :31], 0)
     expected = calculate_moments(
-        make_test_spectrogram_cube(signal, wavelengths, uncertainty=cube.uncertainty), rest_wavelength=532 * u.nm
+        make_test_spectrogram_cube(signal, wavelengths, uncertainty=cube.uncertainty),
+        rest_wavelength=532 * u.nm,
+        velocity_range=None,
     )
-    moments = calculate_moments(corrected, rest_wavelength=532 * u.nm)
+    moments = calculate_moments(corrected, rest_wavelength=532 * u.nm, velocity_range=None)
     for name, moment in moments.items():
         np.testing.assert_allclose(moment.data, expected[name].data, rtol=1e-13, err_msg=name)
         if name != "saturated":
@@ -507,7 +541,7 @@ def test_calculate_moments_preserves_time_without_spectral_global_coord(sns_sg_f
     """
     raster_collection = read_files(sns_sg_file)
     cube = raster_collection["C II 1336"][0]
-    moments = calculate_moments(cube)
+    moments = calculate_moments(cube, velocity_range=None)
     intensity = moments["intensity"]
     assert "time" in tuple(intensity.extra_coords.keys())
     assert "em.wl" not in tuple(intensity.global_coords.keys())
@@ -522,7 +556,7 @@ def test_calculate_moments_uncertainty_by_hand():
     cube = make_test_spectrogram_cube(
         [[[1.0, 2.0, 4.0]]], [500.0, 501.0, 502.0] * u.nm, uncertainty=StdDevUncertainty([[[0.1, 0.2, 0.3]]])
     )
-    moments = calculate_moments(cube, rest_wavelength=500.5 * u.nm)
+    moments = calculate_moments(cube, rest_wavelength=500.5 * u.nm, velocity_range=None)
     centroid_error = np.sqrt(2.8) / 49
     width_error = np.sqrt(75.32) / 98 / np.sqrt(26)
     speed = constants.c.to_value(u.km / u.s) / 500.5
@@ -562,11 +596,15 @@ def test_calculate_moments_uncertainty_types_and_invalid_pixels():
     data = [[[1.0, 2.0, 1.0], [0.1, 0.2, 0.1]]]
     sigma = np.array([[[0.1, 0.2, 0.3], [0.1, 0.2, 0.3]]])
     standard = calculate_moments(
-        make_test_spectrogram_cube(data, wavelengths, uncertainty=StdDevUncertainty(sigma)), min_intensity=1
+        make_test_spectrogram_cube(data, wavelengths, uncertainty=StdDevUncertainty(sigma)),
+        min_intensity=1 * u.DN,
+        velocity_range=None,
     )
     # test_standard_deviation covers the other types
     variance = calculate_moments(
-        make_test_spectrogram_cube(data, wavelengths, uncertainty=VarianceUncertainty(sigma**2)), min_intensity=1
+        make_test_spectrogram_cube(data, wavelengths, uncertainty=VarianceUncertainty(sigma**2)),
+        min_intensity=1 * u.DN,
+        velocity_range=None,
     )
     for key, moment in standard.items():
         if key == "saturated":
@@ -574,7 +612,9 @@ def test_calculate_moments_uncertainty_types_and_invalid_pixels():
         np.testing.assert_allclose(variance[key].uncertainty.array, moment.uncertainty.array)
         assert np.isfinite(moment.uncertainty.array[0, 0])
         assert np.isnan(moment.uncertainty.array[0, 1])  # below min_intensity
-    for moment in calculate_moments(make_test_spectrogram_cube(np.ones((1, 1, 3)), wavelengths)).values():
+    for moment in calculate_moments(
+        make_test_spectrogram_cube(np.ones((1, 1, 3)), wavelengths), velocity_range=None
+    ).values():
         assert moment.uncertainty is None
 
 
@@ -584,7 +624,7 @@ def test_calculate_moments_uncertainty_nan_where_undefined():
     cube = make_test_spectrogram_cube(
         data, [500.0, 501.0, 502.0] * u.nm, uncertainty=StdDevUncertainty(np.full((1, 3, 3), 0.1))
     )
-    moments = calculate_moments(cube, rest_wavelength=501 * u.nm)
+    moments = calculate_moments(cube, rest_wavelength=501 * u.nm, velocity_range=None)
     centroid_error = np.sqrt(0.02) / 33.9
     expected = {
         "intensity": [0.1, np.nan, np.sqrt(0.03)],
@@ -607,7 +647,7 @@ def test_calculate_moments_scalar_uncertainty_with_velocity_range():
 def test_calculate_moments_zero_rest_wavelength_warns():
     cube = make_test_spectrogram_cube(np.ones((1, 1, 3)), [500.0, 501.0, 502.0] * u.nm)
     with pytest.warns(RuntimeWarning, match="divide by zero"):
-        calculate_moments(cube, rest_wavelength=0 * u.nm)
+        calculate_moments(cube, rest_wavelength=0 * u.nm, velocity_range=None)
 
 
 @pytest.mark.parametrize(
@@ -696,6 +736,9 @@ def test_average_window_real_data(sns_sg_file):
     assert "time" in tuple(window.extra_coords.keys())
     assert np.isfinite(window.data[~window.mask]).all()
     assert np.isfinite(window.uncertainty.array[~window.mask]).all()
+    np.testing.assert_array_equal(average_window(cube, [1336.2, 1335.2] * u.AA).data, window.data)
+    with pytest.raises(TypeError, match="wavelength_range"):
+        average_window(cube, [1335.2, 1336.2])
 
 
 @pytest.mark.parametrize(

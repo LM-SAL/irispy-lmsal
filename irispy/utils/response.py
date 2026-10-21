@@ -322,7 +322,8 @@ def _fit_xput_lite(observation_time, time_cal_coeffs, cal_coeffs):
     return np.matmul(aux_cal_coeffs, cal_coeffs[:, :2].reshape(aux_cal_coeffs.shape[0]))
 
 
-def get_interpolated_effective_area(iris_response, detector_type, obs_wavelength):
+@u.quantity_input
+def get_interpolated_effective_area(iris_response, detector_type, obs_wavelength: u.AA):
     """
     To compute the interpolated time-dependent effective area.
 
@@ -335,7 +336,7 @@ def get_interpolated_effective_area(iris_response, detector_type, obs_wavelength
     detector_type : `str`
         Detector type: 'FUV' or 'NUV'.
     obs_wavelength : `astropy.units.Quantity`
-        The wavelength at which the observation has been taken in Angstroms.
+        The wavelengths at which to give the effective area.
 
     Returns
     -------
@@ -361,7 +362,7 @@ def get_interpolated_effective_area(iris_response, detector_type, obs_wavelength
     elif detector_type.startswith("NUV"):
         detector_type_index = 1
     else:
-        msg = "Detector type not recognized."
+        msg = f"detector_type must be 'FUV' or 'NUV', not {detector_type!r}"
         raise ValueError(msg)
     eff_area = iris_response["AREA_SG"][detector_type_index, :]
     response_wavelength = iris_response["LAMBDA"]
