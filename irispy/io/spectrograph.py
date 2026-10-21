@@ -225,6 +225,10 @@ def read_spectrograph_lvl2(
             # An HDU list made in memory has no filename, so name what was given
             given = hdulist.filename() or f"The data given ({type(filename).__name__})"
             _check_level2(given, hdulist[0].header, "raster")
+            # Files made before SolarSoft's sxaddpar saved non-finite values as strings (June 2018) write a NaN
+            # as an unquoted NAN, such as STEPT_DV, which astropy cannot parse: it becomes the string "NAN",
+            # as IDL's sxpar reads it
+            hdulist[0].verify("silentfix")
             aux_times = _auxiliary_times(hdulist)
             # The archive writes a file with no data with DATE_OBS and DATE_END empty and its pointing and roll as 0
             no_data = {}

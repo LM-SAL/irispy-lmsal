@@ -289,6 +289,12 @@ def test_read_spectrograph_reads_files_with_no_data_or_no_nuv_exposure(caplog):
         assert np.all(after.mask) != has_data
 
 
+def test_read_spectrograph_reads_an_unquoted_nan():
+    # STEPT_DV = NAN, as files made before June 2018 write a NaN (see unparsable_card/overview.txt)
+    filename = get_test_filepath("unparsable_card/iris_l2_20140917_050324_3860356063_raster_t000_r00000_test.fits")
+    assert read_spectrograph_lvl2(filename)["C II 1336"][0].meta.step_time_stddev == "NAN"
+
+
 def test_read_spectrograph_flips_v34_mask_uncertainty_and_meta(raster_sg_file, tmp_path):
     # STEPS_AV < -0.01 marks a V34 raster, which is read flipped along the step axis
     filename = tmp_path / "v34.fits"

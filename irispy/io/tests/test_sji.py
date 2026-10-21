@@ -129,6 +129,12 @@ def test_read_sji_lvl2_masks_explicit_float_bad_pixels(tmp_path, sns_sji_1330_fi
     assert cube.data.flat[2] == -198
 
 
+def test_read_sji_lvl2_reads_an_unquoted_nan():
+    # CADPL_DV = NAN, as files made before June 2018 write a NaN (see unparsable_card/overview.txt)
+    filename = get_test_filepath("unparsable_card/iris_l2_20210905_001833_3620258102_SJI_1400_t000_nan_test.fits")
+    assert read_sji_lvl2(filename).meta["CADPL_DV"] == "NAN"
+
+
 def test_read_sji_lvl2_keeps_the_image_of_a_supplied_hdulist(bursts_sji_1400_file):
     with fits.open(bursts_sji_1400_file) as hdulist:
         original = hdulist[0].data.copy()

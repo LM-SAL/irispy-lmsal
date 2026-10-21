@@ -275,6 +275,8 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             _check_level2(filename, None, "SJI")
     with context as hdulist:
         _check_level2(hdulist.filename() or filename, hdulist[0].header, "SJI")
+        # An unquoted NAN, such as CADPL_DV of a two-frame SJI: see read_spectrograph_lvl2
+        hdulist[0].verify("silentfix")
         instrume = hdulist[0].header["INSTRUME"]
         is_sot = instrume.startswith("SOT")
         if hdulist[1].data.ndim == 1:
