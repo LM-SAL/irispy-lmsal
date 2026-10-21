@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import UTC, datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,7 +35,7 @@ def test_fit_xput_lite_idl(observation_time, idl_output):
     cal_coeffs = fit_xput_idl_inputs["coeffs_fuv"]
     iris_fit_expected = fit_xput_idl_outputs["rr"]
 
-    test_time = [parse_time(observation_time)]
+    test_time = parse_time(observation_time)
     time_cal_coeffs_astropy = Time(time_cal_coeffs, format="utime")
 
     # Test each coefficient set
@@ -42,7 +43,7 @@ def test_fit_xput_lite_idl(observation_time, idl_output):
         iris_fit = _fit_xput_lite(test_time, time_cal_coeffs_astropy, cal_coeffs[i, :, :])
         np_test.assert_almost_equal(
             iris_fit,
-            iris_fit_expected[i],
+            iris_fit_expected[i, 0],
         )
 
 
@@ -61,16 +62,11 @@ def old_iris_response_data():
     ],
 )
 def test_fit_iris_xput_lite_old_fuv(old_iris_response_data, coeff_index, expected_value):
-    test_time_obs = [parse_time("2013-09-03")]
+    test_time_obs = parse_time("2013-09-03")
     time_cal_coeffs = parse_time(old_iris_response_data.get("C_F_TIME"), format="utime")
     cal_coeffs = old_iris_response_data.get("COEFFS_FUV")[coeff_index, :, :]
     result = _fit_xput_lite(test_time_obs, time_cal_coeffs, cal_coeffs)
-    expected_array = np.array([expected_value])
-    np_test.assert_almost_equal(
-        result,
-        expected_array,
-        decimal=6,
-    )
+    np_test.assert_almost_equal(result, expected_value, decimal=6)
 
 
 @pytest.mark.parametrize(
@@ -83,16 +79,11 @@ def test_fit_iris_xput_lite_old_fuv(old_iris_response_data, coeff_index, expecte
     ],
 )
 def test_fit_iris_xput_lite_old_nuv(old_iris_response_data, coeff_index, expected_value):
-    test_time_obs = [parse_time("2013-09-03")]
+    test_time_obs = parse_time("2013-09-03")
     time_cal_coeffs = parse_time(old_iris_response_data.get("C_N_TIME"), format="utime")
     cal_coeffs = old_iris_response_data.get("COEFFS_NUV")[coeff_index, :, :]
     result = _fit_xput_lite(test_time_obs, time_cal_coeffs, cal_coeffs)
-    expected_array = np.array([expected_value])
-    np_test.assert_almost_equal(
-        result,
-        expected_array,
-        decimal=6,
-    )
+    np_test.assert_almost_equal(result, expected_value, decimal=6)
 
 
 def test_get_latest_response_to_idl(idl_response):
@@ -113,26 +104,18 @@ def test_get_latest_response_to_idl(idl_response):
     np_test.assert_almost_equal(iris_response["AREA_SJI"][3].to_value(), idl_response["AREA_SJI"][3], decimal=4)
 
 
-def test_get_latest_response_multiple_inputs():
-    times = parse_time(["2025-08-05T22:25:04.723", "2025-08-06T22:25:04.723", "2025-08-07T22:25:04.723"])
-    iris_response = get_latest_response(times)
-    assert len(iris_response) == 3
+def test_get_latest_response_datetime_input():
+    assert get_latest_response(datetime(2014, 1, 1, tzinfo=UTC))["DATE_OBS"] == "2014-01-01T00:00:00.000"
 
 
-def test_get_latest_response_multiple_times_do_not_share_areas():
-    # The responses used to share one AREA_SG and AREA_SJI array, so every time got the last time's areas
-    times = parse_time(["2014-01-01", "2024-01-01"])
-    responses = get_latest_response(times)
-    for response, time in zip(responses, times, strict=True):
-        single = get_latest_response(time)
-        np_test.assert_array_equal(response["AREA_SG"], single["AREA_SG"])
-        np_test.assert_array_equal(response["AREA_SJI"], single["AREA_SJI"])
-    assert not np.array_equal(responses[0]["AREA_SG"], responses[1]["AREA_SG"])
+@pytest.mark.parametrize("observation_time", [Time(["2014-01-01"]), ["2014-01-01", "2024-01-01"]])
+def test_get_latest_response_rejects_several_times(observation_time):
+    with pytest.raises(ValueError, match="observation_time must be a single time"):
+        get_latest_response(observation_time)
 
 
 def test_get_latest_response_no_observation_time():
-    iris_response = get_latest_response()
-    assert iris_response is not None
+    assert abs(Time(get_latest_response()["DATE_OBS"]) - Time.now()) < 1 * u.min
 
 
 @figure_test

@@ -1,1 +1,0 @@
-`~irispy.utils.response.get_latest_response` given several observation times now returns each time's own effective areas; the responses used to share one ``AREA_SG`` and ``AREA_SJI`` array, so every element held the last time's values.

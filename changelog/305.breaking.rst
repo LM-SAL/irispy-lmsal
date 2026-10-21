@@ -1,0 +1,1 @@
+``irispy.utils.response.get_latest_response`` takes one observation time, in any format ``sunpy.time.parse_time`` accepts, and returns one dictionary; call it once for each time. An array of times now raises a ``ValueError``; given several, it used to return a list in which all but the last response had wrong effective areas.

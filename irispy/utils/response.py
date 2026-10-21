@@ -44,14 +44,14 @@ def get_latest_response(
 
     Parameters
     ----------
-    observation_time : `astropy.time.Time`, optional
-        Observation time or times of the datapoints.
+    observation_time : `astropy.time.Time`, `str` or `datetime.datetime`, optional
+        The observation time, in any format `sunpy.time.parse_time` accepts.
+        One time only; call this function once for each time.
         If not provided, the current time is used.
 
     Returns
     -------
-    `dict` or `list` of `dict`
-        One dictionary for a single ``observation_time``, a list with one dictionary for each time otherwise.
+    `dict`
         The keys are the names of the IDL response structure, in upper case:
 
         ``DATE_OBS`` : `str`
@@ -80,22 +80,24 @@ def get_latest_response(
         ``VERSION_DATE`` : `astropy.time.Time`
             Date of that version.
 
+    Raises
+    ------
+    ValueError
+        If ``observation_time`` is an array or list of times, even of one.
+
     Examples
     --------
-    >>> from sunpy.time import parse_time
     >>> from irispy.utils.response import get_latest_response
-    >>> response = get_latest_response(parse_time("2020-01-01"))
+    >>> response = get_latest_response("2020-01-01")
     >>> response["AREA_SG"].shape
     (2, 3601)
     >>> response["VERSION"]
     9
     """
-    if observation_time is None:
-        observation_time = parse_time("now")
-
-    number_of_obs_times = observation_time.size
-    if observation_time.size == 1:
-        observation_time = [observation_time]
+    observation_time = parse_time("now" if observation_time is None else observation_time)
+    if not observation_time.isscalar:
+        msg = f"observation_time must be a single time, not an array of shape {observation_time.shape}"
+        raise ValueError(msg)
     raw_response_data = scipy.io.readsav(ROOTDIR / "iris_sra_c_20231106.geny", python_dict=True)
     iris_response = _record_to_dict(raw_response_data["p0"])
     iris_response = {
@@ -104,10 +106,7 @@ def get_latest_response(
     # Convert to appropriate types
     iris_response["VERSION"] = int(iris_response["VERSION"])
     iris_response["LAMBDA"] = Quantity(iris_response["LAMBDA"], unit=u.nm)
-    iris_response["AREA_SG"] = Quantity(iris_response["AREA_SG"], unit=u.cm**2)
-    iris_response["AREA_SJI"] = Quantity(iris_response["AREA_SJI"], unit=u.cm**2)
     iris_response["GEOM_AREA"] = Quantity(iris_response["GEOM_AREA"], unit=u.cm**2)
-    iris_response["VERSION"] = int(iris_response["VERSION"])
     iris_response["C_F_TIME"] = Time(iris_response["C_F_TIME"], format="utime")
     iris_response["C_F_LAMBDA"] = Quantity(iris_response["C_F_LAMBDA"], unit="nm")
     iris_response["C_N_TIME"] = Time(iris_response["C_N_TIME"], format="utime")
@@ -115,99 +114,80 @@ def get_latest_response(
     iris_response["C_S_TIME"] = Time(iris_response["C_S_TIME"], format="utime")
     iris_response["ELEMENTS"]["DATE"] = parse_time(iris_response["ELEMENTS"]["DATE"].astype(str).tolist())
     iris_response["VERSION_DATE"] = parse_time(iris_response["VERSION_DATE"])
-    # One response per observation time, each with its own effective area arrays to fill in
-    area_sg_shape, area_sji_shape = iris_response["AREA_SG"].shape, iris_response["AREA_SJI"].shape
-    iris_response = [
-        {**iris_response, "AREA_SG": np.zeros(area_sg_shape), "AREA_SJI": np.zeros(area_sji_shape)}
-        for _ in range(number_of_obs_times)
-    ]
-    # Set DATE_OBS to the observation time.
-    for i in range(number_of_obs_times):
-        iris_response[i]["DATE_OBS"] = observation_time[i].isot
+    # The effective areas at the observation time, in cm2, are filled in below
+    iris_response["AREA_SG"] = np.zeros(iris_response["AREA_SG"].shape)
+    iris_response["AREA_SJI"] = np.zeros(iris_response["AREA_SJI"].shape)
+    iris_response["DATE_OBS"] = observation_time.isot
 
     # FUV SG effective areas
     lambda_range_fuv = np.array([[133.1, 135.9], [138.8, 140.8]])
     # Rough SG spectral ranges.
     # Setting effective area to 0 outside of these.
-    shape_fuv = iris_response[0]["COEFFS_FUV"].shape
-    # Time-dependent response for shape_fuv[0] = 3 wavelengths
-    iris_fit_fuv = np.zeros((number_of_obs_times, shape_fuv[0]))
-    for j in range(shape_fuv[0]):
-        iris_fit_fuv[:, j] = _fit_xput_lite(
-            observation_time,
-            iris_response[0]["C_F_TIME"],
-            iris_response[0]["COEFFS_FUV"][j],
-        )
+    # Time-dependent response at each of the 3 wavelengths of C_F_LAMBDA
+    iris_fit_fuv = np.array(
+        [_fit_xput_lite(observation_time, iris_response["C_F_TIME"], coeffs) for coeffs in iris_response["COEFFS_FUV"]]
+    )
     # Interpolate onto lambda grid, separately for each of the two FUV CCD's.
     for j in range(2):
         w_fuv = np.logical_and(
-            iris_response[0]["LAMBDA"].value >= lambda_range_fuv[j, 0],
-            iris_response[0]["LAMBDA"].value <= lambda_range_fuv[j, 1],
+            iris_response["LAMBDA"].value >= lambda_range_fuv[j, 0],
+            iris_response["LAMBDA"].value <= lambda_range_fuv[j, 1],
         )
         # For some reason in Python the above for Si IV misses the last point
         # so I add an extra True value in the mask
         if j == 1:
             idx = np.argwhere(w_fuv)[-1] + 1
             w_fuv[idx] = True
-        for k in range(number_of_obs_times):
-            iris_response[k]["AREA_SG"][0, w_fuv] = make_interp_spline(
-                iris_response[k]["C_F_LAMBDA"][j : j + 2],
-                iris_fit_fuv[k, j : j + 2],
-                k=1,
-            )(iris_response[k]["LAMBDA"][w_fuv])
+        iris_response["AREA_SG"][0, w_fuv] = make_interp_spline(
+            iris_response["C_F_LAMBDA"][j : j + 2],
+            iris_fit_fuv[j : j + 2],
+            k=1,
+        )(iris_response["LAMBDA"][w_fuv])
 
     # The IDL code has a special case here for version 9 and later.
     # Remove wavelength dependence for the Si IV part of the FUV window.
     w_fuv_si_iv = np.logical_and(
-        iris_response[0]["LAMBDA"].value >= lambda_range_fuv[1, 0],
-        iris_response[0]["LAMBDA"].value <= lambda_range_fuv[1, 1],
+        iris_response["LAMBDA"].value >= lambda_range_fuv[1, 0],
+        iris_response["LAMBDA"].value <= lambda_range_fuv[1, 1],
     )
     # For some reason in Python the above for Si IV misses the last point
     # so I add an extra True value in the mask
     idx = np.argwhere(w_fuv_si_iv)[-1] + 1
     w_fuv_si_iv[idx] = True
-    for k in range(number_of_obs_times):
-        mean_area = np.mean(iris_response[k]["AREA_SG"][0, w_fuv_si_iv])
-        iris_response[k]["AREA_SG"][0, w_fuv_si_iv] = np.repeat(mean_area, np.sum(w_fuv_si_iv))
+    iris_response["AREA_SG"][0, w_fuv_si_iv] = np.mean(iris_response["AREA_SG"][0, w_fuv_si_iv])
 
     # NUV SG effective areas
     lambda_range_nuv = np.array([278.2, 283.5])
     # Rough SG spectral ranges.
     # Setting effective area to 0 outside of these.
-    shape_nuv = iris_response[0]["COEFFS_NUV"].shape
-    # Time-dependent response for shape_nuv[0] wavelengths
-    iris_fit_nuv = np.zeros((number_of_obs_times, shape_nuv[0]))
-    for j in range(shape_nuv[0]):
-        iris_fit_nuv[:, j] = _fit_xput_lite(
-            observation_time,
-            iris_response[0]["C_N_TIME"],
-            iris_response[0]["COEFFS_NUV"][j],
-        )
+    # Time-dependent response at each wavelength of C_N_LAMBDA
+    iris_fit_nuv = np.array(
+        [_fit_xput_lite(observation_time, iris_response["C_N_TIME"], coeffs) for coeffs in iris_response["COEFFS_NUV"]]
+    )
     # Interpolate onto lambda grid
     w_nuv = np.where(
         np.bitwise_and(
-            iris_response[0]["LAMBDA"].value >= lambda_range_nuv[0],
-            iris_response[0]["LAMBDA"].value <= lambda_range_nuv[1],
+            iris_response["LAMBDA"].value >= lambda_range_nuv[0],
+            iris_response["LAMBDA"].value <= lambda_range_nuv[1],
         ),
     )
-    for k in range(number_of_obs_times):
-        iris_response[k]["AREA_SG"][1, w_nuv] = make_interp_spline(
-            iris_response[k]["C_N_LAMBDA"], iris_fit_nuv[k], k=3, bc_type="natural"
-        )(iris_response[k]["LAMBDA"][w_nuv])
+    iris_response["AREA_SG"][1, w_nuv] = make_interp_spline(
+        iris_response["C_N_LAMBDA"], iris_fit_nuv, k=3, bc_type="natural"
+    )(iris_response["LAMBDA"][w_nuv])
 
     # SJI effective areas
     for nuv in range(2):
         # Calculate baseline SJI area curves
-        area_sji = iris_response[0]["GEOM_AREA"]
-        for m in range(len(iris_response[0]["INDEX_EL_SJI"][nuv * 2])):
-            index_values1 = iris_response[0]["INDEX_EL_SJI"][nuv * 2 : nuv * 2 + 2, m]
-            area_sji = area_sji * iris_response[0]["ELEMENTS"][index_values1].trans
+        area_sji = iris_response["GEOM_AREA"]
+        for m in range(len(iris_response["INDEX_EL_SJI"][nuv * 2])):
+            index_values1 = iris_response["INDEX_EL_SJI"][nuv * 2 : nuv * 2 + 2, m]
+            area_sji = area_sji * iris_response["ELEMENTS"][index_values1].trans
         # Apply time dependent profile shape adjustment to FUV SJI
         if nuv == 0:
             # FUV: apply FUV SG "slant", then normalize so that a weighted (2.4:1)
             # sum at C II and Si IV gives constant response
             weight = np.array([2.4, 1])  # Typical solar ratio CII : SiIV
-            wavelength = iris_response[0]["C_F_LAMBDA"]
+            wavelength = iris_response["C_F_LAMBDA"]
             n_wavelength = len(wavelength)
             wavelength = np.array(
                 [
@@ -216,13 +196,13 @@ def get_latest_response(
                 ],
             )  # 2 wavelengths in nm
             # Calculate baseline SG area for scaling purposes
-            area_sg = iris_response[0]["GEOM_AREA"]
-            for m in range(len(iris_response[0]["INDEX_EL_SG"][nuv])):
-                index_values2 = iris_response[0]["INDEX_EL_SG"][nuv, m]
-                area_sg = area_sg * iris_response[0]["ELEMENTS"][index_values2].trans
+            area_sg = iris_response["GEOM_AREA"]
+            for m in range(len(iris_response["INDEX_EL_SG"][nuv])):
+                index_values2 = iris_response["INDEX_EL_SG"][nuv, m]
+                area_sg = area_sg * iris_response["ELEMENTS"][index_values2].trans
             # SG and SJI areas at wavelength
             interpol_sg = make_interp_spline(
-                iris_response[0]["LAMBDA"],
+                iris_response["LAMBDA"],
                 area_sg,
                 k=1,
             )
@@ -230,54 +210,42 @@ def get_latest_response(
             area_sj2 = np.zeros((2, 2))
             for m in range(2):
                 interpol_sji = make_interp_spline(
-                    iris_response[0]["LAMBDA"],
+                    iris_response["LAMBDA"],
                     area_sji[m],
                     k=1,
                 )
                 area_sj2[:, m] = interpol_sji(wavelength)
             # Calculate the normalized slant function scal, apply to area_sji
-            for k in range(number_of_obs_times):
-                # Best-estimate slant, i.e., eff.area @ wavelength / baseline SG @ wavelength
-                interpol_sg2 = make_interp_spline(
-                    iris_response[k]["LAMBDA"],
-                    iris_response[k]["AREA_SG"][0],
+            # Best-estimate slant, i.e., eff.area @ wavelength / baseline SG @ wavelength
+            interpol_sg2 = make_interp_spline(
+                iris_response["LAMBDA"],
+                iris_response["AREA_SG"][0],
+                k=1,
+            )
+            sca2 = interpol_sg2(wavelength) / area_sg2
+            # Normalize slant so that total(wei*asj2*sca2)/total(wei*asj2)=1
+            for m in range(2):
+                sca2n = sca2 * np.sum(weight * area_sj2[:, m]) / np.sum(weight * area_sj2[:, m] * sca2)
+                interpol_sca = make_interp_spline(
+                    wavelength,
+                    sca2n,
                     k=1,
                 )
-                sca2 = interpol_sg2(wavelength) / area_sg2
-                # Normalize slant so that total(wei*asj2*sca2)/total(wei*asj2)=1
-                for m in range(2):
-                    sca2n = sca2 * np.sum(weight * area_sj2[:, m]) / np.sum(weight * area_sj2[:, m] * sca2)
-                    interpol_sca = make_interp_spline(
-                        wavelength,
-                        sca2n,
-                        k=1,
-                    )
-                    sca1n = interpol_sca(iris_response[k]["LAMBDA"])
-                    sca1n = np.clip(sca1n, a_min=0, a_max=None)
-                    iris_response[k]["AREA_SJI"][m] = area_sji[m] * sca1n
+                sca1n = interpol_sca(iris_response["LAMBDA"])
+                sca1n = np.clip(sca1n, a_min=0, a_max=None)
+                iris_response["AREA_SJI"][m] = area_sji[m] * sca1n
         else:
             # NUV is not processed
-            for k in range(number_of_obs_times):
-                iris_response[k]["AREA_SJI"] = [Quantity(x, unit=u.cm**2) for x in iris_response[k]["AREA_SJI"]]
-                area_sji = list(area_sji)
-                iris_response[k]["AREA_SJI"][2:4] = area_sji
+            iris_response["AREA_SJI"][2:4] = list(area_sji)
     for j in range(4):
-        for k in range(number_of_obs_times):
-            # SJI specific time dependency
-            iris_fit_sji = _fit_xput_lite(
-                observation_time,
-                iris_response[k]["C_S_TIME"][j, :],
-                iris_response[k]["COEFFS_SJI"][j, :],
-            )
-            iris_response[k]["AREA_SJI"][j] = iris_response[k]["AREA_SJI"][j] * iris_fit_sji[k]
-    # Ensure AREA_SG and AREA_SJI are Quantity arrays
-    for response in iris_response:
-        if not isinstance(response["AREA_SG"], Quantity):
-            response["AREA_SG"] = Quantity(response["AREA_SG"], unit=u.cm**2)
-        if not isinstance(response["AREA_SJI"], Quantity):
-            response["AREA_SJI"] = Quantity(response["AREA_SJI"], unit=u.cm**2)
-    if number_of_obs_times == 1:
-        iris_response = iris_response[0]
+        # SJI specific time dependency
+        iris_response["AREA_SJI"][j] *= _fit_xput_lite(
+            observation_time,
+            iris_response["C_S_TIME"][j, :],
+            iris_response["COEFFS_SJI"][j, :],
+        )
+    iris_response["AREA_SG"] = Quantity(iris_response["AREA_SG"], unit=u.cm**2)
+    iris_response["AREA_SJI"] = Quantity(iris_response["AREA_SJI"], unit=u.cm**2)
     return iris_response
 
 
@@ -297,7 +265,7 @@ def _fit_xput_lite(observation_time, time_cal_coeffs, cal_coeffs):
     Parameters
     ----------
     observation_time: `astropy.time.Time`
-        Observation time.
+        Observation time, a single time.
     time_cal_coeffs: `astropy.time.Time`
         Start and end times of intervals of constant ``cal_coeffs[i]``.
         These should be in "utime" format.
@@ -306,8 +274,8 @@ def _fit_xput_lite(observation_time, time_cal_coeffs, cal_coeffs):
 
     Returns
     -------
-    `numpy.array`
-        Yields the fit used to compute the effective area using the input times ``observation_time``.
+    `float`
+        The fit used to compute the effective area at ``observation_time``.
     """
     if time_cal_coeffs.shape[1] != 2 or cal_coeffs.shape[1] < 2:
         # Raise ValueError as time coefficient have the wrong format.
@@ -316,48 +284,42 @@ def _fit_xput_lite(observation_time, time_cal_coeffs, cal_coeffs):
     # Some time transformations.
     # Exponent for transition between exp.decay intervals.
     transition_exp = 1.5
-    # For loop for carrying out the least-squares fit and computation of fit output.
-    fit_out = np.zeros(len(observation_time))
-    for i, t in enumerate(observation_time):
-        aux_cal_coeffs = np.zeros(2 * time_cal_coeffs.shape[0])
-        # Looking for the closest time in the calibration time intervals.
-        # Differences are given in years before passing to the next stage.
-        # The last interval ends in 2049, past ERFA's leap-second table, which gives a "dubious year" warning.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", ErfaWarning)
-            t_diff = t - time_cal_coeffs
-        t_diff = t_diff.flatten()
-        # To convert to an array, quantities need to be dimensionless, hence dividing out the unit.
-        t_diff = np.array([x.to(u.year).value for x in t_diff])
-        idx = np.where(t_diff < 0)[0]
-        if idx.size == 0:
+    aux_cal_coeffs = np.zeros(2 * time_cal_coeffs.shape[0])
+    # Looking for the closest time in the calibration time intervals.
+    # Differences are given in years before passing to the next stage.
+    # The last interval ends in 2049, past ERFA's leap-second table, which gives a "dubious year" warning.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ErfaWarning)
+        t_diff = observation_time - time_cal_coeffs
+    t_diff = t_diff.flatten().to_value(u.year)
+    idx = np.where(t_diff < 0)[0]
+    if idx.size == 0:
+        idx = 1
+    else:
+        idx = idx[0]
+        if idx == 0:
             idx = 1
-        else:
-            idx = idx[0]
-            if idx == 0:
-                idx = 1
-        # If the observation_time is between the calibration time intervals of a
-        # calibration file (idx % !=0) then the aux_coeffs are given by an
-        # exponential (coefficient and exponential value).
-        # If the observation_time is between the end calibration time interval of
-        # a calibration file (cal_file_t) and the beginning calibration
-        # time interval of the next calibration file (cal_file_t+1)
-        # (idx% 2 == 0) then, the aux_coeffs are given by 4 values
-        # corresponding to a partial exponential obtained from
-        # cal_file_t and a complementary exponential obtained from the
-        # cal_file_t+1
-        if idx % 2 != 0:  # I.e., if idx is not even...
-            dtt_0 = 1
-            exp_0 = np.exp(cal_coeffs[idx // 2, 2] * (t_diff[idx - 1]))
-            aux_cal_coeffs[idx - 1 : idx + 1] = np.array([dtt_0, dtt_0 * exp_0])
-        else:
-            dtt_1 = (t_diff[idx - 1] / (t_diff[idx - 1] - t_diff[idx])) ** transition_exp
-            dtt_0 = 1 - dtt_1
-            exp_0 = np.exp(cal_coeffs[(idx // 2) - 1, 2] * (t_diff[idx - 2]))
-            exp_1 = np.exp(cal_coeffs[idx // 2, 2] * (t_diff[idx]))
-            aux_cal_coeffs[idx - 2 : idx + 2] = np.array([dtt_0, dtt_0 * exp_0, dtt_1, dtt_1 * exp_1])
-        fit_out[i] = np.matmul(aux_cal_coeffs, cal_coeffs[:, :2].reshape(aux_cal_coeffs.shape[0]))
-    return fit_out
+    # If the observation_time is between the calibration time intervals of a
+    # calibration file (idx % !=0) then the aux_coeffs are given by an
+    # exponential (coefficient and exponential value).
+    # If the observation_time is between the end calibration time interval of
+    # a calibration file (cal_file_t) and the beginning calibration
+    # time interval of the next calibration file (cal_file_t+1)
+    # (idx% 2 == 0) then, the aux_coeffs are given by 4 values
+    # corresponding to a partial exponential obtained from
+    # cal_file_t and a complementary exponential obtained from the
+    # cal_file_t+1
+    if idx % 2 != 0:  # I.e., if idx is not even...
+        dtt_0 = 1
+        exp_0 = np.exp(cal_coeffs[idx // 2, 2] * (t_diff[idx - 1]))
+        aux_cal_coeffs[idx - 1 : idx + 1] = np.array([dtt_0, dtt_0 * exp_0])
+    else:
+        dtt_1 = (t_diff[idx - 1] / (t_diff[idx - 1] - t_diff[idx])) ** transition_exp
+        dtt_0 = 1 - dtt_1
+        exp_0 = np.exp(cal_coeffs[(idx // 2) - 1, 2] * (t_diff[idx - 2]))
+        exp_1 = np.exp(cal_coeffs[idx // 2, 2] * (t_diff[idx]))
+        aux_cal_coeffs[idx - 2 : idx + 2] = np.array([dtt_0, dtt_0 * exp_0, dtt_1, dtt_1 * exp_1])
+    return np.matmul(aux_cal_coeffs, cal_coeffs[:, :2].reshape(aux_cal_coeffs.shape[0]))
 
 
 def get_interpolated_effective_area(iris_response, detector_type, obs_wavelength):
