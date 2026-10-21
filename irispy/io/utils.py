@@ -240,9 +240,12 @@ def read_files(
     Parameters
     ----------
     filenames : `list` of `str` or `pathlib.Path`, `str`, `pathlib.Path`
-        Filename(s) or folder(s) to load. For a folder, every ``iris_l2_*`` ``.fits``, ``.fits.gz``
-        and ``.tar.gz`` file directly in it is read, such as the files of an observation downloaded
-        from the IRIS archive. A file given more than once, by any path or symlink, is read once.
+        Filename(s) or folder(s) to load. For a folder, every ``iris_l2_*``, ``aia_l2_*``, ``sot_l2_*``
+        and ``sotsp_l2_*`` ``.fits``, ``.fits.gz`` and ``.tar.gz`` file directly in it is read. The folder
+        should hold either the tarballs of an observation downloaded from the IRIS archive or the files
+        extracted from them, not both: with both, each slit-jaw, AIA and SOT cube comes back twice and
+        each raster scan appears twice in its raster.
+        A file given more than once, by any path or symlink, is read once.
         Tar files are extracted first. Full-disk mosaics are not read here, use `irispy.io.read_mosaic`.
     spectral_windows : iterable of `str` or `str`, optional
         Spectral windows to extract from the raster files; slit-jaw, AIA and SOT files have none.
@@ -320,13 +323,18 @@ def read_files(
     >>> list(raster.keys())  # doctest: +REMOTE_DATA
     ['Mg II k 2796']
     """
-    if isinstance(filenames, (str, Path)):
-        filenames = [filenames]
+    given = [filenames] if isinstance(filenames, (str, Path)) else list(filenames)
     paths = []
-    for f in map(Path, filenames):
+    for f in map(Path, given):
         if f.is_dir():
+            # The IRIS tarballs and files, and the AIA and SOT files extracted from the tarballs.
             # An archive download folder also holds iris_l2_<obs>_movies.tar, the quick-look movies.
-            paths.extend(p for p in f.glob("iris_l2_*") if p.name.endswith((".fits", ".fits.gz", ".tar.gz")))
+            paths.extend(
+                p
+                for p in f.iterdir()
+                if p.name.startswith(("iris_l2_", "aia_l2_", "sot_l2_", "sotsp_l2_"))
+                and p.name.endswith((".fits", ".fits.gz", ".tar.gz"))
+            )
         else:
             paths.append(f)
     filenames = sorted({p.resolve() for p in paths})
@@ -395,6 +403,6 @@ def read_files(
                 continue
             raise
     if not returns:
-        msg = f"No supported IRIS files were loaded from {filenames}."
+        msg = f"No supported IRIS files were loaded from {', '.join(map(str, given)) or '[]'}."
         raise ValueError(msg)
     return NDCollection(returns.items()) if len(returns) > 1 else next(iter(returns.values()))

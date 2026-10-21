@@ -1,4 +1,6 @@
+import os
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -112,6 +114,27 @@ def test_readers_reject_what_is_not_fits_despite_its_suffix(tmp_path, sns_sg_fil
     if reader is read_spectrograph_lvl2:
         # Several files are opened first, to order them by DATE_OBS
         with pytest.raises(ValueError, match=message):
+            reader([sns_sg_file, path])
+
+
+@pytest.mark.parametrize("reader", [read_files, read_sji_lvl2, read_spectrograph_lvl2])
+@pytest.mark.parametrize(
+    ("kind", "error"),
+    [("missing file", FileNotFoundError), ("missing folder", FileNotFoundError), ("unreadable file", PermissionError)],
+)
+def test_readers_raise_the_os_error_for_a_path_they_cannot_read(tmp_path, sns_sg_file, reader, kind, error):
+    path = tmp_path / ("obs" if kind == "missing folder" else Path(sns_sg_file).name)
+    if kind == "unreadable file":
+        if os.name == "nt" or os.geteuid() == 0:
+            pytest.skip("Windows and root read a file without read permission")
+        shutil.copy(sns_sg_file, path)
+        path.chmod(0)
+
+    with pytest.raises(error):
+        reader(path)
+    if reader is read_spectrograph_lvl2:
+        # Several files are opened first, to order them by DATE_OBS
+        with pytest.raises(error):
             reader([sns_sg_file, path])
 
 

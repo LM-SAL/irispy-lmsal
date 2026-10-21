@@ -1,1 +1,1 @@
-`~irispy.io.read_files` takes a folder and reads every ``iris_l2_*`` ``.fits``, ``.fits.gz`` and ``.tar.gz`` file in it, such as the files of an observation downloaded from the IRIS archive.
+``irispy.io.read_files`` takes a folder and reads every ``iris_l2_*``, ``aia_l2_*``, ``sot_l2_*`` and ``sotsp_l2_*`` ``.fits``, ``.fits.gz`` and ``.tar.gz`` file in it, such as the tarballs of an observation downloaded from the IRIS archive or the files extracted from them.

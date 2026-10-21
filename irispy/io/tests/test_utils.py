@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import gzip
 import shutil
 import hashlib
@@ -197,6 +198,23 @@ def test_read_files_folder(tmp_path, sns_sg_file, sns_sji_1330_file, sns_sji_140
     returns = read_files(folder, extract_dir=tmp_path / "extracted")
 
     assert set(returns.keys()) == {"C II 1336", "SJI_1330", "SJI_1400"}
+
+
+def test_read_files_folder_of_aia_and_sot_files(tmp_path, aia_1700_file, sot_fg_file, sot_mg_file, sot_sp_file):
+    # The files extracted from the SDO, SOTFG and SOTSP tarballs
+    for filename in (aia_1700_file, sot_fg_file, sot_mg_file, sot_sp_file):
+        (tmp_path / Path(filename).name).symlink_to(filename)
+
+    returns = read_files(tmp_path)
+
+    assert set(returns.keys()) == {"1700", "G band 4305", "TF Na I 5896", "6302A B_LOS"}
+
+
+def test_read_files_names_a_folder_with_no_iris_files(tmp_path):
+    (tmp_path / "notes.fits").touch()
+
+    with pytest.raises(ValueError, match=re.escape(f"No supported IRIS files were loaded from {tmp_path}.")):
+        read_files(tmp_path)
 
 
 def test_read_files_raster_file_list(raster_sg_files):
