@@ -3,6 +3,7 @@ import pytest
 
 import astropy.units as u
 from astropy import constants
+from astropy.coordinates import SpectralCoord
 from astropy.modeling import models
 from astropy.modeling.fitting import LevMarLSQFitter, LMLSQFitter, TRFLSQFitter, parallel_fit_dask
 from astropy.nddata import StdDevUncertainty
@@ -19,6 +20,7 @@ from irispy.utils.fitting import FitQualityFlag, line_model, maps_from_fit, non_
 SHAPE = (20, 20)
 WAVELENGTH = (1402.0 + 0.026 * np.arange(60)) * u.AA
 MG_FEATURES_FILE = "mg_features/iris_l2_20130902_182935_4000005156_raster_t000_r00000_mg_features_test.fits"
+V34_FILE = "v34/iris_l2_20260206_210853_3460104433_raster_t000_r00000_test.fits"
 C_KMS = constants.c.to_value(u.km / u.s)
 
 
@@ -728,13 +730,58 @@ def test_maps_from_fit_fixed_parameters_and_rest_wavelength():
     assert np.all(np.isfinite(maps["mean_1"].uncertainty.array))
     # Against 1402.0 Å instead of the documented 1402.77 Å.
     np.testing.assert_allclose(np.median(maps["velocity_1"].data), 0.77 / 1402.0 * C_KMS, rtol=0.01)
-    wider = make_test_spectrogram_cube(np.zeros((*SHAPE, 400)), (1395.0 + 0.026 * np.arange(400)) * u.AA)
-    with pytest.raises(ValueError, match="pass rest_wavelength"):
-        maps_from_fit(fitted, wider, fitter=fitter)
     with pytest.raises(ValueError, match="no unit"):
         maps_from_fit(line_model(["Si IV 1403"]), cube, fitter=fitter)
     with pytest.raises(TypeError, match="fit_info=True"):
         maps_from_fit(fitted, cube, fitter=TRFLSQFitter())
+
+
+def _fit_mg_ii(model):
+    """
+    ``model`` fitted to every spectrum of Mg II k and h in the Mg II k 2796 window of a
+    raster, and that cube.
+    """
+    raster = read_spectrograph_lvl2(get_test_filepath(V34_FILE), uncertainty=True)
+    cube = raster["Mg II k 2796"][0][:, :48]
+    cube = cube.crop([SpectralCoord(2795.4 * u.AA), None], [SpectralCoord(2804.5 * u.AA), None])
+    good = np.isfinite(cube.data) & ~cube.mask
+    wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
+    sigma = np.where(good, cube.uncertainty.array, np.inf)
+    return (*_fit(starts_from_model(model, cube), np.where(good, cube.data, 0), sigma, wavelength, cube.unit), cube)
+
+
+def test_maps_from_fit_velocities_against_each_line():
+    fitted, fitter, cube = _fit_mg_ii(line_model(["Mg II k", "Mg II h"]))
+    maps = maps_from_fit(fitted, cube, fitter=fitter, residual=False)
+    for index, rest in zip((1, 2, 3, 4), (2796.352, 2796.352, 2803.53, 2803.53), strict=True):
+        speed = C_KMS / rest
+        np.testing.assert_allclose(maps[f"velocity_{index}"].data, speed * (maps[f"mean_{index}"].data - rest))
+        np.testing.assert_allclose(maps[f"fwhm_velocity_{index}"].data, speed * maps[f"fwhm_{index}"].data)
+        assert u.allclose(maps[f"velocity_{index}"].meta["fit_rest_wavelength"], rest * u.AA)
+    # A rest wavelength given for one component leaves the others at their lines.
+    k2v = maps_from_fit(fitted, cube, fitter=fitter, rest_wavelength={"k2v": 2796.0 * u.AA}, residual=False)
+    np.testing.assert_allclose(k2v["velocity_1"].data, (maps["mean_1"].data / 2796.0 - 1) * C_KMS)
+    np.testing.assert_array_equal(k2v["velocity_3"].data, maps["velocity_3"].data)
+
+
+def test_maps_from_fit_needs_a_rest_wavelength_for_each_component():
+    # Mg II h as a Gaussian named outside the line catalog and a broad one without a name.
+    model = (
+        line_model(["Mg II k"])
+        + models.Gaussian1D(1, 2803.53 * u.AA, 0.1 * u.AA, name="h")
+        + models.Gaussian1D(1, 2803.53 * u.AA, 0.3 * u.AA)
+    )
+    fitted, fitter, cube = _fit_mg_ii(model)
+    for rest_wavelength, components in ((None, r"3 \('h'\), 4"), ({"h": 2803.53 * u.AA}, "4")):
+        with pytest.raises(ValueError, match=rf"rest_wavelength: {components}\.$"):
+            maps_from_fit(fitted, cube, fitter=fitter, rest_wavelength=rest_wavelength)
+    for key in ("H", None):
+        with pytest.raises(
+            ValueError, match=rf"no Gaussian or Lorentzian component named {key!r}; those are 'k2v', 'k2r', 'h'\.$"
+        ):
+            maps_from_fit(fitted, cube, fitter=fitter, rest_wavelength={key: 2803.53 * u.AA, "k2v": 2796.352 * u.AA})
+    with pytest.raises(TypeError, match=r"rest_wavelength\['h'\] must be an astropy Quantity"):
+        maps_from_fit(fitted, cube, fitter=fitter, rest_wavelength={"h": 2803.53})
 
 
 def test_maps_from_fit_on_one_spectrum():
