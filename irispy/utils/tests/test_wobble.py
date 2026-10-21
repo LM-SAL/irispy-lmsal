@@ -21,10 +21,17 @@ def figures(monkeypatch):
     return figures
 
 
+# The wobble cadence as a number of frames: a half rounds up, 2.2 down, and less than one frame shows every frame
+@pytest.mark.parametrize(
+    ("frames_per_cadence", "frames"), [(2.5, [0, 3, 6, 9]), (2.2, [0, 2, 4, 6, 8]), (0.1, range(10))]
+)
 @pytest.mark.parametrize(("trim", "spatial"), [(False, np.s_[:, :]), (True, np.s_[1:38, 1:36])])
-def test_generate_wobble_movie(sns_sjicube_2832, tmp_path, figures, trim, spatial):
-    # The frames are about 1900 s apart, so a 1.1 hour (3960 s) cadence shows every second frame
-    movie = generate_wobble_movie(sns_sjicube_2832, outdir=tmp_path, trim=trim, wobble_cadence=1.1 * u.hour)
+def test_generate_wobble_movie(sns_sjicube_2832, tmp_path, figures, trim, spatial, frames_per_cadence, frames):
+    times = sns_sjicube_2832.time
+    time_between_frames = np.median((times[1:] - times[:-1]).to_value("s")) * u.s
+    movie = generate_wobble_movie(
+        sns_sjicube_2832, outdir=tmp_path, trim=trim, wobble_cadence=frames_per_cadence * time_between_frames
+    )
 
     assert movie.parent == tmp_path
     ffmpeg = shutil.which(animation.FFMpegWriter.bin_path())
@@ -47,11 +54,11 @@ def test_generate_wobble_movie(sns_sjicube_2832, tmp_path, figures, trim, spatia
         check=True,
     )
     # Each decoded frame is one grayscale pixel, so one byte represents one frame.
-    assert len(decoded.stdout) == 5
+    assert len(decoded.stdout) == len(frames)
     (figure,) = figures
     ax = figure.axes[0]
-    assert ax.texts[0].get_text() == sns_sjicube_2832.time[8].isot
-    np.testing.assert_array_equal(ax.images[0].get_array(), sns_sjicube_2832[(8, *spatial)].data)
+    assert ax.texts[0].get_text() == sns_sjicube_2832.time[frames[-1]].isot
+    np.testing.assert_array_equal(ax.images[0].get_array(), sns_sjicube_2832[(frames[-1], *spatial)].data)
     # Solar X and Y follow the trim
     np.testing.assert_allclose(
         ax.wcs.pixel_to_world_values(0, 0),
