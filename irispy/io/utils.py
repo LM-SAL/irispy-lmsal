@@ -275,9 +275,11 @@ def read_files(
     -------
     `irispy.sji.SJICube`, `irispy.sji.AIACube`, `irispy.sji.SOTCube`, `irispy.spectrograph.RasterCollection` or `ndcube.NDCollection`
         What the files hold, if they hold one product: an `~irispy.sji.SJICube` (or AIA or SOT cube) for a slit-jaw file,
-        a `~irispy.spectrograph.RasterCollection` of the spectral windows for the raster files of one observation.
-        Several products come back in an `~ndcube.NDCollection` keyed by band or measured quantity, with the
-        filename added to repeated names.
+        a `~irispy.spectrograph.RasterCollection` keyed by spectral window for the raster files of one observation.
+        Several products come back in an `~ndcube.NDCollection`. A slit-jaw, AIA or SOT cube is keyed by its band
+        or measured quantity, with the filename added to a repeated name. The rasters of an observation are keyed
+        by the observation's first spectral window, such as ``"C II 1336"``, whichever windows ``spectral_windows``
+        reads; a key already taken has ``" (OBSID)"`` added, and ``" (OBSID, STARTOBS)"`` if that is taken too.
 
     Raises
     ------
@@ -316,7 +318,7 @@ def read_files(
     >>> raster = read_files(
     ...     sample_data.RASTER_FITS, spectral_windows=window
     ... )  # doctest: +REMOTE_DATA
-    >>> list(map(str, raster.keys()))  # doctest: +REMOTE_DATA
+    >>> list(raster.keys())  # doctest: +REMOTE_DATA
     ['Mg II k 2796']
     """
     if isinstance(filenames, (str, Path)):

@@ -233,6 +233,7 @@ def read_spectrograph_lvl2(
                     window_fits_indices = [
                         int(np.nonzero(windows_in_obs == window)[0][0]) + 1 for window in spectral_windows_req
                     ]
+                spectral_windows_req = spectral_windows_req.tolist()  # the keys are str, not numpy.str_
                 data_dict = {window_name: [] for window_name in spectral_windows_req}
                 base_time = Time(hdulist[0].header["DATE_OBS"])
                 observer = get_body_heliographic_stonyhurst("Earth", base_time)
