@@ -1,1 +1,1 @@
-Added `irispy.utils.fitting`, with starting models for fitting IRIS lines with `astropy.modeling.fitting.parallel_fit_dask`: `~irispy.utils.fitting.profiles_on_background`, `~irispy.utils.fitting.si_iv_1403_model` and `~irispy.utils.fitting.mg_ii_model`.
+Added ``irispy.utils.fitting``, with ``irispy.utils.fitting.line_model``, a starting model for fitting documented IRIS lines with ``astropy.modeling.fitting.parallel_fit_dask``: a Gaussian for each line on a constant background, with two for the emission peaks of Mg II k and h.
