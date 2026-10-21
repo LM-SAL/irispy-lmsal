@@ -275,6 +275,44 @@ def test_read_spectrograph_retains_missing_nuv_exposure(raster_sg_file, tmp_path
     assert abs((times[0] - cube.meta["auxiliary times"][0]).to_value(u.s)) < 1e-6
 
 
+def test_read_spectrograph_reads_a_file_with_no_data(raster_sg_files, tmp_path, caplog):
+    # The archive writes a raster file whose exposures all failed, such as r00066 of this observation, with DATE_OBS
+    # and DATE_END empty, its pointing and roll as 0, every window fill, its exposure times and pointing as 0 in the
+    # auxiliary table, and its last table of empty (A0) columns, which astropy cannot read
+    empty = tmp_path / "iris_l2_20140329_140938_3860258481_raster_t000_r00001_no_data.fits"
+    with fits.open(raster_sg_files[1], memmap=False) as hdulist:
+        hdulist[0].header.update(DATE_OBS="", DATE_END="", XCEN=0.0, YCEN=0.0, SAT_ROT=0.0)
+        for hdu in hdulist[1:-2]:
+            hdu.data[:] = BAD_PIXEL_VALUE_SCALED
+        auxiliary = hdulist[-2]
+        auxiliary.data[:, auxiliary.header["EXPTIMEF"] :] = 0
+        times = Time(hdulist[0].header["STARTOBS"]) + auxiliary.data[:, auxiliary.header["TIME"]] * u.s
+        table = hdulist[-1].header.copy()
+        hdulist[:-1].writeto(empty)
+    table["NAXIS1"] = 1
+    for i in range(1, 10):
+        table[f"TBCOL{i}"], table[f"TFORM{i}"] = 1, "A0"
+    with empty.open("ab") as file:
+        file.write(table.tostring().encode() + b" " * 2880)
+
+    windows = ["C II 1336", "Mg II k 2796"]
+    with caplog.at_level("WARNING", logger="sunpy"):
+        raster = read_spectrograph_lvl2([raster_sg_files[2], empty, raster_sg_files[0]], spectral_windows=windows)
+
+    assert f"{empty} has no data" in caplog.text
+    for window in windows:
+        before, cube, after = raster[window]
+        assert np.all(cube.mask)
+        cube_times = cube.axis_world_coords("time", wcs=cube.extra_coords)[0]
+        assert_quantity_allclose((cube_times - times).to(u.s), 0 * u.s, atol=1 * u.us)
+        assert before.meta["DATE_END"] < cube.meta["DATE_OBS"] == times[0].isot < after.meta["DATE_OBS"]
+        assert np.all(np.isnan(cube.wcs.pixel_to_world_values(0, 0, np.arange(cube.shape[0]))[1:]))
+        assert np.all(np.isnan(cube.meta["exposure FOV center"].Tx))
+        assert np.isnan(cube.meta.fov_center.Tx)
+        assert np.isnan(cube.meta.satellite_rotation)
+        assert not np.any(np.isnan(after.wcs.pixel_to_world_values(0, 0, np.arange(after.shape[0]))[1:]))
+
+
 def test_read_spectrograph_flips_v34_mask_uncertainty_and_meta(raster_sg_file, tmp_path):
     # STEPS_AV < -0.01 marks a V34 raster, which is read flipped along the step axis
     filename = tmp_path / "v34.fits"
