@@ -14,8 +14,8 @@ class ObsID(dict):
 
     Parameters
     ----------
-    obsid : `int`
-        IRIS OBS ID to query. Needs to be a valid OBS ID, with 10 digits.
+    obsid : `int` or `str`
+        IRIS OBS ID to query, such as the ``OBSID`` header keyword. Needs to be a valid OBS ID, with 10 digits.
 
     Notes
     -----
@@ -52,12 +52,19 @@ class ObsID(dict):
     >>> data["raster_fov"]
     '31.35x120'
     >>> data["raster_step"]
-    np.float64(0.33)
+    <Quantity 0.33 arcsec>
+    >>> data["spec_cadence"]
+    <Quantity 96. s>
+
+    Sparse/dense/sparse rasters have one raster step per sub-raster:
+
+    >>> obsid.ObsID(4191006128)["raster_step"]
+    <Quantity [1.  , 0.33, 1.  ] arcsec>
     """
 
     def __init__(self, obsid) -> None:
-        self.obsid = obsid
-        data, options = self._read_obsid(obsid)
+        self.obsid = int(obsid)
+        data, options = self._read_obsid(self.obsid)
         super().__init__(data)
         self.options = options
 
@@ -102,14 +109,14 @@ class ObsID(dict):
             "FUV binned same as NUV": "fuv_binning",
             "Spatial x 1, Spectral x 1": "binning",
             "Exposure 1s": "exptime",
-            "C II   Si IV   Mg II h/k   Mg II w   ": "sjis",
+            "C II   Si IV   Mg II h/k   Mg II w": "sjis",
         }
         versions = [34, 36, 38, 40]
         if len(str(obsid)) != 10:
             msg = "Invalid OBS ID: must have 10 digits."
             raise ValueError(msg)
         # iris_obsid2struct.pro: the table version is obsid // 2e8 * 2, so v40 Full readout OBS IDs start with 41
-        version = int(obsid) // 200_000_000 * 2
+        version = obsid // 200_000_000 * 2
         if version >= 42:
             msg = (
                 f"OBS ID {obsid} is a calibration or special sequence, which has no OBS table. "
@@ -119,10 +126,8 @@ class ObsID(dict):
         if version not in versions:
             msg = f"Invalid OBS ID: OBS table version {version} is not one of {versions}"
             raise ValueError(msg)
-        obsid = int(obsid) - version * 100_000_000
+        obsid -= version * 100_000_000
         reader = ascii_io.get_reader(reader_cls=ascii_io.Csv)
-        # Option descriptions are also dictionary keys, so keep their trailing spaces.
-        reader.data.splitter.process_val = None
         with importlib.resources.as_file(importlib.resources.files("irispy") / f"data/v{version}-table10.csv") as path:
             table1 = reader.read(path)
         with importlib.resources.as_file(
@@ -138,13 +143,14 @@ class ObsID(dict):
                 msg,
             ) from None
 
-        raster_step = meta["Raster step"]
-        data["raster_step"] = str(raster_step) if isinstance(raster_step, str) else raster_step
-        data["raster_fov"] = str(meta["Raster FOV"])
-        data["spec_cadence"] = str(meta["Spectral cadence"])
-        data["sji_fov"] = str(meta["SJI FOV"])
+        # The v40 sparse/dense/sparse rasters give one step per sub-raster, "1  0.33  1".
+        data["raster_step"] = np.squeeze(np.array(str(meta["Raster step"]).split(), dtype=float)) * u.arcsec
+        # The v40 table writes "126 x120" where the others write "126x120".
+        data["raster_fov"] = str(meta["Raster FOV"]).replace(" x", "x")
+        data["spec_cadence"] = u.Quantity(meta["Spectral cadence"])
+        data["sji_fov"] = str(meta["SJI FOV"]).replace(" x", "x")
         data["raster_desc"] = str(meta["Description"])
-        data["raster_fulldesc"] = f"{data['raster_desc']} {data['raster_fov']} {data['spec_cadence']}"
+        data["raster_fulldesc"] = f"{data['raster_desc']} {data['raster_fov']} {meta['Spectral cadence']}"
         field_ranges = np.r_[np.flatnonzero(table2["OBS ID"] == 0), len(table2)]
         # field indices, start from largest and subtract
         for start, end in zip(field_ranges[-2::-1], field_ranges[:0:-1], strict=True):
@@ -165,7 +171,7 @@ class ObsID(dict):
                     attr_value = self._exptime_to_quant(desc[index - start])
                 else:
                     opt = dict(zip(desc, table["OBS ID"].tolist(), strict=True))
-                    attr_value = desc[index - start].strip()
+                    attr_value = desc[index - start]
                 data[attr_name] = attr_value
                 options[attr_name] = opt
         if obsid != id_raster:
