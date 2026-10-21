@@ -1,0 +1,1 @@
+``BaseMeta.fov_center`` and the ``"exposure FOV center"`` entry of the raster metadata are now seen from Earth at the observation time, so they can be transformed to other frames and passed to sunpy functions such as ``get_heliocentric_angle``, which raised ``ConvertError`` before.

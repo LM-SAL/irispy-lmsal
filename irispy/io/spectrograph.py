@@ -248,6 +248,8 @@ def read_spectrograph_lvl2(
                 Ty=hdulist[-2].data[:, hdulist[-2].header["YCENIX"]],
                 unit=u.arcsec,
                 frame=Helioprojective,
+                observer=observer,
+                obstime=base_time,
             )
             obs_vrix = hdulist[-2].data[:, hdulist[-2].header["OBS_VRIX"]] * u.m / u.s
             ophaseix = hdulist[-2].data[:, hdulist[-2].header["OPHASEIX"]]
