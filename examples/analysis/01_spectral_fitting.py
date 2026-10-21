@@ -170,11 +170,11 @@ for ax in ax_dict.values():
 fig.tight_layout()
 
 ###############################################################################
-# We take the non-thermal velocity from the fitted width, as
-# :ref:`irispy-tutorial-fitting` explains, with the thermal width at log T = 4.9,
-# the peak of Si IV in CHIANTI's ionization equilibrium :cite:p:`dere2023`.
+# We take the non-thermal velocity from the fitted width, as :ref:`irispy-tutorial-fitting`
+# explains, with the thermal width at log T = 4.9 from the line catalog, the peak of Si IV in
+# CHIANTI's ionization equilibrium :cite:p:`dere2023`.
 
-non_thermal = non_thermal_velocity(maps["fwhm_1"], si_iv_core, ion="Si IV", temperature=10**4.9 * u.K)
+non_thermal = non_thermal_velocity(maps["fwhm_1"], si_iv_core, ion="Si IV")
 
 fig = plt.figure()
 ax = fig.add_subplot(projection=non_thermal.wcs)

@@ -198,13 +198,14 @@ Non-thermal velocities
 ======================
 
 A fitted width holds the instrumental and thermal widths of the line as well.
-`~irispy.utils.fitting.non_thermal_velocity` removes both in quadrature from a ``fwhm_<n>`` map of `~irispy.utils.fitting.maps_from_fit`, using the spectral resolution of the passband and, for the thermal width, the ion's mass and a temperature, here the peak of Si IV in CHIANTI's ionization equilibrium :cite:p:`dere2023`.
+`~irispy.utils.fitting.non_thermal_velocity` removes both in quadrature from a ``fwhm_<n>`` map of `~irispy.utils.fitting.maps_from_fit`, using the spectral resolution of the passband and, for the thermal width, the ion's mass and its temperature of maximum abundance from the line catalog, log T = 4.9 for Si IV in CHIANTI's ionization equilibrium :cite:p:`dere2023`.
+Pass ``temperature`` to use another.
 The quadrature subtraction assumes Gaussian profiles; do not pass the width of a Lorentzian fit:
 
 .. code-block:: python
 
     >>> from irispy.utils.fitting import non_thermal_velocity
-    >>> non_thermal = non_thermal_velocity(maps["fwhm_1"], si_iv, ion="Si IV", temperature=10**4.9 * u.K)  # doctest: +REMOTE_DATA
+    >>> non_thermal = non_thermal_velocity(maps["fwhm_1"], si_iv, ion="Si IV")  # doctest: +REMOTE_DATA
     >>> non_thermal.unit  # doctest: +REMOTE_DATA
     Unit("km / s")
 
