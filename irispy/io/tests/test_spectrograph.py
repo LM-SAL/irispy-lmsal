@@ -24,12 +24,6 @@ def test_spectral_windows_order_read_spectrograph_lvl2(sns_sg_file):
         np.testing.assert_array_equal(subset[key][0].data, all_windows[key][0].data)
 
 
-@pytest.mark.parametrize("spectral_windows", [None, ["Mg II k 2796", "Si IV 1394"]])
-def test_read_spectrograph_lvl2_window_keys_are_str(sns_sg_file, spectral_windows):
-    raster = read_spectrograph_lvl2(sns_sg_file, spectral_windows=spectral_windows)
-    assert {type(key) for key in raster} == {str}
-
-
 def test_read_spectrograph_orders_files_by_date_obs(raster_sg_files):
     ordered = read_spectrograph_lvl2(raster_sg_files, spectral_windows="C II 1336")["C II 1336"]
     unordered = read_spectrograph_lvl2(raster_sg_files[::-1], spectral_windows="C II 1336")["C II 1336"]
@@ -51,6 +45,7 @@ def test_sns_read_spectrograph_lvl2(sns_sg_file):
         "2814",
         "Mg II k 2796",
     ]
+    assert {type(key) for key in raster_collection} == {str}
     # Simple repr check
     assert str(raster_collection)
     # We do not expect any metadata to be present on the collection

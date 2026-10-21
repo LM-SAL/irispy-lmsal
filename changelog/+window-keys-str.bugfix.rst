@@ -1,1 +1,1 @@
-The spectral window keys of the ``irispy.spectrograph.RasterCollection`` read by ``irispy.io.read_spectrograph_lvl2`` and ``irispy.io.read_files`` are now ``str`` instead of ``numpy.str_``, so they print as ``'C II 1336'`` instead of ``np.str_('C II 1336')``.
+The spectral window keys of the ``irispy.spectrograph.RasterCollection`` read by ``irispy.io.read_spectrograph_lvl2`` and ``irispy.io.read_files`` are now ``str`` instead of ``numpy.str_``, so ``raster.keys()`` and the printed collection show ``'C II 1336'`` instead of ``np.str_('C II 1336')``.

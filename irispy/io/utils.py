@@ -276,10 +276,9 @@ def read_files(
     `irispy.sji.SJICube`, `irispy.sji.AIACube`, `irispy.sji.SOTCube`, `irispy.spectrograph.RasterCollection` or `ndcube.NDCollection`
         What the files hold, if they hold one product: an `~irispy.sji.SJICube` (or AIA or SOT cube) for a slit-jaw file,
         a `~irispy.spectrograph.RasterCollection` keyed by spectral window for the raster files of one observation.
-        Several products come back in an `~ndcube.NDCollection`. A slit-jaw, AIA or SOT cube is keyed by its band
-        or measured quantity, with the filename added to a repeated name. The rasters of an observation are keyed
-        by the observation's first spectral window, such as ``"C II 1336"``, whichever windows ``spectral_windows``
-        reads; a key already taken has ``" (OBSID)"`` added, and ``" (OBSID, STARTOBS)"`` if that is taken too.
+        Several products come back in an `~ndcube.NDCollection` keyed by band or measured quantity, with the
+        filename added to repeated names; rasters are keyed by the file's first spectral window, such as
+        ``"C II 1336"``, with the OBSID, then also STARTOBS, added to repeated names.
 
     Raises
     ------
