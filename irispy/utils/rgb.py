@@ -51,7 +51,9 @@ def _wavelength_limits(wavelength, rest_wavelength, wavelength_min, wavelength_m
         msg = "The cube metadata has no usable TWAVE value. Pass rest_wavelength explicitly."
         raise ValueError(msg)
     lower, upper = wavelength.min(), wavelength.max()
-    if lower <= rest_wavelength <= upper:
+    # The cube covers its pixels' full width, as in default_rest_wavelength
+    half = np.abs(np.diff(wavelength)).max() / 2 if wavelength.size > 1 else 0 * wavelength.unit
+    if lower - half <= rest_wavelength <= upper + half:
         lower, upper = ([-100, 100] * u.km / u.s).to(u.AA, equivalencies=u.doppler_optical(rest_wavelength))
     return lower if wavelength_min is None else wavelength_min, upper if wavelength_max is None else wavelength_max
 
