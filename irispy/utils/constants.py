@@ -5,15 +5,11 @@ This module provides constants used elsewhere.
 import astropy.units as u
 
 __all__ = [
-    "ATOMIC_MASS",
-    "BAD_PIXEL_VALUES_SCALED",
     "BAD_PIXEL_VALUE_SCALED",
     "BAD_PIXEL_VALUE_UNSCALED",
     "DN_UNIT",
     "INSTRUMENTAL_FWHM",
-    "PASSBAND_LIMITS",
     "RADIANCE_UNIT",
-    "RADIANCE_UNIT_PER_HZ",
     "READOUT_NOISE",
     "SATURATION_LIMIT",
     "SLIT_WIDTH",
