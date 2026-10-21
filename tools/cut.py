@@ -14,6 +14,8 @@ kept values and their neighbors are exactly those of the whole file:
     rest wavelength. Its other keywords, such as TSR/TER/TSC/TEC and the statistics,
     still describe the whole window.
 - The understated TFIELDS of the filename table is repaired, as in ``compress.py``.
+- The primary header cards are written as in the source, even one that breaks the FITS
+    standard, such as ``STEPT_DV = NAN``.
 - The filename table of an AIA cube declares A0 columns, which astropy cannot read, so it
     is dropped, as the SOT fixtures do; irispy does not read it.
 
@@ -136,7 +138,11 @@ def cut(source, output, *, exposures=None, rows=None, columns=None, windows=None
                 for image in images:
                     image.data = image.data[(slice(None),) * (3 - axis) + (pixels,)]
                     image.header[f"CRPIX{axis}"] -= pixels.start
-        hdus.writeto(output, overwrite=True)
+        # "warn" writes a primary card astropy cannot parse, such as STEPT_DV = NAN, as the source has it;
+        # the other HDUs must still meet the standard
+        for hdu in hdus[1:]:
+            hdu.verify("exception")
+        hdus.writeto(output, overwrite=True, output_verify="warn")
 
 
 def main():

@@ -1,0 +1,48 @@
+Test data for level 2 files whose primary header writes a NaN as an unquoted NAN, which is
+neither a number nor a string in FITS, so astropy cannot parse the card. Files made before
+June 2018 write it so; SolarSoft's gen/idl/fits/sxaddpar.pro notes "Jun 2018 W. Thompson,
+for backward compatibility, save non-finite values (e.g. NaN) as strings".
+
+iris_l2_20140917_050324_3860356063_raster_t000_r00000_test.fits
+---------------------------------------------------------------
+
+OBS 3860356063: Very large coarse 2-step raster 2x175 2s   Deep x 4 Spatial x 2, Spe
+(OBS_DESC as written). 748 rasters of 2 steps; only r00000 writes the standard deviation
+of the step time as "STEPT_DV=                  NAN /".
+Source: the L12-2017-04-23 processing (DATE 2017-06-15), downloaded before the archive
+        reprocessed this observation with L12-2019-08-08, which writes STEPT_DV = 'NaN'.
+        iris_l2_20140917_050324_3860356063_raster_t000_r00000.fits,
+        sha256 3538f4c26c875e186980292a7a0315100329d53f827a87e48e4620318488afc7
+
+Kept:   all 9 windows and both steps, slit rows 269-278 (of 548, 0-based), whole
+        spectra. The data values, the auxiliary table and the level 1 filename table
+        are unchanged.
+Header: the primary header is byte for byte that of the source, STEPT_DV included.
+        NAXIS2 and CRPIX2 of the windows describe the cut. The filename table declares
+        TFIELDS = 9 for its 9 columns (the source says 7, see tools/compress.py).
+Made:   python tools/cut.py iris_l2_20140917_050324_3860356063_raster_t000_r00000.fits \
+            iris_l2_20140917_050324_3860356063_raster_t000_r00000_test.fits --rows 269:279
+
+iris_l2_20210905_001833_3620258102_SJI_1400_t000_nan_test.fits
+--------------------------------------------------------------
+
+A cut of the sns slit-jaw fixture with CADPL_DV, the standard deviation of the planned
+cadence, rewritten as the pipeline wrote it for a two-frame slit-jaw before June 2018:
+SolarSoft's iris/idl/uio/level1to2/irisl12_savesjidata.pro sets cadpldv = stddev(dtimes)
+of the one time step, NaN in IDL. The card, "CADPL_DV=                  NAN /", is that of
+sunkit-instruments' sunkit_instruments/data/test/iris_l2_20130801_074720_4040000014_SJI_1400_t000.fits
+(L12-2013-11-15, NEXP = 2).
+Source: sns/iris_l2_20210905_001833_3620258102_SJI_1400_t000_test.fits,
+        sha256 9cbe4037b77c7bb60c916eb518185c849cffdf8a69d170f80fe007b6c72b3c3c
+
+Kept:   frames 0 and 1, whole images, with the same rows of the auxiliary and filename
+        tables; NEXP = NAXIS3 = 2. CADPL_AV and the other statistics still describe the
+        whole fixture.
+Made:   from the repository root,
+        python tools/cut.py irispy/data/test/sns/iris_l2_20210905_001833_3620258102_SJI_1400_t000_test.fits \
+            irispy/data/test/unparsable_card/iris_l2_20210905_001833_3620258102_SJI_1400_t000_nan_test.fits \
+            --exposures 0,1
+        then the card is rewritten in place:
+        python -c "from pathlib import Path; \
+            p = Path('irispy/data/test/unparsable_card/iris_l2_20210905_001833_3620258102_SJI_1400_t000_nan_test.fits'); \
+            p.write_bytes(p.read_bytes().replace(b'CADPL_DV=            0.0996251', b'CADPL_DV=                  NAN'))"
