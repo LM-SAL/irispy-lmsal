@@ -23,7 +23,9 @@ SHORT = "too short for an orbital fit"
 
 
 def idl_reference(obsid):
-    return QTable.read(get_test_filepath(f"wavelength_drift/iris_prep_wavecorr_l2_{obsid}_r00000.ecsv"))
+    table = QTable.read(get_test_filepath(f"wavelength_drift/iris_prep_wavecorr_l2_{obsid}_r00000.ecsv"))
+    table.rename_columns(["nuv", "fuv"], ["NUV", "FUV"])
+    return table
 
 
 def assert_shifts_match_idl(table, idl):
@@ -62,12 +64,12 @@ def synthetic_o_i_shifts(size, sign=1, pixel=0.15, slope=0, scale=1):
 
 def test_shifts_match_idl():
     table = calculate_wavelength_drift(read_spectrograph_lvl2(CROP))
-    assert table.colnames == ["time", "raster", "step", *LINES, "nuv", "fuv"]
+    assert table.colnames == ["time", "raster", "step", *LINES, "NUV", "FUV"]
     assert list(table["step"]) == list(range(len(CROP_STEPS)))
     idl = idl_reference("3824262996")[CROP_STEPS]
     assert_shifts_match_idl(table, idl)
     # Each drift is fitted to its own line, and follows IDL's fit through all 400 steps
-    for drift, atol in [("nuv", 4e-3), ("fuv", 2e-3)]:
+    for drift, atol in [("NUV", 4e-3), ("FUV", 2e-3)]:
         np.testing.assert_allclose(table[drift].to_value(u.AA), idl[drift].to_value(u.AA), atol=atol)
 
 
@@ -82,25 +84,25 @@ def test_rasters_out_of_time_order():
     assert list(swapped["raster"]) == [1, 1, 1, 0, 0, 0, 0, 0]
     assert list(swapped["step"]) == [0, 1, 2, 0, 1, 2, 3, 4]
     assert all(swapped["time"] == table["time"])
-    for name in [*LINES, "nuv", "fuv"]:
+    for name in [*LINES, "NUV", "FUV"]:
         np.testing.assert_array_equal(swapped[name], table[name])
 
 
 def test_drift_fit_matches_idl():
     idl = idl_reference("3824262996")
-    for drift, line, outlier in [("nuv", "Ni I", 0.08), ("fuv", "O I", 0.05)]:
+    for drift, line, outlier in [("NUV", "Ni I", 0.08), ("FUV", "O I", 0.05)]:
         fitted = _fit_drift(seconds(idl), idl[line].to_value(u.AA), outlier, drift)
         np.testing.assert_allclose(fitted, idl[drift].to_value(u.AA), atol=1e-8)
 
 
 def test_drift_fit_leaves_out_missing_shifts():
     # IDL keeps the exposure without a Ni I shift in its fit, so MPFIT returns its starting guess:
-    # the IDL "nuv" column is 0.1 + 0.01 sin(2πt/5856 s + 1) Å, about 0.1 Å from the shifts.
+    # the IDL NUV drift is 0.1 + 0.01 sin(2πt/5856 s + 1) Å, about 0.1 Å from the shifts.
     idl = idl_reference("4000005156")
     shifts = idl["Ni I"].to_value(u.AA)
     assert np.isnan(shifts).any()  # fixture check
     with pytest.warns(UserWarning, match=f"{SHORT}, so the NUV drift is constant"):
-        fitted = _fit_drift(seconds(idl), shifts, 0.08, "nuv")
+        fitted = _fit_drift(seconds(idl), shifts, 0.08, "NUV")
     np.testing.assert_allclose(fitted, np.nanmean(shifts))
 
 
@@ -110,14 +112,14 @@ def test_drift_fit_of_a_short_observation():
     times = np.arange(8) * 5.0
     shifts = np.array([np.nan, np.nan, np.nan, 1.5, np.nan, -109.4, -22.5, -115.2]) * 1e-3
     with pytest.warns(UserWarning, match=f"{SHORT}, so the FUV drift is constant"):
-        fitted = _fit_drift(times, shifts, 0.05, "fuv")
+        fitted = _fit_drift(times, shifts, 0.05, "FUV")
     np.testing.assert_allclose(fitted, np.mean(shifts[5:]))
 
 
 def test_drift_fit_just_under_a_quarter_orbit():
     times = np.arange(8) * 209.0  # 1463 s
     with pytest.warns(UserWarning, match=f"{SHORT}, so the FUV drift is constant"):
-        fitted = _fit_drift(times, 0.01 * np.sin(times / 900), 0.05, "fuv")
+        fitted = _fit_drift(times, 0.01 * np.sin(times / 900), 0.05, "FUV")
     np.testing.assert_allclose(fitted, fitted[0])
 
 
@@ -136,7 +138,7 @@ def test_drift_fit_of_short_measured_coverage(measured, last_shift):
     shifts[measured:] = np.nan  # 221 or 1450 s measured in a raster lasting over three hours
     shifts[-1] = last_shift  # a distant outlier must not extend the coverage either
     with pytest.warns(UserWarning, match=f"{SHORT}, so the NUV drift is constant"):
-        fitted = _fit_drift(times, shifts, 0.08, "nuv")
+        fitted = _fit_drift(times, shifts, 0.08, "NUV")
     np.testing.assert_allclose(fitted, fitted[0])
     assert shifts[:measured].min() <= fitted[0] <= shifts[:measured].max()
 
@@ -147,8 +149,8 @@ def test_drift_fit_polynomial_order_uses_measured_coverage():
     shifts = np.full(len(times), np.nan)
     measured = slice(20, 60)  # less than two measured orbits in a five-orbit observation
     shifts[measured] = 0.01 * np.sin(2 * np.pi * orbits[measured] + 0.3) + 5e-4 * orbits[measured] ** 2
-    fitted = _fit_drift(times, shifts, 0.08, "nuv")
-    expected = _fit_drift(times[measured], shifts[measured], 0.08, "nuv")
+    fitted = _fit_drift(times, shifts, 0.08, "NUV")
+    expected = _fit_drift(times[measured], shifts[measured], 0.08, "NUV")
     np.testing.assert_allclose(fitted[measured], expected, atol=1e-12)
 
 
@@ -168,10 +170,10 @@ def test_drift_fit_needs_more_shifts_than_parameters(steps, cadence, measured, f
     bins = np.linspace(0, len(times) - 1, measured, dtype=int)
     shifts[bins] = 0.01 * np.sin(times[bins] / 900)
     if fits:
-        assert np.isfinite(_fit_drift(times, shifts, 0.05, "fuv")).all()
+        assert np.isfinite(_fit_drift(times, shifts, 0.05, "FUV")).all()
     else:
         with pytest.warns(UserWarning, match="Too few shifts to fit the FUV drift"):
-            assert np.isnan(_fit_drift(times, shifts, 0.05, "fuv")).all()
+            assert np.isnan(_fit_drift(times, shifts, 0.05, "FUV")).all()
 
 
 def test_drift_fit_drops_outliers_on_both_sides():
@@ -179,7 +181,7 @@ def test_drift_fit_drops_outliers_on_both_sides():
     drift = 0.01 * np.sin(2 * np.pi * times / 5856 + 0.3)
     shifts = drift.copy()
     shifts[[50, 150]] = np.median(drift) + np.array([0.1, -0.1])
-    np.testing.assert_allclose(_fit_drift(times, shifts, 0.08, "nuv"), _fit_drift(times, drift, 0.08, "nuv"), atol=1e-5)
+    np.testing.assert_allclose(_fit_drift(times, shifts, 0.08, "NUV"), _fit_drift(times, drift, 0.08, "NUV"), atol=1e-5)
 
 
 def test_drift_fit_polynomial_order_is_at_most_3():
@@ -187,16 +189,16 @@ def test_drift_fit_polynomial_order_is_at_most_3():
     times = np.arange(88) * 300.0
     orbits = times / 5856
     shifts = 0.01 * np.sin(2 * np.pi * orbits + 0.3) + 1e-4 * orbits**3
-    np.testing.assert_allclose(_fit_drift(times, shifts, 0.08, "nuv"), shifts, atol=1e-10)
+    np.testing.assert_allclose(_fit_drift(times, shifts, 0.08, "NUV"), shifts, atol=1e-10)
     shifts += 2e-5 * orbits**4
-    assert not np.allclose(_fit_drift(times, shifts, 0.08, "nuv"), shifts, atol=1e-5)
+    assert not np.allclose(_fit_drift(times, shifts, 0.08, "NUV"), shifts, atol=1e-5)
 
 
 def test_drift_fit_across_a_gap():
     times = np.arange(40) * 60.0
     shifts = 0.01 * np.sin(times / 180)
     shifts[10:25] = np.nan  # longer than the 5-minute smoothing window
-    assert np.isfinite(_fit_drift(times, shifts, 0.05, "nuv")).all()
+    assert np.isfinite(_fit_drift(times, shifts, 0.05, "NUV")).all()
 
 
 @pytest.mark.parametrize(
@@ -268,7 +270,7 @@ def test_memmap_data_give_the_same_table():
     # memmap=True leaves the FITS integers, which are scaled to DN for the fit ranges only
     table = calculate_wavelength_drift(read_spectrograph_lvl2(CROP))
     memmap = calculate_wavelength_drift(read_spectrograph_lvl2(CROP, memmap=True))
-    for name in [*LINES, "nuv", "fuv"]:
+    for name in [*LINES, "NUV", "FUV"]:
         np.testing.assert_array_equal(memmap[name], table[name])
 
 
@@ -276,8 +278,8 @@ def test_missing_lines():
     nuv_only = read_spectrograph_lvl2(CROP, spectral_windows="Mg II k 2796")
     table = calculate_wavelength_drift(nuv_only)  # no warning: the FUV lines are in no window
     assert np.isnan(table["O I"]).all()
-    assert np.isnan(table["fuv"]).all()
-    assert np.isfinite(table["nuv"]).all()
+    assert np.isnan(table["FUV"]).all()
+    assert np.isfinite(table["NUV"]).all()
     sns = get_test_filepath("sns/iris_l2_20210905_001833_3620258102_raster_t000_r00000_test.fits")
     with pytest.raises(ValueError, match="no window with any of the reference lines"):
         calculate_wavelength_drift(read_spectrograph_lvl2(sns, spectral_windows="C II 1336"))
