@@ -44,8 +44,14 @@ class RBAQualityFlag(_QualityFlag):
     """
 
     OK = (0, "ok")
-    NO_FINITE_DATA = (1, "no finite data")
-    PEAK_AT_EDGE = (2, "peak at spectral edge")
+    NO_FINITE_DATA = (1, "no finite sample within velocity_range[1] of rest_wavelength")
+    PEAK_AT_EDGE = (
+        2,
+        (
+            "peak at the first or last sample within velocity_range[1] of rest_wavelength, "
+            "with the profile still rising beyond it"
+        ),
+    )
     TOO_FEW_POINTS = (3, "too few finite points")
     INTERP_FAILED = (4, "interpolation failed")
     PEAK_IS_ZERO = (5, "peak is zero or non-finite")
@@ -137,13 +143,14 @@ def calculate_red_blue_asymmetry(
         Required if there is neither.
     velocity_range : `astropy.units.Quantity`, optional
         Two positive velocities. The red wing spans these velocities and the blue wing their
-        negatives, both measured from the peak of each profile (see Notes).
+        negatives, both measured from the peak of each profile, which is looked for no farther
+        than the upper velocity from ``rest_wavelength`` (see Notes).
     dv : `astropy.units.Quantity`, optional
         Velocity spacing for the interpolated profile.
     spline_degree : `int`, optional
         Spline degree for `scipy.interpolate.make_interp_spline`.
     min_intensity : `astropy.units.Quantity`, optional
-        Minimum peak intensity required for a pixel to be processed.
+        Minimum intensity of the peak sample (see Notes) required for a pixel to be processed.
         Pixels below this threshold are assigned quality flag
         `~irispy.utils.red_blue.RBAQualityFlag.LOW_SIGNAL`. ``u.DN`` stands for the data's DN.
     return_profiles : `bool`, optional
@@ -163,7 +170,8 @@ def calculate_red_blue_asymmetry(
     ------
     ValueError
         If no velocity of the interpolated profile, which is spaced by ``dv``, falls in
-        ``velocity_range``, as when the range is narrower than ``dv``.
+        ``velocity_range``, as when the range is narrower than ``dv``, or if no sample lies
+        within ``velocity_range[1]`` of ``rest_wavelength``, as when the cube does not cover it.
 
     Notes
     -----
@@ -173,9 +181,16 @@ def calculate_red_blue_asymmetry(
     theirs: the profile is interpolated with a spline on a regular velocity grid centered on its
     peak, the asymmetry is the difference of the mean intensities of the two wings over the
     interpolated peak intensity, and the default wing range of 50 to 150 km/s and the requirement
-    that 80% of the wing bins are finite have no source. The peak of a profile is the vertex of the
-    parabola through its brightest sample and the samples on either side, or the brightest sample
-    when one of those is missing.
+    that 80% of the wing bins are finite have no source.
+
+    The peak sample of a profile is its brightest sample within ``velocity_range[1]`` of
+    ``rest_wavelength``. A pixel with no finite sample there is flagged
+    `~irispy.utils.red_blue.RBAQualityFlag.NO_FINITE_DATA`. A peak sample that is the first or last
+    there is measured when the next sample beyond it is lower, and flagged
+    `~irispy.utils.red_blue.RBAQualityFlag.PEAK_AT_EDGE` when that sample is as bright or brighter,
+    missing or past the end of the window, as the profile may still rise there. The peak is the
+    vertex of the parabola through the peak sample and the samples on either side, or the peak
+    sample when one of those is missing. The spline goes through all the samples of the profile.
 
     Pixels with a saturated sample, as the mask and ``cube.meta["saturated"]`` mark the samples the
     readers find at the level 2 ceiling, are flagged `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`.
@@ -225,6 +240,18 @@ def calculate_red_blue_asymmetry(
     if not (red_mask.any() and blue_mask.any()):
         msg = f"No velocity of the interpolated profile, spaced by dv={dv} km/s, falls in velocity_range=({low}, {high}) km/s"
         raise ValueError(msg)
+    # The samples the peak is looked for in, so that another line, the end of the window or a
+    # spike brighter than the line is not taken for it
+    searched = np.flatnonzero(np.abs(velocity) <= high)
+    if not searched.size:
+        covered = np.sort(wavelengths.to_value(u.AA)[[0, -1]])
+        msg = (
+            f"No wavelength of the cube ({covered[0]:.2f} to {covered[1]:.2f} Å) lies within "
+            f"velocity_range[1]={high} km/s of rest_wavelength={rest_wavelength.to_value(u.AA):.3f} Å"
+        )
+        raise ValueError(msg)
+    first, last = searched[0], searched[-1]
+    in_range = slice(first, last + 1)
 
     data, errors = _prepare_data(cube, wavelength_axis)
     output_shape = data.shape[:-1]
@@ -235,7 +262,7 @@ def calculate_red_blue_asymmetry(
     quality = np.full(len(profiles), RBAQualityFlag.OK, dtype=np.uint8)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
-        raw_peak = np.nanmax(profiles, axis=-1)
+        raw_peak = np.nanmax(profiles[:, in_range], axis=-1)
     if min_intensity is not None:
         quality[raw_peak < min_intensity.value] = RBAQualityFlag.LOW_SIGNAL
     quality[_saturated_samples(cube).any(axis=wavelength_axis).ravel()] = RBAQualityFlag.SATURATED
@@ -244,22 +271,25 @@ def calculate_red_blue_asymmetry(
     finite = np.isfinite(profiles)
     finite_velocity = np.isfinite(velocity)
     todo = quality == RBAQualityFlag.OK
-    quality[todo & ~finite.any(axis=-1)] = RBAQualityFlag.NO_FINITE_DATA
+    quality[todo & ~finite[:, in_range].any(axis=-1)] = RBAQualityFlag.NO_FINITE_DATA
     todo &= quality == RBAQualityFlag.OK
-    peak_index = np.argmax(np.where(finite, profiles, -np.inf), axis=-1)
-    quality[todo & ((peak_index == 0) | (peak_index == profiles.shape[1] - 1))] = RBAQualityFlag.PEAK_AT_EDGE
+    peak_index = first + np.argmax(np.where(finite[:, in_range], profiles[:, in_range], -np.inf), axis=-1)
+    # The peak sample and its neighbors; at an end of the window, the peak sample stands in for the
+    # missing neighbor
+    around = np.clip(peak_index[:, None] + [-1, 0, 1], 0, profiles.shape[1] - 1)
+    below, top, above = np.take_along_axis(profiles, around, axis=-1).T
+    rising = ((peak_index == first) & ~(below < top)) | ((peak_index == last) & ~(above < top))
+    quality[todo & rising] = RBAQualityFlag.PEAK_AT_EDGE
     todo &= quality == RBAQualityFlag.OK
-    # The spline goes through the finite samples at finite velocities
+    # The spline goes through all the finite samples at finite velocities
     points = finite & finite_velocity
-    n_points = np.where(finite_velocity[peak_index], points.sum(axis=-1), 0)
-    quality[todo & (n_points < min_points)] = RBAQualityFlag.TOO_FEW_POINTS
+    quality[todo & (points.sum(axis=-1) < min_points)] = RBAQualityFlag.TOO_FEW_POINTS
     todo &= quality == RBAQualityFlag.OK
     # Each profile is centered on the vertex of the parabola through its peak sample and the two
     # neighbors, or on the peak sample when a neighbor is missing. Centered on the peak sample, a
     # symmetric line between two samples had an asymmetry as large as real ones.
-    around = np.clip(peak_index[:, None] + [-1, 0, 1], 0, profiles.shape[1] - 1)
-    below, top, above = np.take_along_axis(profiles, around, axis=-1).T
-    with np.errstate(invalid="ignore"):
+    # A flagged peak sample at an end of the search range can have three samples in line
+    with np.errstate(divide="ignore", invalid="ignore"):
         offset = 0.5 * (below - above) / (below - 2 * top + above)
     center = velocity[peak_index] + np.nan_to_num(offset * (velocity[around[:, 2]] - velocity[around[:, 0]]) / 2)
 
