@@ -188,6 +188,8 @@ def test_mosaic_to_map(mosaic_file):
     assert band.data[1, 1] == pytest.approx(cube.data[1, 1, 1:4].mean())
     assert band.data[2, 1] == pytest.approx(cube.data[1, 2, 2:4].mean())
     assert np.isnan(band.data[0, 0])
+    assert (cube / (2 * u.s)).to_map([2796.30, 2796.40] * u.AA).unit == u.DN / u.s
+    np.testing.assert_array_equal(band.mask, np.isnan(band.data))
     # A position with a saturated sample is NaN, as in average_window.
     assert np.isnan(cube.to_map([2796.38, 2796.43] * u.AA).data[1, 2])
     with pytest.raises(ValueError, match="No wavelengths between"):

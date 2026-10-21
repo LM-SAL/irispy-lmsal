@@ -120,9 +120,9 @@ alignments = {}
 for step, (sji_index, aia_index) in enumerate(zip(sji_indices, aia_indices, strict=True)):
     if (sji_index, aia_index) not in alignments:
         sji_map = sji_cube.to_maps(sji_index)
-        sji_map = sunpy.map.Map(np.where(sji_cube.mask[sji_index], np.nan, sji_map.data), sji_map.meta)
+        sji_map = sunpy.map.Map(np.where(sji_map.mask, np.nan, sji_map.data), sji_map.meta)
         aia_map = aia_cube.to_maps(aia_index)
-        aia_map = sunpy.map.Map(np.where(aia_cube.mask[aia_index], np.nan, aia_map.data), aia_map.meta)
+        aia_map = sunpy.map.Map(np.where(aia_map.mask, np.nan, aia_map.data), aia_map.meta)
         alignments[sji_index, aia_index] = (sji_map.coordinate_frame, aia_map, align_sji(sji_map, aia_map))
     sji_frame, aia_map, shift = alignments[sji_index, aia_index]
     shifts[step] = shift.to_value(u.arcsec)

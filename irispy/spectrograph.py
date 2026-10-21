@@ -13,7 +13,7 @@ from sunraster import SpectrogramSequence as SpecSeq
 
 from irispy._wcs import _ResolveNegativeIndicesMixin
 from irispy.utils.constants import SLIT_WIDTH
-from irispy.visualization import IRISPlotter, IRISSequencePlotter
+from irispy.visualization import IRISPlotter, IRISSequencePlotter, _make_map
 
 __all__ = ["MosaicCube", "RasterCollection", "SpectrogramCube", "SpectrogramCubeSequence"]
 
@@ -231,6 +231,7 @@ class MosaicCube(SpectrogramCube):
         Returns
         -------
         `sunpy.map.GenericMap`
+            In the cube's unit, with DN for the IRIS data numbers, and masked where it is NaN.
 
         Raises
         ------
@@ -238,8 +239,6 @@ class MosaicCube(SpectrogramCube):
             If one wavelength is more than half a wavelength step outside the mosaic,
             or two have no mosaic wavelength between them.
         """
-        from sunpy.map import Map  # NOQA: PLC0415
-
         from irispy.utils.moments import average_window  # NOQA: PLC0415
 
         wavelengths = u.Quantity(self.axis_world_coords(self.wavelength_axis)[0], u.AA)
@@ -254,8 +253,7 @@ class MosaicCube(SpectrogramCube):
             nearest = wavelengths[np.argmin(distance)]
             wavelength = u.Quantity([nearest, nearest])
         mean_wavelength = wavelengths[_wavelength_indices(wavelengths, wavelength)].mean()
-        # A map is (solar Y, solar X)
-        data = average_window(self, wavelength).data.T
+        window = average_window(self, wavelength)
         header = unwrap_wcs_to_fitswcs(self.wcs)[0].celestial.swapaxes(0, 1).to_header()
         header.update(
             {
@@ -266,10 +264,10 @@ class MosaicCube(SpectrogramCube):
                 "DATE-END": self.meta.get("DATE_END"),
                 "WAVELNTH": mean_wavelength.to_value(u.AA),
                 "WAVEUNIT": "Angstrom",
-                "BUNIT": "DN",
             }
         )
-        sunpy_map = Map(data, header)
+        # A map is (solar Y, solar X)
+        sunpy_map = _make_map(window.data.T, header, window.unit, window.mask.T)
         passband = min((1330, 1400, 2796, 2832), key=lambda band: abs(band - mean_wavelength.to_value(u.AA)))
         sunpy_map.plot_settings["cmap"] = f"irissji{passband}"
         return sunpy_map

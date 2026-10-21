@@ -12,7 +12,7 @@ from sunraster import SpectrogramCube
 
 from irispy._wcs import _celestial_frame_from_cube, _ResolveNegativeIndicesMixin
 from irispy.utils._spectral import check_scaled
-from irispy.visualization import SJIPlotter, _sji_cmap_name
+from irispy.visualization import SJIPlotter, _make_map, _sji_cmap_name
 
 __all__ = ["AIACube", "SJICube", "SOTCube"]
 
@@ -206,8 +206,9 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         `sunpy.map.Map` or `sunpy.map.MapSequence`
             A single Map if index is an int, otherwise a MapSequence.
             Each map is built from its frame's FITS header, so sunpy picks the map class
-            from the instrument (`~sunpy.map.sources.SJIMap` for slit-jaw images) and the
-            map has the data unit and the frame's own exposure time. Slit-jaw and AIA maps
+            from the instrument (`~sunpy.map.sources.SJIMap` for slit-jaw images), and the
+            map has the cube's unit, with DN for the IRIS data numbers such as ``DN_IRIS_SJI_1330``,
+            the frame's mask and the frame's own exposure time. Slit-jaw and AIA maps
             plot with the color table of their passband, such as ``irissji1330`` or ``sdoaia304``.
 
         Examples
@@ -225,9 +226,9 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         >>> len(cube.to_maps([0, 1]))
         2
         """
-        from sunpy.map import Map  # NOQA: PLC0415
+        from sunpy.map import MapSequence  # NOQA: PLC0415
 
-        # The frame headers say DN, which the raw integers of a memmap read are not
+        # The maps give the IRIS DN units as DN, which the raw integers of a memmap read are not
         check_scaled(self)
         if self._frame_headers is None:
             msg = (
@@ -244,13 +245,15 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
 
         is_2d = self.wcs.world_n_dim == 2
         if is_2d:
-            frames = [(self.data, self._frame_headers)]
+            frames = [(self.data, self._frame_headers, self.mask)]
         else:
             # The data and header lists wrap negative indices; resolve them once for both.
             idx_list = [range(self.data.shape[0])[i] for i in idx_list]
-            frames = [(self.data[i], self._frame_headers[i]) for i in idx_list]
+            frames = [
+                (self.data[i], self._frame_headers[i], None if self.mask is None else self.mask[i]) for i in idx_list
+            ]
         # Keep the requested order; a MapSequence sorts by date by default
-        maps = Map(frames, sequence=True, sortby=None)
+        maps = MapSequence([_make_map(data, header, self.unit, mask) for data, header, mask in frames], sortby=None)
         # Hinode/SOT cubes have no passband and keep the color table sunpy gives their maps
         if self.meta["TWAVE1"]:
             cmap = _sji_cmap_name(self.meta)

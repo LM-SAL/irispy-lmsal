@@ -8,11 +8,14 @@ import sunpy.map
 
 from irispy.io.utils import read_files
 from irispy.tests.helpers import figure_test
+from irispy.utils.bursts import find_bright_image_events
+from irispy.utils.constants import RADIANCE_UNIT
+from irispy.utils.spectrograph import radiometric_calibration
 from irispy.visualization import LAT_AXIS_LABEL, LON_AXIS_LABEL
 
 
 def test_to_maps_rejects_unscaled_data(bursts_sji_1400_file):
-    # The frame headers say DN, which the raw integers of a memmap read are not
+    # The maps give the IRIS DN units as DN, which the raw integers of a memmap read are not
     with pytest.raises(ValueError, match=r"unscaled.*memmap=False"):
         read_files(bursts_sji_1400_file, memmap=True).to_maps(0)
     assert read_files(bursts_sji_1400_file).to_maps(0).unit == u.DN
@@ -62,6 +65,27 @@ def test_to_maps_are_sji_maps_with_the_frame_metadata(sns_sjicube_1330):
     assert isinstance(sliced_map, sunpy.map.sources.SJIMap)
     assert sliced_map.data.shape == (30, 17)
     assert sliced_map.wcs.pixel_to_world(0, 0).separation(sji_map.wcs.pixel_to_world(20, 10)) < 1e-6 * u.arcsec
+
+
+def test_to_maps_keep_the_unit_and_mask_of_the_cube(bursts_sjicube_1400):
+    # The maps were in DN whatever the cube's unit, and had no mask
+    frame = 1
+    assert bursts_sjicube_1400.mask[frame].any()  # fill values and the clipped pixels of the flare
+    for cube, unit in (
+        (bursts_sjicube_1400, u.DN),
+        (bursts_sjicube_1400.apply_exposure_time_correction(), u.DN / u.s),
+        (radiometric_calibration(bursts_sjicube_1400), RADIANCE_UNIT),
+    ):
+        for sji_map in (cube.to_maps(frame), cube[frame].to_maps()):
+            assert sji_map.unit == unit
+            np.testing.assert_array_equal(sji_map.mask, cube.mask[frame])
+
+
+def test_to_maps_of_a_cube_without_a_mask(bursts_sjicube_1400):
+    # The burst labels have no mask
+    labels, _ = find_bright_image_events(bursts_sjicube_1400[:3])
+    assert labels.to_maps(1).mask is None
+    assert labels[1].to_maps().mask is None
 
 
 def test_aia_cube_and_maps_plot_with_the_sdoaia_color_table(aia_1700_file):
