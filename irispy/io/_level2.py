@@ -3,6 +3,7 @@ Classify the files supplied with IRIS observations from their primary header.
 """
 
 import os
+from pathlib import Path
 
 __all__ = []
 
@@ -37,7 +38,8 @@ def _classify(header):
 
 def _check_level2(file, header, product=None):
     """
-    Return the product of an IRIS level 2 file, or raise `ValueError`.
+    Return the product of an IRIS level 2 file, or raise `ValueError`, or the `OSError`
+    of a path that cannot be read.
 
     Parameters
     ----------
@@ -48,6 +50,9 @@ def _check_level2(file, header, product=None):
     product : `str`, optional
         ``"SJI"`` or ``"raster"`` when the file must be of that product.
     """
+    if header is None and isinstance(file, (str, os.PathLike)) and not Path(file).is_dir():
+        # A missing or unreadable path raises what opening it raises, as in irispy 0.9.1
+        Path(file).open("rb").close()
     found, level = _classify(header) if header is not None else (None, None)
     if found is None or level != 2 or product not in (None, found):
         expected = f"{product} file" if product else "file"
