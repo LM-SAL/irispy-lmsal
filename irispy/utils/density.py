@@ -3,324 +3,126 @@ Helpers for IRIS density diagnostics.
 """
 
 import numpy as np
-from scipy.interpolate import make_interp_spline
 
 import astropy.units as u
+from astropy.nddata import NDDataRef, StdDevUncertainty
 
-__all__ = ["density_diagnostic", "map_ratio_to_quantity"]
+__all__ = ["density_diagnostic"]
 
 
-def map_ratio_to_quantity(observed_ratio, quantity, theoretical_ratio, *, bounds_error=False, fill_value=np.nan):
+def _map_ratio_to_quantity(observed_ratio, quantity, theoretical_ratio, fill_value=np.nan):
     """
-    Map an observed line ratio to the associated physical quantity.
-
-    Parameters
-    ----------
-    observed_ratio : array-like or `~astropy.units.Quantity`
-        Observed line ratio values. Must be dimensionless.
-    quantity : `~astropy.units.Quantity`
-        Quantity grid associated with ``theoretical_ratio``, e.g. an electron
-        density grid.
-    theoretical_ratio : array-like or `~astropy.units.Quantity`
-        Theoretical line ratio sampled on ``quantity``. Must be dimensionless
-        and monotonic.
-    bounds_error : `bool`, optional
-        If `True`, raise an exception when ``observed_ratio`` falls outside the
-        theoretical ratio range. By default, points outside the range are set by
-        ``fill_value``.
-    fill_value : scalar, tuple, or `~astropy.units.Quantity`, optional
-        Value used outside of the interpolation interval. If a quantity is
-        given, it must be convertible to the units of ``quantity``.
+    ``quantity`` at ``observed_ratio`` on the monotonic ``theoretical_ratio``,
+    interpolated linearly, and ``fill_value``, one value or a ``(left, right)`` pair,
+    off it.
     """
-    observed_ratio = u.Quantity(observed_ratio, u.dimensionless_unscaled)
-    quantity = np.ravel(u.Quantity(quantity))
-    theoretical_ratio = np.ravel(u.Quantity(theoretical_ratio, u.dimensionless_unscaled).value)
-
-    if quantity.shape != theoretical_ratio.shape:
-        msg = "quantity and theoretical_ratio must have the same shape."
-        raise ValueError(msg)
-
-    finite = np.isfinite(quantity.value) & np.isfinite(theoretical_ratio)
-    quantity = quantity[finite]
-    theoretical_ratio = theoretical_ratio[finite]
-
-    if quantity.size < 2:
-        msg = "At least two finite samples are required to interpolate a ratio curve."
-        raise ValueError(msg)
-
-    diff = np.diff(theoretical_ratio)
-    nonzero = diff != 0.0
-    if not np.any(nonzero):
-        msg = "theoretical_ratio must vary over the provided quantity grid."
-        raise ValueError(msg)
-    if np.all(diff[nonzero] < 0.0):
+    if np.all(np.diff(theoretical_ratio) <= 0.0):
         quantity = quantity[::-1]
         theoretical_ratio = theoretical_ratio[::-1]
-    elif not np.all(diff[nonzero] > 0.0):
-        msg = (
-            "theoretical_ratio must be monotonic to map ratios back to a quantity. "
-            "Restrict the grid to a monotonic interval first."
-        )
-        raise ValueError(msg)
-
     order = np.argsort(theoretical_ratio)
-    theoretical_ratio = theoretical_ratio[order]
-    quantity = quantity[order]
-    theoretical_ratio, unique_index = np.unique(theoretical_ratio, return_index=True)
-    quantity = quantity[unique_index]
-    if quantity.size < 2:
-        msg = "Theoretical ratio must contain at least two unique samples."
-        raise ValueError(msg)
-
-    if isinstance(fill_value, tuple):
-        fill_value = tuple(
-            value.to_value(quantity.unit) if isinstance(value, u.Quantity) else value for value in fill_value
-        )
-    elif isinstance(fill_value, u.Quantity):
-        fill_value = fill_value.to_value(quantity.unit)
-
-    observed_values = observed_ratio.to_value(u.dimensionless_unscaled)
-    outside = (observed_values < theoretical_ratio[0]) | (observed_values > theoretical_ratio[-1])
-    if bounds_error and np.any(outside):
-        msg = "observed_ratio contains values outside the theoretical ratio range."
-        raise ValueError(msg)
-
-    if isinstance(fill_value, tuple):
-        left, right = fill_value
-    else:
-        left = right = fill_value
+    theoretical_ratio, unique_index = np.unique(theoretical_ratio[order], return_index=True)
+    quantity = quantity[order][unique_index]
+    left, right = fill_value if isinstance(fill_value, tuple) else (fill_value, fill_value)
     return u.Quantity(
-        np.interp(observed_values, theoretical_ratio, quantity.value, left=left, right=right), quantity.unit
+        np.interp(observed_ratio, theoretical_ratio, quantity.value, left=left, right=right), quantity.unit
     )
 
 
-def _transition_indices(transitions, wavelengths):
-    """
-    Indices of the bound-bound transitions within 0.02 Å of any of ``wavelengths``.
-    """
-    lines = transitions.wavelength[transitions.is_bound_bound]
-    wavelengths = np.atleast_1d(wavelengths)
-    # 0.02 Å is how far tools/make_line_database.py lets a NIST line without levels lie from CHIANTI, twice
-    # NIST's 0.01 Å precision. Each documented IRIS line in CHIANTI 11.0.2 lies within 0.017 Å (Fe XXI 1354.08)
-    # of its wavelength in irispy/data/iris_lines.ecsv.gz, while C II 1335.66 and 1335.71 Å, 0.045 Å apart, stay
-    # apart. Transitions this close blend into one line, as O IV 1401.149 and 1401.163 Å do
-    distance = np.abs(lines[:, np.newaxis] - wavelengths).to_value(u.AA)
-    for wavelength, line_distance in zip(wavelengths, distance.T, strict=True):
-        if line_distance.min() > 0.02:
-            nearest = ", ".join(
-                f"{value:.3f}" for value in np.sort(lines[np.argsort(line_distance)[:3]].to_value(u.AA))
-            )
-            msg = f"No transition of the ion lies within 0.02 Å of {wavelength}. The nearest are at {nearest} Å."
-            raise ValueError(msg)
-    return np.flatnonzero((distance <= 0.02).any(axis=1))
-
-
-def density_diagnostic(
-    intensity_numerator,
-    intensity_denominator,
-    density_grid,
-    *,
-    ion,
-    numerator,
-    denominator,
-    intensity_numerator_uncertainty=None,
-    intensity_denominator_uncertainty=None,
-    temperature=None,
-    bounds_error=False,
-    fill_value=np.nan,
-    line_ratio_kwargs=None,
-):
+def density_diagnostic(intensity_numerator, intensity_denominator, density_grid, theoretical_ratio):
     """
     Map an observed IRIS line ratio onto a theoretical density curve.
 
     Parameters
     ----------
-    intensity_numerator, intensity_denominator : array-like or `~astropy.units.Quantity`
-        Measured integrated intensities for the numerator and denominator lines.
+    intensity_numerator, intensity_denominator : array-like, `~astropy.units.Quantity` or `~astropy.nddata.NDData`
+        Measured integrated intensities of the numerator and denominator lines, such as two `~ndcube.NDCube`
+        maps. The uncertainties of `~astropy.nddata.NDData` intensities give the density bounds, and their
+        masked pixels give NaN. An intensity without uncertainty counts as exact.
     density_grid : `~astropy.units.Quantity`
-        Density grid on which to evaluate the theoretical ratio curve.
-    ion : `fiasco.Ion`
-        Ion used to compute the theoretical ratio curve.
-    numerator, denominator : `~astropy.units.Quantity`
-        Required wavelengths of the numerator and denominator lines. The lines
-        of ``ion`` within 0.02 Å of each wavelength are added together, and a
-        wavelength with no line of ``ion`` within 0.02 Å raises a `ValueError`.
-    intensity_numerator_uncertainty, intensity_denominator_uncertainty :
-        array-like or `~astropy.units.Quantity`, optional
-        Uncertainties on the measured integrated intensities. They give the
-        ``"density_lower"`` and ``"density_upper"`` bounds. A bound at an end of the
-        returned ``"density_grid"`` means the ratio plus or minus its uncertainty
-        lies off the theoretical curve.
-    temperature : `~astropy.units.Quantity`, optional
-        Temperature at which to evaluate the theoretical ratio curve from
-        ``ion``. If omitted and scalar, uses the ion temperature; if omitted
-        and non-scalar, falls back to ``ion.formation_temperature``.
-    bounds_error : `bool`, optional
-        Passed through to `map_ratio_to_quantity` for the observed ratio.
-    fill_value : scalar or `~astropy.units.Quantity`, optional
-        Passed through to `map_ratio_to_quantity` for the observed ratio.
-    line_ratio_kwargs : `dict`, optional
-        Extra keyword arguments forwarded to `fiasco.Ion.contribution_function`.
+        Densities at which ``theoretical_ratio`` is sampled.
+    theoretical_ratio : array-like or `~astropy.units.Quantity`
+        Theoretical ratio of the numerator line to the denominator line at each ``density_grid``, such as one
+        computed with `fiasco.Ion.contribution_function`, as in the
+        :ref:`O IV density example <sphx_glr_generated_gallery_analysis_06_oiv_density_diagnostics.py>`, or the
+        O IV 1399.78 / 1401.16 Å table in SolarSoft's ``iris_ne_oiv.pro``.
+        Where the curve turns, the branch that holds the most observed ratios is used.
+
+    Returns
+    -------
+    `dict`
+        * ``"ratio"`` — the observed ratio, NaN where the denominator is 0 or a pixel is masked
+        * ``"ratio_uncertainty"`` — its uncertainty, NaN where the ratio is NaN, `None` for intensities without
+          uncertainties
+        * ``"density"`` — the density at the ratio, NaN off the curve
+        * ``"density_lower"``, ``"density_upper"`` — the densities at the ratio minus and plus its uncertainty,
+          `None` for intensities without uncertainties. A bound at an end of the curve means the error bar runs
+          off the curve.
+        * ``"density_grid"``, ``"theoretical_ratio"`` — the curve used: the finite samples of its branch, which
+          can be shorter than ``density_grid``
+
+    Raises
+    ------
+    ValueError
+        If ``density_grid`` and ``theoretical_ratio`` differ in size, ``theoretical_ratio`` has fewer than two
+        different finite values, or ``density_grid`` is not monotonic.
     """
-    if (intensity_numerator_uncertainty is None) != (intensity_denominator_uncertainty is None):
-        msg = "Both numerator and denominator uncertainties must be provided together."
-        raise ValueError(msg)
-    if any(value is None for value in (ion, numerator, denominator)):
-        msg = "ion, numerator, and denominator are required."
-        raise ValueError(msg)
-
-    if line_ratio_kwargs is None:
-        line_ratio_kwargs = {}
-
-    intensity_numerator = u.Quantity(intensity_numerator)
-    intensity_denominator = u.Quantity(intensity_denominator)
-    numerator_value, denominator_value = np.broadcast_arrays(intensity_numerator.value, intensity_denominator.value)
-    ratio_value = np.divide(
-        numerator_value,
-        denominator_value,
-        out=np.full(numerator_value.shape, np.nan),
-        where=denominator_value != 0.0,
-    )
-    ratio = u.Quantity(ratio_value, intensity_numerator.unit / intensity_denominator.unit).to(u.dimensionless_unscaled)
-
+    with np.errstate(divide="ignore", invalid="ignore"):
+        quotient = NDDataRef(intensity_numerator).divide(intensity_denominator)
+    ratio = np.where(np.isfinite(quotient.data), quotient.data, np.nan)
+    if quotient.mask is not None:
+        ratio = np.where(quotient.mask, np.nan, ratio)
+    ratio = u.Quantity(ratio, quotient.unit).to(u.one)
     ratio_uncertainty = None
-    if intensity_numerator_uncertainty is not None:
-        numerator_uncertainty = u.Quantity(intensity_numerator_uncertainty)
-        denominator_uncertainty = u.Quantity(intensity_denominator_uncertainty)
-        numerator_uncertainty_value, numerator_value = np.broadcast_arrays(
-            numerator_uncertainty.to_value(intensity_numerator.unit),
-            intensity_numerator.value,
-        )
-        denominator_uncertainty_value, denominator_value = np.broadcast_arrays(
-            denominator_uncertainty.to_value(intensity_denominator.unit),
-            intensity_denominator.value,
-        )
-        numerator_fraction = np.divide(
-            numerator_uncertainty_value,
-            numerator_value,
-            out=np.full(numerator_uncertainty_value.shape, np.nan),
-            where=numerator_value != 0.0,
-        )
-        denominator_fraction = np.divide(
-            denominator_uncertainty_value,
-            denominator_value,
-            out=np.full(denominator_uncertainty_value.shape, np.nan),
-            where=denominator_value != 0.0,
-        )
-        ratio_uncertainty = np.abs(ratio) * np.sqrt(numerator_fraction**2 + denominator_fraction**2)
-        try:
-            ratio_uncertainty = np.broadcast_to(ratio_uncertainty.value, ratio.shape)
-        except ValueError as exc:
-            msg = (
-                f"Uncertainty shapes {numerator_uncertainty.shape} and {denominator_uncertainty.shape} "
-                f"are not broadcastable to intensity shape {ratio.shape}."
-            )
-            raise ValueError(msg) from exc
-        ratio_uncertainty = u.Quantity(ratio_uncertainty, ratio.unit)
+    # The ratios that choose the branch, or the ends of their error bars
+    observed = ratio.value[np.newaxis]
+    if quotient.uncertainty is not None:
+        ratio_uncertainty = u.Quantity(quotient.uncertainty.represent_as(StdDevUncertainty).array, quotient.unit)
+        ratio_uncertainty = np.where(np.isnan(ratio), np.nan, ratio_uncertainty.to(u.one))
+        observed = u.Quantity([ratio - ratio_uncertainty, ratio + ratio_uncertainty]).value
 
-    numerator_indices = _transition_indices(ion.transitions, numerator)
-    denominator_indices = _transition_indices(ion.transitions, denominator)
-    contribution = ion.contribution_function(density_grid, **line_ratio_kwargs)
-    numerator_contribution = contribution[..., numerator_indices].sum(-1).value
-    denominator_contribution = contribution[..., denominator_indices].sum(-1).value
-    # Both lines vanish where the ion has no population, such as O IV from 10^8.5 K in CHIANTI 11.0.2
-    theoretical_ratio = np.divide(
-        numerator_contribution,
-        denominator_contribution,
-        out=np.full(numerator_contribution.shape, np.nan),
-        where=denominator_contribution != 0.0,
-    )
-    theoretical_ratio = u.Quantity(theoretical_ratio, u.dimensionless_unscaled).squeeze()
-    if theoretical_ratio.ndim > 1:
-        ion_temperature = u.Quantity(ion.temperature)
-        if theoretical_ratio.shape[0] != ion_temperature.size:
-            msg = "theoretical_ratio temperature axis does not match ion.temperature"
-            raise ValueError(msg)
+    density = np.ravel(u.Quantity(density_grid))
+    theoretical_ratio = np.ravel(u.Quantity(theoretical_ratio, u.one).value)
+    if density.shape != theoretical_ratio.shape:
+        msg = "density_grid and theoretical_ratio must have the same size."
+        raise ValueError(msg)
+    finite = np.isfinite(density.value) & np.isfinite(theoretical_ratio)
+    density, theoretical_ratio = density[finite], theoretical_ratio[finite]
+    if np.unique(theoretical_ratio).size < 2:
+        msg = "theoretical_ratio must have at least two different finite values."
+        raise ValueError(msg)
+    step = np.diff(density.value)
+    if not (np.all(step > 0) or np.all(step < 0)):
+        msg = "density_grid must increase or decrease monotonically."
+        raise ValueError(msg)
 
-        if temperature is None:
-            ratio_temperature = u.Quantity(ion.temperature)
-            if ratio_temperature.size != 1:
-                ratio_temperature = u.Quantity(ion.formation_temperature)
-        else:
-            ratio_temperature = u.Quantity(temperature)
-        if ratio_temperature.size != 1:
-            msg = "temperature must be scalar."
-            raise ValueError(msg)
-        ratio_temperature = ratio_temperature.flat[0]
+    # The monotonic branches, which share the sample where the curve turns
+    branches = []
+    start = 0
+    previous_sign = 0
+    for i, sign in enumerate(np.sign(np.diff(theoretical_ratio))):
+        if sign == 0:
+            continue
+        if previous_sign not in (0, sign):
+            branches.append(slice(start, i + 1))
+            start = i
+        previous_sign = sign
+    branches.append(slice(start, None))
+    votes = observed[np.isfinite(observed)]
 
-        order = np.argsort(ion_temperature.to_value(u.K))
-        # Leave out the temperatures where the ion has no population
-        order = order[np.isfinite(theoretical_ratio.value[order]).all(axis=1)]
-        temperature_grid = ion_temperature.to_value(u.K)[order]
-        ratio_values = theoretical_ratio.value[order]
-        interp = make_interp_spline(temperature_grid, ratio_values, k=1, axis=0)
-        theoretical_ratio = u.Quantity(
-            interp(ratio_temperature.to_value(u.K), extrapolate=False),
-            theoretical_ratio.unit,
-        ).squeeze()
+    def score(branch):
+        # Ties go to the longer branch, then to the one with the wider range
+        curve = theoretical_ratio[branch]
+        return ((votes >= curve.min()) & (votes <= curve.max())).sum(), curve.size, np.ptp(curve)
 
-    density_grid = u.Quantity(density_grid)
-    theoretical_ratio = u.Quantity(theoretical_ratio, u.dimensionless_unscaled)
-    finite = np.isfinite(density_grid.value) & np.isfinite(theoretical_ratio.value)
-    density_grid = density_grid[finite]
-    theoretical_ratio = theoretical_ratio[finite]
+    branch = max(branches, key=score)
+    density_grid, theoretical_ratio = density[branch], theoretical_ratio[branch]
 
-    segments = []
-    if density_grid.size < 2:
-        segments.append((density_grid, theoretical_ratio))
-    else:
-        start = 0
-        previous_sign = None
-        for i, delta in enumerate(np.diff(theoretical_ratio.value)):
-            sign = np.sign(delta)
-            if sign == 0:
-                continue
-            if previous_sign is None:
-                previous_sign = sign
-                continue
-            if sign != previous_sign:
-                segments.append((density_grid[start : i + 1], theoretical_ratio[start : i + 1]))
-                start = i
-                previous_sign = sign
-        segments.append((density_grid[start:], theoretical_ratio[start:]))
-        segments = [(quantity, ratio_segment) for quantity, ratio_segment in segments if quantity.size >= 2]
-    if len(segments) == 1:
-        density_grid, theoretical_ratio = segments[0]
-    elif segments:
-        observed_ratio = ratio.value[np.isfinite(ratio.value)]
-        if ratio_uncertainty is not None:
-            ratio_min_obs = (ratio - ratio_uncertainty).value[np.isfinite((ratio - ratio_uncertainty).value)]
-            ratio_max_obs = (ratio + ratio_uncertainty).value[np.isfinite((ratio + ratio_uncertainty).value)]
-            observed_ratio_range = np.concatenate([ratio_min_obs, ratio_max_obs])
-        else:
-            observed_ratio_range = observed_ratio
-        best_score = None
-        for segment in segments:
-            quantity, ratio_segment = segment
-            ratio_min = np.nanmin(ratio_segment.value)
-            ratio_max = np.nanmax(ratio_segment.value)
-            in_range = np.logical_and(observed_ratio_range >= ratio_min, observed_ratio_range <= ratio_max).sum()
-            score = (in_range, quantity.size, ratio_max - ratio_min)
-            if best_score is None or score > best_score:
-                density_grid, theoretical_ratio = segment
-                best_score = score
-
-    density = map_ratio_to_quantity(
-        ratio,
-        density_grid,
-        theoretical_ratio,
-        bounds_error=bounds_error,
-        fill_value=fill_value,
-    )
     density_lower = density_upper = None
     if ratio_uncertainty is not None:
         # A side of the error bar off the curve gives the curve's end, as in iris_ne_oiv.pro
         curve_ends = density_grid[[0, -1]] if theoretical_ratio[-1] > theoretical_ratio[0] else density_grid[[-1, 0]]
-        density_minus, density_plus = map_ratio_to_quantity(
-            u.Quantity([ratio - ratio_uncertainty, ratio + ratio_uncertainty]),
-            density_grid,
-            theoretical_ratio,
-            fill_value=tuple(curve_ends),
+        density_minus, density_plus = _map_ratio_to_quantity(
+            observed, density_grid, theoretical_ratio, fill_value=tuple(curve_ends.value)
         )
         density_lower = np.fmin(density_minus, density_plus)
         density_upper = np.fmax(density_minus, density_plus)
@@ -328,9 +130,9 @@ def density_diagnostic(
     return {
         "ratio": ratio,
         "ratio_uncertainty": ratio_uncertainty,
-        "density": density,
+        "density": _map_ratio_to_quantity(ratio.value, density_grid, theoretical_ratio),
         "density_lower": density_lower,
         "density_upper": density_upper,
-        "density_grid": u.Quantity(density_grid),
-        "theoretical_ratio": u.Quantity(theoretical_ratio, u.dimensionless_unscaled),
+        "density_grid": density_grid,
+        "theoretical_ratio": u.Quantity(theoretical_ratio, u.one),
     }

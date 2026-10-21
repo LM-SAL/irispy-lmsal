@@ -1,0 +1,2 @@
+``irispy.utils.density.density_diagnostic`` now takes the theoretical ratio curve, ``density_diagnostic(intensity_numerator, intensity_denominator, density_grid, theoretical_ratio)``, instead of computing it with ``fiasco``, as the O IV density example now does, so the ``density`` extra is removed.
+Its other keywords are removed; pass ``astropy.nddata.NDData`` or ``ndcube.NDCube`` intensities to use their uncertainties and masks.

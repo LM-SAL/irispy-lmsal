@@ -165,7 +165,7 @@ New Features
 - Added ``remove_cosmic_rays`` methods both for SJI and raster cubes, with two possible backends: ``rsliding`` and ``astroscrappy``. (`#113 <https://github.com/LM-SAL/irispy/pull/113>`__)
 - Added a way to calculate the moments for a SpectrumCube with an example: :ref:`sphx_glr_generated_gallery_analysis_04_spectral_moments.py`. (`#124 <https://github.com/LM-SAL/irispy/pull/124>`__)
 - Added utilities and examples to calculate moments and red-blue asymmetry maps for `~irispy.spectrograph.SpectrogramCube`. (`#125 <https://github.com/LM-SAL/irispy/pull/125>`__)
-- Added utilities to compute IRIS density diagnostics from line ratios, including `~irispy.utils.density.density_diagnostic` and `~irispy.utils.density.map_ratio_to_quantity`. (`#126 <https://github.com/LM-SAL/irispy/pull/126>`__)
+- Added utilities to compute IRIS density diagnostics from line ratios, including ``irispy.utils.density.density_diagnostic`` and ``irispy.utils.density.map_ratio_to_quantity``. (`#126 <https://github.com/LM-SAL/irispy/pull/126>`__)
 
 
 Bug Fixes

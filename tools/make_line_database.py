@@ -1,7 +1,7 @@
 """
 Regenerate irispy/data/iris_lines.ecsv.gz from current NIST and CHIANTI data.
 
-Requires ``pip install -e '.[density]'``, fiasco 0.8.2 or later, and a full CHIANTI database in fiasco's configured
+Requires fiasco 0.8.2 or later and a full CHIANTI database in fiasco's configured
 location (https://fiasco.readthedocs.io/en/latest/quick_start.html).
 Model assumptions are documented in docs/line_database.rst.
 
