@@ -130,7 +130,7 @@ The mark survives slicing, `~irispy.utils.spectrograph.subtract_background`, exp
 `~irispy.utils.moments.calculate_moments`, `~irispy.utils.mg_features.calculate_mg_features` and `~irispy.utils.red_blue.calculate_red_blue_asymmetry` flag the pixels with a sample that is both masked and marked, and give them no values.
 `~irispy.utils.moments.average_window` masks such pixels, the burst finders use the samples at their value, as IDL does, and the other utilities leave them out like any masked sample.
 To use the values, unmask the samples; for a stricter limit, mask and mark more samples yourself.
-To fit such spectra, give the samples no weight, as the fitting examples do with ``~cube.mask``.
+To fit such spectra, give the samples no weight, as :ref:`irispy-tutorial-fitting` does with ``~cube.mask``.
 
 Cosmetic finishing in quicklook movies
 ======================================
