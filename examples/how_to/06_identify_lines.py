@@ -105,5 +105,6 @@ for peak in [1357.14, 1357.66]:
 # metals can also emit in the chromosphere during flares, so identification needs
 # the spectrum and a solar atlas.
 
-cool_metals = get_lines([2812, 2818] * u.AA, categories="cool_metal")
+nuv = get_lines([2812, 2818] * u.AA)
+cool_metals = nuv[nuv["category"] == "cool_metal"]
 print(f"{len(cool_metals)} cool-metal candidates between 2812 and 2818 Å")
