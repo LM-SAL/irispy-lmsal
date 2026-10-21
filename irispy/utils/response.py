@@ -83,7 +83,7 @@ def get_latest_response(
     Raises
     ------
     ValueError
-        If ``observation_time`` is not a single time, such as an array of one or more times.
+        If ``observation_time`` is an array or list of times, even of one.
 
     Examples
     --------

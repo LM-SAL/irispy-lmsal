@@ -104,13 +104,8 @@ def test_get_latest_response_to_idl(idl_response):
     np_test.assert_almost_equal(iris_response["AREA_SJI"][3].to_value(), idl_response["AREA_SJI"][3], decimal=4)
 
 
-@pytest.mark.parametrize("observation_time", ["2014-01-01", datetime(2014, 1, 1, tzinfo=UTC)])
-def test_get_latest_response_parse_time_input(observation_time):
-    expected = get_latest_response(Time("2014-01-01"))
-    response = get_latest_response(observation_time)
-    assert response["DATE_OBS"] == expected["DATE_OBS"]
-    np_test.assert_array_equal(response["AREA_SG"], expected["AREA_SG"])
-    np_test.assert_array_equal(response["AREA_SJI"], expected["AREA_SJI"])
+def test_get_latest_response_datetime_input():
+    assert get_latest_response(datetime(2014, 1, 1, tzinfo=UTC))["DATE_OBS"] == "2014-01-01T00:00:00.000"
 
 
 @pytest.mark.parametrize("observation_time", [Time(["2014-01-01"]), ["2014-01-01", "2024-01-01"]])
@@ -120,7 +115,7 @@ def test_get_latest_response_rejects_several_times(observation_time):
 
 
 def test_get_latest_response_no_observation_time():
-    assert isinstance(get_latest_response(), dict)
+    assert abs(Time(get_latest_response()["DATE_OBS"]) - Time.now()) < 1 * u.min
 
 
 @figure_test

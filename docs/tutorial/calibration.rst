@@ -35,8 +35,7 @@ The latest calibration data are included in ``irispy`` and can be read:
 
    >>> response = get_latest_response(observation_time="2020-01-01T00:00:00")
 
-where ``observation_time`` is the time of the observation, an `~astropy.time.Time` or anything else `sunpy.time.parse_time` accepts.
-It takes one time; call it once for each time you need.
+where ``observation_time`` is one observation time, in any format `sunpy.time.parse_time` accepts.
 The output is a dictionary with the following keys:
 
 .. code-block:: python
