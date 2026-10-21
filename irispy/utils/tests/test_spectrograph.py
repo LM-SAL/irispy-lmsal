@@ -257,6 +257,20 @@ def test_subtract_background(degree):
     assert result.unit == cube.unit
 
 
+def test_subtract_background_rounds_the_float64_fit_to_float32(sns_sg_file):
+    cube = read_files(sns_sg_file)["Mg II k 2796"][0]
+    windows = [[2793.4, 2794.5], [2799.5, 2800.5], [2805, 2806.4]] * u.AA
+    as_float64 = SpectrogramCube(cube.data.astype(float), cube.wcs, unit=cube.unit, meta=cube.meta, mask=cube.mask)
+    result = subtract_background(cube, windows, degree=3)
+    expected = subtract_background(as_float64, windows, degree=3)
+    assert result.data.dtype == np.float32
+    # Rounded to float32 once in the background and once in the difference
+    background = cube.data - expected.data
+    rounding = np.spacing(np.maximum(np.abs(background), np.abs(expected.data)).astype(np.float32))
+    fitted = np.isfinite(expected.data)
+    assert np.all(np.abs(result.data - expected.data)[fitted] <= rounding[fitted])
+
+
 def test_subtract_background_integer_mask():
     # An integer mask, which the Mg II feature finder accepts, raised in the background fit
     wavelengths = np.linspace(1333, 1337, 5) * u.AA
