@@ -22,7 +22,7 @@ MG_FEATURES_FILE = "mg_features/iris_l2_20130902_182935_4000005156_raster_t000_r
 C_KMS = constants.c.to_value(u.km / u.s)
 
 
-def _fit(model, data, sigma, wavelength=WAVELENGTH, unit=u.ct, *, fitter=None, **kwargs):
+def _fit(model, data, sigma, wavelength=WAVELENGTH, unit=u.ct, *, fitter=None, fit_info=True, **kwargs):
     fitter = TRFLSQFitter() if fitter is None else fitter
     fitted = parallel_fit_dask(
         model=model,
@@ -33,7 +33,7 @@ def _fit(model, data, sigma, wavelength=WAVELENGTH, unit=u.ct, *, fitter=None, *
         world=(wavelength,),
         fitting_axes=2,
         scheduler="single-threaded",
-        fit_info=True,
+        fit_info=fit_info,
         **kwargs,
     )
     return fitted, fitter
@@ -484,12 +484,12 @@ def test_maps_from_fit_formulas(profile, width, fwhm, area):
     model = models.Const1D(0 * u.DN) + profile(
         np.full((2, 3), 50) * u.DN, np.full((2, 3), 1402.77) * u.AA, np.full((2, 3), width) * u.AA
     )
-    cube = make_test_spectrogram_cube(np.zeros((2, 3, 60)), WAVELENGTH)
-    maps = maps_from_fit(model, cube)
+    data = np.moveaxis(model(WAVELENGTH[:, None, None]).to_value(u.DN), 0, -1)
+    fitted, fitter = _fit(model, data, np.ones_like(data), unit=u.DN)
+    maps = maps_from_fit(fitted, make_test_spectrogram_cube(data, WAVELENGTH), fitter=fitter)
     np.testing.assert_allclose(maps["velocity_1"].data, 0, atol=1e-9)
     np.testing.assert_allclose(maps["fwhm_1"].data, fwhm)
     np.testing.assert_allclose(maps["integrated_intensity_1"].data, area)
-    assert all(maps[name].uncertainty is None for name in maps if name != "residual")
 
 
 def test_maps_from_fit_takes_absolute_widths():
@@ -549,15 +549,18 @@ def test_maps_from_fit_flags_convergence(fitter_class, expected):
 
 
 def test_maps_from_fit_bound_tolerance_is_relative():
-    # In meters the center is 1e-11 from its bounds, which only a relative tolerance leaves unflagged.
+    # In meters the center is 1e-11 from its bounds, which only a relative tolerance leaves unflagged;
+    # LMLSQFitter reports no active bounds, which TRFLSQFitter would here, within its own tolerance.
     model = models.Const1D(5 * u.DN) + models.Gaussian1D(
         np.full((2, 3), 50) * u.DN,
         np.full((2, 3), 1402.77e-10) * u.m,
         np.full((2, 3), 0.05e-10) * u.m,
         bounds={"amplitude": (0, 100), "mean": (1402.67e-10, 1402.87e-10), "stddev": (0.01e-10, 0.1e-10)},
     )
-    cube = make_test_spectrogram_cube(np.zeros((2, 3, 60)), WAVELENGTH)
-    assert np.all(maps_from_fit(model, cube)["quality"].data == FitQualityFlag.OK)
+    data = np.moveaxis(model(WAVELENGTH[:, None, None]).to_value(u.DN), 0, -1)
+    fitted, fitter = _fit(model, data, np.ones_like(data), WAVELENGTH.to(u.m), u.DN, fitter=LMLSQFitter())
+    maps = maps_from_fit(fitted, make_test_spectrogram_cube(data, WAVELENGTH), fitter=fitter)
+    assert np.all(maps["quality"].data == FitQualityFlag.OK)
 
 
 # TRFLSQFitter stops just inside a bound and LMLSQFitter beyond it.
@@ -586,11 +589,11 @@ def test_maps_from_fit_flags_bounds_per_spectrum(fitter_class):
 @pytest.mark.parametrize(("wavelength_axis", "wcs_axes"), [(0, [2, 3, 1]), (1, [2, 1, 3])])
 def test_maps_from_fit_aligns_spatial_axes(wavelength_axis, wcs_axes):
     _, cube = _si_iv_cube(np.random.default_rng(3))
-    fitted, _ = _fit(
+    fitted, fitter = _fit(
         starts_from_model(line_model(["Si IV 1403"]), cube), cube.data, cube.uncertainty.array, unit=cube.unit
     )
     cube = type(cube)(np.moveaxis(cube.data, 2, wavelength_axis), cube.wcs.sub(wcs_axes), unit=cube.unit)
-    maps = maps_from_fit(fitted, cube)
+    maps = maps_from_fit(fitted, cube, fitter=fitter)
     map_axes = (0, 1)
     residual_axes = tuple(axis for axis in range(3) if axis != wavelength_axis)
     assert maps.aligned_axes["mean_1"] == map_axes
@@ -605,13 +608,13 @@ def test_maps_from_fit_aligns_spatial_axes(wavelength_axis, wcs_axes):
 
 def test_maps_from_fit_preserves_residual_coordinates():
     _, cube = _si_iv_cube(np.random.default_rng(3))
-    fitted, _ = _fit(
+    fitted, fitter = _fit(
         starts_from_model(line_model(["Si IV 1403"]), cube), cube.data, cube.uncertainty.array, unit=cube.unit
     )
     times = Time("2020-01-01") + np.arange(SHAPE[0]) * u.s
     cube.extra_coords.add("time", 0, times, physical_types="time")
     cube.global_coords.add("observer", "custom:observer", "IRIS")
-    residual = maps_from_fit(fitted, cube)["residual"]
+    residual = maps_from_fit(fitted, cube, fitter=fitter)["residual"]
     assert residual.global_coords["observer"] == "IRIS"
     assert residual.extra_coords._ndcube is residual
     assert cube.extra_coords._ndcube is cube
@@ -636,31 +639,82 @@ def test_maps_from_fit_without_residual():
 
 def test_maps_from_fit_flags_masked_input():
     _, cube = _si_iv_cube(np.random.default_rng(3))
-    fitted, _ = _fit(
+    fitted, fitter = _fit(
         starts_from_model(line_model(["Si IV 1403"]), cube), cube.data, cube.uncertainty.array, unit=cube.unit
     )
     cube.mask = np.zeros(cube.data.shape, dtype=bool)
     cube.mask[0, 1, 5] = True
-    quality = maps_from_fit(fitted, cube)["quality"].data
+    quality = maps_from_fit(fitted, cube, fitter=fitter)["quality"].data
     assert quality[0, 1] == FitQualityFlag.MASKED_INPUT
     assert quality[1, 1] == FitQualityFlag.OK
-    for mask, expected in ((False, FitQualityFlag.OK), (True, FitQualityFlag.MASKED_INPUT)):  # Scalar masks.
+    # Scalar masks; a cube masked in full has no usable sample.
+    for mask, expected in ((False, FitQualityFlag.OK), (True, FitQualityFlag.NO_FIT)):
         cube.mask = mask
-        assert np.all(maps_from_fit(fitted, cube)["quality"].data == expected)
+        assert np.all(maps_from_fit(fitted, cube, fitter=fitter)["quality"].data == expected)
 
 
-def test_maps_from_fit_without_any_covariance():
-    _, cube = _si_iv_cube(np.random.default_rng(3))
-    fitted, fitter = _fit(
-        starts_from_model(line_model(["Si IV 1403"]), cube),
-        np.full_like(cube.data, np.nan),
-        cube.uncertainty.array,
-        unit=cube.unit,
-    )
+def test_maps_from_fit_flags_spectra_without_usable_samples():
+    raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
+    cube = raster["Mg II k 2796"][0][:, 700:740]  # Rows 731 to 739 are masked in full.
+    wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
+    good = np.isfinite(cube.data) & ~cube.mask
+    # One start for every spectrum and zero weights for the masked samples, with which the fits of the
+    # spectra masked in full end at their start.
+    start = TRFLSQFitter()(_k2_peaks(cube.unit), wavelength, cube.data[1, 0] * cube.unit)
+    sigma = np.where(good, cube.uncertainty.array, np.inf)
+    fitted, fitter = _fit(start, np.where(good, cube.data, 0), sigma, wavelength, cube.unit)
     maps = maps_from_fit(fitted, cube, fitter=fitter)
+    empty = ~np.any(good, axis=-1)
+    np.testing.assert_array_equal(maps["quality"].data == FitQualityFlag.NO_FIT, empty)
+    assert np.all(np.isnan(maps["integrated_intensity_1"].data[empty]))
+    assert np.all(np.isnan(maps["mean_1"].uncertainty.array[empty]))
+
+
+def test_maps_from_fit_raises_only_when_no_spectrum_with_data_was_fitted():
+    raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
+    cube = raster["Mg II k 2796"][0][:, 700:740]  # Rows 731 to 739 are masked in full.
+    wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
+
+    def fit(cube, wavelength):
+        return _fit(
+            starts_from_model(line_model(["Mg II k"]), cube),
+            np.where(cube.mask, np.nan, cube.data),
+            cube.uncertainty.array,
+            wavelength,
+            cube.unit,
+            fitter_kwargs={"filter_non_finite": True},
+        )
+
+    # astropy converts the means to nm but not their bounds, so every fit fails.
+    fitted, fitter = fit(cube, wavelength.to(u.nm))
+    with pytest.raises(ValueError, match="Every fit of a spectrum with data failed"):
+        maps_from_fit(fitted, cube, fitter=fitter)
+    missing = cube[:, 31:]
+    fitted, fitter = fit(missing, wavelength)
+    maps = maps_from_fit(fitted, missing, fitter=fitter)
     assert np.all(maps["quality"].data == FitQualityFlag.NO_FIT)
     assert maps["mean_1"].uncertainty is None
-    assert maps["integrated_intensity_1"].uncertainty is None
+
+
+def test_maps_from_fit_takes_fit_info_naming_its_keys():
+    raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
+    cube = raster["Mg II k 2796"][0][:, 700:740]
+    wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
+    quality = []
+    for fit_info in (True, ("param_cov", "success", "active_mask")):
+        fitted, fitter = _fit(
+            starts_from_model(line_model(["Mg II k"]), cube),
+            np.where(cube.mask, np.nan, cube.data),
+            cube.uncertainty.array,
+            wavelength,
+            cube.unit,
+            fit_info=fit_info,
+            fitter_kwargs={"filter_non_finite": True},
+        )
+        maps = maps_from_fit(fitted, cube, fitter=fitter)
+        assert np.isfinite(maps["mean_1"].uncertainty.array).any()
+        quality.append(maps["quality"].data)
+    np.testing.assert_array_equal(*quality)
 
 
 def test_maps_from_fit_fixed_parameters_and_rest_wavelength():
@@ -674,12 +728,12 @@ def test_maps_from_fit_fixed_parameters_and_rest_wavelength():
     assert np.all(np.isfinite(maps["mean_1"].uncertainty.array))
     # Against 1402.0 Å instead of the documented 1402.77 Å.
     np.testing.assert_allclose(np.median(maps["velocity_1"].data), 0.77 / 1402.0 * C_KMS, rtol=0.01)
-    wider = make_test_spectrogram_cube(np.zeros((2, 3, 400)), (1395.0 + 0.026 * np.arange(400)) * u.AA)
+    wider = make_test_spectrogram_cube(np.zeros((*SHAPE, 400)), (1395.0 + 0.026 * np.arange(400)) * u.AA)
     with pytest.raises(ValueError, match="pass rest_wavelength"):
-        maps_from_fit(fitted, wider)
+        maps_from_fit(fitted, wider, fitter=fitter)
     with pytest.raises(ValueError, match="no unit"):
-        maps_from_fit(line_model(["Si IV 1403"]), cube)
-    with pytest.raises(ValueError, match="fit_info=True"):
+        maps_from_fit(line_model(["Si IV 1403"]), cube, fitter=fitter)
+    with pytest.raises(TypeError, match="fit_info=True"):
         maps_from_fit(fitted, cube, fitter=TRFLSQFitter())
 
 
@@ -689,11 +743,11 @@ def test_maps_from_fit_on_one_spectrum():
     wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
     model = starts_from_model(line_model(["Mg II k"]), cube)
     fitted, fitter = _fit(model, cube.data, cube.uncertainty.array, wavelength, cube.unit)
-    for maps in (maps_from_fit(fitted, cube), maps_from_fit(fitted, cube, fitter=fitter)):
-        for name in fitted.param_names:
-            np.testing.assert_array_equal(maps[name].data, [[getattr(fitted, name).value]], strict=True)
-        assert maps["quality"].data.tolist() == [[FitQualityFlag.OK]]
-        assert maps["residual"].data.shape == cube.data.shape
+    maps = maps_from_fit(fitted, cube, fitter=fitter)
+    for name in fitted.param_names:
+        np.testing.assert_array_equal(maps[name].data, [[getattr(fitted, name).value]], strict=True)
+    assert maps["quality"].data.tolist() == [[FitQualityFlag.OK]]
+    assert maps["residual"].data.shape == cube.data.shape
     np.testing.assert_allclose(maps["mean_1"].uncertainty.array, _errors(fitter)[..., 2], strict=True)
 
 

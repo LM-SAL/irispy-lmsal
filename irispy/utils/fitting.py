@@ -284,7 +284,7 @@ class FitQualityFlag(_QualityFlag):
     """
 
     OK = (0, "ok")
-    NO_FIT = (1, "no fit: NaN parameters")
+    NO_FIT = (1, "no fit: the fit failed or the spectrum has no usable sample")
     NOT_CONVERGED = (2, "the fitter reports no success")
     AT_BOUND = (3, "a parameter stopped at one of its bounds")
     MASKED_INPUT = (4, "the spectrum has masked samples")
@@ -292,13 +292,15 @@ class FitQualityFlag(_QualityFlag):
 
 def _fit_property(fit_info, name, fill):
     """
-    Return a fit property as an array, using ``fill`` for missing fits.
+    The fit property ``name`` as an array, ``fill`` where a fit has none, or `None` if
+    no fit has it.
 
-    `~astropy.modeling.fitting.FitInfoArrayContainer.get_property_as_array` fails where
-    `~astropy.modeling.fitting.parallel_fit_dask` left no fit information: a 0 for an all-NaN
-    spectrum and `None` for a fit that raised.
+    `~astropy.modeling.fitting.FitInfoArrayContainer.get_property_as_array` fails on the 0
+    that `~astropy.modeling.fitting.parallel_fit_dask` leaves for an all-NaN spectrum, and gives
+    zeros for the `None` of a fit that raised.
     """
-    found = [fit_info[index] for index in np.ndindex(fit_info.shape)]
+    # fit_info[index] raises a KeyError for the entries of a fit_info naming its keys.
+    found = list(fit_info._fit_info_array.flat)
     found = [info.get(name) if isinstance(info, dict) else None for info in found]
     template = next((np.asarray(value) for value in found if value is not None), None)
     if template is None:
@@ -307,7 +309,7 @@ def _fit_property(fit_info, name, fill):
     return np.reshape(np.asarray(values, dtype=float), fit_info.shape + template.shape)
 
 
-def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None, residual=True):
+def maps_from_fit(fitted_model, cube, *, fitter, rest_wavelength=None, residual=True):
     r"""
     Maps of the parameters of a model fitted to every spectrum of a cube.
 
@@ -319,10 +321,11 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None, resi
         with ``data_unit``.
     cube : `~irispy.spectrograph.SpectrogramCube`
         The cube that was fitted.
-    fitter : `~astropy.modeling.fitting.Fitter`, optional
-        The fitter passed to `~astropy.modeling.fitting.parallel_fit_dask` with ``fit_info=True``.
-        Without it the maps have no uncertainties and no fit counts as not converged. That flag
-        relies on the ``success`` that `~astropy.modeling.fitting.TRFLSQFitter` and the other
+    fitter : `~astropy.modeling.fitting.Fitter`
+        The fitter passed to `~astropy.modeling.fitting.parallel_fit_dask`, with ``fit_info=True``
+        or ``fit_info`` naming the keys read here: ``"param_cov"`` for the uncertainties, and
+        ``"success"`` and ``"active_mask"`` for `FitQualityFlag.NOT_CONVERGED` and
+        `FitQualityFlag.AT_BOUND`, which `~astropy.modeling.fitting.TRFLSQFitter` and the other
         fitters built on `scipy.optimize.least_squares` report.
     rest_wavelength : `~astropy.units.Quantity`, optional
         The rest wavelength for the Doppler velocities. Defaults to the one documented line that
@@ -345,40 +348,57 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None, resi
         * ``"residual"``, unless ``residual`` is `False`, ``cube`` minus the fitted model,
           retaining its WCS, uncertainty, mask and coordinates.
 
+    Raises
+    ------
+    ValueError
+        If every fit of a spectrum with a usable sample failed, as when a model with bounds is
+        fitted against wavelengths that are not in Å; see :ref:`irispy-tutorial-fitting`.
+
     Notes
     -----
     When the fit provides covariance, parameter and derived maps include a
     `~astropy.nddata.StdDevUncertainty`. Parameter uncertainties are the square roots of the
-    covariance diagonal, NaN where a fit failed and for fixed or tied parameters.
+    covariance diagonal, NaN where there is no fit and for fixed or tied parameters.
 
     The derived maps propagate the covariance to first order. The full width at half
     maximum is :math:`2\sqrt{2\ln 2}\,|\sigma|` for a Gaussian and the absolute value of the ``fwhm``
     parameter of a Lorentzian, and the integral is :math:`\sqrt{2\pi}\,A|\sigma|` for a Gaussian and
     :math:`\pi A\,|\mathrm{FWHM}|/2` for a Lorentzian.
 
+    A spectrum is `FitQualityFlag.NO_FIT`, and NaN in the parameter and derived maps, where its
+    fit failed or where it has no usable sample, one that is finite and not masked.
     A spectrum is `FitQualityFlag.AT_BOUND` where a free parameter is at or beyond one of its
-    bounds, to within 1e-8 times the larger of their magnitudes in that spectrum, or,
-    given ``fitter``, where the fitter reports the bound as active (the ``active_mask`` of
-    `scipy.optimize.least_squares`). `~astropy.modeling.fitting.TRFLSQFitter` keeps the
-    parameters strictly inside their bounds, so without ``fitter`` its fits that stopped just
-    inside a bound of zero are not flagged.
+    bounds, to within 1e-8 times the larger of their magnitudes in that spectrum, or where the
+    fitter reports the bound as active (the ``active_mask`` of `scipy.optimize.least_squares`).
     """
     names = fitted_model.param_names
     values = {name: getattr(fitted_model, name).quantity for name in names}
     if unitless := [name for name, value in values.items() if value is None]:
         msg = f"{', '.join(unitless)} have no unit; fit the model with data_unit or start it with units."
         raise ValueError(msg)
+    fit_info = getattr(fitter, "fit_info", None)
+    if not isinstance(fit_info, FitInfoArrayContainer):
+        msg = "fitter has no per-spectrum fit information; pass fit_info=True to parallel_fit_dask."
+        raise TypeError(msg)
     # Parameter.value is a scalar for one spectrum; Parameter.shape keeps the spatial axes.
     shape = np.broadcast_shapes(*(getattr(fitted_model, name).shape for name in names))
     values = {name: np.broadcast_to(value, shape, subok=True) for name, value in values.items()}
-    failed = np.any([np.isnan(value.value) for value in values.values()], axis=0)
+    usable = np.any(np.isfinite(cube.data) & ~_boolean_mask(cube), axis=cube.wavelength_axis)
+    # A spectrum without usable samples, given zero weights, "converges" at its start with a zero covariance.
+    failed = ~usable | np.any([np.isnan(value.value) for value in values.values()], axis=0)
+    # A cube with no usable samples at all, such as a slab of missing steps, still gives its maps.
+    if usable.any() and failed.all():
+        msg = (
+            "Every fit of a spectrum with data failed, giving NaN parameters; see Things to know in the fitting "
+            "tutorial, and pass diagnostics='error' and a diagnostics_path to parallel_fit_dask to see the errors."
+        )
+        raise ValueError(msg)
+    values = {name: np.where(failed, np.nan, value.value) * value.unit for name, value in values.items()}
     # The covariance covers the free parameters only, in the order of the model's.
     free = [name for name in names if not (fitted_model.fixed[name] or fitted_model.tied[name])]
-    fit_info = getattr(fitter, "fit_info", None)
-    if fitter is not None and not isinstance(fit_info, FitInfoArrayContainer):
-        msg = "fitter has no per-spectrum fit information; pass fit_info=True to parallel_fit_dask."
-        raise ValueError(msg)
-    covariance = None if fit_info is None else _fit_property(fit_info, "param_cov", np.nan)
+    covariance = _fit_property(fit_info, "param_cov", np.nan)
+    if covariance is not None:
+        covariance[failed] = np.nan
     wavelength = _wavelength(cube)
     if rest_wavelength is None:
         lines = _covered_lines(wavelength)
@@ -461,10 +481,10 @@ def maps_from_fit(fitted_model, cube, *, fitter=None, rest_wavelength=None, resi
                 tolerance = 1e-8 * np.maximum(np.abs(value), abs(bound))
                 quality[side * (value - bound) <= tolerance] = FitQualityFlag.AT_BOUND
     # TRFLSQFitter stops strictly inside a bound, within its own tolerance of it.
-    active = None if fit_info is None else _fit_property(fit_info, "active_mask", 0)
+    active = _fit_property(fit_info, "active_mask", 0)
     if active is not None:
         quality[np.any(active != 0, axis=-1)] = FitQualityFlag.AT_BOUND
-    success = None if fit_info is None else _fit_property(fit_info, "success", 0)
+    success = _fit_property(fit_info, "success", 0)
     if success is not None:
         quality[success == 0] = FitQualityFlag.NOT_CONVERGED
     quality[failed] = FitQualityFlag.NO_FIT

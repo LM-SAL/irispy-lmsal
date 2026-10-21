@@ -90,7 +90,7 @@ Maps from the fit
 =================
 
 `~irispy.utils.fitting.maps_from_fit` turns the fitted model into a `~irispy.spectrograph.RasterCollection` of maps with the spatial coordinates of the cube.
-Given the fitter that ran with ``fit_info=True``, parameter maps carry the uncertainties from the fit, and derived maps propagate them:
+It takes the fitter that ran with ``fit_info=True``: parameter maps carry the uncertainties from the fit, and derived maps propagate them:
 
 .. code-block:: python
 
@@ -102,7 +102,7 @@ Given the fitter that ran with ``fit_info=True``, parameter maps carry the uncer
     (Unit("km / s"), Unit("Angstrom DN_IRIS_FUV"))
 
 The velocities are against the rest wavelength of the one documented line in the cube, here Si IV, unless ``rest_wavelength`` is given.
-``"quality"`` holds a `~irispy.utils.fitting.FitQualityFlag` for each spectrum: whether its fit failed or did not converge, stopped at a bound, or used a spectrum with masked samples.
+``"quality"`` holds a `~irispy.utils.fitting.FitQualityFlag` for each spectrum: whether it has no fit (its fit failed or it has no usable sample), its fit did not converge or stopped at a bound, or it has masked samples.
 ``"residual"`` is the cube minus the fitted model, to check the fits.
 It retains the cube's uncertainty and coordinates.
 
@@ -218,12 +218,12 @@ Things to know
 * **One value per parameter**
   Build a model with one value per parameter and let `~irispy.utils.fitting.starts_from_model` give each spectrum its own: a compound model built with array parameters fits every spectrum to NaN without an error (`astropy#20554 <https://github.com/astropy/astropy/issues/20554>`__).
 * **Pass the wavelengths in Å**
-  The starting models are in Å, and astropy converts a model's parameters to the unit of the wavelengths it is given but not their bounds, so with wavelengths in meters, the unit of the cube's WCS, every fit of a model with bounds, such as that of Mg II k, fails and comes back NaN.
+  The starting models are in Å, and astropy converts a model's parameters to the unit of the wavelengths it is given but not their bounds, so with wavelengths in meters, the unit of the cube's WCS, every fit of a model with bounds, such as that of Mg II k, fails and comes back NaN, and `~irispy.utils.fitting.maps_from_fit` raises a `ValueError`.
   `~astropy.modeling.fitting.TRFLSQFitter` also does not rescale the parameters, so without bounds it can stop before the line centers and widths converge.
   That is why the wavelengths are passed as ``world`` rather than the cube itself.
 * **Masked and missing samples**
   The fitters do not accept NaN, so replace bad samples with any number and give them zero weight, as above.
-  Fits that raise an error give NaN parameters and a zero covariance, and spectra left entirely NaN make ``fit_info.get_property_as_array`` fail; `~irispy.utils.fitting.maps_from_fit` copes with both.
+  Fits that raise an error give NaN parameters and a zero covariance, a spectrum whose samples are all masked keeps its start, and spectra left entirely NaN make ``fit_info.get_property_as_array`` fail; `~irispy.utils.fitting.maps_from_fit` flags all three `~irispy.utils.fitting.FitQualityFlag.NO_FIT`.
   ``diagnostics="error"`` with a ``diagnostics_path`` writes each error to a folder.
 * **Uncertainties**
   With weights of 1/σ, ``param_cov`` is the covariance of the parameters given those uncertainties, and the errors are only as good as the uncertainties of the cube.
