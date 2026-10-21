@@ -59,7 +59,7 @@ def _nuv_t_obs_from_source_filenames(source_data, exposure_times, auxiliary_time
 
 def _auxiliary_times(hdulist):
     """
-    The time of each exposure of a raster file: ``STARTOBS`` plus the auxiliary ``TIME``.
+    Return the time of each exposure of a raster file: ``STARTOBS`` plus the auxiliary ``TIME``.
     """
     auxiliary = hdulist[-2]
     return Time(hdulist[0].header["STARTOBS"]) + TimeDelta(auxiliary.data[:, auxiliary.header["TIME"]], format="sec")
@@ -67,8 +67,8 @@ def _auxiliary_times(hdulist):
 
 def _exposure_pointing(auxiliary_data, auxiliary_header):
     """
-    The ``XCENIX`` and ``YCENIX`` of each exposure, NaN for an exposure without data,
-    which has them as 0.
+    Return the ``XCENIX`` and ``YCENIX`` of each exposure, NaN for an exposure missing
+    on both detectors, which has them as 0.
     """
     x, y = auxiliary_data[:, auxiliary_header["XCENIX"]], auxiliary_data[:, auxiliary_header["YCENIX"]]
     unknown = (x == 0) & (y == 0)
@@ -234,10 +234,7 @@ def read_spectrograph_lvl2(
                     "DATE_END": (aux_times[-1].isot, "STARTOBS plus the auxiliary TIME of the last exposure"),
                     **dict.fromkeys(("XCEN", "YCEN", "SAT_ROT"), (np.nan, "Unknown: the file has no data")),
                 }
-                logger.warning(
-                    f"{given} has no data: its exposures are masked, timed at STARTOBS plus the auxiliary TIME, "
-                    "and its pointing and roll are unknown (NaN)."
-                )
+                logger.warning(f"{given} has no data: its exposures are masked and its pointing and roll are NaN.")
             if file_index == 0:
                 # After a discussion with the IRIS team, it was decided that instead of the
                 # OBSID, we will use STEPS_AV less than -0.01 to identify V34 observations.
@@ -303,7 +300,10 @@ def read_spectrograph_lvl2(
                     exposure_times = exposure_times_nuv
                     dn_unit = DN_UNIT["NUV"]
                     readout_noise = READOUT_NOISE["NUV"]
-                    if t_obs_nuv is None:
+                    if no_data:
+                        # Its own warning covers the missing NUV exposures
+                        t_obs_nuv = aux_times
+                    elif t_obs_nuv is None:
                         # The archive writes the NUV source filenames of a file without NUV exposures as A0 columns,
                         # which astropy cannot read
                         t_obs_nuv = _nuv_t_obs_from_source_filenames(
