@@ -90,8 +90,11 @@ def test_line_model():
         assert getattr(model, f"mean_{index}").unit == u.AA
         assert getattr(model, f"stddev_{index}").quantity == 0.05 * u.AA
     assert model.bounds["mean_1"] == model.bounds["mean_2"] == (None, None)
+    # Only the Mg II peaks are kept in emission: other lines, such as Ni I 2799, can be absorption lines.
+    assert model.bounds["amplitude_1"] == model.bounds["amplitude_2"] == (None, None)
     for index, rest in ((3, k), (4, k), (5, h), (6, h)):
         np.testing.assert_allclose(model.bounds[f"mean_{index}"], rest * (1 + np.array([-40, 40]) / C_KMS))
+        assert model.bounds[f"amplitude_{index}"] == (0, None)
 
 
 @pytest.mark.parametrize("line", ["Si IV", "Si IV 1500", "Xx IV 1403", "C II 1335"])
@@ -231,6 +234,20 @@ def test_starts_from_model_finds_lines_on_a_steep_background(background):
     # Each line starts at its sample nearest its center, at its true height there.
     assert np.all(np.abs(starts.mean_1.value - truth.mean_1.value) < np.diff(WAVELENGTH.value)[0] / 2)
     np.testing.assert_allclose(starts.amplitude_1.value, truth[1](starts.mean_1.value * u.AA).to_value(u.DN))
+
+
+def test_starts_from_model_rejects_lines_outside_the_cube():
+    _, cube = _line_cube(np.random.default_rng(13))
+    with pytest.raises(ValueError, match=r"lines at 1401\.16 Å, outside the cube's 1402\.00-1403\.53 Å"):
+        starts_from_model(line_model(["Si IV 1403", "O IV 1401"]), cube)
+
+
+def test_starts_from_model_takes_absolute_widths():
+    # A Lorentzian fit can end with a negative fwhm; reused as a start, it still finds each spectrum's peak.
+    truth, cube = _line_cube(np.random.default_rng(14), profile=models.Lorentz1D)
+    model = models.Const1D(5 * u.DN) + models.Lorentz1D(150 * u.DN, 1402.75 * u.AA, -0.06 * u.AA)
+    starts = starts_from_model(model, cube)
+    assert np.all(np.abs(starts.x_0_1.value - truth.x_0_1.value) < np.diff(WAVELENGTH.value)[0] / 2)
 
 
 def test_starts_from_model_keeps_lines_without_a_peak():
