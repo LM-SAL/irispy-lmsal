@@ -1,0 +1,2 @@
+``irispy.utils.moments.calculate_moments``, ``irispy.utils.red_blue.calculate_red_blue_asymmetry``, ``irispy.utils.rgb.calculate_rgb`` and ``irispy.utils.rgb.plot_rgb`` now default the rest wavelength of a cube that does not cover ``cube.meta.rest_wavelength`` to the one documented IRIS line it covers, so a crop of the Mg II k window to Mg II h no longer gets velocities 786 km/s too high, nor a crop of the C II window to C II 1334 velocities 264 km/s too low.
+``calculate_moments`` records the rest wavelength of its velocity maps in their ``meta["moments_rest_wavelength"]``.

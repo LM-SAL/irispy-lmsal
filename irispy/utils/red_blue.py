@@ -16,6 +16,7 @@ from irispy.spectrograph import RasterCollection, SpectrogramCube
 from irispy.utils._spectral import (
     _QualityFlag,
     check_scaled,
+    default_rest_wavelength,
     drop_extra_coords_dependent_on_axis,
     make_map_cube,
     make_spatial_template,
@@ -126,9 +127,10 @@ def calculate_red_blue_asymmetry(
     cube : `irispy.spectrograph.SpectrogramCube`
         Input spectrogram cube.
     rest_wavelength : `astropy.units.Quantity`, optional
-        Rest wavelength used to convert the spectral axis to Doppler velocity.
-        If omitted, read from ``cube.meta.rest_wavelength`` (requires an
-        `~irispy.meta.SGMeta` instance with a ``TWAVE<n>`` FITS keyword).
+        Rest wavelength used to convert the spectral axis to Doppler velocity. Defaults to
+        ``cube.meta.rest_wavelength``, or to the one documented line the cube covers
+        (`~irispy.utils.lines.get_lines`) if it does not cover ``cube.meta.rest_wavelength``.
+        Required if there is neither.
     velocity_range : `astropy.units.Quantity`, optional
         Two positive velocities. The red wing spans these velocities and the blue wing their
         negatives, both measured from the peak of each profile (see Notes).
@@ -181,7 +183,7 @@ def calculate_red_blue_asymmetry(
     """
     check_scaled(cube)
     if rest_wavelength is None:
-        rest_wavelength = getattr(cube.meta, "rest_wavelength", None)
+        rest_wavelength = default_rest_wavelength(cube)
         if rest_wavelength is None:
             msg = (
                 "rest_wavelength was not provided and could not be read from cube.meta. "
