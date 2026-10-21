@@ -20,12 +20,7 @@ def test_remove_cosmic_rays_rsliding(sns_sjicube_1330):
     cube.data[...] = data
     cube.mask = mask.copy()
 
-    cleaned_cube = remove_cosmic_rays(
-        cube,
-        sigma=2.5,
-        max_iters=7,
-        method_kwargs={"kernel": 3, "threads": 1},
-    )
+    cleaned_cube = remove_cosmic_rays(cube, method_kwargs={"kernel": 3, "threads": 1, "sigma": 2.5, "max_iters": 7})
 
     np.testing.assert_allclose(cleaned_cube.data[1, 1], 5.0, atol=2.0)
     np.testing.assert_array_equal(cleaned_cube.mask, mask)
@@ -42,11 +37,7 @@ def test_remove_cosmic_rays_astroscrappy(sns_sjicube_1330):
     cube.mask = mask.copy()
 
     cleaned_cube = remove_cosmic_rays(
-        cube,
-        method="astroscrappy",
-        sigma=2.0,
-        max_iters=3,
-        method_kwargs={"readnoise": 1.0},
+        cube, method="astroscrappy", method_kwargs={"readnoise": 1.0, "sigclip": 2.0, "niter": 3}
     )
 
     assert not np.isclose(cleaned_cube.data[5, 5], 500.0)
@@ -70,22 +61,15 @@ def test_remove_cosmic_rays_rsliding_kwargs_forwarded(sns_sjicube_1330, monkeypa
     cube = sns_sjicube_1330[0, :2, :2]
     cube.data[...] = np.array([[1.0, 2.0], [3.0, 4.0]])
     cube.mask = np.zeros(cube.data.shape, dtype=bool)
-    user_kwargs = {"kernel": 5, "threads": 2}
+    user_kwargs = {"kernel": 5, "threads": 2, "sigma": 2.5, "max_iters": 7}
 
-    remove_cosmic_rays(
-        cube,
-        sigma=2.5,
-        max_iters=7,
-        method_kwargs=user_kwargs,
-    )
+    remove_cosmic_rays(cube, method_kwargs=user_kwargs)
 
     assert captured["kwargs"]["sigma"] == 2.5
     assert captured["kwargs"]["max_iters"] == 7
     assert captured["kwargs"]["kernel"] == 5
     assert captured["kwargs"]["threads"] == 2
     assert captured["kwargs"]["masked_array"] is True
-    assert "sigma" not in user_kwargs
-    assert "max_iters" not in user_kwargs
     assert "masked_array" not in user_kwargs
 
 
@@ -102,23 +86,15 @@ def test_remove_cosmic_rays_astroscrappy_kwargs_forwarded(sns_sjicube_1330, monk
     cube = sns_sjicube_1330[0, :3, :3]
     cube.data[...] = np.ones((3, 3), dtype=float)
     cube.mask = np.zeros((3, 3), dtype=bool)
-    user_kwargs = {"readnoise": 4.0}
+    user_kwargs = {"readnoise": 4.0, "sigclip": 2.0, "niter": 3}
 
-    remove_cosmic_rays(
-        cube,
-        method="astroscrappy",
-        sigma=2.0,
-        max_iters=3,
-        method_kwargs=user_kwargs,
-    )
+    remove_cosmic_rays(cube, method="astroscrappy", method_kwargs=user_kwargs)
 
     assert len(calls) == 1
     assert calls[0]["sigclip"] == 2.0
     assert calls[0]["niter"] == 3
     assert calls[0]["readnoise"] == 4.0
     assert calls[0]["verbose"] is False
-    assert "sigclip" not in user_kwargs
-    assert "niter" not in user_kwargs
     assert "verbose" not in user_kwargs
 
 
@@ -232,8 +208,8 @@ def test_remove_cosmic_rays_missing_optional_dependency(sns_sjicube_1330, monkey
 @pytest.mark.parametrize(
     ("method", "kwargs"),
     [
-        ("rsliding", {"sigma": 2.5, "max_iters": 7, "method_kwargs": {"kernel": 3, "threads": 1}}),
-        ("astroscrappy", {"sigma": 2.0, "max_iters": 3, "method_kwargs": {"readnoise": 1.0}}),
+        ("rsliding", {"kernel": 3, "threads": 1, "sigma": 2.5, "max_iters": 7}),
+        ("astroscrappy", {"readnoise": 1.0, "sigclip": 2.0, "niter": 3}),
     ],
 )
 def test_remove_cosmic_rays_keeps_clipped_pixels(sns_sjicube_1330, method, kwargs):
@@ -246,7 +222,7 @@ def test_remove_cosmic_rays_keeps_clipped_pixels(sns_sjicube_1330, method, kwarg
     cube.data[...] = data
     cube.mask = np.zeros((10, 10), dtype=bool)
     mark_saturated(cube, data == SATURATION_LIMIT.value)  # as the readers mark clipped pixels
-    cleaned = remove_cosmic_rays(cube, method=method, **kwargs)
+    cleaned = remove_cosmic_rays(cube, method=method, method_kwargs=kwargs)
     assert np.isposinf(cleaned.data[2, 2])
     assert cleaned.data[7, 7] == SATURATION_LIMIT.value
     np.testing.assert_allclose(cleaned.data[5, 5], 10.0, atol=2.0)
@@ -256,10 +232,8 @@ def test_remove_cosmic_rays_keeps_clipped_pixels(sns_sjicube_1330, method, kwarg
 def test_remove_cosmic_rays_spectrogram_cube(sns_sg_file, monkeypatch):
     captured = {}
 
-    def fake_remove_cosmic_rays(data, mask, *, sigma, max_iters, method_kwargs):
+    def fake_remove_cosmic_rays(data, mask, *, method_kwargs):
         captured["mask"] = mask.copy()
-        captured["sigma"] = sigma
-        captured["max_iters"] = max_iters
         captured["method_kwargs"] = method_kwargs
         return data + 2
 
@@ -268,19 +242,11 @@ def test_remove_cosmic_rays_spectrogram_cube(sns_sg_file, monkeypatch):
     raster = read_spectrograph_lvl2(sns_sg_file)
     key = next(iter(raster.keys()))
     cube = raster[key][0]
-    cleaned_cube = remove_cosmic_rays(
-        cube,
-        method="astroscrappy",
-        sigma=5.0,
-        max_iters=5,
-        method_kwargs={"batch_size": 16},
-    )
+    cleaned_cube = remove_cosmic_rays(cube, method="astroscrappy", method_kwargs={"batch_size": 16})
 
     np.testing.assert_array_equal(cleaned_cube.data, cube.data + 2)
     np.testing.assert_array_equal(cleaned_cube.mask, cube.mask)
     assert list(cleaned_cube.extra_coords.keys()) == list(cube.extra_coords.keys())
-    assert captured["sigma"] == 5.0
-    assert captured["max_iters"] == 5
     assert captured["method_kwargs"]["batch_size"] == 16
     np.testing.assert_array_equal(captured["mask"], cube.mask)
     # WCS is deep-copied, so check equivalence not identity

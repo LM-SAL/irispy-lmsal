@@ -1,5 +1,3 @@
-from contextlib import nullcontext
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -34,9 +32,9 @@ def test_remove_dust_repairs_pixels_from_neighboring_frames(sns_sjicube_1330):
     dust_mask[1, 1, 1] = True
     original_exposure_times = cube.axis_world_coords(0, wcs=cube.extra_coords["exposure time"])[0].to_value(u.s)
 
-    cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=2, exposure_normalize=False)
+    cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=2)
 
-    assert cleaned.data[1, 1, 1] == 10
+    assert cleaned.data[1, 1, 1] == pytest.approx(10, rel=1e-4)
     assert cleaned.mask[1, 1, 1] is np.False_
     assert cube.data[1, 1, 1] == 0
     np.testing.assert_allclose(
@@ -57,7 +55,7 @@ def test_remove_dust_preserves_sjicube_state(sns_sjicube_1330):
     original_extra_coord_keys = list(cube.extra_coords.keys())
     original_global_coord_keys = list(cube.global_coords.keys())
 
-    cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=1, exposure_normalize=False)
+    cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=1)
 
     assert type(cleaned) is type(cube)
     assert cleaned.meta["scaled"] is cube.meta["scaled"]
@@ -68,68 +66,28 @@ def test_remove_dust_preserves_sjicube_state(sns_sjicube_1330):
     assert cleaned.to_maps(0).wcs is not None
 
 
-def test_remove_dust_exposure_normalize_uses_exposure_time(sns_sjicube_1330, monkeypatch):
-    # Use a small cube with a single spatial pixel so temporal behavior is clear
-    cube = sns_sjicube_1330[:4, :1, :1]
-    cube.data[...] = 0.0
-    cube.mask = np.zeros_like(cube.data, dtype=bool)
-
-    # Exposure times vary so a simple median in data space would differ
-    exposure_times = u.Quantity([1, 2, 4, 8], u.s)
-    monkeypatch.setattr(type(cube), "exposure_time", property(lambda _self: exposure_times))
-
-    scale = 10.0
-    for i, t in enumerate(exposure_times.value):
-        cube.data[i, 0, 0] = scale * t
-
-    # Introduce a dust pixel in the second frame
-    dust_mask = np.zeros_like(cube.data, dtype=bool)
-    dust_mask[1, 0, 0] = True
-    cube.data[1, 0, 0] = 0.0
-    cube.mask[1, 0, 0] = True
-
-    cleaned = remove_dust(
-        cube,
-        dust_mask=dust_mask,
-        temporal_window=1,
-        exposure_normalize=True,
-    )
-
-    # If exposure normalization is used, the repaired value should scale with the
-    # local exposure time (i.e. be proportional to exposure_time[1])
-    expected_value = scale * exposure_times[1].value
-    assert cleaned.data[1, 0, 0] == expected_value
-
-    # And it should *not* equal the median of the un-normalized neighboring values
-    # (which would be 10, 40, 80 -> median 40)
-    assert cleaned.data[1, 0, 0] != np.median([10.0, 40.0, 80.0])
-
-
 @pytest.mark.parametrize(
-    "exposure_time",
-    [pytest.param(2 * u.s, id="scalar"), pytest.param([1, 2, 3] * u.s, id="wrong-length")],
+    ("unit", "values", "expected"),
+    [(u.DN, [10, 20, 40, 80], 20), (u.DN / u.s, [10, 10, 10, 10], 10)],
 )
-def test_remove_dust_exposure_normalize_invalid_exposure_time_falls_back(sns_sjicube_1330, monkeypatch, exposure_time):
+def test_remove_dust_scales_counts_to_the_exposure_time(sns_sjicube_1330, monkeypatch, unit, values, expected):
+    # 10 DN/s through exposures of 1, 2, 4 and 8 s, as under automatic exposure control
+    monkeypatch.setattr(type(sns_sjicube_1330), "exposure_time", property(lambda _self: [1, 2, 4, 8] * u.s))
     cube = sns_sjicube_1330[:4, :1, :1]
-    cube.data[...] = 1.0
-    cube.data[1, 0, 0] = 0.0
+    cube = cube.to_nddata(
+        data=np.reshape(values, cube.shape).astype(float),
+        mask=np.zeros(cube.shape, dtype=bool),
+        unit=unit,
+        nddata_type=type(cube),
+        extra_coords="copy",
+        global_coords="copy",
+    )
     dust_mask = np.zeros(cube.shape, dtype=bool)
     dust_mask[1, 0, 0] = True
-    cube.mask = dust_mask.copy()
-    monkeypatch.setattr(type(cube), "exposure_time", property(lambda _self: exposure_time))
-    warning = (
-        nullcontext()
-        if exposure_time.isscalar
-        else pytest.warns(UserWarning, match="exposure_normalize=True but the number of exposure_time values")
-    )
 
-    with warning:
-        cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=1, exposure_normalize=True)
+    cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=1, fallback=None)
 
-    np.testing.assert_array_equal(cleaned.data, np.ones(cube.shape))
-    assert not cleaned.mask.any()
-    assert cube.data[1, 0, 0] == 0
-    np.testing.assert_array_equal(cube.mask, dust_mask)
+    assert cleaned.data[1, 0, 0] == expected
 
 
 def test_remove_dust_broadcasts_2d_mask_over_time(sns_sjicube_1330):
@@ -147,7 +105,7 @@ def test_remove_dust_broadcasts_2d_mask_over_time(sns_sjicube_1330):
     dust_mask_2d = np.zeros(cube.data.shape[1:], dtype=bool)
     dust_mask_2d[1, 1] = True
 
-    cleaned = remove_dust(cube, dust_mask=dust_mask_2d, temporal_window=1, exposure_normalize=False)
+    cleaned = remove_dust(cube, dust_mask=dust_mask_2d, temporal_window=1)
 
     expected_broadcast_mask = np.broadcast_to(dust_mask_2d, cube.data.shape)
     # All broadcast dust pixels are repaired by spatial fallback, so they should be unmasked.
@@ -217,7 +175,7 @@ def test_remove_dust_before_after_figure(sns_sjicube_1330):
     dust_mask[1, 5, 5] = True
     cube.data[1, 5, 5] = 0.0
 
-    cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=2, exposure_normalize=False)
+    cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=2)
 
     original_frame = cube[1]
     cleaned_frame = cleaned[1]
@@ -315,9 +273,9 @@ def test_remove_dust_leaves_pixels_without_values(sns_sjicube_1330):
     dust_mask[1, 1, 1] = True
     dust_mask[1, 2, 2] = True
 
-    cleaned = remove_dust(cube, dust_mask=dust_mask, exposure_normalize=False)
+    cleaned = remove_dust(cube, dust_mask=dust_mask)
 
     assert np.isnan(cleaned.data[1, 1, 1])
     assert cleaned.mask[1, 1, 1]
-    assert cleaned.data[1, 2, 2] == 10
+    assert cleaned.data[1, 2, 2] == pytest.approx(10, rel=1e-4)
     assert not cleaned.mask[1, 2, 2]
