@@ -1,0 +1,1 @@
+The O IV density example now measures the O IV 1399.78 / 1401.16 Å ratio in a flare raster and maps it onto the log T = 5.15 curve with ``density_diagnostic``, instead of taking a point of a curve as a synthetic observation; it drops the ratios with O IV 1404.81 Å, which is blended with S IV.
