@@ -7,6 +7,8 @@ import numpy as np
 import astropy.units as u
 from astropy.nddata import NDDataRef, StdDevUncertainty
 
+from irispy.utils._spectral import standard_deviation
+
 __all__ = ["density_diagnostic"]
 
 
@@ -28,6 +30,14 @@ def _map_ratio_to_quantity(observed_ratio, quantity, theoretical_ratio, fill_val
     )
 
 
+def _with_standard_deviation(intensity):
+    # An UnknownUncertainty, which astropy cannot propagate, is taken to be a standard deviation
+    intensity = NDDataRef(intensity)
+    if (sigma := standard_deviation(intensity)) is None:
+        return intensity
+    return NDDataRef(intensity.data, uncertainty=StdDevUncertainty(sigma), mask=intensity.mask, unit=intensity.unit)
+
+
 def density_diagnostic(intensity_numerator, intensity_denominator, density_grid, theoretical_ratio):
     """
     Map an observed IRIS line ratio onto a theoretical density curve.
@@ -35,9 +45,9 @@ def density_diagnostic(intensity_numerator, intensity_denominator, density_grid,
     Parameters
     ----------
     intensity_numerator, intensity_denominator : array-like, `~astropy.units.Quantity` or `~astropy.nddata.NDData`
-        Measured integrated intensities of the numerator and denominator lines, such as two `~ndcube.NDCube`
-        maps. The uncertainties of `~astropy.nddata.NDData` intensities give the density bounds, and their
-        masked pixels give NaN. An intensity without uncertainty counts as exact.
+        Measured integrated intensities of the numerator and denominator lines on the same pixels, such as two
+        `~ndcube.NDCube` maps of one raster. The uncertainties of `~astropy.nddata.NDData` intensities give the
+        density bounds, and their masked pixels give NaN. An intensity without uncertainty counts as exact.
     density_grid : `~astropy.units.Quantity`
         Densities at which ``theoretical_ratio`` is sampled.
     theoretical_ratio : array-like or `~astropy.units.Quantity`
@@ -67,7 +77,7 @@ def density_diagnostic(intensity_numerator, intensity_denominator, density_grid,
         different finite values, or ``density_grid`` is not monotonic.
     """
     with np.errstate(divide="ignore", invalid="ignore"):
-        quotient = NDDataRef(intensity_numerator).divide(intensity_denominator)
+        quotient = _with_standard_deviation(intensity_numerator).divide(_with_standard_deviation(intensity_denominator))
     ratio = np.where(np.isfinite(quotient.data), quotient.data, np.nan)
     if quotient.mask is not None:
         ratio = np.where(quotient.mask, np.nan, ratio)

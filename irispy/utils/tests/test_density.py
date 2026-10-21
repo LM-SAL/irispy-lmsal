@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 import astropy.units as u
-from astropy.nddata import NDData, StdDevUncertainty
+from astropy.nddata import NDData, StdDevUncertainty, UnknownUncertainty
 from astropy.wcs import WCS
 
 from ndcube import NDCube
@@ -41,6 +41,16 @@ def test_density_diagnostic_decreasing_curve():
 def test_density_diagnostic_rejects_bad_curves(theoretical_ratio, message):
     with pytest.raises(ValueError, match=message):
         density_diagnostic(0.35, 1.0, [1e8, 1e9, 1e10] * u.cm**-3, theoretical_ratio)
+
+
+def test_density_diagnostic_takes_an_unknown_uncertainty_as_a_standard_deviation():
+    curve = ([1e9, 1e10, 1e11] * u.cm**-3, [0.2, 0.5, 0.8])
+    known, unknown = (
+        density_diagnostic(NDData([0.5, 0.6], uncertainty=kind([0.1, 0.1])), 1.0, *curve)
+        for kind in (StdDevUncertainty, UnknownUncertainty)
+    )
+    for key in ("ratio_uncertainty", "density_lower", "density_upper"):
+        assert u.allclose(unknown[key], known[key])
 
 
 def test_density_diagnostic_rejects_an_unordered_density_grid():
