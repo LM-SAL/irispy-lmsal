@@ -77,20 +77,17 @@ Now we fit every spectrum:
     ...     fit_info=True,
     ...     scheduler="single-threaded",
     ... )  # doctest: +REMOTE_DATA
-    >>> covariance = fitter.fit_info.get_property_as_array("param_cov")  # doctest: +REMOTE_DATA
-    >>> errors = np.sqrt(np.diagonal(covariance, axis1=-2, axis2=-1))  # doctest: +REMOTE_DATA
-    >>> fitted.mean_1.quantity.shape, errors.shape  # doctest: +REMOTE_DATA
-    ((16, 60), (16, 60, 4))
+    >>> fitted.mean_1.quantity.shape  # doctest: +REMOTE_DATA
+    (16, 60)
 
-``errors[..., i]`` is the 1σ uncertainty of the ``i``-th free parameter, here ``fitted.param_names[i]`` as none is fixed or tied.
-The other properties of each fit, such as ``status``, ``success`` and ``nfev``, come out of ``fitter.fit_info`` in the same way.
+Each parameter of ``fitted`` holds one value per spectrum, and ``fitter.fit_info.get_property_as_array`` gives the other results of each fit, such as ``"status"``, ``"success"`` and ``"nfev"``.
 The default ``scheduler`` uses several processes; ``"single-threaded"`` keeps this example simple, and any dask scheduler or a ``dask.distributed.Client`` can be passed instead.
 
 Maps from the fit
 =================
 
 `~irispy.utils.fitting.maps_from_fit` turns the fitted model into a `~irispy.spectrograph.RasterCollection` of maps with the spatial coordinates of the cube.
-It takes the fitter that ran with ``fit_info=True``: parameter maps carry the uncertainties from the fit, and derived maps propagate them:
+It takes the fitter that ran with ``fit_info=True``: parameter maps carry the 1σ uncertainties from the fit, and derived maps propagate them; both are NaN for fixed and tied parameters and for the derived maps that use one:
 
 .. code-block:: python
 
@@ -120,21 +117,24 @@ Judging the fits
 `~irispy.utils.fitting.FitQualityFlag.OK` only says that the fitter converged, not at a bound, on a spectrum without masked samples.
 A fit to noise converges just as well, so it does not say that there is a line.
 Two checks, both from quantities above, tell more.
-The signal-to-noise ratio of the line is the fitted amplitude over its 1σ error, and the reduced chi-square is the sum of the squared residuals over the uncertainties of the unmasked samples, divided by their number minus the number of parameters:
+The signal-to-noise ratio of the line is the fitted amplitude over its 1σ error, and the reduced chi-square is the sum of the squared residuals over the uncertainties of the unmasked samples, divided by their number minus the number of free parameters, those neither fixed nor tied:
 
 .. code-block:: python
 
     >>> from irispy.utils.fitting import FitQualityFlag
-    >>> with np.errstate(divide="ignore", invalid="ignore"):  # doctest: +REMOTE_DATA
-    ...     snr = fitted.amplitude_1.value / errors[..., 1]
+    >>> with np.errstate(divide="ignore"):  # doctest: +REMOTE_DATA
+    ...     snr = maps["amplitude_1"].data / maps["amplitude_1"].uncertainty.array
     >>> chi2 = np.sum(np.where(good, maps["residual"].data / cube.uncertainty.array, 0) ** 2, axis=-1)  # doctest: +REMOTE_DATA
-    >>> reduced_chi2 = chi2 / (good.sum(axis=-1) - len(fitted.param_names))  # doctest: +REMOTE_DATA
+    >>> free = [name for name in fitted.param_names if not (fitted.fixed[name] or fitted.tied[name])]  # doctest: +REMOTE_DATA
+    >>> reduced_chi2 = chi2 / (good.sum(axis=-1) - len(free))  # doctest: +REMOTE_DATA
     >>> converged = maps["quality"].data == FitQualityFlag.OK  # doctest: +REMOTE_DATA
     >>> f"{round(converged.mean(), 1):.0%}", bool(np.median(snr[converged]) < 1)  # doctest: +REMOTE_DATA
     ('80%', True)
 
 Here the fitter converged for about 80% of the 960 spectra, but the median signal-to-noise ratio of those fits is below 1: most of them are fits to noise.
-There is no universal threshold: choose one for your science case, and keep the fits above it.
+A fit that moved its Gaussian out of the window, or made it much narrower than the sample spacing, does not constrain the line: the fitter gives its parameters zero uncertainties, and so an infinite ratio.
+Leave those out, for example with ``np.isfinite(snr)``.
+There is no universal threshold: choose one for your science case, and keep the finite ratios above it.
 A reduced chi-square near 1 means that the model describes the spectrum within its uncertainties, which a fit to pure noise does as well, so it is a check of the model and of the uncertainties and not of the presence of the line.
 Values well above 1 point to a profile that the model does not describe, such as a blend or a second component, or to uncertainties that are too small.
 Values well below 1 mean that the uncertainties are larger than the scatter of the data.
@@ -234,8 +234,8 @@ Things to know
   Fits that raise an error give NaN parameters and a zero covariance, a spectrum whose samples are all masked keeps its start, and spectra left entirely NaN make ``fit_info.get_property_as_array`` fail; `~irispy.utils.fitting.maps_from_fit` flags all three `~irispy.utils.fitting.FitQualityFlag.NO_FIT`.
   ``diagnostics="error"`` with a ``diagnostics_path`` writes each error to a folder.
 * **Uncertainties**
-  With weights of 1/σ, ``param_cov`` is the covariance of the parameters given those uncertainties, and the errors are only as good as the uncertainties of the cube.
-  Without weights, astropy scales it by the variance of the residuals, as `scipy.optimize.curve_fit` does with ``absolute_sigma=False``.
+  With weights of 1/σ, the uncertainties of the maps are those of the parameters given the uncertainties of the cube, and only as good as them.
+  Without weights, astropy scales the covariance of the parameters by the variance of the residuals, as `scipy.optimize.curve_fit` does with ``absolute_sigma=False``.
 * **Bounds**
   `~astropy.modeling.fitting.TRFLSQFitter` keeps the parameters within their bounds while it fits;
   `~astropy.modeling.fitting.LMLSQFitter`, which is faster, clips them to the bounds at each step.

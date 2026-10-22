@@ -354,6 +354,16 @@ The position on the disk is often given as μ, the cosine of the angle between t
     >>> raster["C II 1336"][0].meta.exposure_mu[:4]  # doctest: +REMOTE_DATA
     array([0.84654971, 0.84697349, 0.84739576, 0.8478167 ])
 
+For μ at each pixel, take the cosine of `~sunpy.coordinates.utils.get_heliocentric_angle` of the cube's coordinates, one image at a time:
+
+.. code-block:: python
+
+    >>> import numpy as np
+    >>> from sunpy.coordinates.utils import get_heliocentric_angle
+    >>> mu = np.cos(get_heliocentric_angle(iris_sji[0].axis_world_coords("lon")[0]))  # doctest: +REMOTE_DATA
+    >>> mu.shape, f"{mu.min():.2f} to {mu.max():.2f}"  # doctest: +REMOTE_DATA
+    ((548, 555), '0.75 to 0.92')
+
 Specific coordinates are also provided as part of the cube instead of the metadata.
 These are called extra coordinates, and they are stored in the ``extra_coords`` attribute of the cube.
 
