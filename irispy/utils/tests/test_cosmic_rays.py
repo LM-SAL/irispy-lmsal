@@ -5,6 +5,8 @@ import dask.array as da
 import numpy as np
 import pytest
 
+import astropy.units as u
+
 from irispy.io.sji import read_sji_lvl2
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.tests.helpers import mark_saturated
@@ -171,6 +173,19 @@ def test_remove_cosmic_rays_astroscrappy_inmask_combined(sns_sjicube_1330, monke
     np.testing.assert_array_equal(calls, kept)
     np.testing.assert_array_equal(cleaned.data, np.where(kept, 1.0, 0.0))
     assert method_kwargs["inmask"] is inmask
+
+
+def test_remove_cosmic_rays_does_not_share_meta_coordinates_or_mask(sns_sjicube_1330):
+    pytest.importorskip("rsliding")
+    cube = sns_sjicube_1330
+    mask = cube.mask.copy()
+    cleaned = remove_cosmic_rays(cube)
+    cleaned.meta["note"] = "changed"
+    cleaned.extra_coords.add("sequence", 0, np.arange(len(cleaned.data)) * u.one)
+    cleaned.mask[...] = ~cleaned.mask
+    assert "note" not in cube.meta
+    assert "sequence" not in tuple(cube.extra_coords.keys())
+    np.testing.assert_array_equal(cube.mask, mask)
 
 
 def test_remove_cosmic_rays_rejects_unscaled_data(bursts_sji_1400_file):

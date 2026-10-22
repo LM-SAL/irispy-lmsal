@@ -172,12 +172,14 @@ def test_radiometric_calibration_keeps_a_standard_deviation(sns_sg_file):
     assert new_cube.data.dtype == new_cube.uncertainty.array.dtype == np.float32
 
 
-def test_radiometric_calibration_does_not_share_coordinates_or_mask(sns_sg_file):
+def test_radiometric_calibration_does_not_share_meta_coordinates_or_mask(sns_sg_file):
     cube = read_files(sns_sg_file)["C II 1336"][0]
     mask = cube.mask.copy()
     new_cube = radiometric_calibration(cube)
+    new_cube.meta["note"] = "changed"
     new_cube.extra_coords.add("sequence", 0, np.arange(len(new_cube.data)) * u.one)
     new_cube.mask[...] = ~new_cube.mask
+    assert "note" not in cube.meta
     assert "sequence" not in tuple(cube.extra_coords.keys())
     np.testing.assert_array_equal(cube.mask, mask)
 

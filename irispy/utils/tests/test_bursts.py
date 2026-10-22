@@ -77,12 +77,15 @@ def test_si_iv_default_threshold(si_iv_cube, idl_si_iv):
 def test_si_iv_sequence_numbers_events_on(si_iv_cube):
     later = copy.deepcopy(si_iv_cube)
     later.wcs.wcs.dateobs = "2013-09-02T18:40:00"  # its own obstime, as a separate read gives
-    labels, events = find_si_iv_bursts(SpectrogramCubeSequence([si_iv_cube, later]), threshold=80 * u.DN / u.s)
+    sequence = SpectrogramCubeSequence([si_iv_cube, later], meta={"OBSID": si_iv_cube.meta["OBSID"]})
+    labels, events = find_si_iv_bursts(sequence, threshold=80 * u.DN / u.s)
     assert list(events["label"]) == [1, 2, 3, 4, 5, 6]
     assert list(events["raster"]) == [0, 0, 0, 1, 1, 1]
     first, second = (cube.data for cube in labels.data)
     np.testing.assert_array_equal(second, np.where(first > 0, first + 3, 0))
     assert all(events["coordinate"][3:] == events["coordinate"][:3])
+    labels.meta["note"] = "changed"
+    assert "note" not in sequence.meta
 
 
 def test_si_iv_threshold_scales_with_summing(si_iv_cube):
@@ -221,9 +224,11 @@ def test_sji_errors(bursts_sjicube_1400, bursts_sji_1400_file):
         find_bright_image_events(bursts_sjicube_1400[0])
 
 
-def test_bright_image_events_labels_do_not_share_coordinates(sns_sjicube_1330):
+def test_bright_image_events_labels_do_not_share_meta_or_coordinates(sns_sjicube_1330):
     labels, _ = find_bright_image_events(sns_sjicube_1330)
+    labels.meta["note"] = "changed"
     labels.extra_coords.add("sequence", 0, np.arange(len(labels.data)) * u.one)
+    assert "note" not in sns_sjicube_1330.meta
     assert "sequence" not in tuple(sns_sjicube_1330.extra_coords.keys())
 
 

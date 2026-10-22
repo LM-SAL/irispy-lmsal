@@ -616,11 +616,19 @@ def test_maps_from_fit_preserves_residual_coordinates():
     times = Time("2020-01-01") + np.arange(SHAPE[0]) * u.s
     cube.extra_coords.add("time", 0, times, physical_types="time")
     cube.global_coords.add("observer", "custom:observer", "IRIS")
-    residual = maps_from_fit(fitted, cube, fitter=fitter)["residual"]
+    cube.mask = np.zeros(cube.data.shape, dtype=bool)
+    maps = maps_from_fit(fitted, cube, fitter=fitter)
+    residual = maps["residual"]
     assert residual.global_coords["observer"] == "IRIS"
     assert residual.extra_coords._ndcube is residual
     assert cube.extra_coords._ndcube is cube
     np.testing.assert_array_equal(residual.axis_world_coords("time", wcs=residual.extra_coords)[0], times)
+    residual.meta["note"] = "changed"
+    residual.mask[...] = True
+    assert "note" not in cube.meta
+    assert not cube.mask.any()
+    for name in maps:
+        assert ("fit_rest_wavelength" in maps[name].meta) == name.startswith(("velocity_", "fwhm_velocity_"))
 
 
 def test_maps_from_fit_without_residual():

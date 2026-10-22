@@ -207,7 +207,7 @@ def find_bright_spectral_events(
         offset += count
     if not isinstance(raster, SpectrogramCubeSequence):
         return maps[0], tables[0]
-    return SpectrogramCubeSequence(maps, meta=raster.meta), vstack(tables)
+    return SpectrogramCubeSequence(maps, meta=deepcopy(raster.meta)), vstack(tables)
 
 
 def find_bright_image_events(cube, *, sigma_factor=10, min_pixels=2):
@@ -294,7 +294,7 @@ def find_bright_image_events(cube, *, sigma_factor=10, min_pixels=2):
     )
     # Coordinates point back to their cube; copy them without copying its data.
     extra_coords = deepcopy(cube.extra_coords, {id(cube): None})
-    return type(cube)(labels, cube.wcs, unit=u.one, meta=cube.meta, extra_coords=extra_coords), events
+    return type(cube)(labels, cube.wcs, unit=u.one, meta=deepcopy(cube.meta), extra_coords=extra_coords), events
 
 
 def _events(values, labels, count):

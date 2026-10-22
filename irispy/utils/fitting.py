@@ -3,7 +3,6 @@ Starting models for fitting IRIS spectral lines with astropy.
 """
 
 import warnings
-from copy import copy, deepcopy
 
 import numpy as np
 
@@ -14,7 +13,7 @@ from astropy.modeling.fitting import FitInfoArrayContainer
 from astropy.modeling.utils import poly_map_domain
 from astropy.nddata import StdDevUncertainty
 
-from irispy.spectrograph import RasterCollection, SpectrogramCube
+from irispy.spectrograph import RasterCollection
 from irispy.utils._spectral import (
     _QualityFlag,
     _to_unit,
@@ -555,31 +554,14 @@ def maps_from_fit(fitted_model, cube, *, fitter, rest_wavelength=None, residual=
     ]
     for name, map_cube in cubes:
         if name in velocity_rests:
-            # The maps share the meta of the template; each velocity map holds its own rest wavelength.
-            map_cube.meta = copy(map_cube.meta)
             map_cube.meta["fit_rest_wavelength"] = velocity_rests[name].to(u.nm)
     cubes.append(("quality", make_map_cube(template, quality, u.dimensionless_unscaled)))
     map_axes = tuple(range(len(shape)))
     if not residual:
         return RasterCollection(cubes, aligned_axes=(map_axes,) * len(cubes))
     model_values = np.moveaxis(fitted_model(wavelength.reshape((-1,) + (1,) * len(shape))), 0, cube.wavelength_axis)
-    # Coordinates point back to their cube; copy them without copying its data.
-    coordinate_memo = {id(cube): None}
-    cubes.append(
-        (
-            "residual",
-            SpectrogramCube(
-                np.asarray(cube.data) - model_values.to_value(cube.unit),
-                cube.wcs,
-                cube.uncertainty,
-                cube.unit,
-                cube.meta,
-                mask=cube.mask,
-                extra_coords=deepcopy(cube.extra_coords, coordinate_memo),
-                global_coords=deepcopy(cube.global_coords, coordinate_memo),
-            ),
-        )
-    )
+    residual_values = np.asarray(cube.data) - model_values.to_value(cube.unit)
+    cubes.append(("residual", make_map_cube(cube, residual_values, cube.unit, uncertainty=cube.uncertainty)))
     residual_axes = tuple(axis for axis in range(cube.data.ndim) if axis != cube.wavelength_axis)
     return RasterCollection(cubes, aligned_axes=(map_axes,) * (len(cubes) - 1) + (residual_axes,))
 
