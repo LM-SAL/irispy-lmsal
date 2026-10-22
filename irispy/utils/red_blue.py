@@ -130,7 +130,7 @@ def calculate_red_blue_asymmetry(
     The asymmetry is computed for each spatial pixel as
     :math:`(I_R - I_B) / I_p`, where ``I_R`` and ``I_B`` are mean intensities
     in matching red and blue velocity ranges and ``I_p`` is the interpolated
-    peak intensity.
+    peak intensity (see Notes).
 
     Parameters
     ----------
@@ -190,7 +190,9 @@ def calculate_red_blue_asymmetry(
     `~irispy.utils.red_blue.RBAQualityFlag.PEAK_AT_EDGE` when that sample is as bright or brighter,
     missing or past the end of the window, as the profile may still rise there. The peak is the
     vertex of the parabola through the peak sample and the samples on either side, or the peak
-    sample when one of those is missing. The spline goes through all the samples of the profile.
+    sample when one of those is missing. The spline goes through all the samples of the profile,
+    and ``I_p`` is the maximum of the interpolated profile within ``velocity_range[1]`` of
+    ``rest_wavelength``.
 
     Pixels with a saturated sample, as the mask and ``cube.meta["saturated"]`` mark the samples the
     readers find at the level 2 ceiling, are flagged `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`.
@@ -364,10 +366,14 @@ def calculate_red_blue_asymmetry(
         profile = interpolated[rows]
         red_intensity = np.nanmean(profile[:, red_mask], axis=-1)
         blue_intensity = np.nanmean(profile[:, blue_mask], axis=-1)
-        peak = np.nanmax(profile, axis=-1)
+        # The interpolated peak, within velocity_range[1] of rest_wavelength as the peak sample is
+        near_rest = np.abs(center[rows][:, None] + interp_velocity) <= high
+        candidates = np.where(near_rest & np.isfinite(profile), profile, -np.inf)
+        peak_bin = np.argmax(candidates, axis=-1)
+        peak = candidates[np.arange(len(rows)), peak_bin]
         zero = ~np.isfinite(peak) | np.isclose(peak, 0)
         quality[rows[zero]] = RBAQualityFlag.PEAK_IS_ZERO
-        rows, profile, peak = rows[~zero], profile[~zero], peak[~zero]
+        rows, peak, peak_bin = rows[~zero], peak[~zero], peak_bin[~zero]
         numerator = (red_intensity - blue_intensity)[~zero]
         red_blue = np.full(len(profiles), np.nan)
         red_blue[rows] = numerator / peak
@@ -381,7 +387,7 @@ def calculate_red_blue_asymmetry(
                 return np.divide(total, count, out=np.full(count.shape, np.nan), where=count > 0)
 
             numerator_error = np.sqrt(wing_error(red_mask) ** 2 + wing_error(blue_mask) ** 2)
-            peak_error = error[np.arange(len(rows)), np.nanargmax(profile, axis=-1)]
+            peak_error = error[np.arange(len(rows)), peak_bin]
             numerator_is_zero = np.isclose(numerator, 0)
             valid = np.isfinite(numerator_error) & (numerator_is_zero | np.isfinite(peak_error))
             variance = (numerator_error / peak) ** 2

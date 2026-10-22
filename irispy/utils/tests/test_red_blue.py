@@ -533,6 +533,36 @@ def test_calculate_red_blue_asymmetry_peak_within_velocity_range(v34_sg_file):
     np.testing.assert_allclose(result["red_blue_asymmetry"].data, expected["red_blue_asymmetry"].data, rtol=1e-10)
 
 
+def test_calculate_red_blue_asymmetry_peak_intensity_within_velocity_range(v34_sg_file):
+    """
+    A spike in the interpolated profile beyond velocity_range[1] of rest_wavelength
+    changes neither the peak intensity the asymmetry is divided by nor its error.
+    """
+    cube = read_files(v34_sg_file, uncertainty=True)["Mg II k 2796"][0]
+    spiked = read_files(v34_sg_file, uncertainty=True)["Mg II k 2796"][0]
+    # With a linear spline and dv=25 km/s, the outer bins of each interpolated profile lie 100 km/s
+    # from its peak, 25 km/s past the wings: a spike 18 samples (98 km/s) from the brightest sample
+    # within 75 km/s of rest, away from rest, moves one of them and no wing bin
+    kwargs = {"velocity_range": (25, 75) * u.km / u.s, "dv": 25 * u.km / u.s, "spline_degree": 1}
+    velocity = cube.axis_world_coords("em.wl")[0].to_value(
+        u.km / u.s, doppler_rest=cube.meta.rest_wavelength, doppler_convention="optical"
+    )
+    searched = np.flatnonzero(np.abs(velocity) <= 75)
+    peak = searched[0] + np.argmax(cube.data[..., searched], axis=-1)
+    spike = peak + np.where(velocity[peak] < 0, -18, 18)
+    np.put_along_axis(spiked.data, spike[..., None], 10 * cube.data.max(), axis=-1)
+    result = calculate_red_blue_asymmetry(cube, **kwargs)
+    with_spike = calculate_red_blue_asymmetry(spiked, **kwargs)
+    profile, spiked_profile = result["interpolated_profile"].data, with_spike["interpolated_profile"].data
+    assert np.all(np.nanmax(spiked_profile, axis=-1) > np.nanmax(profile, axis=-1))
+    assert set(np.unique(with_spike["quality"].data)) == {RBAQualityFlag.OK}
+    for name in ("red_blue_asymmetry", "quality"):
+        np.testing.assert_array_equal(with_spike[name].data, result[name].data, err_msg=name)
+    np.testing.assert_array_equal(
+        with_spike["red_blue_asymmetry"].uncertainty.array, result["red_blue_asymmetry"].uncertainty.array
+    )
+
+
 def test_calculate_red_blue_asymmetry_peak_at_edge_of_velocity_range(v34_sg_file):
     """
     A peak sample at the first or last sample within velocity_range[1] of rest_wavelength is
