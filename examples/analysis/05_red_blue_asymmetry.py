@@ -129,15 +129,16 @@ fig.colorbar(im, ax=ax, shrink=0.8, label="Red-Blue Asymmetry")
 
 # This plot will be the raw profile for the selected pixel.
 # The wing windows are measured from the peak of the line, not from its rest wavelength.
+# The peak is the brightest sample no farther from the rest wavelength than the upper velocity.
 ax = axes[1]
-finite = np.isfinite(velocities.value) & np.isfinite(profile)
-ax.plot(velocities.value[finite], profile[finite], color="black", marker="o", markersize=3)
-v_peak = velocities.value[finite][np.argmax(profile[finite])]
-ax.axvline(0, color="gray", linestyle="dashed", label="Rest wavelength")
-ax.axvline(v_peak, color="gray", linestyle="dotted", label="Line peak")
-
 v_low = velocity_range[0].to_value(u.km / u.s)
 v_high = velocity_range[1].to_value(u.km / u.s)
+finite = np.isfinite(velocities.value) & np.isfinite(profile)
+ax.plot(velocities.value[finite], profile[finite], color="black", marker="o", markersize=3)
+searched = finite & (np.abs(velocities.value) <= v_high)
+v_peak = velocities.value[searched][np.argmax(profile[searched])]
+ax.axvline(0, color="gray", linestyle="dashed", label="Rest wavelength")
+ax.axvline(v_peak, color="gray", linestyle="dotted", label="Line peak")
 ax.axvspan(v_peak - v_high, v_peak - v_low, color="C0", alpha=0.1, label="Blue wing")
 ax.axvspan(v_peak + v_low, v_peak + v_high, color="C3", alpha=0.1, label="Red wing")
 ax.legend()

@@ -465,21 +465,14 @@ def test_calculate_red_blue_asymmetry_chunks_give_the_same_results(monkeypatch, 
 def test_calculate_red_blue_asymmetry_real_cube_shape_and_coords(sns_sg_file):
     raster = read_files(sns_sg_file, uncertainty=True)
     cube = raster["C II 1336"][0]
-    result = calculate_red_blue_asymmetry(
-        cube,
-        rest_wavelength=133.29 * u.nm,
-        velocity_range=(20, 60) * u.km / u.s,
-        spline_degree=1,
-    )
+    result = calculate_red_blue_asymmetry(cube, spline_degree=1)
     assert set(result) == {"red_blue_asymmetry", "quality", "interpolated_profile"}
     result["interpolated_profile"].meta["exposure time"][0] = 0 * u.s
     assert cube.meta["exposure time"][0] > 0 * u.s
     assert result["red_blue_asymmetry"].shape == cube.shape[:-1]
     assert "time" in tuple(result["red_blue_asymmetry"].extra_coords.keys())
-    # The "red_blue_asymmetry_error" map this uncertainty replaced had these values
     error = result["red_blue_asymmetry"].uncertainty.array
-    assert np.isfinite(error).sum() == 5922
-    np.testing.assert_allclose(np.nanmean(error), 0.24545979335051332)
+    np.testing.assert_array_equal(np.isfinite(error), result["quality"].data == RBAQualityFlag.OK)
     for item in (np.s_[0:3], np.s_[:, 10:20]):
         for name, sliced in result[item].items():
             np.testing.assert_array_equal(sliced.data, result[name].data[item], err_msg=name)
@@ -492,22 +485,107 @@ def test_calculate_red_blue_asymmetry_rest_wavelength_required_without_meta():
         calculate_red_blue_asymmetry(cube, spline_degree=1)
 
 
-@pytest.mark.parametrize(
-    ("limits", "rest_wavelength"),
-    [((2802, 2805), 2803.53 * u.AA), ((2800, 2802), 2796.352 * u.AA)],
-    ids=["Mg II h", "wing"],
-)
-def test_calculate_red_blue_asymmetry_default_rest_wavelength(raster_sg_file, limits, rest_wavelength):
+def _crop(cube, limits):
+    return cube.crop(*([SpectralCoord(wavelength * u.AA), None] for wavelength in limits))
+
+
+def test_calculate_red_blue_asymmetry_default_rest_wavelength(raster_sg_file):
     """
-    A crop of the Mg II k window to Mg II h is measured from Mg II h, a wing crop from
-    Mg II k.
+    A crop of the Mg II k window to Mg II h is measured from Mg II h.
     """
-    cube = read_files(raster_sg_file)["Mg II k 2796"][0]
-    cube = cube.crop(*([SpectralCoord(wavelength * u.AA), None] for wavelength in limits))
+    cube = _crop(read_files(raster_sg_file)["Mg II k 2796"][0], (2802, 2805))
     result = calculate_red_blue_asymmetry(cube, return_profiles=False)["red_blue_asymmetry"]
-    expected = calculate_red_blue_asymmetry(cube, rest_wavelength=rest_wavelength, return_profiles=False)
-    assert_quantity_allclose(result.meta["rba_rest_wavelength"] * u.nm, rest_wavelength)
+    expected = calculate_red_blue_asymmetry(cube, rest_wavelength=2803.53 * u.AA, return_profiles=False)
+    assert_quantity_allclose(result.meta["rba_rest_wavelength"] * u.nm, 2803.53 * u.AA)
     np.testing.assert_allclose(result.data, expected["red_blue_asymmetry"].data, rtol=1e-12)
+
+
+def test_calculate_red_blue_asymmetry_rejects_rest_wavelength_outside_cube(raster_sg_file):
+    """
+    A wing crop of the Mg II k window, which defaults to Mg II k, has no sample to take
+    the peak from.
+    """
+    cube = _crop(read_files(raster_sg_file)["Mg II k 2796"][0], (2800, 2802))
+    with pytest.raises(
+        ValueError,
+        match=r"No wavelength of the cube \(2799.91 to 2801.95 Å\) lies within velocity_range\[1\]=150.0 km/s "
+        r"of rest_wavelength=2796.352 Å",
+    ):
+        calculate_red_blue_asymmetry(cube)
+
+
+def test_calculate_red_blue_asymmetry_peak_within_velocity_range(v34_sg_file):
+    """
+    Mg II h measured in the Mg II k window, where Mg II k is brighter, gives what a crop
+    to Mg II h gives, min_intensity included.
+    """
+    cube = read_files(v34_sg_file)["Mg II k 2796"][0]
+    kwargs = {
+        "rest_wavelength": 2803.53 * u.AA,
+        "velocity_range": (25, 75) * u.km / u.s,
+        "min_intensity": 300 * u.DN,
+        "return_profiles": False,
+    }
+    result = calculate_red_blue_asymmetry(cube, **kwargs)
+    expected = calculate_red_blue_asymmetry(_crop(cube, (2800, 2806)), **kwargs)
+    assert set(np.unique(result["quality"].data)) == {RBAQualityFlag.OK, RBAQualityFlag.LOW_SIGNAL}
+    np.testing.assert_array_equal(result["quality"].data, expected["quality"].data)
+    np.testing.assert_allclose(result["red_blue_asymmetry"].data, expected["red_blue_asymmetry"].data, rtol=1e-10)
+
+
+def test_calculate_red_blue_asymmetry_peak_intensity_within_velocity_range(v34_sg_file):
+    """
+    A spike in the interpolated profile beyond velocity_range[1] of rest_wavelength
+    changes neither the peak intensity the asymmetry is divided by nor its error.
+    """
+    cube = read_files(v34_sg_file, uncertainty=True)["Mg II k 2796"][0]
+    spiked = read_files(v34_sg_file, uncertainty=True)["Mg II k 2796"][0]
+    # With a linear spline and dv=25 km/s, the outer bins of each interpolated profile lie 100 km/s
+    # from its peak, 25 km/s past the wings: a spike 18 samples (98 km/s) from the brightest sample
+    # within 75 km/s of rest, away from rest, moves one of them and no wing bin
+    kwargs = {"velocity_range": (25, 75) * u.km / u.s, "dv": 25 * u.km / u.s, "spline_degree": 1}
+    velocity = cube.axis_world_coords("em.wl")[0].to_value(
+        u.km / u.s, doppler_rest=cube.meta.rest_wavelength, doppler_convention="optical"
+    )
+    searched = np.flatnonzero(np.abs(velocity) <= 75)
+    peak = searched[0] + np.argmax(cube.data[..., searched], axis=-1)
+    spike = peak + np.where(velocity[peak] < 0, -18, 18)
+    np.put_along_axis(spiked.data, spike[..., None], 10 * cube.data.max(), axis=-1)
+    result = calculate_red_blue_asymmetry(cube, **kwargs)
+    with_spike = calculate_red_blue_asymmetry(spiked, **kwargs)
+    profile, spiked_profile = result["interpolated_profile"].data, with_spike["interpolated_profile"].data
+    assert np.all(np.nanmax(spiked_profile, axis=-1) > np.nanmax(profile, axis=-1))
+    assert set(np.unique(with_spike["quality"].data)) == {RBAQualityFlag.OK}
+    for name in ("red_blue_asymmetry", "quality"):
+        np.testing.assert_array_equal(with_spike[name].data, result[name].data, err_msg=name)
+    np.testing.assert_array_equal(
+        with_spike["red_blue_asymmetry"].uncertainty.array, result["red_blue_asymmetry"].uncertainty.array
+    )
+
+
+def test_calculate_red_blue_asymmetry_peak_at_edge_of_velocity_range(v34_sg_file):
+    """
+    A peak sample at the first or last sample within velocity_range[1] of rest_wavelength is
+    measured where the next sample beyond it is lower and flagged where the profile still rises:
+    within 10 km/s of Mg II k, profiles have either. A crop to those samples flags them all, as
+    the window ends there.
+    """
+    cube = read_files(v34_sg_file)["Mg II k 2796"][0]
+    kwargs = {"velocity_range": (5, 10) * u.km / u.s, "dv": 1 * u.km / u.s, "return_profiles": False}
+    velocity = cube.axis_world_coords("em.wl")[0].to_value(
+        u.km / u.s, doppler_rest=cube.meta.rest_wavelength, doppler_convention="optical"
+    )
+    first, last = np.flatnonzero(np.abs(velocity) <= 10)[[0, -1]]
+    quality = calculate_red_blue_asymmetry(cube, **kwargs)["quality"].data
+    at_edge = calculate_red_blue_asymmetry(cube[..., first : last + 1], **kwargs)["quality"].data
+    at_edge = at_edge == RBAQualityFlag.PEAK_AT_EDGE
+    at_first = np.argmax(cube.data[..., first : last + 1], axis=-1) == 0
+    edge = np.where(at_first, cube.data[..., first], cube.data[..., last])
+    beyond = np.where(at_first, cube.data[..., first - 1], cube.data[..., last + 1])
+    rising = at_edge & (beyond >= edge)
+    assert 0 < np.count_nonzero(rising) < np.count_nonzero(at_edge)
+    np.testing.assert_array_equal(quality == RBAQualityFlag.PEAK_AT_EDGE, rising)
+    assert np.all(quality[at_edge & ~rising] == RBAQualityFlag.OK)
 
 
 @pytest.mark.parametrize(
