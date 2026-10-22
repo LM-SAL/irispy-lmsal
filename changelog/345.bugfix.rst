@@ -1,0 +1,1 @@
+``irispy.io.read_spectrograph_lvl2`` and ``irispy.io.read_files`` now take ``spectral_windows`` as any iterable of names, such as a NumPy array, instead of raising a ``ValueError`` about an ambiguous truth value.

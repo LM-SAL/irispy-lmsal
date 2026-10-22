@@ -512,3 +512,8 @@ def test_extract_tarfile_serializes_concurrent_callers(tmp_path, monkeypatch):
     assert not extracting.acquire(blocking=False)
     assert results == [[_extract_target(tmp_path, tar_path) / "a.fits"]] * 2
     assert (_extract_target(tmp_path, tar_path) / "a.fits").read_bytes() == b"abc"
+
+
+def test_read_files_reads_the_windows_of_a_generator_from_every_observation(sns_sg_file, raster_sg_file):
+    returns = read_files([sns_sg_file, raster_sg_file], spectral_windows=(w for w in ["Mg II k 2796"]))
+    assert [list(raster.keys()) for raster in returns.values()] == [["Mg II k 2796"], ["Mg II k 2796"]]
