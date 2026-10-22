@@ -5,7 +5,7 @@ Breaking Changes
 ----------------
 
 - The minimum supported versions are now astropy 8.0.0 and mpl-animators 1.2.3. (`#184 <https://github.com/LM-SAL/irispy/pull/184>`__)
-- Removed ``SJICube.basic_wcs``; use ``SJICube.fits_wcs``, which now also describes the sliced pixels of a spatially sliced cube, and is ``None`` for a rebinned one. Removed ``SJICube.scaled`` and the ``scaled`` argument of `~irispy.sji.SJICube`; `~irispy.io.sji.read_sji_lvl2` stores it in ``cube.meta["scaled"]``. (`#186 <https://github.com/LM-SAL/irispy/pull/186>`__)
+- Removed ``SJICube.basic_wcs``; use ``SJICube.fits_wcs``, which now also describes the sliced pixels of a spatially sliced cube, and is ``None`` for a rebinned one. Removed ``SJICube.scaled`` and the ``scaled`` argument of `~irispy.sji.SJICube`; ``irispy.io.sji.read_sji_lvl2`` stores it in ``cube.meta["scaled"]``. (`#186 <https://github.com/LM-SAL/irispy/pull/186>`__)
 - Slicing a spectrograph or SJI cube so that an axis has length 0, for example ``cube[3:3]``, now raises ``IndexError`` instead of returning an empty cube. (`#186 <https://github.com/LM-SAL/irispy/pull/186>`__)
 
 
@@ -106,7 +106,7 @@ Bug Fixes
 - `~irispy.utils.spectrograph.radiometric_calibration` no longer returns infinite or
   wildly amplified values for wavelengths outside the spectral ranges covered by the
   response file (e.g., the blue end of a full-CCD Si IV window). (`#164 <https://github.com/LM-SAL/irispy/pull/164>`__)
-- Fixed `~irispy.io.spectrograph.read_spectrograph_lvl2` (used by `~irispy.io.read_files`)
+- Fixed ``irispy.io.spectrograph.read_spectrograph_lvl2`` (used by `~irispy.io.read_files`)
   assigning data to the wrong spectral window when ``spectral_windows`` was passed
   in an order different from the order of the windows in the file. (`#164 <https://github.com/LM-SAL/irispy/pull/164>`__)
 

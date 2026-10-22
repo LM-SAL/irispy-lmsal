@@ -73,8 +73,8 @@ def calculate_moments(
     * Negative, non-finite and masked samples are set to zero and add no uncertainty.
     * Pixels with a saturated sample within ``velocity_range`` are NaN in every moment map and `True`
       in ``"saturated"``. Saturated samples are those the mask and ``cube.meta["saturated"]`` both
-      mark: the level 2 readers mark the samples clipped at ``irispy.utils.constants.SATURATION_LIMIT``
-      (see the comment on the constant) in both, keeping their value, and both survive
+      mark: the level 2 readers mark the samples clipped at `irispy.utils.constants.SATURATION_LIMIT`
+      in both, keeping their value, and both survive
       `~irispy.utils.spectrograph.subtract_background`, exposure time correction and calibration.
       Other masked samples are left out without saturating the pixel.
     * Every map is masked where no sample within ``velocity_range`` is unmasked and not NaN, or
