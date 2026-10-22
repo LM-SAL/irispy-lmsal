@@ -58,8 +58,7 @@ core_image = si_iv.crop([si_iv_core, None], [si_iv_core, None])
 
 fig = plt.figure(figsize=(7, 7))
 ax = fig.add_subplot(111, projection=core_image.wcs)
-# The raster has 64 steps and 771 slit positions, so we let the image fill the axes.
-core_image.plot(axes=ax, plot_axes=["x", "y"], aspect="auto", vmin=0, vmax=100)
+core_image.plot(axes=ax, plot_axes=["x", "y"], vmin=0, vmax=100)
 # The map is plotted with the raster steps along x, so the labels are transposed to match.
 ax.contour(labels.data.T > 0, levels=[0.5], colors="red", linewidths=1.5)
 ax.set_title("Bursts in Si IV 1402.77 Å")

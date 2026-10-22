@@ -14,6 +14,7 @@ from astropy.wcs import WCS
 
 from ndcube import NDCubeSequence
 
+from irispy.data.test import get_test_filepath
 from irispy.io.spectrograph import read_spectrograph_lvl2
 from irispy.io.utils import read_files
 from irispy.spectrograph import SpectrogramCube, SpectrogramCubeSequence
@@ -218,6 +219,36 @@ def test_spectrogram_plot_labels_narrow_window(sns_sg_file, kwargs, labels):
 def test_default_colormap_falls_back_to_viridis():
     assert _registered_colormap("irissjiNUV") == "irissjiNUV"
     assert _registered_colormap("irissji1700") == "viridis"
+
+
+@pytest.mark.parametrize(
+    ("file_fixture", "plot_axes", "expected"),
+    [
+        # The 2" steps of this raster are 12 times its 0.17" slit pixels: CDELT2 / CDELT3 is 0.0834
+        ("bursts_si_iv_file", ["x", "y"], 0.0834),
+        ("bursts_si_iv_file", None, 1 / 0.0834),
+        # The steps of a sit-and-stare are times, so its maps keep square pixels
+        ("sns_sg_file", None, 1),
+    ],
+)
+def test_raster_map_is_drawn_with_its_true_proportions(request, file_fixture, plot_axes, expected):
+    raster_map = read_files(request.getfixturevalue(file_fixture))["Si IV 1403"][0][:, :, 10]
+    assert raster_map.plot(plot_axes=plot_axes).get_aspect() == pytest.approx(expected, rel=0.01)
+    plt.close("all")
+
+
+@pytest.mark.parametrize("raster", ["r00066", "r00067"])
+def test_raster_map_with_a_data_gap_plots(raster):
+    """
+    Steps without an exposure have no pointing: none of the 8 steps of r00066 has one,
+    and one of r00067, too few to measure the step spacing from.
+    """
+    collection = read_files(
+        get_test_filepath(f"data_gap/iris_l2_20140329_140938_3860258481_raster_t000_{raster}_test.fits")
+    )
+    for window in ("C II 1336", "2832"):
+        assert collection[window][0][:, :, 5].plot().get_aspect() == 1
+        plt.close("all")
 
 
 @figure_test

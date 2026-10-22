@@ -3,6 +3,8 @@ import numpy as np
 from mpl_animators import ArrayAnimatorWCS
 
 import astropy.units as u
+from astropy.visualization import AsymmetricPercentileInterval
+from astropy.wcs.wcsapi import HighLevelWCSWrapper
 
 import sunpy.visualization.colormaps as cm  # NOQA: F401
 from ndcube.visualization.mpl_plotter import MatplotlibPlotter
@@ -81,6 +83,34 @@ def _set_axis_properties(axis, label, color):
     axis.set_axislabel(label, color=color, fontsize=8)
 
 
+def _map_aspect(cube, wcs, plot_axes):
+    """
+    The ``aspect`` that draws a 2D map with its true proportions, `None` for other
+    images.
+
+    ``plot_axes`` is in pixel order, as `ndcube` passes it to ``_plot_2D_cube``.
+    """
+    spatial = set(wcs.world_axis_physical_types) == {"custom:pos.helioprojective.lon", "custom:pos.helioprojective.lat"}
+    # The step axis of a sit-and-stare is time, along which the slit only follows solar rotation; without
+    # metadata a cube cannot tell one from a raster.
+    if not spatial or not cube.meta or cube.meta.get("NRASTERP") == 1:
+        return None
+    nx, ny = cube.data.shape[::-1]
+    wcs = HighLevelWCSWrapper(wcs)
+    scale = []
+    # The mean pixel spacing across the middle of the map, which pointing jitter barely changes. Steps
+    # without an exposure have no pointing, so measure between the finite ends of each line.
+    for line in (
+        wcs.pixel_to_world(np.arange(nx), np.full(nx, ny // 2)),
+        wcs.pixel_to_world(np.full(ny, nx // 2), np.arange(ny)),
+    ):
+        finite = np.flatnonzero(np.isfinite(line.Tx))
+        if finite.size < 2:
+            return None
+        scale.append(line[finite[0]].separation(line[finite[-1]]) / (finite[-1] - finite[0]))
+    return (scale[plot_axes.index("y")] / scale[plot_axes.index("x")]).to_value(u.one)
+
+
 class Plot2DMixin:
     def update_plot_2d(self, val, im, slider):
         super().update_plot_2d(val, im, slider)
@@ -153,10 +183,16 @@ class _IRISPlotMixin:
         when given. IRIS axis styling is applied to the result; all other arguments are
         passed to the parent plotter's ``plot``.
 
-        The colors run linearly from the minimum to the maximum of the data by default,
-        which a few hot pixels turn into a nearly black image. For a cube with more than
-        two dimensions, ``clip_interval=(1, 99.5) * u.percent`` limits them to those
-        percentiles of each frame.
+        A 2D map, such as a cut of a scanning raster at one wavelength, a moment map or
+        a Hinode/SOT-SP scan, is drawn with its true proportions unless ``aspect`` is
+        given. Maps of a sit-and-stare keep square pixels.
+
+        By default the colors run linearly from the minimum to the maximum of the image,
+        or of the first frame of an animation, which the other frames keep, so a few
+        bright pixels, such as cosmic-ray hits, can leave little contrast.
+
+        ``clip_interval=(1, 99.5) * u.percent`` sets them to those percentiles of the
+        image, or of each frame.
         """
         kwargs["cmap"] = kwargs.get("cmap") or self._default_cmap_name()
         if len(self._ndcube.shape) == 1:
@@ -167,6 +203,22 @@ class _IRISPlotMixin:
 
 
 class IRISPlotter(_IRISPlotMixin, MatplotlibPlotter):
+    def _plot_2D_cube(  # NOQA: N802
+        self, wcs, axes=None, plot_axes=None, axes_coordinates=None, axes_units=None, data_unit=None, **kwargs
+    ):
+        if "aspect" not in kwargs:
+            kwargs["aspect"] = _map_aspect(self._ndcube, wcs, plot_axes)
+        # ndcube passes clip_interval on to imshow, which rejects it; remove this once the minimum
+        # ndcube applies it to 2D cubes, as its animations do.
+        if (clip_interval := kwargs.pop("clip_interval", None)) is not None:
+            if len(clip_interval) != 2:
+                msg = "A range of 2 values must be specified for clip_interval."
+                raise ValueError(msg)
+            data = self._ndcube.data if data_unit is None else self._ndcube.quantity.to_value(data_unit)
+            interval = AsymmetricPercentileInterval(*clip_interval.to_value(u.percent))
+            kwargs["vmin"], kwargs["vmax"] = interval.get_limits(np.ma.masked_array(data, self._ndcube.mask))
+        return super()._plot_2D_cube(wcs, axes, plot_axes, axes_coordinates, axes_units, data_unit, **kwargs)
+
     def _animate_cube(
         self,
         wcs,

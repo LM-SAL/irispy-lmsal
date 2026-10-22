@@ -186,7 +186,7 @@ def plot_rgb(
     vmin=None,
     vmax=None,
     stretch=None,
-    coordinates="helioprojective",
+    coordinates=None,
     aspect=None,
     rest_wavelength=None,
     cbar_fraction=0.1,
@@ -215,9 +215,10 @@ def plot_rgb(
         Intensities mapped to black and to full brightness, as in `calculate_rgb`.
     stretch : `callable`, optional
         Applied to the intensity once scaled to [0, 1], for example `numpy.sqrt`.
-    coordinates : ``{"helioprojective", "time"}``, optional
-        Horizontal axis: longitude for a raster, or time for a sit-and-stare, whose
-        longitude would only show solar rotation.
+    coordinates : ``{"helioprojective", "time"}`` or `None`, optional
+        Horizontal axis: longitude, or time. Defaults to time for a sit-and-stare
+        (``NRASTERP`` of 1), whose longitude would only show solar rotation, and to
+        longitude otherwise.
     aspect : `str` or `float`, optional
         Aspect ratio of the image axes. Defaults to ``"equal"`` for helioprojective
         coordinates and ``"auto"`` for time; use ``"auto"`` for a raster with few steps too.
@@ -244,6 +245,8 @@ def plot_rgb(
     combines signal across the line profile, so its color also depends on line width
     and asymmetry. The colorbar cannot uniquely determine a line's intensity or velocity.
     """
+    if coordinates is None:
+        coordinates = "time" if (cube.meta or {}).get("NRASTERP") == 1 else "helioprojective"
     if coordinates not in {"helioprojective", "time"}:
         msg = f"`coordinates` must be 'helioprojective' or 'time', got {coordinates!r}"
         raise ValueError(msg)
@@ -298,7 +301,9 @@ def plot_rgb(
         ax.set_box_aspect(box_aspect)
         cax.set_box_aspect(box_aspect * (1 - cbar_fraction) / cbar_fraction)
     if coordinates == "time":
-        ax.xaxis_date()
+        locator = matplotlib.dates.AutoDateLocator()
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(matplotlib.dates.ConciseDateFormatter(locator))
     ax.set_xlabel(label)
     ax.set_ylabel(LAT_AXIS_LABEL)
     cax.pcolormesh(intensity, wavelength.to_value(u.AA), rgb_colorbar)
