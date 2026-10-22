@@ -205,7 +205,9 @@ def calculate_red_blue_asymmetry(
 
     For the asymmetry as a function of velocity, as :cite:t:`depontieu2009` and :cite:t:`tian2011`
     show it, divide the difference of the wings of each interpolated profile, in 20 km/s bands, by
-    its peak::
+    its peak:
+
+    .. code-block:: python
 
         rba = calculate_red_blue_asymmetry(cube, velocity_range=(0, 160) * u.km / u.s)
         ok = rba["quality"].data == RBAQualityFlag.OK

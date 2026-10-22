@@ -334,7 +334,9 @@ class BaseMeta(NDMeta):
 
         For mu at each pixel, take the cosine of
         `sunpy.coordinates.utils.get_heliocentric_angle` of the cube's coordinates. Slice
-        the cube first, as a whole slit-jaw cube is slow::
+        the cube first, as a whole slit-jaw cube is slow:
+
+        .. code-block:: python
 
             np.cos(get_heliocentric_angle(cube[0].axis_world_coords("lon")[0]))
         """
