@@ -282,7 +282,8 @@ def subtract_background(cube, windows, *, degree=1):
     Returns
     -------
     `irispy.spectrograph.SpectrogramCube`
-        ``cube`` minus the fitted background, with the same mask, uncertainty and coordinates.
+        ``cube`` minus the fitted background, with the same mask, uncertainty and coordinates, in
+        the floating-point type of the data: float32 for Level 2 data.
         Spectra with no more than ``degree`` samples to fit are NaN, except their saturated samples.
 
     Notes
@@ -301,4 +302,5 @@ def subtract_background(cube, windows, *, degree=1):
     background = _fit_background(cube, windows, degree)
     # Their value minus NaN would be NaN
     background[np.isnan(background) & _saturated_samples(cube)] = 0
-    return cube - u.Quantity(background, cube.unit)
+    values = np.subtract(cube.data, background, out=background)
+    return make_map_cube(cube, values, cube.unit, uncertainty=cube.uncertainty)

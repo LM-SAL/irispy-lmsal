@@ -124,7 +124,18 @@ def _fit_background(cube, windows, degree):
     normal[~enough] = np.eye(degree + 1)
     rhs = np.einsum("...k,ki->...i", samples, vander[index], optimize=True)
     coefficients = np.linalg.solve(normal, rhs[..., np.newaxis])[..., 0]
-    background = np.where(enough[..., np.newaxis], anchor + coefficients @ vander.T, np.nan)
+    # The background is the size of the cube: hold it in the data's floating-point type, evaluated in float64 a
+    # block of spectra at a time, as float32 sums of large polynomial terms lose the background at degree 3 and up
+    background = np.empty((*coefficients.shape[:-1], len(vander)), np.promote_types(cube.data.dtype, np.float32))
+    flat, flat_coefficients, flat_anchor = (
+        background.reshape(-1, len(vander)),
+        coefficients.reshape(-1, degree + 1),
+        anchor.reshape(-1, 1),
+    )
+    for start in range(0, len(flat), 4096):
+        block = slice(start, start + 4096)
+        flat[block] = flat_anchor[block] + flat_coefficients[block] @ vander.T
+    background[~enough] = np.nan
     return np.moveaxis(background, -1, wavelength_axis)
 
 
