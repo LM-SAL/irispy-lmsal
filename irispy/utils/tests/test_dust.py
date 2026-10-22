@@ -60,6 +60,7 @@ def test_remove_dust_preserves_sjicube_state(sns_sjicube_1330):
     cleaned = remove_dust(cube, dust_mask=dust_mask, temporal_window=1)
 
     assert type(cleaned) is type(cube)
+    assert cleaned.data.dtype == np.float32
     assert cleaned.meta["scaled"] is cube.meta["scaled"]
     assert list(cleaned.extra_coords.keys()) == original_extra_coord_keys
     assert list(cleaned.global_coords.keys()) == original_global_coord_keys
