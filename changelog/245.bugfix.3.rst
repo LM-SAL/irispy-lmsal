@@ -1,1 +1,1 @@
-``SJICube.celestial_frame`` now works after an integer index on a spatial axis; it is the frame of the first exposure whatever the slice, as documented.
+``SJICube.celestial_frame`` now works after an integer index on a spatial axis, such as ``sji[:, 5]``, where it raised a ``ValueError``, and is the frame of the file's first exposure whatever the slice, as documented; for a cube sliced in time, such as ``sji[3:]``, it was the frame of the slice's first frame.

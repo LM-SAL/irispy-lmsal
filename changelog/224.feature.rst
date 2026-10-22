@@ -1,1 +1,1 @@
-Added the constant ``irispy.utils.constants.INSTRUMENTAL_FWHM`` (the spectral resolution of each passband) and ``irispy.utils.fitting.non_thermal_velocity``, which removes the instrumental and thermal widths from a map of line widths.
+Added the constant ``irispy.utils.constants.INSTRUMENTAL_FWHM`` (the spectral resolution of each passband) and ``irispy.utils.fitting.non_thermal_velocity``, which removes the instrumental and thermal widths from a map of line widths, the thermal width by default for the ion's temperature of maximum abundance in the line catalog.

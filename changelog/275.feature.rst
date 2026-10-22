@@ -1,1 +1,0 @@
-``irispy.io.spectrograph.read_spectrograph_lvl2`` accepts files already opened as ``astropy.io.fits.HDUList``, which it leaves open, as ``irispy.io.read_sji_lvl2`` does.

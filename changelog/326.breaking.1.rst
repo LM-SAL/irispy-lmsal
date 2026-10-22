@@ -1,0 +1,1 @@
+``velocity_range`` of ``irispy.utils.red_blue.calculate_red_blue_asymmetry`` must now be one ``Quantity``, such as ``(25, 75) * u.km / u.s``; a tuple of two Quantities raises a ``TypeError``.

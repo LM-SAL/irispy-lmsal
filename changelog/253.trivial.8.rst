@@ -1,1 +1,0 @@
-A ``py313-core`` test environment and CI leg run the suite with plain ``irispy-lmsal``, without ``astroscrappy``, ``rsliding`` and ``colorsynth``, so a hard import of an optional package fails CI.

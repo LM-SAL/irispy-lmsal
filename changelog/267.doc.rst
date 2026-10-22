@@ -1,1 +1,1 @@
-The calibration tutorial now says Level 2 wavelengths are in vacuum and points to the wavelength drift correction, the line catalog page gives the air wavelength offset of Mg II and how to find the window that holds a line, and the Mg II Dopplergram example applies each drift to its own raster step.
+The calibration tutorial now says Level 2 wavelengths are in vacuum and points to the wavelength drift correction.

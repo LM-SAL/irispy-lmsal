@@ -1,1 +1,1 @@
-``irispy.utils.wobble.generate_wobble_movie`` no longer takes ``ffmpeg_path``; set ``matplotlib.rcParams["animation.ffmpeg_path"]`` instead.
+``irispy.utils.wobble.generate_wobble_movie`` no longer takes ``ffmpeg_path`` or extra keyword arguments for ``matplotlib.animation.FuncAnimation``; set ``matplotlib.rcParams["animation.ffmpeg_path"]`` instead of ``ffmpeg_path``.

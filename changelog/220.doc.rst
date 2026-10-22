@@ -1,1 +1,1 @@
-Added a "Fitting spectral lines" tutorial page, and the spectral fitting gallery examples now start from `irispy.utils.fitting`.
+Added a "Fitting spectral lines" tutorial page on fitting a cube, making maps from the fit and judging them, fitting the mean spectrum of a region to start the fits of every spectrum, and non-thermal velocities; the spectral fitting gallery examples now start from ``irispy.utils.fitting``.

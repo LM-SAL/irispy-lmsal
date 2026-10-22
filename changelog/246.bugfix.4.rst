@@ -1,1 +1,1 @@
-`~irispy.spectrograph.SpectrogramCube.plot` now defaults to the IRIS color table of the cube's detector band, ``irissjiFUV`` or ``irissjiNUV``, as `~irispy.sji.SJICube.plot` uses the passband table; the lookup used to fail and fall back to viridis for every spectrogram.
+``SpectrogramCube.plot`` now defaults to the IRIS color table of the cube's detector band, ``irissjiFUV`` or ``irissjiNUV``, as ``SJICube.plot`` uses the passband table; the lookup used to fail and fall back to viridis for every spectrogram.

@@ -1,1 +1,0 @@
-The contributing guide documents how to run the tests and the figure tests: the hash library is made on Linux by the ``py313-figure`` tox environment, CircleCI runs it on every pull request with an image comparison page, and the baseline images are public.

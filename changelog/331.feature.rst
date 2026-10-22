@@ -1,0 +1,1 @@
+``irispy.utils.dust.remove_dust`` is faster and uses about half the memory: with the same dust pixels, a 374-frame slit-jaw 1330 cube takes 2 s instead of 17 s.

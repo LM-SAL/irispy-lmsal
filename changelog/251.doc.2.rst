@@ -1,1 +1,1 @@
-The calibration and data idiosyncrasies pages now give the effective area in cm\ :sup:`2`, point to ``remove_dust`` instead of saying there is no dust removal, and run the radiation temperature example on the sample data.
+The calibration page now gives the effective area in cm², where it said cm⁻², and the data idiosyncrasies page points to ``irispy.utils.dust.remove_dust`` instead of saying there is no dust removal.

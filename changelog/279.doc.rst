@@ -1,1 +1,1 @@
-Documented `irispy.meta.BaseMeta.fits_header`, the primary header the metadata was made from.
+Documented ``BaseMeta.fits_header``, the primary header the metadata was made from.

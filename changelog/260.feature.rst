@@ -1,1 +1,0 @@
-`irispy.utils.fitting.maps_from_fit` takes a new ``residual=`` keyword; ``residual=False`` leaves out the ``"residual"`` cube, which saves memory and time when only the maps are needed.

@@ -1,1 +1,1 @@
-Added `irispy.utils.fitting.maps_from_fit` to turn cube fits into parameter and line maps, quality flags and residuals.
+Added ``irispy.utils.fitting.maps_from_fit``, which turns the fit of every spectrum of a cube into maps of the fitted parameters and of the Doppler velocity, width and integrated intensity of each line, with their uncertainties, a ``FitQualityFlag`` for each spectrum and, unless ``residual=False``, the residual cube.

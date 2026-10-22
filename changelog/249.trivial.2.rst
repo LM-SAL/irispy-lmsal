@@ -1,1 +1,0 @@
-The error branches of ``density_diagnostic``, ``calculate_red_blue_asymmetry``, ``remove_cosmic_rays`` and ``SGMeta``, and every ``RBAQualityFlag``, are now tested.

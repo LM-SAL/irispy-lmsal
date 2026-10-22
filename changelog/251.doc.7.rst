@@ -1,1 +1,1 @@
-The visualization tutorial now explains what the slider and the axes of the cube plots show and why ``vmax=255`` is used, and plots a single image and a single spectrum.
+The Level 2 tutorial now explains what the slider and the axes of the cube plots show and plots a single image and a single spectrum. It and the ``plot`` docstrings show ``clip_interval=(1, 99.5) * u.percent`` for images with a few bright pixels, such as cosmic-ray hits, which leave the default stretch, from the minimum to the maximum of the first frame, little contrast.

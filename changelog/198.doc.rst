@@ -1,1 +1,1 @@
-Corrected the wavelength scale in the Mg II Dopplergram example with `~irispy.utils.wavelength_drift.calculate_wavelength_drift`, as the IDL tutorial does with ``iris_prep_wavecorr_l2``, instead of the orbital velocity alone.
+The Mg II Dopplergram example now corrects the wavelength scale of each raster step with ``irispy.utils.wavelength_drift.calculate_wavelength_drift``, as the IDL tutorial does with ``iris_prep_wavecorr_l2``, instead of with the orbital velocity alone, and uses the reader's mask to leave out the -200 DN fill values and the -199 DN samples.

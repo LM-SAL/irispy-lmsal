@@ -1,1 +1,1 @@
-``trim=True`` in `~irispy.utils.wobble.generate_wobble_movie` now keeps exactly the rows and columns that hold data in every frame; it used to swap the two ranges and drop the last row and column.
+``trim=True`` in ``irispy.utils.wobble.generate_wobble_movie`` now keeps exactly the rows and columns that hold data in every frame; it used to swap the two ranges and drop the last row and column.

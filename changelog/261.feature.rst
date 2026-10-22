@@ -1,1 +1,1 @@
-Added `irispy.utils.lines.get_lines`, which searches a packaged catalog of NIST and CHIANTI lines in the IRIS passbands and can rank them by predicted strength in quiet-Sun, active-region and flare reference atmospheres.
+Added ``irispy.utils.lines.get_lines``, which searches a packaged catalog of NIST and CHIANTI lines in the IRIS passbands and can rank them by predicted strength in quiet-Sun, active-region and flare reference atmospheres.

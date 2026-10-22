@@ -1,1 +1,0 @@
-irispy no longer calls astropy's deprecated ``sanitize_slices`` when slicing a cube, and the test suite ignores that deprecation from ndcube until ndcube drops the call.

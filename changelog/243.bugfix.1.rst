@@ -1,1 +1,1 @@
-`irispy.io.read_files` now groups the rasters of several ``_raster.tar.gz`` tarballs by observation, like loose raster files, instead of keeping only the last tarball whose first spectral window has the same name.
+``irispy.io.read_files`` now groups the rasters of several ``_raster.tar.gz`` tarballs by observation, like loose raster files, instead of keeping only the last tarball whose first spectral window has the same name.
