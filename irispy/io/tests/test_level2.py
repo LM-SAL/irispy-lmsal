@@ -68,16 +68,33 @@ def test_readers_reject_other_products_and_levels(request, level3_file, reader, 
             reader(hdulist)
 
 
+@pytest.mark.parametrize(
+    ("reader", "product", "level2_fixture"),
+    [(read_sji_lvl2, "SJI", "sns_sji_1400_file"), (read_spectrograph_lvl2, "raster", "sns_sg_file")],
+    ids=["sji-reader", "spectrograph-reader"],
+)
 @pytest.mark.parametrize("kind", ["bytes", "HDUList"])
-def test_read_sji_lvl2_names_the_data_it_rejects_without_a_filename(sns_sji_1400_file, level3_file, kind):
+def test_readers_name_the_data_they_reject_without_a_filename(
+    request, level3_file, reader, product, level2_fixture, kind
+):
     # Bytes are refused even when they hold a level 2 file
     if kind == "bytes":
-        data = Path(sns_sji_1400_file).read_bytes()
+        data = Path(request.getfixturevalue(level2_fixture)).read_bytes()
     else:
         data = fits.HDUList.fromstring(level3_file.read_bytes())
 
-    with pytest.raises(ValueError, match=re.escape(f"The data given ({kind}) is not an IRIS level 2 SJI file")):
-        read_sji_lvl2(data)
+    with pytest.raises(ValueError, match=re.escape(f"The data given ({kind}) is not an IRIS level 2 {product} file")):
+        reader(data)
+
+
+def test_read_spectrograph_lvl2_refuses_an_empty_list():
+    with pytest.raises(ValueError, match="filenames is empty"):
+        read_spectrograph_lvl2([])
+
+
+def test_read_files_names_bytes_in_its_type_error(sns_sg_file):
+    with pytest.raises(TypeError, match="not 'bytes'"):
+        read_files(Path(sns_sg_file).read_bytes())
 
 
 # read_files reads a folder, so only the single-file readers reject one

@@ -324,7 +324,7 @@ def read_files(
     >>> list(raster.keys())  # doctest: +REMOTE_DATA
     ['Mg II k 2796']
     """
-    given = [filenames] if isinstance(filenames, (str, Path)) else list(filenames)
+    given = [filenames] if isinstance(filenames, (str, bytes, Path)) else list(filenames)
     paths = []
     for f in map(Path, given):
         if f.is_dir():
@@ -339,6 +339,9 @@ def read_files(
         else:
             paths.append(f)
     filenames = sorted({p.resolve() for p in paths})
+    if spectral_windows is not None and not isinstance(spectral_windows, str):
+        # Each observation is read with them, and a generator would be used up by the first
+        spectral_windows = list(spectral_windows)
     returns = {}
     spec_groups = {}
     for filename in filenames:

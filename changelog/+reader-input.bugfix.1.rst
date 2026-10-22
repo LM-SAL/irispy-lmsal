@@ -1,0 +1,1 @@
+``irispy.io.read_spectrograph_lvl2`` now raises a ``ValueError`` for an empty list instead of an ``IndexError``, and takes ``bytes`` as one item, as ``irispy.io.read_sji_lvl2`` does, instead of looking for a file named after each byte, such as ``97``.

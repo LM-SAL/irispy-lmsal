@@ -211,9 +211,12 @@ def read_spectrograph_lvl2(
     >>> raster["Si IV 1403"][0].unit, raster["Mg II k 2796"][0].unit
     (Unit("DN_IRIS_FUV"), Unit("DN_IRIS_NUV"))
     """
-    if isinstance(filenames, (str, Path, fits.HDUList)):
+    if isinstance(filenames, (str, bytes, Path, fits.HDUList)):
         filenames = [filenames]
     filenames = list(filenames)
+    if not filenames:
+        msg = "filenames is empty: give at least one raster file"
+        raise ValueError(msg)
     if len(filenames) > 1:
         # The sequence follows time whatever the order given, such as that of an unsorted glob.
         date_obs = []
@@ -267,6 +270,9 @@ def read_spectrograph_lvl2(
                 )
                 # If spectral_window is not set then get every window.
                 # Else take the appropriate windows
+                if spectral_windows is not None and not isinstance(spectral_windows, str):
+                    # A NumPy array has no truth value
+                    spectral_windows = list(spectral_windows)
                 if not spectral_windows:
                     spectral_windows_req = windows_in_obs
                     window_fits_indices = range(1, len(hdulist) - 2)
