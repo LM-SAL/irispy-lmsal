@@ -118,6 +118,20 @@ def test_get_latest_response_no_observation_time():
     assert abs(Time(get_latest_response()["DATE_OBS"]) - Time.now()) < 1 * u.min
 
 
+@pytest.mark.filterwarnings("ignore:.*dubious year")  # Past ERFA's leap-second table
+def test_get_latest_response_end_of_calibration():
+    # The last calibration interval ends at 2049-12-31T00:00. IDL 9.2 iris_get_response gives these
+    # largest FUV, NUV SG and four SJI areas then, and zero areas a second later.
+    at_end = get_latest_response("2049-12-31T00:00")
+    np_test.assert_almost_equal(at_end["AREA_SG"].max(axis=1).to_value(u.cm**2), [0.3410465, 0.1108608], decimal=4)
+    np_test.assert_almost_equal(
+        at_end["AREA_SJI"].max(axis=1).to_value(u.cm**2), [0.0121178, 0.0264849, 0.0020466, 0.0021704]
+    )
+    after = get_latest_response("2049-12-31T00:00:01")
+    assert not after["AREA_SG"].value.any()
+    assert not after["AREA_SJI"].value.any()
+
+
 @figure_test
 def test_plot_idl_vs_python_fuv_sg(idl_response):
     iris_response = get_latest_response(parse_time("2025-08-05T22:25:04.723"))

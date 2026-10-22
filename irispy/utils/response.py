@@ -225,7 +225,11 @@ def get_latest_response(
             sca2 = interpol_sg2(wavelength) / area_sg2
             # Normalize slant so that total(wei*asj2*sca2)/total(wei*asj2)=1
             for m in range(2):
-                sca2n = sca2 * np.sum(weight * area_sj2[:, m]) / np.sum(weight * area_sj2[:, m] * sca2)
+                # After the last calibration interval sca2 is zero; IDL's "> 0.0" below turns this 0/0 into 0.
+                with np.errstate(invalid="ignore"):
+                    sca2n = np.nan_to_num(
+                        sca2 * np.sum(weight * area_sj2[:, m]) / np.sum(weight * area_sj2[:, m] * sca2)
+                    )
                 interpol_sca = make_interp_spline(
                     wavelength,
                     sca2n,
@@ -292,13 +296,11 @@ def _fit_xput_lite(observation_time, time_cal_coeffs, cal_coeffs):
         warnings.simplefilter("ignore", ErfaWarning)
         t_diff = observation_time - time_cal_coeffs
     t_diff = t_diff.flatten().to_value(u.year)
-    idx = np.where(t_diff < 0)[0]
+    idx = np.where(t_diff <= 0)[0]
     if idx.size == 0:
-        idx = 1
-    else:
-        idx = idx[0]
-        if idx == 0:
-            idx = 1
+        # After the last calibration interval, fit_iris_xput.pro gives zero.
+        return 0.0
+    idx = max(idx[0], 1)
     # If the observation_time is between the calibration time intervals of a
     # calibration file (idx % !=0) then the aux_coeffs are given by an
     # exponential (coefficient and exponential value).
