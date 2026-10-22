@@ -15,10 +15,29 @@ class ObsID(dict):
     Parameters
     ----------
     obsid : `int` or `str`
-        IRIS OBS ID to query, such as the ``OBSID`` header keyword. Needs to be a valid OBS ID, with 10 digits.
+        IRIS OBS ID to query, such as ``cube.meta.observing_mode_id`` of a cube or the ``OBSID`` header
+        keyword. Needs to be a valid OBS ID, with 10 digits.
 
     Notes
     -----
+    The keys and the types of their values:
+
+    * ``"obsid"`` (`int`): the OBS ID.
+    * ``"raster_desc"`` and ``"raster_fulldesc"`` (`str`): the description, such as
+      ``"Large dense 96-step raster"``, and the same with the field of view and cadence.
+    * ``"raster_fov"`` and ``"sji_fov"`` (`str`): the fields of view in arcsec, such as ``"31.35x120"``.
+    * ``"raster_step"`` (`~astropy.units.Quantity`): the raster step, one per sub-raster for
+      sparse/dense/sparse rasters.
+    * ``"exptime"`` (`~astropy.units.Quantity`): the exposure time.
+    * ``"spec_cadence"`` (`~astropy.units.Quantity`): the nominal cadence of the OBS table, which counts
+      1 s per raster step; the cadence of the data is longer, as the cube's times show.
+    * ``"linelist"``, ``"compression"``, ``"sji_cadence"``, ``"fuv_binning"``, ``"binning"`` and
+      ``"sjis"`` (`str`): the options of the OBS table, such as ``"Flare linelist 1"``.
+    * ``"readout"`` (`str`): ``"Non-simultaneous readout"`` or ``"Simultaneous readout"``, only in OBS
+      table versions 34 and 36.
+
+    ``options`` holds, for each option, the choices of the OBS table.
+
     OBS IDs from the OBS table versions 34, 36, 38 and 40 are supported.
     OBS IDs of 4200000000 and above are calibration and special sequences
     with no OBS table; the ``OBS_DESC`` and ``OBSTITLE`` header keywords

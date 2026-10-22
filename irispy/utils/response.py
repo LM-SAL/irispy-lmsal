@@ -25,22 +25,11 @@ def get_latest_response(
     observation_time=None,
 ):
     """
-    Returns the latest IRIS response structure.
+    Returns the IRIS response, with the effective areas at the observation time.
 
-    This is not downloading the latest response file from the IRIS website,'
-    but rather reading the latest response file from the local data directory.
-
-    Goal is to replicate the base functionality of the IDL routine
-    ``iris_get_response.pro`` in the SSWIDL package.
-
-    There are no plans to support anything but the latest response file.
-
-    This routine does calculate time dependent effective areas using
-    as is done in the SSWIDL version of this code.
-
-    As a result of being translated from IDL, it has that IDL code smell and layout.
-    The upside to this is that if upstream IDL changes occur, it is easy to adapt this
-    in the future compared to if it was Python-ized.
+    The response comes from the newest SolarSoft response file, version 9
+    (``iris_sra_c_20231106.geny``), which ships with irispy; nothing is downloaded.
+    The effective areas are those SolarSoft's ``iris_get_response.pro`` gives for that file.
 
     Parameters
     ----------
@@ -94,6 +83,8 @@ def get_latest_response(
     >>> response["VERSION"]
     9
     """
+    # A close translation of iris_get_response.pro, keeping its layout and names, so that changes
+    # to the IDL routine are easy to follow here. Only the newest response file is supported.
     observation_time = parse_time("now" if observation_time is None else observation_time)
     if not observation_time.isscalar:
         msg = f"observation_time must be a single time, not an array of shape {observation_time.shape}"

@@ -122,6 +122,8 @@ This can be avoided altogether by reading the cameras sequentially, and most of 
 For OBSIDs starting with 36, those whose 4th digit are 0-4 are sequential read and those with 5-9 are simultaneous readout (3624103603 is sequential and 3629103603 is simultaneous).
 Also the high-cadence flare OBSIDS 4204700126-4204700143 are simultaneous readout.
 
+.. _irispy-tutorial-saturated-data:
+
 Flagging of saturated data
 ==========================
 

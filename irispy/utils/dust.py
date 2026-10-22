@@ -146,7 +146,11 @@ def remove_dust(
 
     This routine is inspired by SolarSoft's ``IRIS_DUSTBUSTER``. It uses
     neighboring frames at the same pixel location first, and falls back to a local
-    spatial median when temporal replacements is not available.
+    spatial median when temporal replacement is not available.
+    The dust moves with the slit, so neighboring frames help only when the slit moves between them,
+    as in a raster; in a sit-and-stare only the spatial median fills the dust.
+    Dust pixels that neither can fill keep their value and stay masked.
+    To mask the dust without replacing it, use ``cube.mask | calculate_dust_mask(cube)``.
 
     Parameters
     ----------

@@ -187,10 +187,12 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
     @cached_property
     def fits_wcs(self):
         """
-        Returns a standard WCS instead of gWCS.
+        The FITS WCS of each frame, with the pointing and time of that frame.
 
-        One per frame, following the cube's slicing; after an integer spatial index it
-        is the sliced WCS of each frame.
+        A list with one `astropy.wcs.WCS` per frame, following the cube's slicing, or
+        one WCS after an integer index along time; after an integer spatial index, each
+        is a sliced WCS (`~astropy.wcs.wcsapi.SlicedLowLevelWCS`) of the remaining axis.
+        `None` when the cube has no frame headers, as after rebinning.
         """
         if self._file_frames is None:
             return None

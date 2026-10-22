@@ -273,7 +273,8 @@ def read_files(
         The folder that tar files are extracted into, each in a subfolder named after it and its path.
         Defaults to the ``irispy`` cache folder, ``astropy.config.paths.get_cache_dir("irispy")``
         (``~/.cache/irispy`` unless ``XDG_CACHE_HOME`` is set), so the archive's own folder
-        can be read-only. An archive extracted there before is not extracted again.
+        can be read-only. An archive extracted there before is not extracted again. The extracted
+        files stay until you delete them; see :ref:`irispy-known-issues-extracted-archives`.
 
     Returns
     -------

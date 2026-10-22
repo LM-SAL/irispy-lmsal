@@ -224,7 +224,8 @@ class MosaicCube(SpectrogramCube):
         Return a `sunpy.map.Map` at one wavelength or averaged over a range.
 
         As in `~irispy.utils.moments.average_window`, masked values are left out of the mean
-        and positions with a saturated sample are NaN. The color map is that of the nearest
+        and positions with a saturated sample (see :ref:`irispy-tutorial-saturated-data`) are NaN.
+        The color map is that of the nearest
         slit-jaw passband.
 
         Parameters

@@ -80,7 +80,8 @@ def remove_cosmic_rays(
     `~irispy.sji.SJICube` or `~irispy.spectrograph.SpectrogramCube`
         A new cube with cleaned data and copied metadata/coordinates. Masked and
         non-finite samples, and those ``inmask`` marks for ``astroscrappy``, keep their
-        value. The cleaned data are in memory.
+        value. The cleaned data are in memory. The mask and uncertainty are those of ``cube``,
+        so a replaced spike is not masked and keeps the uncertainty it had as a spike.
     """
     # Avoid circular imports
     from irispy.utils._spectral import check_scaled, make_map_cube  # NOQA: PLC0415

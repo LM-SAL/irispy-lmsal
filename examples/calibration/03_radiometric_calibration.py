@@ -9,9 +9,11 @@ IRIS Level 2 data are provided in units of Data Number (DN). To convert these to
 in physical units (e.g., :math:`erg s^{-1} sr^{-1} cm^{-2} Å^{-1}`) one must perform a
 radiometric calibration.
 
-The output matches the SolarSoft IDL routine
-`IRIS_CALIB <https://hesperia.gsfc.nasa.gov/ssw/iris/idl/nrl/iris_calib.pro>`__, except that it is
-per unit wavelength, hence the extra :math:`Å^{-1}` in the units. See
+The output is in the units of SolarSoft's
+`iris_calib_spectrum.pro <https://hesperia.gsfc.nasa.gov/ssw/iris/idl/lmsal/iris2/iris_calib_spectrum.pro>`__,
+radiance per Å. The NRL routine `IRIS_CALIB <https://hesperia.gsfc.nasa.gov/ssw/iris/idl/nrl/iris_calib.pro>`__
+takes the DN summed over a line and gives its intensity in :math:`erg s^{-1} sr^{-1} cm^{-2}`: to compare,
+sum the calibrated spectrum over the line and multiply by ``abs(cube.spectral_dispersion)``. See
 `ITN26 <https://iris.lmsal.com/itn26/calibration.html>`__ for the calibration process.
 """
 
