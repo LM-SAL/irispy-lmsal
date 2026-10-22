@@ -75,7 +75,7 @@ class ObsID(dict):
             "Description:       {raster_fulldesc:>45}\n"
             "SJI filters:       {sjis:>45}\n"
             "SJI field of view: {sji_fov:>45}\n"
-            "Exposure time:     {exptime:>45}\n"
+            "Exposure time:     {exptime!s:>45}\n"
             "Binning:           {binning:>45}\n"
             "FUV binning:       {fuv_binning:>45}\n"
             "SJI cadence:       {sji_cadence:>45}\n"

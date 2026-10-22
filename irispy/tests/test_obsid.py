@@ -118,6 +118,12 @@ def test_values_have_one_type(obsid):
         assert decoded[key] in options
 
 
+@pytest.mark.parametrize("obsid", OBSIDS)
+def test_repr_values_end_in_one_column(obsid):
+    # Every value but the description, which can run past it, ends in the same column
+    assert {len(line) for line in repr(ObsID(obsid)).splitlines()[3:]} == {64}
+
+
 @pytest.mark.parametrize(
     ("test_input", "message"),
     [
