@@ -197,7 +197,8 @@ def starts_from_model(model, cube):
     their own peaks. Lines on the same side of the background whose centers in ``model``, a tied
     one where its tie puts it, lie within a sample of each other, such as a narrow core and a
     broad component with one center, search the samples within two widths of any of them and
-    share the peak in the ratio of their amplitudes in ``model``.
+    share the peak, less the amplitudes of fixed ones, in the ratio of their amplitudes in
+    ``model``; where that leaves nothing, they keep the amplitudes of ``model``.
 
     Fixed and tied parameters and those of other components keep the values of ``model``, and the
     others are clipped to their bounds. Masked and non-finite samples are left out of the starts.
@@ -218,8 +219,12 @@ def starts_from_model(model, cube):
     wavelength = _wavelength(cube).value
     spectra = _spectra(cube)
     # The values of model in Å and the unit of cube, a tied one where its tie puts it: the fitter evaluates the ties
-    # without units, in those of the wavelengths and data it is given.
-    untied = model.without_units_for_data(x=1 * u.AA, y=1 * cube.unit)
+    # without units, in those of the wavelengths and data it is given. Like the fitter, convert only a model with
+    # units, as other components, such as a custom model, need not support the conversion.
+    if any(getattr(model, name).unit is not None for name in model.param_names):
+        untied = model.without_units_for_data(x=1 * u.AA, y=1 * cube.unit)
+    else:
+        untied = model.copy()
     for name in model.param_names:
         if model.tied[name]:
             setattr(untied, name, model.tied[name](untied))
@@ -272,8 +277,9 @@ def starts_from_model(model, cube):
     spacing = np.min(np.abs(np.diff(wavelength)), initial=np.inf)
     groups = []
     for index in sorted(range(len(centers)), key=lambda index: (signs[index], centers[index])):
-        last = groups[-1][-1] if groups else None
-        if last is not None and signs[last] == signs[index] and centers[index] - centers[last] < spacing:
+        # Against the group's lowest center, so that a group spans less than a sample.
+        first = groups[-1][0] if groups else None
+        if first is not None and signs[first] == signs[index] and centers[index] - centers[first] < spacing:
             groups[-1].append(index)
         else:
             groups.append([index])
@@ -291,13 +297,16 @@ def starts_from_model(model, cube):
         peak = np.argmax(excess, axis=-1)
         height = np.take_along_axis(excess, peak[..., np.newaxis], axis=-1)[..., 0]
         found = height > 0  # Otherwise no sample lies beyond the background on the side of the line.
-        # So that the starts of the lines add up to the peak.
-        total = sum(abs(amplitudes[index]) for index in group)
+        # Fixed amplitudes stay, and the others share what they leave of the peak, so that the starts add up to it.
+        free = [index for index in group if not model.fixed[line_names[index][0]]]
+        left = height - sum(abs(amplitudes[index]) for index in group if index not in free)
+        total = sum(abs(amplitudes[index]) for index in free)
         for index in group:
             amplitude, center, _ = line_names[index]
-            share = abs(amplitudes[index]) / total if total else 1 / len(group)
             starts[center] = np.where(found, wavelength[peak], centers[index]) * u.AA
-            starts[amplitude] = np.where(found, sign * height * share, amplitudes[index]) * cube.unit
+            if index in free:
+                share = abs(amplitudes[index]) / total if total else 1 / len(free)
+                starts[amplitude] = np.where(found & (left > 0), sign * left * share, amplitudes[index]) * cube.unit
     values = {}
     for name in model.param_names:
         parameter = getattr(model, name)
