@@ -592,6 +592,40 @@ def test_calculate_red_blue_asymmetry_flags_saturated_near_peak(v34_sg_file):
     np.testing.assert_array_equal(quality, expected)
 
 
+def test_calculate_red_blue_asymmetry_flags_saturated_one_sample_beyond_the_wing(v34_sg_file):
+    """
+    With dv finer than the samples, a saturated sample within one sample of the end of a
+    wing, which the spline there depends on, flags the pixel.
+    """
+    cube = read_files(v34_sg_file)["Mg II k 2796"][0]
+    velocity = cube.axis_world_coords("em.wl")[0].to_value(
+        u.km / u.s, doppler_rest=cube.meta.rest_wavelength, doppler_convention="optical"
+    )
+    kwargs = {"velocity_range": (10, 30) * u.km / u.s, "dv": 1 * u.km / u.s, "return_profiles": False}
+    expected = calculate_red_blue_asymmetry(cube, **kwargs)["quality"].data
+    assert expected[0, 0] == RBAQualityFlag.OK
+    expected[0, 0] = RBAQualityFlag.SATURATED
+    # Pixel 0 peaks at 16.3 km/s: its sample at 49.8 km/s is beyond 30 + 1 km/s of the peak, but
+    # within 30 km/s and one of the 5.5 km/s samples
+    saturated = np.zeros(cube.shape, dtype=bool)
+    saturated[0, 0, np.argmin(np.abs(velocity - 49.8))] = True
+    mark_saturated(cube, saturated)
+    np.testing.assert_array_equal(calculate_red_blue_asymmetry(cube, **kwargs)["quality"].data, expected)
+
+
+def test_calculate_red_blue_asymmetry_bin_in_both_wings_has_no_error(v34_sg_file):
+    """
+    Within dv / 2 of the peak, the center bin alone is in both wings, so the asymmetry
+    and its error are 0.
+    """
+    cube = read_files(v34_sg_file, uncertainty=True)["Mg II k 2796"][0]
+    result = calculate_red_blue_asymmetry(cube, velocity_range=(1, 2) * u.km / u.s, return_profiles=False)
+    ok = result["quality"].data == RBAQualityFlag.OK
+    assert ok.sum() > 100
+    np.testing.assert_array_equal(result["red_blue_asymmetry"].data[ok], 0)
+    np.testing.assert_array_equal(result["red_blue_asymmetry"].uncertainty.array[ok], 0)
+
+
 def test_calculate_red_blue_asymmetry_peak_at_edge_of_velocity_range(v34_sg_file):
     """
     A peak sample at the first or last sample within velocity_range[1] of rest_wavelength is

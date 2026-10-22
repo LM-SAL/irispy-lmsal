@@ -201,7 +201,8 @@ def calculate_red_blue_asymmetry(
 
     Pixels with a saturated sample (see :ref:`irispy-tutorial-saturated-data`) within
     ``velocity_range[1]`` of ``rest_wavelength``, where the peak is looked for, or within
-    ``velocity_range[1] + dv`` of the peak, are flagged `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`.
+    ``velocity_range[1]`` of the peak plus ``dv`` or the cube's sample spacing, whichever is larger,
+    are flagged `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`.
     Subtract a background first with `~irispy.utils.spectrograph.subtract_background` if the line
     sits on one.
 
@@ -339,13 +340,14 @@ def calculate_red_blue_asymmetry(
     center = velocity[peak_index] + np.nan_to_num(offset * (velocity[around[:, 2]] - velocity[around[:, 0]]) / 2)
 
     # The samples the peak is looked for in, as a masked saturated peak leaves a fainter one to be
-    # found, and those the wings and I_p are interpolated from, with dv to spare, measured from the
-    # peak sample where a flag leaves the center meaningless. A saturated line elsewhere in the
-    # window, as C II 1334 is for C II 1336, does not flag the pixel.
+    # found, and those the wings and I_p are interpolated from, with dv or a sample to spare, as the
+    # spline at the end of a wing depends on the next sample, measured from the peak sample where a
+    # flag leaves the center meaningless. A saturated line elsewhere in the window, as C II 1334 is
+    # for C II 1336, does not flag the pixel.
     saturated = np.moveaxis(_saturated_samples(cube), wavelength_axis, -1).reshape(profiles.shape)
     rows = np.flatnonzero(saturated.any(axis=-1))
     anchor = np.where(todo, center, velocity[peak_index])
-    near = np.abs(velocity - anchor[rows, None]) <= high + dv
+    near = np.abs(velocity - anchor[rows, None]) <= high + max(dv, np.abs(np.diff(velocity)).max(initial=0))
     near[:, in_range] = True
     quality[rows[(saturated[rows] & near).any(axis=-1)]] = RBAQualityFlag.SATURATED
     todo &= quality == RBAQualityFlag.OK
@@ -437,12 +439,13 @@ def calculate_red_blue_asymmetry(
         if interpolated_errors is not None:
             error = interpolated_errors[rows]
 
-            def wing_error(weight):
-                norm = (np.isfinite(error) * weight).sum(axis=-1)
-                total = np.sqrt(np.nansum((error * weight) ** 2, axis=-1))
-                return np.divide(total, norm, out=np.full(norm.shape, np.nan), where=norm > 0)
-
-            numerator_error = np.sqrt(wing_error(red_weight) ** 2 + wing_error(blue_weight) ** 2)
+            red_norm, blue_norm = ((np.isfinite(error) * weight).sum(axis=-1) for weight in (red_weight, blue_weight))
+            # Each bin counts by its red less its blue weight, each over its wing's total, so that a
+            # bin in both wings, the center bin when velocity_range[0] < dv / 2, cancels
+            with np.errstate(divide="ignore", invalid="ignore"):
+                weight = red_weight / red_norm[:, None] - blue_weight / blue_norm[:, None]
+                numerator_error = np.sqrt(np.nansum((weight * error) ** 2, axis=-1))
+            numerator_error[(red_norm == 0) | (blue_norm == 0)] = np.nan
             peak_error = error[:, peak_bin]
             numerator_is_zero = np.isclose(numerator, 0)
             valid = np.isfinite(numerator_error) & (numerator_is_zero | np.isfinite(peak_error))
