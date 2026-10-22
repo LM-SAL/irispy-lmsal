@@ -798,17 +798,30 @@ def test_maps_from_fit_defaults_to_the_line_of_the_window(raster_sg_file):
     fitted, fitter, cube = _fit_mg_ii(line_model(["Mg II k"]) + models.Gaussian1D(1, 2796.352 * u.AA, 0.3 * u.AA))
     maps = maps_from_fit(fitted, cube, fitter=fitter, residual=False)
     assert u.allclose(maps["velocity_3"].meta["fit_rest_wavelength"], 2796.352 * u.AA)
-    # One Gaussian without a name on a whole Si IV 1403 window, which covers five documented lines.
-    cube = read_spectrograph_lvl2(raster_sg_file, uncertainty=True)["Si IV 1403"][0]
-    wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
-    good = np.isfinite(cube.data) & ~cube.mask
-    model = starts_from_model(
-        models.Const1D(0 * cube.unit) + models.Gaussian1D(1 * cube.unit, 1402.77 * u.AA, 0.1 * u.AA), cube
-    )
-    sigma = np.where(good, cube.uncertainty.array, np.inf)
-    fitted, fitter = _fit(model, np.where(good, cube.data, 0), sigma, wavelength, cube.unit)
-    maps = maps_from_fit(fitted, cube, fitter=fitter, residual=False)
-    assert u.allclose(maps["velocity_1"].meta["fit_rest_wavelength"], 1402.77 * u.AA)
+    raster = read_spectrograph_lvl2(raster_sg_file, uncertainty=True)
+
+    def one_gaussian(window, center):
+        """
+        The maps of a Gaussian without a name at ``center`` fitted to every spectrum of
+        ``window``.
+        """
+        cube = raster[window][0]
+        wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
+        good = np.isfinite(cube.data) & ~cube.mask
+        model = models.Const1D(0 * cube.unit) + models.Gaussian1D(1 * cube.unit, center, 0.2 * u.AA)
+        sigma = np.where(good, cube.uncertainty.array, np.inf)
+        fitted, fitter = _fit(
+            starts_from_model(model, cube), np.where(good, cube.data, 0), sigma, wavelength, cube.unit
+        )
+        return maps_from_fit(fitted, cube, fitter=fitter, residual=False)
+
+    # A whole Si IV 1403 window, which covers five documented lines, and the 2832 continuum window, whose rest
+    # wavelength is its center.
+    for window, rest in (("Si IV 1403", 1402.77 * u.AA), ("2832", raster["2832"][0].meta.rest_wavelength.to(u.AA))):
+        assert u.allclose(one_gaussian(window, rest)["velocity_1"].meta["fit_rest_wavelength"], rest)
+    # C II 1334.53 in the C II window, whose line is C II 1335.71.
+    with pytest.raises(ValueError, match=r"rest_wavelength: 1\.$"):
+        one_gaussian("C II 1336", 1334.53 * u.AA)
 
 
 def test_maps_from_fit_on_one_spectrum():

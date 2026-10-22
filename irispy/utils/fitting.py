@@ -451,7 +451,12 @@ def maps_from_fit(fitted_model, cube, *, fitter, rest_wavelength=None, residual=
                 ("mean" if isinstance(leaves[index], models.Gaussian1D) else "x_0") + (f"_{index}" if compound else "")
             ]
             center = center[np.isfinite(center)]  # Empty where no spectrum has a fit, as in a slab of missing steps.
-            if center.size and abs(catalog[np.argmin(np.abs(catalog - np.median(center)))] - default) > _BLEND_WIDTH:
+            if not center.size:
+                continue
+            center = np.median(center)
+            nearest = catalog[np.argmin(np.abs(catalog - center))]
+            # The default of a continuum window, such as 2832, is its center, away from any documented line.
+            if abs(nearest - center) < abs(default - center) and abs(nearest - default) > _BLEND_WIDTH:
                 elsewhere.append(index)
         if elsewhere:
             labels = ", ".join(f"{index}" + (f" ({lines[index]!r})" if lines[index] else "") for index in elsewhere)
