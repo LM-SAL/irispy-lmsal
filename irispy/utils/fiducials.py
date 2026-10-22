@@ -70,7 +70,7 @@ def _candidates(cube_or_sequence, min_depth):
         return positions, depths, depths / scatter
 
 
-def find_fiducials(cube_or_sequence, *, min_depth=0.5):
+def find_fiducials(cube, *, min_depth=0.5):
     """
     Find the fiducial marks along the slit of a spectral window.
 
@@ -84,7 +84,7 @@ def find_fiducials(cube_or_sequence, *, min_depth=0.5):
 
     Parameters
     ----------
-    cube_or_sequence : `~irispy.spectrograph.SpectrogramCube` or `~irispy.spectrograph.SpectrogramCubeSequence`
+    cube : `~irispy.spectrograph.SpectrogramCube` or `~irispy.spectrograph.SpectrogramCubeSequence`
         One spectral window, read with ``memmap=False``. The slit axis is the axis before the
         wavelength axis, as in the cubes from `irispy.io.read_files`.
     min_depth : `float`, optional
@@ -122,10 +122,10 @@ def find_fiducials(cube_or_sequence, *, min_depth=0.5):
     FUV windows show a dark row that is not a mark about 61 rows below the lower mark; when in
     doubt, compare with the NUV windows, where the marks are clear.
     """
-    positions, depths, significance = _candidates(cube_or_sequence, min_depth)
+    positions, depths, significance = _candidates(cube, min_depth)
     if positions.size < 2:
         return positions, depths
-    separation = (_SEPARATION / _plate_scale(_cubes(cube_or_sequence)[0])).to_value(u.pix)
+    separation = (_SEPARATION / _plate_scale(_cubes(cube)[0])).to_value(u.pix)
     first, second = np.nonzero(np.abs(positions - positions[:, np.newaxis] - separation) < 2)
     if first.size:
         best = np.argmax(significance[first] + significance[second])
