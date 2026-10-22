@@ -31,9 +31,9 @@ DETECTOR_YIELD = {"NUV": 1.0, "FUV": 1.5, "SJI_1330": 1.5, "SJI_1400": 1.5, "SJI
 DN_UNIT = {
     band: u.def_unit(f"DN_IRIS_{band}", DETECTOR_GAIN[band] / DETECTOR_YIELD[band] * u.photon) for band in DETECTOR_GAIN
 } | {
-    "SJI_UNSCALED": u.def_unit("DN_IRIS_SJI_UNSCALED", u.ct),
-    "NUV_UNSCALED": u.def_unit("DN_IRIS_NUV_UNSCALED", u.ct),
-    "FUV_UNSCALED": u.def_unit("DN_IRIS_FUV_UNSCALED", u.ct),
+    # The raw integers of a memmap read are not physical values, so their units convert to nothing
+    band: u.def_unit(f"DN_IRIS_{band}")
+    for band in ("SJI_UNSCALED", "NUV_UNSCALED", "FUV_UNSCALED")
 }
 READOUT_NOISE = {band: (3.1 if band == "FUV" else 1.2) * DN_UNIT[band] for band in DETECTOR_GAIN}
 # The level 2 clipping ceiling, not a detector saturation level. Level 2 data are int16 with BSCALE 0.25 and BZERO

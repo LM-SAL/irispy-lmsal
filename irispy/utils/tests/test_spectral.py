@@ -18,6 +18,8 @@ def test_check_scaled():
         for unit in (DN_UNIT[f"{band}_UNSCALED"], DN_UNIT[f"{band}_UNSCALED"] / u.s):
             with pytest.raises(ValueError, match="unscaled"):
                 check_scaled(make_test_spectrogram_cube(np.ones((1, 1, 3)), wavelengths, unit=unit))
+        # Converting the raw integers to counts would lose the unit that marks them
+        assert not DN_UNIT[f"{band}_UNSCALED"].is_equivalent(u.ct)
 
 
 @pytest.mark.parametrize("windows", [[[1, 2], [10, 11]], [[10, 11], [1, 2]]])

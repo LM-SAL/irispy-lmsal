@@ -258,9 +258,10 @@ def read_files(
         memory mapping rather than being fully read into memory at once. This
         can keep memory usage low when working with many files, since array
         data are accessed from disk on demand. In this mode FITS image scaling
-        is disabled, so the returned data are unscaled/raw FITS values rather
-        than automatically scaled physical values. If ``memmap=True``, the
-        uncertainty is never computed.
+        is disabled, so IRIS data are the raw integers of the file, in the
+        ``DN_IRIS_*_UNSCALED`` units, which the analysis functions refuse; AIA and
+        Hinode/SOT data are stored unscaled and keep their units. If ``memmap=True``,
+        the uncertainty is never computed.
     allow_errors : `bool`, optional
         Will continue loading the files if one fails to load.
         Defaults to `False`.

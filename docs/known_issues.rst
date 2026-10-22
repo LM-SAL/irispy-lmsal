@@ -55,7 +55,7 @@ To use less memory:
 
 * Read only the spectral windows you need with ``spectral_windows``; the memory goes down in proportion.
 * Leave ``uncertainty=False`` (the default); ``uncertainty=True`` adds an array of the data's type and size.
-* Pass ``memmap=True``, which maps the raw, unscaled integers instead of allocating scaled data numbers (DN).
+* Pass ``memmap=True``, which maps the raw, unscaled integers instead of allocating scaled data numbers (DN); the analysis functions refuse these raw IRIS data (AIA and Hinode/SOT data are stored unscaled and keep their units).
   A lazy Dask mask marks both fill values without reading the mapped data at open.
   Only the mask slices that are used read data; computing the entire mask takes one byte per pixel.
   No uncertainty is computed in this mode.
