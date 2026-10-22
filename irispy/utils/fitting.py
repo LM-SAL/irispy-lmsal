@@ -388,10 +388,12 @@ def maps_from_fit(fitted_model, cube, *, fitter, rest_wavelength=None, residual=
     `~astropy.nddata.StdDevUncertainty`. Parameter uncertainties are the square roots of the
     covariance diagonal, NaN where there is no fit and for fixed or tied parameters.
 
-    The derived maps propagate the covariance to first order. The full width at half
-    maximum is :math:`2\sqrt{2\ln 2}\,|\sigma|` for a Gaussian and the absolute value of the ``fwhm``
-    parameter of a Lorentzian, and the integral is :math:`\sqrt{2\pi}\,A|\sigma|` for a Gaussian and
-    :math:`\pi A\,|\mathrm{FWHM}|/2` for a Lorentzian.
+    The derived maps propagate the covariance to first order; their uncertainties are NaN for
+    those that use a fixed or tied parameter: ``"velocity_i"`` uses the center, ``"fwhm_i"`` and
+    ``"fwhm_velocity_i"`` the width, and ``"integrated_intensity_i"`` the amplitude and the width.
+    The full width at half maximum is :math:`2\sqrt{2\ln 2}\,|\sigma|` for a Gaussian and the
+    absolute value of the ``fwhm`` parameter of a Lorentzian, and the integral is
+    :math:`\sqrt{2\pi}\,A|\sigma|` for a Gaussian and :math:`\pi A\,|\mathrm{FWHM}|/2` for a Lorentzian.
 
     A spectrum is `FitQualityFlag.NO_FIT`, and NaN in the parameter and derived maps, where its
     fit failed or where it has no usable sample, one that is finite and not masked.
