@@ -34,8 +34,10 @@ __all__ = ["RBAQualityFlag", "calculate_red_blue_asymmetry"]
 # finite bins is flagged INCOMPLETE_WINGS.
 _MIN_WING_COVERAGE = 0.8
 # Spatial pixels whose profiles are interpolated at a time: without return_profiles only one
-# chunk of interpolated profiles is held
-_CHUNK_ROWS = 20000
+# chunk of interpolated profiles is held. 1000 is about 1.5 times faster per profile than 20000
+# on one thread, and below the about 8192 / k profiles from which OpenBLAS solves the spline of
+# degree k >= 2 on several threads, for two to three times the CPU time and no faster.
+_CHUNK_ROWS = 1000
 
 
 class RBAQualityFlag(_QualityFlag):
