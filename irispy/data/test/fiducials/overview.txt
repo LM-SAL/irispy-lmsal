@@ -1,0 +1,29 @@
+Test data for irispy/utils/tests/test_fiducials.py. The whole level 2 file is in
+https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2014/07/08/
+The "Made:" command writes the FITS file byte for byte from it.
+
+iris_l2_20140708_114109_3824262996_raster_t000_r00000_fiducials_test.fits
+-------------------------------------------------------------------------
+
+Cut from iris_l2_20140708_114109_3824262996_raster_t000_r00000.fits (in
+20140708_114109_3824262996/iris_l2_20140708_114109_3824262996_raster.tar.gz).
+OBS 3824262996: Very large dense raster 131.7x175 400s, no spatial summing, near the limb, so
+the upper fiducial mark (row 777) is off the disk.
+
+Kept:   the Si IV 1403 window (extension 5), step 225 (of 400), all 1095 slit rows and
+        wavelength pixels 150-169 (of 304), 1402.45-1402.93 A. Indices are 0-based. The data
+        values (raw int16 with BSCALE/BZERO) are unchanged, and the auxiliary and level 1
+        filename tables keep the row of that step.
+        The step and pixels are chosen so that the mark, at row 238.06, stands out from the noise
+        less than every other dip: the candidates find_fiducials considers are rows 32.00, 53.76,
+        176.45 (the FUV dark row that is not a mark) and 238.06, with significance 28.9, 10.4,
+        8.1 and 6.9. Rows 120-299 hold only the dark row and the mark.
+Header: NWIN = 1 and the window keywords of Si IV 1403 are numbered 1. NAXIS1/3, CRPIX1/3 and
+        TWMIN1/TWMAX1 describe the cut; NEXP = NRASTERP = 1. CDELT3, STEPS_AV/STEPT_AV, DATE_OBS
+        and DATE_END still describe the whole file. The filename table declares TFIELDS = 9 for
+        its 9 columns (the whole file says 7, see tools/compress.py). TSR1/TER1 (1 and 1095)
+        still describe the whole window, which the cut keeps along the slit, as do TSC1/TEC1,
+        STEPS_DV/STEPT_DV and the statistics keywords (DATA*, TD*1).
+Made:   python tools/cut.py iris_l2_20140708_114109_3824262996_raster_t000_r00000.fits \
+            iris_l2_20140708_114109_3824262996_raster_t000_r00000_fiducials_test.fits \
+            --exposures 225 --window "Si IV 1403" 150:170
