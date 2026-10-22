@@ -176,6 +176,12 @@ def test_apply_exposure_time_correction(sns_sjicube_1330):
     np.testing.assert_allclose(frame.apply_exposure_time_correction().data, corrected.data[1])
 
 
+def test_time_of_one_frame(sns_sjicube_1330):
+    frame, expected = sns_sjicube_1330[1].time, sns_sjicube_1330.time[1]
+    assert (frame.shape, frame.scale, frame.format) == ((), expected.scale, expected.format)
+    assert frame == expected
+
+
 def test_array_index_raises_index_error(sns_sjicube_1330):
     # As ndcube: a list reads as a tuple of indices, an array is rejected
     assert sns_sjicube_1330[[0, 1]].shape == sns_sjicube_1330[0, 1].shape

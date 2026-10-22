@@ -124,6 +124,16 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
         )
 
     @property
+    def time(self):
+        """
+        The time of each frame, an `~astropy.time.Time`; a single time for one frame.
+        """
+        # Indexing one frame moves its time from the WCS to the global coordinates, where sunraster does not look
+        if "Time (UTC)" in self.global_coords:
+            return self.global_coords["Time (UTC)"]
+        return super().time
+
+    @property
     def exposure_time(self):
         """
         The exposure time of each frame; a single value for one frame.
