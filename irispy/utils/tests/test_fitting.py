@@ -780,6 +780,7 @@ def test_maps_from_fit_needs_a_rest_wavelength_for_each_component():
         + models.Gaussian1D(1, 2803.53 * u.AA, 0.3 * u.AA)
     )
     fitted, fitter, cube = _fit_mg_ii(model)
+    # Against Mg II k, the line of the window, they would be 770 km/s off.
     for rest_wavelength, components in ((None, r"3 \('h'\), 4"), ({"h": 2803.53 * u.AA}, "4")):
         with pytest.raises(ValueError, match=rf"rest_wavelength: {components}\.$"):
             maps_from_fit(fitted, cube, fitter=fitter, rest_wavelength=rest_wavelength)
@@ -790,6 +791,24 @@ def test_maps_from_fit_needs_a_rest_wavelength_for_each_component():
             maps_from_fit(fitted, cube, fitter=fitter, rest_wavelength={key: 2803.53 * u.AA, "k2v": 2796.352 * u.AA})
     with pytest.raises(TypeError, match=r"rest_wavelength\['h'\] must be an astropy Quantity"):
         maps_from_fit(fitted, cube, fitter=fitter, rest_wavelength={"h": 2803.53})
+
+
+def test_maps_from_fit_defaults_to_the_line_of_the_window(raster_sg_file):
+    # A broad Gaussian without a name at Mg II k, in a crop of the Mg II k window that covers five documented lines.
+    fitted, fitter, cube = _fit_mg_ii(line_model(["Mg II k"]) + models.Gaussian1D(1, 2796.352 * u.AA, 0.3 * u.AA))
+    maps = maps_from_fit(fitted, cube, fitter=fitter, residual=False)
+    assert u.allclose(maps["velocity_3"].meta["fit_rest_wavelength"], 2796.352 * u.AA)
+    # One Gaussian without a name on a whole Si IV 1403 window, which covers five documented lines.
+    cube = read_spectrograph_lvl2(raster_sg_file, uncertainty=True)["Si IV 1403"][0]
+    wavelength = cube.axis_world_coords("em.wl")[0].to(u.AA)
+    good = np.isfinite(cube.data) & ~cube.mask
+    model = starts_from_model(
+        models.Const1D(0 * cube.unit) + models.Gaussian1D(1 * cube.unit, 1402.77 * u.AA, 0.1 * u.AA), cube
+    )
+    sigma = np.where(good, cube.uncertainty.array, np.inf)
+    fitted, fitter = _fit(model, np.where(good, cube.data, 0), sigma, wavelength, cube.unit)
+    maps = maps_from_fit(fitted, cube, fitter=fitter, residual=False)
+    assert u.allclose(maps["velocity_1"].meta["fit_rest_wavelength"], 1402.77 * u.AA)
 
 
 def test_maps_from_fit_on_one_spectrum():

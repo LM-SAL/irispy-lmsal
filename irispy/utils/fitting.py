@@ -18,12 +18,13 @@ from irispy.utils._spectral import (
     _QualityFlag,
     _to_unit,
     check_scaled,
+    default_rest_wavelength,
     make_map_cube,
     make_spatial_template,
     standard_deviation,
 )
 from irispy.utils.constants import ATOMIC_MASS, INSTRUMENTAL_FWHM, PASSBAND_LIMITS
-from irispy.utils.lines import _load_lines, get_lines
+from irispy.utils.lines import _BLEND_WIDTH, _load_lines, get_lines
 from irispy.utils.utils import _boolean_mask
 
 __all__ = [
@@ -56,8 +57,7 @@ def _rest_wavelength(line):
     wavelength = lines["wavelength"][lines["ion"] == ion].to_value(u.AA)
     distance = np.abs(wavelength - float(near)) if near.replace(".", "", 1).isdigit() else np.inf
     close = wavelength[distance <= 1]
-    # Lines closer than 0.1 Å, such as C II 1335.66 and 1335.71, are one blended line.
-    if not close.size or np.ptp(close) > 0.1:
+    if not close.size or np.ptp(close) > _BLEND_WIDTH.to_value(u.AA):
         msg = (
             f"No single documented line {line!r}; name one by its ion and wavelength in Å, "
             "such as 'Si IV 1403' or 'C II 1335.71'."
@@ -79,15 +79,6 @@ def _named_rest_wavelength(name):
         return _rest_wavelength(_MG_II_PEAKS.get(line, line)) * u.AA
     except ValueError:
         return None
-
-
-def _covered_lines(wavelength):
-    """
-    The ``(ion, wavelength in Å)`` pairs of the documented lines that ``wavelength``
-    covers.
-    """
-    lines = get_lines([wavelength.min(), wavelength.max()], main_only=True)
-    return list(zip(lines["ion"], lines["wavelength"].to_value(u.AA), strict=True))
 
 
 def _spectra(cube):
@@ -352,8 +343,10 @@ def maps_from_fit(fitted_model, cube, *, fitter, rest_wavelength=None, residual=
         The rest wavelength for the Doppler velocities of every Gaussian and Lorentzian component,
         or a `dict` of rest wavelengths by component name, such as ``{"broad": 1402.77 * u.AA}``.
         A component without one gets the rest wavelength of the documented line it is named after,
-        as `line_model` names its components, such as ``"Si IV 1403"`` or ``"k2v"``, or else that
-        of the one documented line that the cube covers.
+        as `line_model` names its components, such as ``"Si IV 1403"`` or ``"k2v"``, or else
+        ``cube.meta.rest_wavelength``, or the one documented line the cube covers if it does not
+        cover ``cube.meta.rest_wavelength``; a blend of lines within 0.1 Å of each other counts as
+        its strongest line.
     residual : `bool`, optional
         Whether to return the ``"residual"`` cube. `False` leaves it out, which saves memory and
         time when only the maps are needed. Defaults to `True`.
@@ -379,8 +372,8 @@ def maps_from_fit(fitted_model, cube, *, fitter, rest_wavelength=None, residual=
         If every fit of a spectrum with a usable sample failed, as when a model with bounds is
         fitted against wavelengths that are not in Å; see :ref:`irispy-tutorial-fitting`. If a key
         of ``rest_wavelength`` is not the name of a Gaussian or Lorentzian component of the model, or
-        if one of them has no rest wavelength from ``rest_wavelength`` or its name and the cube does
-        not cover exactly one documented line.
+        if a component without a rest wavelength from ``rest_wavelength`` or its name has its median
+        fitted center nearer another documented line than the default rest wavelength above.
 
     Notes
     -----
@@ -449,15 +442,26 @@ def maps_from_fit(fitted_model, cube, *, fitter, rest_wavelength=None, residual=
     else:
         rests = dict.fromkeys(lines, _to_unit(rest_wavelength, u.AA, "rest_wavelength"))
     if unknown := [index for index, rest in rests.items() if rest is None]:
-        covered = _covered_lines(wavelength)
-        if len(covered) != 1:
-            labels = ", ".join(f"{index}" + (f" ({lines[index]!r})" if lines[index] else "") for index in unknown)
+        default = default_rest_wavelength(cube).to(u.AA)
+        catalog = get_lines(main_only=True)["wavelength"].to(u.AA)
+        # A component nearer another documented line, such as one at Mg II h in the Mg II k window, needs its own.
+        elsewhere = []
+        for index in unknown:
+            center = values[
+                ("mean" if isinstance(leaves[index], models.Gaussian1D) else "x_0") + (f"_{index}" if compound else "")
+            ]
+            center = center[np.isfinite(center)]  # Empty where no spectrum has a fit, as in a slab of missing steps.
+            if center.size and abs(catalog[np.argmin(np.abs(catalog - np.median(center)))] - default) > _BLEND_WIDTH:
+                elsewhere.append(index)
+        if elsewhere:
+            labels = ", ".join(f"{index}" + (f" ({lines[index]!r})" if lines[index] else "") for index in elsewhere)
             msg = (
-                f"The cube covers {len(covered)} documented lines; name these components after their lines, such "
-                f"as 'Si IV 1403', or name them and pass their rest wavelengths in rest_wavelength: {labels}."
+                f"These components are nearer another documented line than {default:.3f}, the rest wavelength of the "
+                "cube; name them after their lines, such as 'Si IV 1403', or name them and pass their rest "
+                f"wavelengths in rest_wavelength: {labels}."
             )
             raise ValueError(msg)
-        rests.update(dict.fromkeys(unknown, covered[0][1] * u.AA))
+        rests.update(dict.fromkeys(unknown, default))
 
     def variance(gradient):
         """

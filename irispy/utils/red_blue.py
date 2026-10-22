@@ -141,7 +141,8 @@ def calculate_red_blue_asymmetry(
     rest_wavelength : `astropy.units.Quantity`, optional
         Rest wavelength used to convert the spectral axis to Doppler velocity. Defaults to
         ``cube.meta.rest_wavelength``, or to the one documented line the cube covers
-        (`~irispy.utils.lines.get_lines`) if it does not cover ``cube.meta.rest_wavelength``.
+        (`~irispy.utils.lines.get_lines`) if it does not cover ``cube.meta.rest_wavelength``;
+        a blend of lines within 0.1 Å of each other counts as its strongest line.
         Required if there is neither.
     velocity_range : `astropy.units.Quantity`, optional
         Two positive velocities. The red wing spans these velocities and the blue wing their
