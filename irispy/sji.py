@@ -217,7 +217,8 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
             from the instrument (`~sunpy.map.sources.SJIMap` for slit-jaw images), and the
             map has the cube's unit, with DN for the IRIS data numbers such as ``DN_IRIS_SJI_1330``,
             the frame's mask and the frame's own exposure time. Slit-jaw and AIA maps
-            plot with the color table of their passband, such as ``irissji1330`` or ``sdoaia304``.
+            plot with the color table of their passband, such as ``irissji1330`` or ``sdoaia304``,
+            and Hinode/SOT maps with ``hinodesotintensity``.
 
         Examples
         --------
@@ -262,11 +263,9 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
             ]
         # Keep the requested order; a MapSequence sorts by date by default
         maps = MapSequence([_make_map(data, header, self.unit, mask) for data, header, mask in frames], sortby=None)
-        # Hinode/SOT cubes have no passband and keep the color table sunpy gives their maps
-        if self.meta["TWAVE1"]:
-            cmap = _sji_cmap_name(self.meta)
-            for m in maps:
-                m.plot_settings["cmap"] = cmap
+        cmap = _sji_cmap_name(self.meta)
+        for m in maps:
+            m.plot_settings["cmap"] = cmap
         return maps[0] if is_2d or isinstance(index, Integral) else maps
 
 
