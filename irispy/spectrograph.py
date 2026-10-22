@@ -106,6 +106,23 @@ class SpectrogramCube(_ResolveNegativeIndicesMixin, SpecCube):
         )
 
     @property
+    def time(self):
+        """
+        The time of each exposure, an `~astropy.time.Time`; a single time for one
+        exposure.
+        """
+        # sunraster evaluates ndcube's gWCS of the extra coordinates for the times, about 1 ms a cube, and the
+        # table of the "time" coordinate holds them; ndcube 2.4 has no public route to the table
+        for _, coordinate in self.extra_coords._lookup_tables:
+            if coordinate.names == ["time"]:
+                return coordinate.table.copy()  # a copy, as a change to it must not move the coordinate
+        # Indexing one exposure moves the coordinate to the dropped tables, where sunraster does not look
+        for coordinate in self.extra_coords._dropped_tables:
+            if coordinate.names == ["time"]:
+                return coordinate.table.copy()
+        return super().time
+
+    @property
     def _wcs_array_axis_physical_types(self):
         """
         `~ndcube.NDCube.array_axis_physical_types` from the main WCS alone.

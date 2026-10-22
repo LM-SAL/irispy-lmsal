@@ -9,6 +9,7 @@ import pytest
 
 import astropy.units as u
 from astropy.io import fits
+from astropy.tests.helper import assert_quantity_allclose
 from astropy.wcs import WCS
 
 from ndcube import NDCubeSequence
@@ -47,6 +48,18 @@ def test_spectrogram_cube_slice_preserves_coordinates(sns_sg_file):
 
     assert "time" in tuple(sliced_cube.global_coords)
     assert "time" in tuple(sliced_sequence.extra_coords.keys())
+
+
+def test_time_is_the_time_coordinate(sns_sg_file):
+    for (cube,) in read_files(sns_sg_file).values():
+        for piece in (cube, cube[:, 5], cube[1:3, 4:9, 2:20], cube[0:1]):
+            time, expected = piece.time, piece.axis_world_coords("time", wcs=piece.extra_coords)[0]
+            assert (time.shape, time.scale, time.format) == (expected.shape, expected.scale, expected.format)
+            # The same instants; the WCS splits them into jd1 and jd2 differently, so == can be off by a rounding
+            assert_quantity_allclose((time - expected).to(u.s), 0 * u.s, atol=1 * u.ns)
+        exposure, expected = cube[-1].time, cube.time[-1]
+        assert (exposure.shape, exposure.scale, exposure.format) == ((), expected.scale, expected.format)
+        assert exposure == expected
 
 
 def test_spectrogram_cube_negative_indices(sns_sg_file):
