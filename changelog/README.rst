@@ -10,7 +10,9 @@ This directory contains "news fragments" which are short files that contain a sm
 
 The ``CHANGELOG`` will be read by users, so this description should be aimed at users instead of describing internal changes which are only relevant to the developers.
 
-Make sure to use full sentences with correct case and punctuation, for example::
+Make sure to use full sentences with correct case and punctuation, for example:
+
+.. code-block:: rst
 
     Added ``irispy.utils.moments.average_window``, which averages a spectrogram cube over a wavelength window.
 
