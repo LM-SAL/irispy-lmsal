@@ -1,1 +1,1 @@
-The IRIS technical notes and the Level 2 keyword document linked from the documentation are now in the bibliography, and the page on IRIS gives the spectrograph passbands once, from De Pontieu et al. (2014).
+The page on IRIS gives the spectrograph passbands once, from De Pontieu et al. (2014).

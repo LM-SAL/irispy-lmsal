@@ -1,1 +1,0 @@
-Reading level 2 files is faster: the readers verify only the primary header, not every HDU, and ``irispy.io.read_files`` and the spectrograph reader read only the primary header of a file before reading it in one pass, instead of opening it up to four times.

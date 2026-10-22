@@ -1,0 +1,1 @@
+``import irispy`` is faster: ``sunpy.map`` and the analysis modules under ``irispy.utils``, such as ``irispy.utils.dust``, are now imported on first use; ``irispy.utils.dust`` and ``from irispy.utils import dust`` work as before.

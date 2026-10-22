@@ -1,1 +1,0 @@
-Importing irispy and reading SJI files is faster, as ``sunpy.map`` is only imported when converting a cube to maps.

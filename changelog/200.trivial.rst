@@ -1,1 +1,0 @@
-Added a second IDL comparison of the throughput fit, at 2013-10-22.

@@ -1,1 +1,0 @@
-Added a section to the fitting tutorial on fitting the mean spectrum of a region, with its uncertainty, and starting the fits of every spectrum of a cube from it with `~irispy.utils.fitting.starts_from_model`.

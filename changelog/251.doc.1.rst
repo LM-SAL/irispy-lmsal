@@ -1,1 +1,0 @@
-The example gallery now lists, on each API page, the examples that use it.

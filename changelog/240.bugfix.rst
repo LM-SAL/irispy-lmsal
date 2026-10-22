@@ -1,1 +1,1 @@
-Slicing a cube with negative indices, such as ``cube[-3:]``, works again with astropy 8.0.2, whose ``sanitize_slices`` raises on negative indices when it is not given the shape.
+Slicing a cube with negative indices, such as ``cube[-3:]``, now works with astropy 8.0.2, which made it raise an error.

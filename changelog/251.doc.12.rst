@@ -1,1 +1,1 @@
-The red-blue asymmetry docstring now cites De Pontieu et al. (2009) and Tian et al. (2011) and lists its own choices, and the fitting tutorial shows how to check the signal-to-noise ratio and reduced chi-square of the fits, because ``FitQualityFlag.OK`` is also given to fits of noise.
+The ``irispy.utils.red_blue.calculate_red_blue_asymmetry`` docstring now cites De Pontieu et al. (2009) and Tian et al. (2011) and lists the choices that are its own.

@@ -1,1 +1,1 @@
-`~irispy.utils.response.get_latest_response` no longer warns about a dubious year: the last calibration interval of the response file ends in 2049, past ERFA's leap-second table.
+``irispy.utils.response.get_latest_response`` no longer gives an ERFA warning about a dubious year.

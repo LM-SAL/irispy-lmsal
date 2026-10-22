@@ -1,1 +1,1 @@
-``irispy.io.read_sji_lvl2`` is now exported from ``irispy.io`` and accepts an open ``astropy.io.fits.HDUList``, which it leaves open, as well as filenames and file-like objects.
+``irispy.io.read_sji_lvl2`` and ``irispy.io.read_spectrograph_lvl2`` are now exported from ``irispy.io``, and both accept an open ``astropy.io.fits.HDUList``, which they leave open, in place of a filename.

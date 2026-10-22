@@ -1,0 +1,1 @@
+``irispy.utils.red_blue.calculate_red_blue_asymmetry`` is about twice as fast: 0.34 s instead of 0.67 s for the Si IV 1403 window of an 8-step raster.

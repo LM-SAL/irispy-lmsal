@@ -1,1 +1,1 @@
-Added a page on the spectral line catalog and a gallery example that identifies lines in a flare raster.
+Added a page on the spectral line catalog, which gives the air wavelength offset of Mg II and how to find the window that holds a line, and a gallery example that identifies lines in a flare raster.

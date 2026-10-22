@@ -1,1 +1,0 @@
-``AIACube.plot`` and the maps from ``AIACube.to_maps`` now use the sunpy color table of the cube's channel, such as ``sdoaia304``; the cube plotted in viridis and plotting its maps raised a ``ValueError``, except at 1600 Å, where both used the IRIS slit-jaw table ``irissji1600``.

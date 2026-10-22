@@ -1,1 +1,1 @@
-``SJICube.apply_exposure_time_correction`` now works; it raised ``TypeError`` because the exposure time of a slit-jaw cube is an extra coordinate, whose axis `sunraster` does not unpack.
+``SJICube.apply_exposure_time_correction`` now works; it raised a ``TypeError``. It and ``SJICube.exposure_time`` also work on one frame of a slit-jaw or AIA cube, such as ``sji[1]``, where ``exposure_time`` raised a ``ValueError``.

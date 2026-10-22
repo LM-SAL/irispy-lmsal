@@ -1,0 +1,1 @@
+``irispy.utils.red_blue.calculate_red_blue_asymmetry`` no longer takes ``continuum_windows``; subtract a background first with ``irispy.utils.spectrograph.subtract_background``. Its ``degree`` keyword is now ``spline_degree``, and the ``rba_interpolation_degree`` key of the result ``meta`` is now ``rba_spline_degree``.

@@ -1,1 +1,0 @@
-``irispy.utils.wobble.generate_wobble_movie`` now treats ``-199`` as a fill value like ``-200``, so such pixels are no longer used as data.

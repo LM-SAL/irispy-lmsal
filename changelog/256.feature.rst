@@ -1,1 +1,0 @@
-`~irispy.utils.dust.remove_dust` now finds dust with the IRIS pipeline's bad-pixel table, which ships with irispy (``tools/badpix.py`` converts a new SolarSoft table).

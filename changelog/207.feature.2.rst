@@ -1,0 +1,1 @@
+Reading Level 2 files is faster: ``irispy.io.read_files`` reads 40 raster files of a 2014 flare observation in 1.9 s instead of 2.7 s.
