@@ -1,4 +1,5 @@
 import matplotlib as mpl
+import numpy as np
 from mpl_animators import ArrayAnimatorWCS
 
 import astropy.units as u
@@ -102,6 +103,20 @@ def _registered_colormap(name):
     ``name`` when matplotlib knows that colormap, viridis otherwise.
     """
     return name if name in mpl.colormaps else "viridis"
+
+
+def _make_map(data, header, unit, mask):
+    """
+    A `sunpy.map.Map` of ``data`` and ``mask`` with a copy of ``header`` that gives
+    ``unit`` as its BUNIT.
+    """
+    from sunpy.map import Map  # NOQA: PLC0415
+
+    # The IRIS DN units, such as DN_IRIS_SJI_1330, are not FITS units; sunpy reads DN
+    bases = [u.DN if base.name.startswith("DN_IRIS") else base for base in unit.bases]
+    header = header.copy()
+    header["bunit"] = u.CompositeUnit(unit.scale, bases, unit.powers).to_string()
+    return Map(data, header, mask=None if mask is None else np.asarray(mask))
 
 
 def _sji_cmap_name(meta):

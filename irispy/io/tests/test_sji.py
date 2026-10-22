@@ -382,7 +382,7 @@ def test_frame_wcs_headers_match_per_frame_make_fitswcs_header(sns_sji_1400_file
         hdulist.verify("silentfix")
         t_obs = _t_obs(hdulist)
         _fill_dropped_pointing_rows(hdulist)
-        headers = _create_headers_wcs(hdulist, t_obs, "DN")
+        headers = _create_headers_wcs(hdulist, t_obs)
         aux = hdulist[1]
         for i in (1, len(headers) - 1):
             pointing = Helioprojective(
@@ -402,7 +402,6 @@ def test_frame_wcs_headers_match_per_frame_make_fitswcs_header(sns_sji_1400_file
                 telescope=hdulist[0].header["TELESCOP"],
                 wavelength=int(hdulist[0].header["TWAVE1"]) * u.AA,
                 exposure=aux.data[i, aux.header["EXPTIMES"]] * u.second,
-                unit=u.DN,
             )
             expected["twave1"] = hdulist[0].header["TWAVE1"]
             assert dict(headers[i]) == dict(expected)

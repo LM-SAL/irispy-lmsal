@@ -136,7 +136,7 @@ def _create_gwcs(hdulist: fits.HDUList, t_obs) -> gwcs.WCS:
     return gwcs.WCS(forward_transform, input_frame=input_frame, output_frame=output_frame)
 
 
-def _create_headers_wcs(hdulist, t_obs, bunit):
+def _create_headers_wcs(hdulist, t_obs):
     """
     This is required as occasionally we need a normal WCS instead of a gWCS due to
     compatibility issues.
@@ -146,7 +146,7 @@ def _create_headers_wcs(hdulist, t_obs, bunit):
     However, this only creates the WCS headers, not the full WCS objects. Those are
     created in the SJICube class property fits_wcs, and `irispy.sji.SJICube.to_maps`
     builds its maps from them, so they carry the keys sunpy reads: the instrument and
-    telescope that pick the map class, ``bunit`` and the frame's exposure time.
+    telescope that pick the map class and the frame's exposure time.
     """
     from sunpy.coordinates.ephemeris import get_body_heliographic_stonyhurst  # NOQA: PLC0415
     from sunpy.coordinates.frames import Helioprojective  # NOQA: PLC0415
@@ -176,7 +176,6 @@ def _create_headers_wcs(hdulist, t_obs, bunit):
             "instrume": hdulist[0].header["INSTRUME"],
             "telescop": hdulist[0].header["TELESCOP"],
             "twave1": hdulist[0].header["TWAVE1"],
-            "bunit": bunit,
         }
     )
     # Hinode/SOT cubes have no wavelength (TWAVE1 is 0)
@@ -356,9 +355,7 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             bunit = hdulist[0].header.get("BUNIT", "")
             unit = u.Unit(_SOT_BUNIT.get(bunit, bunit), parse_strict="silent")
         meta = SJIMeta(hdulist[0].header)
-        # The IRIS DN units are not FITS units; sunpy reads the SOT units ("", G) as they are
-        bunit = unit.to_string() if is_sot else "DN"
-        meta["frame_wcs_headers"] = _create_headers_wcs(hdulist, t_obs, bunit)  # root-relative, not axis-aware
+        meta["frame_wcs_headers"] = _create_headers_wcs(hdulist, t_obs)  # root-relative, not axis-aware
         meta["scaled"] = scaled
         if saturated is not None and saturated.any():
             meta.add("saturated", saturated, "Samples at the level 2 ceiling, also masked", (0, 1, 2))

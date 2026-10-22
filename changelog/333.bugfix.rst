@@ -1,0 +1,1 @@
+The maps from ``SJICube.to_maps`` now carry the mask of their frame, so samples masked in the cube, such as those at the level 2 ceiling, are masked in the maps too and left blank in their plots, as in the cube's; the maps had no mask.
