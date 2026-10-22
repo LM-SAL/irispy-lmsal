@@ -128,6 +128,8 @@ def test_read_mosaic_archive_cut():
     assert cube.mask[2, 19, 14]
     assert "saturated" not in cube.meta
     assert cube.meta["time"][2, 19].isot == "2015-02-22T21:17:44.280"
+    # A mosaic has no time coordinate table, so its time is that of the meta
+    assert cube.time[2, 19] == cube.meta["time"][2, 19]
     # Column 541 and row 5626 (0-based) of the whole file, whose header grid is within 0.01 arcsec of the WCS
     wavelength, coord = cube.wcs.pixel_to_world(7, 0, 1)
     assert_quantity_allclose(wavelength, 2796.352 * u.AA)
