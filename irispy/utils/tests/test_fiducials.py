@@ -61,12 +61,6 @@ def test_find_fiducials_prefers_the_pair_at_the_mark_separation():
     np.testing.assert_allclose(find_fiducials(cube)[0], MARKS, atol=0.05)
 
 
-def test_find_fiducials_takes_the_most_significant_dip_without_a_pair():
-    cube = make_window(marks=MARKS[:1])
-    cube.data[:, 99:102] *= 0.4
-    np.testing.assert_allclose(find_fiducials(cube)[0], MARKS[:1], atol=0.05)
-
-
 def test_find_fiducials_skips_single_dark_rows():
     # The PSF spreads a mark over its neighbors; a lone dark row is a bad pixel row
     cube = make_window(marks=[])
@@ -106,6 +100,18 @@ def test_level2_fuv_without_marks():
     np.testing.assert_allclose(find_fiducials(raster["Mg II k 2796"])[0], [238.0], atol=0.1)
     for window in ("O I 1356", "Si IV 1394"):
         assert find_fiducials(raster[window])[0].size == 0
+
+
+def test_level2_finds_the_mark_without_a_pair():
+    # OBS 3824262996 near the limb: the upper mark is off the disk, and two other dips and the FUV dark
+    # row 61 rows below the lower mark stand out more from the noise than the mark
+    window = read_files(
+        get_test_filepath("fiducials/iris_l2_20140708_114109_3824262996_raster_t000_r00000_fiducials_test.fits")
+    )["Si IV 1403"][0]
+    # The header puts the mark at row 238.0
+    np.testing.assert_allclose(find_fiducials(window)[0], [238.0], atol=0.1)
+    # A slice keeps the header of the whole window, so the dark row is skipped instead
+    np.testing.assert_allclose(find_fiducials(window[:, 120:300])[0], [118.0], atol=0.1)
 
 
 @pytest.mark.remote_data
