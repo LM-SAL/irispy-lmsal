@@ -36,7 +36,7 @@ def read_mosaic(filename, *, wavelength_range: u.AA = None):
     `irispy.spectrograph.MosaicCube`
         The mosaic in DN, with array axes solar X, solar Y and wavelength, as in a Level 2
         raster. Positions no raster covered, and the Level 2 fill values, are masked and NaN.
-        Samples at the level 2 ceiling, ``irispy.utils.constants.SATURATION_LIMIT``, keep
+        Samples at the level 2 ceiling, `irispy.utils.constants.SATURATION_LIMIT`, keep
         their value and are marked in the mask and, if there are any, in ``meta["saturated"]``.
 
     Notes

@@ -1,4 +1,4 @@
-Calibration
-===========
+Cleaning and calibration
+========================
 
-These tutorials provide common workflows for users to calibrate their IRIS data.
+These tutorials provide common workflows for users to clean and calibrate their IRIS data.

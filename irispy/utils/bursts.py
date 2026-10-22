@@ -38,7 +38,7 @@ def find_si_iv_bursts(raster, *, threshold=None, velocity_range: u.km / u.s = (-
 
     Parameters
     ----------
-    raster : `~irispy.SpectrogramCube` or `~irispy.SpectrogramCubeSequence`
+    raster : `~irispy.spectrograph.SpectrogramCube` or `~irispy.spectrograph.SpectrogramCubeSequence`
         Level 2 spectra of a window covering 1402.77 Å, in DN with axes (step, slit, wavelength).
     threshold : `~astropy.units.Quantity`, optional
         Burst threshold per wavelength bin for data summed by 2 in wavelength and not along
@@ -54,7 +54,7 @@ def find_si_iv_bursts(raster, *, threshold=None, velocity_range: u.km / u.s = (-
 
     Returns
     -------
-    labels : `~irispy.SpectrogramCube` or `~irispy.SpectrogramCubeSequence`
+    labels : `~irispy.spectrograph.SpectrogramCube` or `~irispy.spectrograph.SpectrogramCubeSequence`
         As `find_bright_spectral_events`.
     events : `~astropy.table.QTable`
         As `find_bright_spectral_events`; ``events.meta["threshold"]`` is the scaled threshold.
@@ -114,7 +114,7 @@ def find_bright_spectral_events(
 
     Parameters
     ----------
-    raster : `~irispy.SpectrogramCube` or `~irispy.SpectrogramCubeSequence`
+    raster : `~irispy.spectrograph.SpectrogramCube` or `~irispy.spectrograph.SpectrogramCubeSequence`
         Level 2 spectra of one window, in DN with axes (step, slit, wavelength).
     threshold : `~astropy.units.Quantity`
         Threshold per wavelength bin of the data, applied as given, such as ``80 * u.DN / u.s``.
@@ -130,7 +130,7 @@ def find_bright_spectral_events(
 
     Returns
     -------
-    labels : `~irispy.SpectrogramCube` or `~irispy.SpectrogramCubeSequence`
+    labels : `~irispy.spectrograph.SpectrogramCube` or `~irispy.spectrograph.SpectrogramCubeSequence`
         Event labels on the (step, slit) plane of each raster: 0 outside events, and 1 to N
         for the N events, numbered on through the rasters of a sequence.
     events : `~astropy.table.QTable`

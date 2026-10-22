@@ -235,7 +235,7 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
         slices that are used.
         With ``memmap=False``, missing pixels are marked in the mask and replaced with ``NaN`` for
         floating-point data or ``-200`` for integer data, and IRIS pixels at the level 2 ceiling,
-        ``irispy.utils.constants.SATURATION_LIMIT``, keep their value and are marked in the mask
+        `irispy.utils.constants.SATURATION_LIMIT`, keep their value and are marked in the mask
         and, if there are any, in ``meta["saturated"]``.
         Hinode/SOT data retain their units and ``NaN`` values with either setting.
         Compressed filenames are decompressed into memory once and cannot be memory-mapped.

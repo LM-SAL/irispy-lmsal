@@ -1,5 +1,5 @@
 """
-This module provides constants used elsewhere.
+Constants of the IRIS instrument and its level 2 data.
 """
 
 import astropy.units as u
@@ -16,11 +16,13 @@ __all__ = [
     "SPECTRAL_BAND",
 ]
 
-# The following value is only appropriate for byte scaled images
+#: The level 2 fill value of samples with no data, in DN; the readers also treat -199 DN, the floor that lower
+#: samples are clipped to, as missing.
 BAD_PIXEL_VALUE_SCALED = -200
 # Both Level 2 fill values represent missing samples; -199 is an IRIS SolarSoft convention.
 BAD_PIXEL_VALUES_SCALED = (BAD_PIXEL_VALUE_SCALED, -199)
-# The following value is only appropriate for unscaled images
+#: The raw integer of the -200 DN fill value in IRIS level 2 files, and so in the raw IRIS integers the readers give
+#: with ``memmap=True``.
 BAD_PIXEL_VALUE_UNSCALED = -32768
 # Camera gain (electrons per DN), yield (electrons per photon) and read noise (DN) by spectrograph detector and
 # slit-jaw passband: De Pontieu et al. (2014) Sect. 7.1. The photons per DN, 4 (FUV) and 18 (NUV) for the spectrograph
@@ -28,6 +30,9 @@ BAD_PIXEL_VALUE_UNSCALED = -32768
 # the response files (DN2PHOT_SG and DN2PHOT_SJI).
 DETECTOR_GAIN = {"NUV": 18.0, "FUV": 6.0, "SJI_1330": 18.0, "SJI_1400": 18.0, "SJI_2796": 18.0, "SJI_2832": 18.0}
 DETECTOR_YIELD = {"NUV": 1.0, "FUV": 1.5, "SJI_1330": 1.5, "SJI_1400": 1.5, "SJI_2796": 1.0, "SJI_2832": 1.0}
+#: The DN unit of each spectrograph detector and slit-jaw passband, which converts to photons, and the
+#: ``"*_UNSCALED"`` units of the raw IRIS integers the readers give with ``memmap=True``, which convert to no other
+#: unit.
 DN_UNIT = {
     band: u.def_unit(f"DN_IRIS_{band}", DETECTOR_GAIN[band] / DETECTOR_YIELD[band] * u.photon) for band in DETECTOR_GAIN
 } | {
@@ -35,6 +40,7 @@ DN_UNIT = {
     band: u.def_unit(f"DN_IRIS_{band}")
     for band in ("SJI_UNSCALED", "NUV_UNSCALED", "FUV_UNSCALED")
 }
+#: The readout noise of each spectrograph detector and slit-jaw passband, in its DN unit.
 READOUT_NOISE = {band: (3.1 if band == "FUV" else 1.2) * DN_UNIT[band] for band in DETECTOR_GAIN}
 # The level 2 clipping ceiling, not a detector saturation level. Level 2 data are int16 with BSCALE 0.25 and BZERO
 # 7992, clipped to -199 to 16182 DN, the top code 32760 (irisl12_savesjidata.pro lines 545-552,
@@ -59,13 +65,18 @@ READOUT_NOISE = {band: (3.1 if band == "FUV" else 1.2) * DN_UNIT[band] for band 
 # Files: https://sohoftp.nascom.nasa.gov/solarsoft/iris/idl/lmsal/calibration/ (iris_prep.pro, infterpolate.pro,
 # inf_poly_2d.pro, iris_prep_geowave_correct.pro) and https://sohoftp.nascom.nasa.gov/solarsoft/iris/idl/uio/level1to2/
 # (irisl12_savesjidata.pro, irisl12_savespectraldata.pro, irisl12_changelog.rtf).
+#: The level 2 ceiling, to which every sample above it, saturated or merely bright, is clipped.
 SATURATION_LIMIT = 16182 * u.DN
+#: The unit of radiometrically calibrated spectra, and of slit-jaw images calibrated without ``line``.
 RADIANCE_UNIT = u.erg / u.cm**2 / u.s / u.steradian / u.Angstrom
 RADIANCE_UNIT_PER_HZ = u.erg / u.cm**2 / u.s / u.steradian / u.Hz
+# De Pontieu et al. (2014) Table 1.
+#: The width of the spectrograph slit.
 SLIT_WIDTH = 0.33 * u.arcsec
 # Spectral resolution (FWHM) of the spectrograph by passband: De Pontieu et al. (2014) Table 1.
 # Their Sect. 7.3.3 measures 25.85 mA (FUV1) and 50.54 mA (NUV) on solar lines, upper bounds that include the
 # solar width; the 31.8 mA often used for FUV2 is a pre-launch laboratory value (Tian et al. 2014, Text S5).
+#: The spectral resolution (FWHM) of each spectrograph passband.
 INSTRUMENTAL_FWHM = {"FUV1": 26 * u.mAA, "FUV2": 26 * u.mAA, "NUV": 53 * u.mAA}
 # Vacuum wavelength limits of the spectrograph passbands: De Pontieu et al. (2014) Table 2.
 PASSBAND_LIMITS = {"FUV1": [1331.7, 1358.4] * u.AA, "FUV2": [1389.0, 1407.0] * u.AA, "NUV": [2782.7, 2835.1] * u.AA}
@@ -85,6 +96,7 @@ ATOMIC_MASS = {
     "Fe": 55.845 * u.u,
     "Ni": 58.693 * u.u,
 }
+#: The detector, ``"FUV"`` or ``"NUV"``, of each spectral window name.
 SPECTRAL_BAND = {
     "1330": "FUV",
     "1336": "FUV",

@@ -617,7 +617,7 @@ def non_thermal_velocity(
         The rest wavelength :math:`\lambda` of the line.
     instrumental_fwhm : `~astropy.units.Quantity`, optional
         The instrumental width. Defaults to the spectral resolution of the passband of ``rest_wavelength``
-        in ``irispy.utils.constants.INSTRUMENTAL_FWHM``, 26 mÅ in the FUV and 53 mÅ in the NUV
+        in `irispy.utils.constants.INSTRUMENTAL_FWHM`, 26 mÅ in the FUV and 53 mÅ in the NUV
         :cite:p:`depontieu2014`.
     thermal_fwhm : `~astropy.units.Quantity`, optional
         The thermal width. Defaults to the width above for the mass of ``ion`` and ``temperature``.

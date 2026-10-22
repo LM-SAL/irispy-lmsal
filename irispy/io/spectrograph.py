@@ -185,7 +185,7 @@ def read_spectrograph_lvl2(
         in the mask in either mode; with ``memmap=True`` it is a lazy Dask array, computed only for
         the slices that are used.
         With ``memmap=False``, the samples at the level 2 ceiling,
-        ``irispy.utils.constants.SATURATION_LIMIT``, keep their value and are marked in the mask
+        `irispy.utils.constants.SATURATION_LIMIT`, keep their value and are marked in the mask
         and, if there are any, in ``meta["saturated"]``.
     revert_v34 : `bool`, optional.
         Will undo the flipping of the raster step axis made to V34 observations
