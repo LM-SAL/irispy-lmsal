@@ -304,12 +304,16 @@ def read_spectrograph_lvl2(
             exposure_times_nuv = hdulist[-2].data[:, hdulist[-2].header["EXPTIMEN"]] * u.s
             t_obs_nuv = None
             file_wcs = None
+            # The meta of each window copies one dict of the primary header: walking its cards is slow
+            primary = dict(hdulist[0].header.items())
             for i, window_name in enumerate(spectral_windows_req):
                 meta = SGMeta(
-                    hdulist[0].header,
+                    primary,
                     window_name,
                     data_shape=hdulist[window_fits_indices[i]].data.shape,
                 )
+                # As if made from the header itself, which NDMeta keeps as the meta's original_meta
+                meta._original_meta = meta._fits_header = hdulist[0].header
                 for key, (value, comment) in no_data.items():
                     meta.add(key, value, comment, overwrite=True)
                 meta.add("auxiliary times", aux_times[steps], None, 0)

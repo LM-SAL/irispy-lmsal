@@ -40,6 +40,16 @@ def test_each_window_has_the_spectral_axis_of_its_header(sns_sg_file):
                 np.testing.assert_allclose(wavelength.to_value(u.AA), expected, rtol=1e-12)
 
 
+def test_each_window_meta_is_of_the_primary_header(sns_sg_file):
+    with fits.open(sns_sg_file) as hdulist:
+        header = hdulist[0].header
+        for window, (cube,) in read_spectrograph_lvl2(hdulist).items():
+            assert cube.meta.fits_header is header
+            assert cube.meta.original_meta == header  # a read-only view of it, made anew at each access
+            assert {key: cube.meta[key] for key in header} == dict(header.items())
+            assert cube.meta.spectral_window == window
+
+
 def test_read_spectrograph_orders_files_by_date_obs(raster_sg_files):
     ordered = read_spectrograph_lvl2(raster_sg_files, spectral_windows="C II 1336")["C II 1336"]
     unordered = read_spectrograph_lvl2(raster_sg_files[::-1], spectral_windows="C II 1336")["C II 1336"]
