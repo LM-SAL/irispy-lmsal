@@ -29,9 +29,9 @@ from irispy.utils.utils import _boolean_mask, _saturated_samples
 
 __all__ = ["RBAQualityFlag", "calculate_red_blue_asymmetry"]
 
-# Minimum fraction of wing bins that must have finite interpolated values.
-# This is a choice of this module, not a value from the literature: a pixel with fewer
-# finite bins is flagged INCOMPLETE_WINGS.
+# Minimum fraction of each wing, by weight, whose interpolated values must be finite.
+# This is a choice of this module, not a value from the literature: a pixel with less is
+# flagged INCOMPLETE_WINGS.
 _MIN_WING_COVERAGE = 0.8
 # Spatial pixels whose profiles are interpolated at a time: without return_profiles only one
 # chunk of interpolated profiles is held. 1000 is about 1.5 times faster per profile than 20000
@@ -148,7 +148,8 @@ def calculate_red_blue_asymmetry(
         negatives, both measured from the peak of each profile, which is looked for no farther
         than the upper velocity from ``rest_wavelength`` (see Notes).
     dv : `astropy.units.Quantity`, optional
-        Velocity spacing for the interpolated profile.
+        Velocity spacing of the interpolated profile, which is sampled at multiples of ``dv``
+        from the peak of each profile.
     spline_degree : `int`, optional
         Spline degree for `scipy.interpolate.make_interp_spline`.
     min_intensity : `astropy.units.Quantity`, optional
@@ -172,9 +173,8 @@ def calculate_red_blue_asymmetry(
     Raises
     ------
     ValueError
-        If no velocity of the interpolated profile, which is spaced by ``dv``, falls in
-        ``velocity_range``, as when the range is narrower than ``dv``, or if no sample lies
-        within ``velocity_range[1]`` of ``rest_wavelength``, as when the cube does not cover it.
+        If no sample lies within ``velocity_range[1]`` of ``rest_wavelength``, as when the cube
+        does not cover it.
 
     Notes
     -----
@@ -184,7 +184,7 @@ def calculate_red_blue_asymmetry(
     theirs: the profile is interpolated with a spline on a regular velocity grid centered on its
     peak, the asymmetry is the difference of the mean intensities of the two wings over the
     interpolated peak intensity, and the default wing range of 50 to 150 km/s and the requirement
-    that 80% of the wing bins are finite have no source.
+    that 80% of each wing is finite have no source.
 
     The peak sample of a profile is its brightest sample within ``velocity_range[1]`` of
     ``rest_wavelength``. A pixel with no finite sample there is flagged
@@ -194,18 +194,20 @@ def calculate_red_blue_asymmetry(
     missing or past the end of the window, as the profile may still rise there. The peak is the
     vertex of the parabola through the peak sample and the samples on either side, or the peak
     sample when one of those is missing. The spline goes through all the samples of the profile,
-    and ``I_p`` is the maximum of the interpolated profile within ``velocity_range[1]`` of
-    ``rest_wavelength``.
+    and ``I_p`` is the interpolated profile at the peak. ``I_R`` and ``I_B`` are its means over
+    ``velocity_range`` either side of the peak, each of its velocities weighted by how much of the
+    ``dv``-wide band centered on it lies in the range, so that they change little with ``dv`` for
+    a range several ``dv`` wide; use a smaller ``dv`` for a narrower range.
 
-    Pixels with a sample saturated anywhere along the wavelength axis of ``cube``, not only within
-    ``velocity_range`` (see :ref:`irispy-tutorial-saturated-data`), are flagged
-    `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`.
+    Pixels with a saturated sample (see :ref:`irispy-tutorial-saturated-data`) within
+    ``velocity_range[1]`` of ``rest_wavelength``, where the peak is looked for, or within
+    ``velocity_range[1] + dv`` of the peak, are flagged `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`.
     Subtract a background first with `~irispy.utils.spectrograph.subtract_background` if the line
     sits on one.
 
-    For the asymmetry as a function of velocity, as :cite:t:`depontieu2009` and :cite:t:`tian2011`
-    show it, divide the difference of the wings of each interpolated profile, in 20 km/s bands, by
-    its peak:
+    For the asymmetry as a function of velocity, as :cite:t:`tian2011` show it
+    (:cite:t:`depontieu2009` do not divide), divide the difference of the wings of each
+    interpolated profile, in 20 km/s bands, by its value at the peak:
 
     .. code-block:: python
 
@@ -215,14 +217,17 @@ def calculate_red_blue_asymmetry(
         velocity = (
             rba["interpolated_profile"].axis_world_coords(-1)[0].to_value(u.km / u.s)
         )
-        peak = np.nanmax(profiles, axis=-1, keepdims=True)
+        peak = profiles[:, np.isclose(velocity, 0)]
 
 
         def wing(low, high):
-            return np.mean(
-                profiles[:, (velocity >= low) & (velocity <= high)],
-                axis=-1,
-                keepdims=True,
+            # Each velocity weighted by the overlap of the 10 km/s about it with the band
+            overlap = np.clip(
+                np.minimum(velocity + 5, high) - np.maximum(velocity - 5, low), 0, None
+            )
+            inside = overlap > 0
+            return np.average(
+                profiles[:, inside], axis=-1, weights=overlap[inside], keepdims=True
             )
 
 
@@ -270,13 +275,17 @@ def calculate_red_blue_asymmetry(
     velocity = ((wavelengths - rest_wavelength) / rest_wavelength * constants.c).to_value(u.km / u.s)
     velocity_range_kms = tuple(velocity_range.to_value(u.km / u.s))
     low, high = velocity_range_kms
-    interp_extent = high + dv
-    interp_velocity = np.arange(-interp_extent, interp_extent + dv, dv)
-    red_mask = (interp_velocity >= low) & (interp_velocity <= high)
-    blue_mask = (interp_velocity >= -high) & (interp_velocity <= -low)
-    if not (red_mask.any() and blue_mask.any()):
-        msg = f"No velocity of the interpolated profile, spaced by dv={dv} km/s, falls in velocity_range=({low}, {high}) km/s"
-        raise ValueError(msg)
+    # Multiples of dv from the peak, out to at least velocity_range[1] + dv: the grid holds the peak,
+    # which I_p is read at, and its wings are mirror images
+    steps = np.ceil(high / dv) + 1
+    interp_velocity = dv * np.arange(-steps, steps + 1)
+    peak_bin = interp_velocity.size // 2
+    # Each velocity stands for the dv about it, and a wing weights it by the overlap with
+    # velocity_range, so that the wing is the mean over the range whatever dv
+    red_weight = np.clip(
+        np.minimum(interp_velocity + dv / 2, high) - np.maximum(interp_velocity - dv / 2, low), 0, None
+    )
+    blue_weight = red_weight[::-1]
     # The samples the peak is looked for in, so that another line, the end of the window or a
     # spike brighter than the line is not taken for it
     searched = np.flatnonzero(np.abs(velocity) <= high)
@@ -302,7 +311,6 @@ def calculate_red_blue_asymmetry(
         raw_peak = np.nanmax(profiles[:, in_range], axis=-1)
     if min_intensity is not None:
         quality[raw_peak < min_intensity.value] = RBAQualityFlag.LOW_SIGNAL
-    quality[_saturated_samples(cube).any(axis=wavelength_axis).ravel()] = RBAQualityFlag.SATURATED
 
     min_points = spline_degree + 1
     finite = np.isfinite(profiles)
@@ -329,6 +337,18 @@ def calculate_red_blue_asymmetry(
     with np.errstate(divide="ignore", invalid="ignore"):
         offset = 0.5 * (below - above) / (below - 2 * top + above)
     center = velocity[peak_index] + np.nan_to_num(offset * (velocity[around[:, 2]] - velocity[around[:, 0]]) / 2)
+
+    # The samples the peak is looked for in, as a masked saturated peak leaves a fainter one to be
+    # found, and those the wings and I_p are interpolated from, with dv to spare, measured from the
+    # peak sample where a flag leaves the center meaningless. A saturated line elsewhere in the
+    # window, as C II 1334 is for C II 1336, does not flag the pixel.
+    saturated = np.moveaxis(_saturated_samples(cube), wavelength_axis, -1).reshape(profiles.shape)
+    rows = np.flatnonzero(saturated.any(axis=-1))
+    anchor = np.where(todo, center, velocity[peak_index])
+    near = np.abs(velocity - anchor[rows, None]) <= high + dv
+    near[:, in_range] = True
+    quality[rows[(saturated[rows] & near).any(axis=-1)]] = RBAQualityFlag.SATURATED
+    todo &= quality == RBAQualityFlag.OK
 
     def interpolate(x, y):
         return make_interp_spline(x, y, k=spline_degree, axis=-1)(interp_velocity, extrapolate=False)
@@ -393,22 +413,23 @@ def calculate_red_blue_asymmetry(
             interpolated_errors = np.where(interpolated_errors >= 0, interpolated_errors, np.nan)
 
         finite_interpolated = np.isfinite(interpolated)
-        incomplete = ((finite_interpolated & red_mask).sum(axis=-1) < _MIN_WING_COVERAGE * red_mask.sum()) | (
-            (finite_interpolated & blue_mask).sum(axis=-1) < _MIN_WING_COVERAGE * blue_mask.sum()
+        incomplete = ((finite_interpolated * red_weight).sum(axis=-1) < _MIN_WING_COVERAGE * red_weight.sum()) | (
+            (finite_interpolated * blue_weight).sum(axis=-1) < _MIN_WING_COVERAGE * blue_weight.sum()
         )
         quality[(quality == RBAQualityFlag.OK) & incomplete] = RBAQualityFlag.INCOMPLETE_WINGS
         rows = np.flatnonzero(quality == RBAQualityFlag.OK)  # with finite samples in both wings
         profile = interpolated[rows]
-        red_intensity = np.nanmean(profile[:, red_mask], axis=-1)
-        blue_intensity = np.nanmean(profile[:, blue_mask], axis=-1)
-        # The interpolated peak, within velocity_range[1] of rest_wavelength as the peak sample is
-        near_rest = np.abs(center[rows][:, None] + interp_velocity) <= high
-        candidates = np.where(near_rest & np.isfinite(profile), profile, -np.inf)
-        peak_bin = np.argmax(candidates, axis=-1)
-        peak = candidates[np.arange(len(rows)), peak_bin]
+        red_intensity, blue_intensity = (
+            np.nansum(profile * weight, axis=-1) / (np.isfinite(profile) * weight).sum(axis=-1)
+            for weight in (red_weight, blue_weight)
+        )
+        # I_p is the profile at its center, not its maximum, which can be a spike or an overshoot of
+        # the spline across a gap; SolarSoft's sgf_rbp_1lp.pro centers on the spline's maximum and
+        # takes its value
+        peak = profile[:, peak_bin]
         zero = ~np.isfinite(peak) | np.isclose(peak, 0)
         quality[rows[zero]] = RBAQualityFlag.PEAK_IS_ZERO
-        rows, peak, peak_bin = rows[~zero], peak[~zero], peak_bin[~zero]
+        rows, peak = rows[~zero], peak[~zero]
         numerator = (red_intensity - blue_intensity)[~zero]
         red_blue = np.full(len(profiles), np.nan)
         red_blue[rows] = numerator / peak
@@ -416,13 +437,13 @@ def calculate_red_blue_asymmetry(
         if interpolated_errors is not None:
             error = interpolated_errors[rows]
 
-            def wing_error(wing):
-                count = np.isfinite(error[:, wing]).sum(axis=-1)
-                total = np.sqrt(np.nansum(error[:, wing] ** 2, axis=-1))
-                return np.divide(total, count, out=np.full(count.shape, np.nan), where=count > 0)
+            def wing_error(weight):
+                norm = (np.isfinite(error) * weight).sum(axis=-1)
+                total = np.sqrt(np.nansum((error * weight) ** 2, axis=-1))
+                return np.divide(total, norm, out=np.full(norm.shape, np.nan), where=norm > 0)
 
-            numerator_error = np.sqrt(wing_error(red_mask) ** 2 + wing_error(blue_mask) ** 2)
-            peak_error = error[np.arange(len(rows)), peak_bin]
+            numerator_error = np.sqrt(wing_error(red_weight) ** 2 + wing_error(blue_weight) ** 2)
+            peak_error = error[:, peak_bin]
             numerator_is_zero = np.isclose(numerator, 0)
             valid = np.isfinite(numerator_error) & (numerator_is_zero | np.isfinite(peak_error))
             variance = (numerator_error / peak) ** 2

@@ -117,8 +117,8 @@ def test_calculate_red_blue_asymmetry_with_uncertainty():
     assert isinstance(result["red_blue_asymmetry"].uncertainty, StdDevUncertainty)
     numerator = 2
     peak = 10
-    n_wing_bins = int((150 - 50) / 10) + 1
-    wing_error = np.sqrt(np.sum(np.full(n_wing_bins, 0.1) ** 2)) / n_wing_bins
+    weight = np.r_[0.5, np.ones(9), 0.5]  # the bins at 50 and 150 km/s are half in the wing
+    wing_error = 0.1 * np.sqrt(np.sum(weight**2)) / weight.sum()
     expected_propagated_error = np.sqrt((np.sqrt(2) * wing_error / peak) ** 2 + (numerator * 0.1 / peak**2) ** 2)
     assert_quantity_allclose(
         result["red_blue_asymmetry"].uncertainty.array[0, 0] * u.one, expected_propagated_error * u.one
@@ -355,18 +355,6 @@ def test_calculate_red_blue_asymmetry_flags_incomplete_wings():
     assert np.isnan(result["red_blue_asymmetry"].data[0, 0])
 
 
-def test_calculate_red_blue_asymmetry_rejects_wings_without_samples():
-    # The interpolated grid starts at -(150 + 10) km/s, so no sample falls between 50 and 52 km/s
-    velocity = np.arange(-200, 201, 10) * u.km / u.s
-    cube = make_test_spectrogram_cube(
-        _flat_wing_profile(velocity).reshape(1, 1, -1), _wavelengths_from_velocity(velocity)
-    )
-    with pytest.raises(ValueError, match=r"dv=10\.0 km/s.*velocity_range=\(50\.0, 52\.0\) km/s"):
-        calculate_red_blue_asymmetry(
-            cube, rest_wavelength=REST_WAVELENGTH, velocity_range=(50, 52) * u.km / u.s, dv=10 * u.km / u.s
-        )
-
-
 def test_calculate_red_blue_asymmetry_flags_low_signal():
     velocity = np.arange(-200, 201, 10) * u.km / u.s
     wavelengths = _wavelengths_from_velocity(velocity)
@@ -533,34 +521,75 @@ def test_calculate_red_blue_asymmetry_peak_within_velocity_range(v34_sg_file):
     np.testing.assert_allclose(result["red_blue_asymmetry"].data, expected["red_blue_asymmetry"].data, rtol=1e-10)
 
 
-def test_calculate_red_blue_asymmetry_peak_intensity_within_velocity_range(v34_sg_file):
+@pytest.mark.parametrize("velocity_range", [(25, 75), (50, 150)])
+def test_calculate_red_blue_asymmetry_divides_by_profile_at_peak(v34_sg_file, velocity_range):
     """
-    A spike in the interpolated profile beyond velocity_range[1] of rest_wavelength
-    changes neither the peak intensity the asymmetry is divided by nor its error.
+    The asymmetry is the difference of the wings of the interpolated profile, each
+    velocity weighted by the overlap of the 10 km/s about it with the wing, over its
+    value at the peak, not its maximum, which is brighter for a few of these Mg II k
+    profiles at the defaults.
+
+    The profile holds the peak also when velocity_range[1] is not a multiple of dv.
     """
-    cube = read_files(v34_sg_file, uncertainty=True)["Mg II k 2796"][0]
-    spiked = read_files(v34_sg_file, uncertainty=True)["Mg II k 2796"][0]
-    # With a linear spline and dv=25 km/s, the outer bins of each interpolated profile lie 100 km/s
-    # from its peak, 25 km/s past the wings: a spike 18 samples (98 km/s) from the brightest sample
-    # within 75 km/s of rest, away from rest, moves one of them and no wing bin
-    kwargs = {"velocity_range": (25, 75) * u.km / u.s, "dv": 25 * u.km / u.s, "spline_degree": 1}
+    cube = read_files(v34_sg_file)["Mg II k 2796"][0]
+    low, high = velocity_range
+    result = calculate_red_blue_asymmetry(cube, velocity_range=velocity_range * u.km / u.s)
+    profiles = result["interpolated_profile"].data
+    velocity = result["interpolated_profile"].axis_world_coords(-1)[0].to_value(u.km / u.s)
+    np.testing.assert_allclose(velocity, -velocity[::-1], atol=1e-9)
+
+    def wing(low, high):
+        overlap = np.clip(np.minimum(velocity + 5, high) - np.maximum(velocity - 5, low), 0, None)
+        return np.nansum(profiles * overlap, axis=-1) / (np.isfinite(profiles) * overlap).sum(axis=-1)
+
+    peak = profiles[..., np.isclose(velocity, 0)][..., 0]
+    ok = result["quality"].data == RBAQualityFlag.OK
+    assert ok.sum() > ok.size / 2
+    expected = (wing(low, high) - wing(-high, -low)) / peak
+    np.testing.assert_allclose(result["red_blue_asymmetry"].data[ok], expected[ok], rtol=1e-12)
+
+
+@pytest.mark.parametrize(("velocity_range", "atol"), [((52, 58), 0.01), ((50, 150), 0.002)])
+def test_calculate_red_blue_asymmetry_wings_do_not_depend_on_dv(v34_sg_file, velocity_range, atol):
+    """
+    The wings are the means over velocity_range, which change little with dv: on these Mg II k
+    profiles, dv = 10 km/s gives a median asymmetry within atol of a 1 km/s grid, about a
+    quarter of the difference the bins within the range alone gave.
+    """
+    cube = read_files(v34_sg_file)["Mg II k 2796"][0]
+    kwargs = {"velocity_range": velocity_range * u.km / u.s, "return_profiles": False}
+    coarse = calculate_red_blue_asymmetry(cube, **kwargs)
+    fine = calculate_red_blue_asymmetry(cube, dv=1 * u.km / u.s, **kwargs)
+    ok = (coarse["quality"].data == RBAQualityFlag.OK) & (fine["quality"].data == RBAQualityFlag.OK)
+    assert ok.sum() > ok.size / 2
+    difference = coarse["red_blue_asymmetry"].data[ok] - fine["red_blue_asymmetry"].data[ok]
+    assert np.median(np.abs(difference)) < atol
+
+
+def test_calculate_red_blue_asymmetry_flags_saturated_near_peak(v34_sg_file):
+    """
+    A saturated sample flags a pixel within velocity_range[1] of rest_wavelength, where
+    the peak is looked for, or within velocity_range[1] + dv of the peak: one at Mg II h
+    does not flag the Mg II k measurement.
+    """
+    cube = read_files(v34_sg_file)["Mg II k 2796"][0]
     velocity = cube.axis_world_coords("em.wl")[0].to_value(
         u.km / u.s, doppler_rest=cube.meta.rest_wavelength, doppler_convention="optical"
     )
-    searched = np.flatnonzero(np.abs(velocity) <= 75)
-    peak = searched[0] + np.argmax(cube.data[..., searched], axis=-1)
-    spike = peak + np.where(velocity[peak] < 0, -18, 18)
-    np.put_along_axis(spiked.data, spike[..., None], 10 * cube.data.max(), axis=-1)
-    result = calculate_red_blue_asymmetry(cube, **kwargs)
-    with_spike = calculate_red_blue_asymmetry(spiked, **kwargs)
-    profile, spiked_profile = result["interpolated_profile"].data, with_spike["interpolated_profile"].data
-    assert np.all(np.nanmax(spiked_profile, axis=-1) > np.nanmax(profile, axis=-1))
-    assert set(np.unique(with_spike["quality"].data)) == {RBAQualityFlag.OK}
-    for name in ("red_blue_asymmetry", "quality"):
-        np.testing.assert_array_equal(with_spike[name].data, result[name].data, err_msg=name)
-    np.testing.assert_array_equal(
-        with_spike["red_blue_asymmetry"].uncertainty.array, result["red_blue_asymmetry"].uncertainty.array
-    )
+    kwargs = {"velocity_range": (10, 30) * u.km / u.s, "return_profiles": False}
+    saturated = np.zeros(cube.shape, dtype=bool)
+    saturated[0, 10, np.argmin(np.abs(velocity - 766))] = True  # Mg II h
+    saturated[0, 20, np.argmin(np.abs(velocity))] = True  # Mg II k
+    # Pixel 30 peaks at -15.8 km/s, more than 30 + 10 km/s from its last sample within 30 km/s of rest
+    saturated[0, 30, np.flatnonzero(velocity <= 30)[-1]] = True
+    # Pixel 40 peaks at -15.8 km/s: its sample at -32 km/s, beyond the search range, is within 30 + 10 km/s of the peak
+    saturated[0, 40, np.flatnonzero(velocity >= -30)[0] - 1] = True
+    expected = calculate_red_blue_asymmetry(cube, **kwargs)["quality"].data
+    assert np.all(expected[0, [10, 20, 30, 40]] == RBAQualityFlag.OK)
+    expected[0, [20, 30, 40]] = RBAQualityFlag.SATURATED
+    mark_saturated(cube, saturated)
+    quality = calculate_red_blue_asymmetry(cube, **kwargs)["quality"].data
+    np.testing.assert_array_equal(quality, expected)
 
 
 def test_calculate_red_blue_asymmetry_peak_at_edge_of_velocity_range(v34_sg_file):
