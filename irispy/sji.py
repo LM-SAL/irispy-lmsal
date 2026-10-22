@@ -10,7 +10,7 @@ from ndcube.visualization import PlotterDescriptor
 from sunpy.util import MetaDict
 from sunraster import SpectrogramCube
 
-from irispy._wcs import _celestial_frame_from_cube, _ResolveNegativeIndicesMixin
+from irispy._wcs import _celestial_frame_from_cube, _ResolveNegativeIndicesMixin, _wcs_array_axis_physical_types
 from irispy.utils._spectral import check_scaled
 from irispy.visualization import SJIPlotter, _make_map, _sji_cmap_name
 
@@ -104,20 +104,18 @@ class SJICube(_ResolveNegativeIndicesMixin, SpectrogramCube):
             instance_start = self.global_coords.get("Time (UTC)")
             instance_end = None
         else:
-            instance_start = self.wcs.pixel_to_world(0, 0, 0)[-1]
-            instance_end = self.wcs.pixel_to_world(0, 0, self.data.shape[0] - 1)[-1]
+            instance_start, instance_end = self.time[[0, -1]]
         return textwrap.dedent(
             f"""
             SJICube
             -------
             Observatory:           {self.meta.get("TELESCOP", "IRIS")}
             Instrument:            {self.meta.get("INSTRUME")}
-            Bandpass:              {self.meta.get("TWAVE1")}
+            Bandpass:              {self.meta.spectral_window}
             Obs Date:              {instance_start} -- {instance_end}
-            Total Frames in Obs:   {self.meta.get("NBFRAMES")}
             Obs ID:                {self.meta.get("OBSID")}
             Obs Description:       {self.meta.get("OBS_DESC")}
-            Axis Types:            {self.array_axis_physical_types}
+            Axis Types:            {_wcs_array_axis_physical_types(self)}
             Roll:                  {self.meta.get("SAT_ROT")}
             Cube dimensions:       {self.shape}
             """,

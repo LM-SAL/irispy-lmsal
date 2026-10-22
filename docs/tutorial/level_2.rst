@@ -232,12 +232,11 @@ We use the same command to read and load the data from a SJI level 2 file:
     -------
     Observatory:           IRIS
     Instrument:            SJI
-    Bandpass:              1330.0
+    Bandpass:              1330
     Obs Date:              2021-10-01T06:09:25.270 -- 2021-10-01T06:11:37.830
-    Total Frames in Obs:   None
     Obs ID:                3683602040
     Obs Description:       Very large sparse 16-step raster 15x175 16s   Deep x 0.5 Spatial x 2
-    Axis Types:            [('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat', 'time', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:CUSTOM', 'custom:PIXEL', 'custom:PIXEL', 'custom:CUSTOM', 'custom:CUSTOM'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat')]
+    Axis Types:            [('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat', 'time'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat'), ('custom:pos.helioprojective.lon', 'custom:pos.helioprojective.lat')]
     Roll:                  0.000464606
     Cube dimensions:       (20, 548, 555)
     <BLANKLINE>
@@ -450,8 +449,8 @@ Both the raster and slit-jaw cubes can be visualized using the ``plot`` method.
 A cube with a time axis is shown as an animation, and this is its first frame.
 The slider below the image selects the frame by its time.
 
-The default stretch of the colors runs linearly from the minimum to the maximum of the data, and a few hot pixels, in the thousands of DN, make the rest of the image look black.
-Pass ``clip_interval`` to let the stretch of each frame ignore the extremes:
+By default the colors run linearly from the minimum to the maximum of the first frame, and the other frames keep that stretch, so a few bright pixels, such as cosmic-ray hits, can leave the image with little contrast.
+Pass ``clip_interval`` to give each frame its own stretch, which ignores the extremes:
 
 .. plot::
     :include-source:
@@ -464,7 +463,7 @@ Pass ``clip_interval`` to let the stretch of each frame ignore the extremes:
     plt.show()
 
 The colors now run from the 1st to the 99.5th percentile of each frame.
-The same argument works for the raster plot below, in place of ``vmax``.
+The same argument works for the raster plot below.
 
 .. note::
 
@@ -481,7 +480,7 @@ This only applies to the slit-jaw images, as the raster cubes do not have a sing
 
     import matplotlib.pyplot as plt
 
-    raster["Mg II k 2796"].plot(vmax=255)
+    raster["Mg II k 2796"].plot()
 
     plt.show()
 
@@ -491,8 +490,6 @@ Furthermore, the tick and axes labels have been automatically set based on the c
 The raster plot shows the spectrograms of the Mg II k window, one for each position of the slit.
 In a spectrogram the slit runs along the vertical axis, so the vertical axis is the solar Y coordinate, the helioprojective latitude, and the horizontal axis is the wavelength.
 The sliders step through the raster steps and the repeated scans of the raster, which move the slit along solar X.
-We set ``vmax=255`` because a few hot pixels reach 11,700 DN while 99.9% of the samples are below about 100 DN, so the default stretch, from the minimum to the maximum of the data, would show a nearly black image.
-The value is a choice for this data and not a property of the instrument.
 
 To plot a single image, slice the cube down to two dimensions, here the first frame:
 
@@ -501,14 +498,11 @@ To plot a single image, slice the cube down to two dimensions, here the first fr
     :context: close-figs
 
     import matplotlib.pyplot as plt
-    import numpy as np
 
     frame = iris_sji[0]
-    frame.plot(vmax=np.nanpercentile(frame.data, 99.5))
+    frame.plot(clip_interval=(1, 99.5) * u.percent)
 
     plt.show()
-
-A single image has no slider, so we set the upper limit of the stretch to the 99.5th percentile of the frame ourselves.
 
 Slicing a raster down to one dimension gives a single spectrum, here raster step 0 of the first scan at pixel 274 along the slit:
 

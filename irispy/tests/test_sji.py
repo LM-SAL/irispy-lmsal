@@ -51,6 +51,34 @@ def test_world_axis_physical_types_sjicube(request, cube_fixture, n_frames):
     assert cube.array_axis_physical_types == AXIS
 
 
+def test_sjicube_str(sns_sjicube_1330, sot_fg_file):
+    """
+    The summary names the passband, also of a SOT cube, whose TWAVE1 is 0, gives the
+    times of the first and last frames of a slice along them, and the axis types of the
+    WCS alone.
+    """
+    times = sns_sjicube_1330.time
+    summary = str(sns_sjicube_1330[:, 5])
+    assert "Bandpass:              1330\n" in summary
+    assert f"Obs Date:              {times[0]} -- {times[-1]}\n" in summary
+    assert "Total Frames" not in summary
+    assert f"Axis Types:            {[AXIS[0][:3], AXIS[2]]}\n" in summary
+    assert "Bandpass:              G band 4305\n" in str(read_files(sot_fg_file))
+
+
+def test_sji_frame_plot_clip_interval(sns_sjicube_1400):
+    """
+    ``clip_interval`` sets the stretch of a single frame, as of each frame of an
+    animation.
+    """
+    frame = sns_sjicube_1400[0]
+    ax = frame.plot(clip_interval=(1, 99.5) * u.percent)
+    np.testing.assert_allclose(ax.images[0].get_clim(), np.percentile(frame.data[~frame.mask], [1, 99.5]))
+    plt.close("all")
+    with pytest.raises(ValueError, match="A range of 2 values"):
+        frame.plot(clip_interval=(1, 50, 99.5) * u.percent)
+
+
 def test_to_maps_are_sji_maps_with_the_frame_metadata(sns_sjicube_1330):
     # Maps were built from the WCS alone: GenericMap, no unit, the file-level EXPTIME in every frame
     exposure_times = sns_sjicube_1330.axis_world_coords(wcs=sns_sjicube_1330.extra_coords["exposure time"])[0]

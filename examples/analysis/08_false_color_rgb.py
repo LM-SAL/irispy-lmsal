@@ -68,8 +68,8 @@ plot_rgb(
 )
 
 ###############################################################################
-# For a sit-and-stare, you can use ``coordinates="time"`` to plot time along
-# the horizontal axis.
+# A sit-and-stare is plotted with time along the horizontal axis, as the slit
+# stays in place; ``coordinates="helioprojective"`` would plot its longitude.
 #
 # This sit-and-stare is from the observation used in
 # :ref:`sphx_glr_generated_gallery_analysis_05_red_blue_asymmetry.py`.
@@ -82,6 +82,6 @@ sns_filename = pooch.retrieve(
 )
 sit_and_stare = read_files(sns_filename, spectral_windows="Si IV 1403")["Si IV 1403"][0]
 
-plot_rgb(sit_and_stare, coordinates="time")
+plot_rgb(sit_and_stare)
 
 plt.show()

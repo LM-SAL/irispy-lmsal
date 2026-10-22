@@ -1,5 +1,6 @@
 import copy
 
+import matplotlib.dates
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -11,6 +12,7 @@ from irispy.io.utils import read_files
 from irispy.tests.helpers import figure_test, make_test_spectrogram_cube
 from irispy.utils.constants import DN_UNIT
 from irispy.utils.rgb import calculate_rgb, plot_rgb
+from irispy.visualization import LON_AXIS_LABEL
 
 colorsynth = pytest.importorskip("colorsynth")
 
@@ -241,6 +243,15 @@ def test_plot_rgb_against_time(si_iv_cube):
     plot_rgb(si_iv_cube, ax=ax, coordinates="time")
     assert "Time" in ax.get_xlabel()
     plt.close(fig)
+
+
+def test_plot_rgb_defaults_to_time_for_a_sit_and_stare(si_iv_cube, raster_sg_file):
+    ax = plot_rgb(si_iv_cube)
+    assert ax.get_xlabel() == "Time [UTC]"
+    assert isinstance(ax.xaxis.get_major_formatter(), matplotlib.dates.ConciseDateFormatter)
+    ax = plot_rgb(read_files(raster_sg_file)["Si IV 1403"][0])
+    assert ax.get_xlabel() == LON_AXIS_LABEL
+    plt.close("all")
 
 
 def test_plot_rgb_rejects_an_unknown_coordinate_choice(si_iv_cube):

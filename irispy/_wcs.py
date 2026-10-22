@@ -4,7 +4,19 @@ from astropy.utils.shapes import simplify_basic_index
 from astropy.wcs import WCS
 from astropy.wcs.utils import wcs_to_celestial_frame
 
+from ndcube.utils.wcs import pixel_axis_to_physical_types
 from sunpy.coordinates.frames import Helioprojective
+
+
+def _wcs_array_axis_physical_types(cube):
+    """
+    `~ndcube.NDCube.array_axis_physical_types` from the main WCS alone.
+
+    The combined WCS, with the extra coordinates, raises on a length-1 step axis
+    (ndcube: mismatched pixel bounds), such as ``cube[0:1]`` or a one-exposure file.
+    """
+    wcs = cube.wcs.low_level_wcs
+    return [tuple(pixel_axis_to_physical_types(axis, wcs).tolist()) for axis in reversed(range(wcs.pixel_n_dim))]
 
 
 def _celestial_frame_from_cube(cube):
