@@ -70,10 +70,12 @@ ny, nx = (n // 2 * 2 for n in si_iv_1403.data.shape[:2])
 si_iv_1403 = si_iv_1403[:ny, :nx].rebin((2, 2, 1), propagate_uncertainties=True)
 
 ###############################################################################
-# We keep the wavelengths halfway to the O IV lines on either side of Si IV,
-# from the line catalog.
+# We keep the wavelengths halfway to the O IV lines on either side of Si IV, from the
+# line catalog. ``meta.rest_wavelength`` holds the catalog wavelength of Si IV.
 
-blue, si_iv_core, red = get_lines([1401, 1405] * u.AA, main_only=True)["wavelength"][:3]
+si_iv_core = si_iv_1403.meta.rest_wavelength
+lines = get_lines([1401, 1405] * u.AA, main_only=True)
+blue, red = lines["wavelength"][lines["ion"] == "O IV"]
 lower_corner = [SpectralCoord((blue + si_iv_core) / 2), None]
 upper_corner = [SpectralCoord((si_iv_core + red) / 2), None]
 si_iv_1403 = si_iv_1403.crop(lower_corner, upper_corner)

@@ -3,7 +3,8 @@
 Fix the dust pixels in slit-jaw images
 ======================================
 
-Dust on the slit-jaw detectors darkens the same pixels in every image.
+Dust on the slit-jaw detectors darkens the same detector pixels in every image, which
+the IRIS pipeline sets to zero.
 This example removes them and shows the difference.
 """
 
@@ -29,10 +30,9 @@ sji_2832 = read_files(sample.SJI_2832)
 clean_2832 = remove_dust(sji_2832)
 
 ###############################################################################
-# To only mask the dust pixels and keep their values, turn off both replacements,
-# and `~irispy.utils.dust.calculate_dust_mask` gives the mask itself.
+# To only mask the dust pixels and keep their values, use
+# ``sji_2832.mask | calculate_dust_mask(sji_2832)`` as the cube's mask.
 
-masked_2832 = remove_dust(sji_2832, temporal_window=0, fallback=None)
 dust_mask = calculate_dust_mask(sji_2832)
 print(f"{dust_mask[0].sum()} dust pixels in the first image")
 

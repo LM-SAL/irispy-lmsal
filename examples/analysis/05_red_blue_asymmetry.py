@@ -101,13 +101,13 @@ fig = plt.figure(figsize=(14, 5))
 axes = [fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)]
 
 ax = axes[0]
-rba_map = np.where(quality.data == int(RBAQualityFlag.OK), asymmetry.data, np.nan)
+# The map is NaN and masked wherever the quality is not OK.
 # Color scale: 98th percentile of absolute RBA, floored so subtle features remain visible.
-vmax = max(np.nanpercentile(np.abs(rba_map), 98), 0.15)
+vmax = max(np.nanpercentile(np.abs(asymmetry.data), 98), 0.15)
 latitude = asymmetry[0].axis_world_coords()[0].Ty.to_value(u.arcsec)
 minutes = (asymmetry.time - asymmetry.time[0]).to_value(u.min)
 im = ax.imshow(
-    rba_map,
+    asymmetry.data,
     cmap="RdBu_r",
     origin="lower",
     aspect="auto",
@@ -129,7 +129,9 @@ fig.colorbar(im, ax=ax, shrink=0.8, label="Red-Blue Asymmetry")
 
 # This plot will be the raw profile for the selected pixel.
 # The wing windows are measured from the peak of the line, not from its rest wavelength.
-# The peak is the brightest sample no farther from the rest wavelength than the upper velocity.
+# The peak is the vertex of the parabola through the brightest sample within the upper
+# velocity of the rest wavelength and the samples on either side of it; we mark that
+# brightest sample and draw the wings from it.
 ax = axes[1]
 v_low = velocity_range[0].to_value(u.km / u.s)
 v_high = velocity_range[1].to_value(u.km / u.s)
@@ -138,7 +140,7 @@ ax.plot(velocities.value[finite], profile[finite], color="black", marker="o", ma
 searched = finite & (np.abs(velocities.value) <= v_high)
 v_peak = velocities.value[searched][np.argmax(profile[searched])]
 ax.axvline(0, color="gray", linestyle="dashed", label="Rest wavelength")
-ax.axvline(v_peak, color="gray", linestyle="dotted", label="Line peak")
+ax.axvline(v_peak, color="gray", linestyle="dotted", label="Brightest sample")
 ax.axvspan(v_peak - v_high, v_peak - v_low, color="C0", alpha=0.1, label="Blue wing")
 ax.axvspan(v_peak + v_low, v_peak + v_high, color="C3", alpha=0.1, label="Red wing")
 ax.legend()

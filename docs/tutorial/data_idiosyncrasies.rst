@@ -108,9 +108,10 @@ Particles on slit-jaw images
 ============================
 
 The slit-jaw CCD contains some particles that cause dark regions of order up to a few arcseconds in size in the slit.
-These features are marked as bad pixels and set to zero values (0) in ``iris_prep.pro`` so they can be easily recognized during data analysis.
-The particles are stable in position and do not let any light through - they are completely dark.
-They are most prominent in the FUV images (1400 Å and 1330 Å) and much less visible in the NUV images (2796 Å and 2830 Å).
+The particles are stable in position.
+``iris_prep`` sets the pixels that the IRIS pipeline lists as bad to zero before it warps the images to the Level 2 grid, so in Level 2 data the dust is zero, or close to it, inside and blends into the measured values at its edges.
+Faint images have zeros elsewhere too, so find the dust with `~irispy.utils.dust.calculate_dust_mask`, not by its value.
+They are most prominent in the FUV images (1400 Å and 1330 Å) and much less visible in the NUV images (2796 Å and 2832 Å).
 
 CCD camera readout noise
 ========================
@@ -171,5 +172,5 @@ Cleaning Up
 -----------
 
 The dust spots described in `Particles on slit-jaw images`_ can be cosmetically corrected in slit-jaw images and movies with `irispy.utils.dust.remove_dust`, which takes their positions from the IRIS pipeline's bad-pixel table and replaces them with values from neighboring frames or, failing that, a local median.
-With ``temporal_window=0`` and ``fallback=None`` it only masks them.
+To mask them and keep their values, use ``cube.mask | calculate_dust_mask(cube)`` as the cube's mask.
 See :ref:`sphx_glr_generated_gallery_calibration_04_remove_dust.py`.

@@ -8,6 +8,10 @@ the IRIS instrument team. These cubes are aligned to the IRIS observation and
 are 50" larger than the IRIS FOV.
 
 They have the same format as IRIS SJI files, so you can read them via ``irispy``.
+
+The SDO tarball of an observation holds AIA cubes only: HMI cutouts come from JSOC through
+`sunpy.net.Fido` with `sunpy.net.jsoc.attrs.Cutout`, and the ``AllSDOMaps.tar.gz`` of the
+full-disk mosaics has an HMI magnetogram mosaic (see :ref:`irispy-tutorial-lev2`).
 """
 
 import matplotlib.pyplot as plt

@@ -70,6 +70,53 @@ A detailed discussion of the radiometric calibration steps for IRIS and how to u
 
 The routine that converts DN to physical units is described in this example :ref:`sphx_glr_generated_gallery_calibration_03_radiometric_calibration.py`; IRIS Technical Note 26 :cite:p:`itn26` describes the calibration process it follows.
 
+Other units
+-----------
+
+`~irispy.utils.spectrograph.radiometric_calibration` gives radiance per unit wavelength.
+``cube.to`` converts the data and the uncertainty to another unit.
+A conversion to radiance per unit frequency, or in photons, depends on the wavelength, so it also needs `astropy.units.spectral_density` of the cube's wavelengths, as in :ref:`sphx_glr_generated_gallery_calibration_03_radiometric_calibration.py`:
+
+.. code-block:: python
+
+   >>> import numpy as np
+   >>> import astropy.units as u
+
+   >>> import irispy.data.sample as sample_data  # doctest: +REMOTE_DATA
+   >>> from irispy.io import read_files
+   >>> from irispy.utils.spectrograph import radiometric_calibration
+
+   >>> raster = read_files(sample_data.RASTER_FITS, spectral_windows="Mg II k 2796", uncertainty=True)  # doctest: +REMOTE_DATA
+   >>> cube = raster["Mg II k 2796"][0]  # doctest: +REMOTE_DATA
+   >>> calibrated = radiometric_calibration(cube)  # doctest: +REMOTE_DATA
+   >>> wavelength = calibrated.axis_world_coords("em.wl")[0]  # doctest: +REMOTE_DATA
+   >>> per_hz = calibrated.to(u.erg / (u.s * u.sr * u.cm**2 * u.Hz), equivalencies=u.spectral_density(wavelength))  # doctest: +REMOTE_DATA
+   >>> per_hz.unit, per_hz.uncertainty.unit  # doctest: +REMOTE_DATA
+   (Unit("erg / (Hz s sr cm2)"), Unit("erg / (Hz s sr cm2)"))
+
+From radiance to DN
+-------------------
+
+To predict the counts of a spectrum, such as one from a model atmosphere, as IDL's ``iris_erg2dn`` does, divide its radiance by `~irispy.utils.spectrograph.calculate_dn_to_radiance_factor`, which gives photons per second, and convert those to DN per second with ``.to(cube.unit / u.s)``, as the DN units are defined in photons (18 per DN in the NUV, 4 in the FUV).
+Multiplied by the exposure times, the DN per second of the calibrated cube give back its DN, and are NaN where the response has no effective area:
+
+.. code-block:: python
+
+   >>> from irispy.utils.response import get_latest_response
+   >>> from irispy.utils.spectrograph import calculate_dn_to_radiance_factor
+
+   >>> factor = calculate_dn_to_radiance_factor(
+   ...     iris_response=get_latest_response(cube.meta.date_reference),
+   ...     wavelength=wavelength,
+   ...     detector_type=cube.meta.detector_band,
+   ...     spectral_dispersion_per_pixel=cube.spectral_dispersion,
+   ...     solid_angle=cube.solid_angle,
+   ... )  # doctest: +REMOTE_DATA
+   >>> dn_per_second = (calibrated.data * calibrated.unit / factor).to(cube.unit / u.s)  # doctest: +REMOTE_DATA
+   >>> dn = dn_per_second * cube.exposure_time[:, np.newaxis, np.newaxis]  # doctest: +REMOTE_DATA
+   >>> dn.unit, bool(np.nanmax(np.abs(dn.value - cube.data)) < 1e-3)  # doctest: +REMOTE_DATA
+   (Unit("DN_IRIS_NUV"), True)
+
 Slit-jaw images
 ---------------
 
