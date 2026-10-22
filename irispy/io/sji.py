@@ -15,7 +15,7 @@ from sunpy.util import MetaDict
 
 from irispy._interpolation import _time_lookup
 from irispy.io._level2 import _check_level2
-from irispy.io._mask import _check_scaled, _fill_mask_values, _memmap_fill_mask
+from irispy.io._mask import _check_scaled, _fill_mask_values, _is_scaled, _memmap_fill_mask
 from irispy.meta import SJIMeta
 from irispy.sji import AIACube, SJICube, SOTCube
 from irispy.utils import calculate_uncertainty
@@ -228,7 +228,8 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
         If `True` (not the default), will not load arrays into memory, and will only read from
         the file into memory when needed. This option is faster and uses a
         lot less memory. However, because FITS scaling is not done on-the-fly,
-        the data units will be unscaled, not the usual data numbers (DN).
+        IRIS data are the raw integers of the file, in ``DN_IRIS_SJI_UNSCALED``, not the usual
+        data numbers (DN); AIA data are stored in DN and keep that unit.
         When ``memmap=True``, missing pixels retain their original values and are marked in a
         lazy Dask mask, computed only for the slices that are used.
         With ``memmap=False``, missing pixels are marked in the mask and replaced with ``NaN`` for
@@ -320,11 +321,14 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
         data_nan_masked = hdulist[0].data
         out_uncertainty = None
         saturated = None
+        scaled = _is_scaled(hdulist[0].header)
+        # The passband, e.g. SJI_1400, sets the photons per DN; only the four main passbands have one
+        # published (Wülser et al. 2018, Table 1), so the others, such as SJI_5000W, and AIA cubes stay in DN
+        passband = hdulist[0].header["TDESC1"]
+        unit = DN_UNIT.get(passband, u.DN) if scaled else DN_UNIT["SJI_UNSCALED"]
         # Negative SOT magnetic values are valid measurements; only NaN marks missing pixels.
         if memmap:
             mask = _memmap_fill_mask(data, hdulist[0].header, nan_only=is_sot)
-            scaled = False
-            unit = DN_UNIT["SJI_UNSCALED"]
         else:
             _check_scaled(hdulist[0].header)
             # This is a workaround for the AIA cubes being in int and not float
@@ -334,16 +338,10 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
             if isinstance(filename, fits.HDUList) or not data_nan_masked.flags["W"]:
                 data_nan_masked = data_nan_masked.copy()
             data_nan_masked[mask] = mask_value
-            scaled = True
-            unit = u.DN
             if instrume in ["IRIS", "SJI"]:
                 # Level 2 clips at the ceiling, where iris_prep's +Inf saturation flags were lost
                 saturated = data_nan_masked >= SATURATION_LIMIT.value
                 mask |= saturated
-                # The passband, e.g. SJI_1400, sets the photons per DN; only the four main passbands have one
-                # published (Wülser et al. 2018, Table 1), so the others, such as SJI_5000W, stay in DN
-                passband = hdulist[0].header["TDESC1"]
-                unit = DN_UNIT.get(passband, u.DN)
                 if uncertainty:
                     if passband not in READOUT_NOISE:
                         msg = f"No photons per DN is published for {passband}; read it with uncertainty=False"
@@ -354,7 +352,7 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
         cube_class = SJICube if instrume in ["IRIS", "SJI"] else AIACube
         if is_sot:
             # Hinode/SOT cubes are floats without FITS scaling
-            cube_class, scaled = SOTCube, True
+            cube_class = SOTCube
             bunit = hdulist[0].header.get("BUNIT", "")
             unit = u.Unit(_SOT_BUNIT.get(bunit, bunit), parse_strict="silent")
         meta = SJIMeta(hdulist[0].header)

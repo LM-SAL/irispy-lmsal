@@ -173,9 +173,9 @@ def test_remove_cosmic_rays_astroscrappy_inmask_combined(sns_sjicube_1330, monke
     assert method_kwargs["inmask"] is inmask
 
 
-def test_remove_cosmic_rays_rejects_unscaled_data(sns_sji_1330_file):
+def test_remove_cosmic_rays_rejects_unscaled_data(bursts_sji_1400_file):
     with pytest.raises(ValueError, match="unscaled"):
-        remove_cosmic_rays(read_sji_lvl2(sns_sji_1330_file, memmap=True))
+        remove_cosmic_rays(read_sji_lvl2(bursts_sji_1400_file, memmap=True))
 
 
 @pytest.mark.parametrize("method", ["rsliding", "astroscrappy"])

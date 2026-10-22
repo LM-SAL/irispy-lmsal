@@ -15,7 +15,7 @@ from irispy.io.utils import read_files
 from irispy.sji import SJICube
 from irispy.spectrograph import SpectrogramCube, SpectrogramCubeSequence
 from irispy.tests.helpers import make_test_spectrogram_cube
-from irispy.utils.constants import RADIANCE_UNIT, RADIANCE_UNIT_PER_HZ, SLIT_WIDTH
+from irispy.utils.constants import DN_UNIT, RADIANCE_UNIT, RADIANCE_UNIT_PER_HZ, SLIT_WIDTH
 from irispy.utils.response import get_latest_response
 from irispy.utils.spectrograph import (
     calculate_dn_to_radiance_factor,
@@ -287,7 +287,9 @@ def test_subtract_background_rejects_bad_windows(windows, match):
 
 
 def test_subtract_background_rejects_unscaled_data():
-    cube = make_test_spectrogram_cube(np.ones((1, 1, 5), dtype=np.int16), np.linspace(1333, 1337, 5) * u.AA)
+    cube = make_test_spectrogram_cube(
+        np.ones((1, 1, 5)), np.linspace(1333, 1337, 5) * u.AA, unit=DN_UNIT["FUV_UNSCALED"]
+    )
     with pytest.raises(ValueError, match="unscaled"):
         subtract_background(cube, [1333, 1334] * u.AA)
 

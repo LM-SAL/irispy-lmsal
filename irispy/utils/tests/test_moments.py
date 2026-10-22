@@ -153,7 +153,7 @@ def test_calculate_moments_min_intensity_in_dn(sns_sg_file):
 
 
 def test_calculate_moments_rejects_unscaled_data():
-    cube = make_test_spectrogram_cube(np.ones((1, 1, 3), dtype=np.int16), [500.0, 501.0, 502.0] * u.nm)
+    cube = make_test_spectrogram_cube(np.ones((1, 1, 3)), [500.0, 501.0, 502.0] * u.nm, unit=DN_UNIT["NUV_UNSCALED"])
     with pytest.raises(ValueError, match="unscaled"):
         calculate_moments(cube, velocity_range=None)
 
