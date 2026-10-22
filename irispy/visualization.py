@@ -151,9 +151,14 @@ def _make_map(data, header, unit, mask):
 
 def _sji_cmap_name(meta):
     """
-    The sunpy color table of a slit-jaw or AIA cube's passband, viridis without one.
+    The sunpy color table of a slit-jaw or AIA cube's passband or of a Hinode/SOT cube,
+    viridis without one.
     """
-    # Hinode/SOT cubes have TWAVE1 = 0, and a cube built by hand may have none
+    # Hinode/SOT cubes have TWAVE1 = 0. sunpy's SOTMap plots with hinodesotintensity, but sunpy makes
+    # GenericMaps of the broadband ("SOT") and SP ("SOT-SP") files.
+    if meta.get("INSTRUME", "").startswith("SOT"):
+        return "hinodesotintensity"
+    # A cube built by hand may have no TWAVE1
     twave = meta.get("TWAVE1")
     if not twave:
         return "viridis"
@@ -178,10 +183,10 @@ class _IRISPlotMixin:
 
         If ``cmap`` is falsey, the color table of the data is used: the IRIS passband
         table for slit-jaw images, the sunpy ``sdoaia`` table of the channel for AIA
-        cubes and the IRIS FUV or NUV table for spectrograms, with viridis for
-        Hinode/SOT cubes. For one-dimensional cubes ``cmap`` is dropped entirely, even
-        when given. IRIS axis styling is applied to the result; all other arguments are
-        passed to the parent plotter's ``plot``.
+        cubes, the sunpy ``hinodesotintensity`` table for Hinode/SOT cubes and the IRIS
+        FUV or NUV table for spectrograms. For one-dimensional cubes ``cmap`` is dropped
+        entirely, even when given. IRIS axis styling is applied to the result; all other
+        arguments are passed to the parent plotter's ``plot``.
 
         A 2D map, such as a cut of a scanning raster at one wavelength, a moment map or
         a Hinode/SOT-SP scan, is drawn with its true proportions unless ``aspect`` is

@@ -124,6 +124,16 @@ def test_aia_cube_and_maps_plot_with_the_sdoaia_color_table(aia_1700_file):
     assert aia.to_maps(0).plot().get_cmap().name == "sdoaia1700"
 
 
+@pytest.mark.parametrize("sot_file", ["sot_fg_file", "sot_mg_file", "sot_sp_file"])
+def test_sot_cube_plots_with_the_hinodesotintensity_color_table(sot_file, request):
+    # The cubes plotted in viridis, and the maps of the broadband and SP files in gray
+    sot = read_files(request.getfixturevalue(sot_file))
+    assert sot[0].plot().images[0].get_cmap().name == "hinodesotintensity"
+    plt.close("all")
+    assert sot.to_maps(0).plot().get_cmap().name == "hinodesotintensity"
+    plt.close("all")
+
+
 def test_to_map(sns_sjicube_1330):
     # Basic smoke tests
     output = sns_sjicube_1330.to_maps(0)
