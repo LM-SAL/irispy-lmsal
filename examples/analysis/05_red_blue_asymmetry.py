@@ -67,12 +67,10 @@ red_blue = calculate_red_blue_asymmetry(
     si_iv,
     velocity_range=velocity_range,
     min_intensity=min_intensity,
-    return_profiles=True,
 )
 
 asymmetry = red_blue["red_blue_asymmetry"]
 quality = red_blue["quality"]
-observed_profiles = red_blue["observed_profile"]
 
 ###############################################################################
 # The settings used for the calculation are stored in the ``meta`` of each result,
@@ -81,11 +79,15 @@ observed_profiles = red_blue["observed_profile"]
 print({key: value for key, value in asymmetry.meta.items() if key.startswith("rba_")})
 
 ###############################################################################
-# Now we will select a pixel with a significant blue excess (negative RBA).
+# Now we will select a pixel with a significant blue excess (negative RBA),
+# and convert its wavelengths to Doppler velocities from the rest wavelength.
+# The red-blue asymmetry leaves out negative and masked samples, so we do too.
 
-observed_profile = observed_profiles[selected_pixel_index]
-velocities = observed_profile.axis_world_coords(0)[0].to(u.km / u.s)
-profile = observed_profile.data
+spectrum = si_iv[selected_pixel_index]
+velocities = spectrum.axis_world_coords(0)[0].to(
+    u.km / u.s, doppler_rest=si_iv.meta.rest_wavelength, doppler_convention="optical"
+)
+profile = np.where((spectrum.data < 0) | spectrum.mask, np.nan, spectrum.data)
 
 ###############################################################################
 # Now we will plot the RBA map and the raw profile in velocity space for the
