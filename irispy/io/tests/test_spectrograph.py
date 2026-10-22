@@ -24,6 +24,22 @@ def test_spectral_windows_order_read_spectrograph_lvl2(sns_sg_file):
         np.testing.assert_array_equal(subset[key][0].data, all_windows[key][0].data)
 
 
+def test_each_window_has_the_spectral_axis_of_its_header(sns_sg_file):
+    # The windows of a file share one built WCS, each with its own spectral axis; the windows of the
+    # wavelength drift file have CRPIX1 -116, -61 and -243
+    drift = get_test_filepath(
+        "wavelength_drift/iris_l2_20140708_114109_3824262996_raster_t000_r00000_wavelength_drift_test.fits"
+    )
+    for filename in (sns_sg_file, drift):
+        with fits.open(filename) as hdulist:
+            for index, (cube,) in enumerate(read_spectrograph_lvl2(filename).values(), start=1):
+                header = hdulist[index].header
+                assert cube.wcs.pixel_shape == cube.data.shape[::-1]
+                expected = header["CRVAL1"] + header["CDELT1"] * (np.arange(header["NAXIS1"]) + 1 - header["CRPIX1"])
+                (wavelength,) = cube.axis_world_coords_values("em.wl")
+                np.testing.assert_allclose(wavelength.to_value(u.AA), expected, rtol=1e-12)
+
+
 def test_read_spectrograph_orders_files_by_date_obs(raster_sg_files):
     ordered = read_spectrograph_lvl2(raster_sg_files, spectral_windows="C II 1336")["C II 1336"]
     unordered = read_spectrograph_lvl2(raster_sg_files[::-1], spectral_windows="C II 1336")["C II 1336"]
