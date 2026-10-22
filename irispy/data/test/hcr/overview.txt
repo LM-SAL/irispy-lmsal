@@ -1,0 +1,26 @@
+Test data for irispy/net/tests/test_client.py.
+
+They are responses of the Heliophysics Coverage Registry (HCR) at LMSAL to the searches irispy.net.IRISClient
+makes, recorded on 2026-10-22 and stored as the server sent them (JSON in ISO-8859-1):
+
+curl -o hcr_20200303.json 'https://www.lmsal.com/hek/hcr?cmd=search-events3&outputformat=json&instrument=IRIS&hasData=true&limit=5000&startTime=2020-03-03T00:00:00.000&stopTime=2020-03-03T05:00:00.000'
+curl -o hcr_20160108.json 'https://www.lmsal.com/hek/hcr?cmd=search-events3&outputformat=json&instrument=IRIS&hasData=true&limit=5000&startTime=2016-01-08T18:00:00.000&stopTime=2016-01-08T20:00:00.000'
+
+hcr_20200303.json
+-----------------
+
+Three observations and the full-disk mosaic of 2020-03-02, which ends at 00:33:44:
+
+20200303_010044_3640604076  On-disk Filament Tracking (FI), raster, SJI 1330 1400 2796 2832, SDO
+20200303_041957_3882010194  A1: QS throughput monitoring (QS), raster, SJI 1330 1400 2796 2832 and
+                            2796 2832 deconvolved, SDO
+20200303_044800_3605202860  Jets in QS/CH near disk center (QS), raster, SJI 1400 2796 2832, SDO;
+                            it ends at 05:25:07, after the end of the search
+
+hcr_20160108.json
+-----------------
+
+Two observations of AR 12480 with Hinode/SOT data:
+
+20160108_173544_3680100932  raster, SJI 1330 2796 2832, SDO, SOTFG (0 MiB)
+20160108_191211_3680100932  raster, SJI 1330 2796 2832, SDO, SOTFG, SOTSP
