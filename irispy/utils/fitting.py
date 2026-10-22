@@ -594,7 +594,9 @@ def non_thermal_velocity(
     ----------
     fwhm : `~irispy.spectrograph.SpectrogramCube`
         A map of the Gaussian full width at half maximum, such as ``"fwhm_1"`` from a Gaussian
-        fit processed by `maps_from_fit`.
+        fit processed by `maps_from_fit`. The ``"width"`` map of
+        `~irispy.utils.moments.calculate_moments` is a standard deviation, not a full width at half
+        maximum: multiply it by :math:`\sqrt{8 \ln 2} \approx 2.355` first.
     rest_wavelength : `~astropy.units.Quantity`
         The rest wavelength :math:`\lambda` of the line.
     instrumental_fwhm : `~astropy.units.Quantity`, optional

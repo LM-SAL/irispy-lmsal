@@ -30,16 +30,10 @@ def radiometric_calibration(
     line: u.AA = None,
 ) -> SpectrogramCube | SpectrogramCubeSequence | SJICube:
     """
-    Performs radiometric calibration on the input cube or cube sequence.
+    Converts a cube or cube sequence from DN to radiance.
 
-    This takes into consideration also the observation time and uses the latest response.
-
-    The data is also exposure time corrected during the conversion.
-
-    This takes into account the spectral dispersion and solid angle of the pixels
-    based on the WCS, which is different from the IDL code that does not take spectral
-    dispersion into account. If you want the same results as the IDL code, you can multiply
-    the output by the spectral dispersion.
+    The data are divided by their exposure times and converted with the effective areas at the
+    observation time (`~irispy.utils.response.get_latest_response`).
 
     Parameters
     ----------
@@ -54,7 +48,11 @@ def radiometric_calibration(
     Returns
     -------
     `irispy.spectrograph.SpectrogramCube`, `irispy.spectrograph.SpectrogramCubeSequence` or `irispy.sji.SJICube`
-        New cube in new units, with the data type of ``cube``.
+        New cube with the data type and mask of ``cube``, in :math:`erg s^{-1} sr^{-1} cm^{-2} Å^{-1}`,
+        or :math:`erg s^{-1} sr^{-1} cm^{-2}` for a slit-jaw cube with ``line``.
+        Spectra are NaN, but not masked, where the response has no effective area: outside
+        1331-1359 Å and 1388-1408 Å in the FUV and 2782-2835 Å in the NUV, as at the blue end of a
+        full-CCD Si IV 1394 window.
 
     Raises
     ------
@@ -65,21 +63,12 @@ def radiometric_calibration(
 
     Notes
     -----
-    This is designed to do the same as `iris2/iris_calib_spectrum.pro <https://hesperia.gsfc.nasa.gov/ssw/iris/idl/lmsal/iris2/iris_calib_spectrum.pro>`__ IDL code.
-
-    The calibration output has been confirmed to provide the same results as those provided
-    by the SolarSoft IDL routine `IRIS_CALIB <https://hesperia.gsfc.nasa.gov/ssw/iris/idl/nrl/iris_calib.pro>`__.
-    The major difference being that the output here is accounting for the wavelength, which is why the units
-    here are :math:`erg s^{-1} sr^{-1} cm^{-2} Å^{-1}` and not :math:`erg s^{-1} sr^{-1} cm^{-2}`.
-    Notice the extra :math:`Å^{-1}` in the units.
-
-    The response file only defines the effective area within the nominal spectral
-    ranges of each band, while some observations read out wider spectral windows
-    (e.g., a full-CCD Si IV window reaching blueward of ~1389 Å). The upstream IDL
-    code divides by the zero effective area there and silently returns infinities;
-    here those wavelengths are instead set to NaN in the output data. The mask is
-    left untouched (it is copied from the input cube) so nothing is hidden beyond
-    what was already flagged as bad in the level 2 data.
+    For spectra this does what SolarSoft's `iris_calib_spectrum.pro <https://hesperia.gsfc.nasa.gov/ssw/iris/idl/lmsal/iris2/iris_calib_spectrum.pro>`__
+    does, in the same units, but takes the dispersion, plate scale and exposure times from the cube,
+    where it takes fixed values and keywords, and gives NaN where it gives infinities.
+    The NRL routine `iris_calib.pro <https://hesperia.gsfc.nasa.gov/ssw/iris/idl/nrl/iris_calib.pro>`__
+    gives the intensity of a whole line, in :math:`erg s^{-1} sr^{-1} cm^{-2}`: to compare with it, sum the
+    calibrated spectra over the line and multiply by ``abs(cube.spectral_dispersion)``.
     """
     if isinstance(cube, SpectrogramCubeSequence):
         return SpectrogramCubeSequence([radiometric_calibration(c, line=line) for c in cube])
@@ -293,10 +282,7 @@ def subtract_background(cube, windows, *, degree=1):
     `~astropy.nddata.StdDevUncertainty` of independent samples cannot hold. For a constant
     (``degree=0``) fitted to :math:`n` samples of error :math:`\sigma`, it is :math:`\sigma / \sqrt{n}`.
 
-    Saturated samples (see `~irispy.utils.moments.calculate_moments`) are masked, so left out of the
-    fit, and keep their value in spectra with too few samples to fit, so that
-    `~irispy.utils.moments.calculate_moments` still flags a spectrum saturated across its line and its
-    windows.
+    Saturated samples (see :ref:`irispy-tutorial-saturated-data`) are left out of the fit and stay marked.
     """
     check_scaled(cube)
     background = _fit_background(cube, windows, degree)

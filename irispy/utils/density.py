@@ -49,7 +49,10 @@ def density_diagnostic(intensity_numerator, intensity_denominator, density_grid,
         `~ndcube.NDCube` maps of one raster. The uncertainties of `~astropy.nddata.NDData` intensities give the
         density bounds, and their masked pixels give NaN. An intensity without uncertainty counts as exact.
     density_grid : `~astropy.units.Quantity`
-        Densities at which ``theoretical_ratio`` is sampled.
+        Densities at which ``theoretical_ratio`` is sampled. It can be any quantity the ratio depends
+        on, such as the temperature, as in SolarSoft's
+        `iris_te.pro <https://sohoftp.nascom.nasa.gov/solarsoft/iris/idl/sao/util/tian/iris_te.pro>`__;
+        the ``"density"`` results are then values of that quantity.
     theoretical_ratio : array-like or `~astropy.units.Quantity`
         Theoretical ratio of the numerator line to the denominator line at each ``density_grid``, such as one
         computed with `fiasco.Ion.contribution_function`, as in the

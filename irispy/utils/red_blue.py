@@ -161,7 +161,8 @@ def calculate_red_blue_asymmetry(
     Returns
     -------
     `irispy.spectrograph.RasterCollection`
-        Always contains ``"red_blue_asymmetry"`` and ``"quality"`` 2D maps.
+        Always contains ``"red_blue_asymmetry"`` and ``"quality"`` 2D maps. The asymmetry is NaN and
+        masked wherever ``"quality"`` is not `~irispy.utils.red_blue.RBAQualityFlag.OK`.
         When the input cube has uncertainty, the ``"red_blue_asymmetry"`` map carries
         its error as a `~astropy.nddata.StdDevUncertainty`.
         The ``"interpolated_profile"`` 3D cube is added when ``return_profiles=True``;
@@ -196,10 +197,40 @@ def calculate_red_blue_asymmetry(
     and ``I_p`` is the maximum of the interpolated profile within ``velocity_range[1]`` of
     ``rest_wavelength``.
 
-    Pixels with a saturated sample, as the mask and ``cube.meta["saturated"]`` mark the samples the
-    readers find at the level 2 ceiling, are flagged `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`.
+    Pixels with a sample saturated anywhere along the wavelength axis of ``cube``, not only within
+    ``velocity_range`` (see :ref:`irispy-tutorial-saturated-data`), are flagged
+    `~irispy.utils.red_blue.RBAQualityFlag.SATURATED`.
     Subtract a background first with `~irispy.utils.spectrograph.subtract_background` if the line
     sits on one.
+
+    For the asymmetry as a function of velocity, as :cite:t:`depontieu2009` and :cite:t:`tian2011`
+    show it, divide the difference of the wings of each interpolated profile, in 20 km/s bands, by
+    its peak::
+
+        rba = calculate_red_blue_asymmetry(cube, velocity_range=(0, 160) * u.km / u.s)
+        ok = rba["quality"].data == RBAQualityFlag.OK
+        profiles = rba["interpolated_profile"].data[ok]
+        velocity = (
+            rba["interpolated_profile"].axis_world_coords(-1)[0].to_value(u.km / u.s)
+        )
+        peak = np.nanmax(profiles, axis=-1, keepdims=True)
+
+
+        def wing(low, high):
+            return np.mean(
+                profiles[:, (velocity >= low) & (velocity <= high)],
+                axis=-1,
+                keepdims=True,
+            )
+
+
+        rb_v = np.hstack(
+            [(wing(v, v + 20) - wing(-v - 20, -v)) / peak for v in range(0, 150, 10)]
+        )
+
+    ``rb_v`` has a row for each pixel whose ``"quality"`` is OK and a column for each band, centered
+    on ``v + 10`` km/s; a band with a missing velocity is NaN. Calling this function for each band
+    instead takes a peak for each band, within its upper velocity of ``rest_wavelength``.
     """
     check_scaled(cube)
     if min_intensity is not None:

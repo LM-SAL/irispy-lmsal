@@ -110,7 +110,8 @@ def find_bright_spectral_events(
     wavelength bins within ``velocity_range`` from ``rest_wavelength`` reaches ``threshold`` and
     stays below ``median_factor`` times their median, which rejects particle hits. Pixels that
     touch, diagonally included, form one event. For sit-and-stare data the step axis is time,
-    so events also link in time.
+    so events also link in time. Saturated samples (see :ref:`irispy-tutorial-saturated-data`) count
+    at their value, as in IDL; other masked samples are left out.
 
     Parameters
     ----------
@@ -215,7 +216,10 @@ def find_bright_image_events(cube, *, sigma_factor=10, min_pixels=2):
     Find compact bright events in images.
 
     A pixel is part of an event when it is at least ``sigma_factor`` standard deviations above
-    the median of its frame. Pixels that touch within a frame, diagonally included, form one event.
+    the median of its frame. Pixels that touch within a frame, diagonally included, form one event,
+    so an event that lasts several frames is one event in each. To join them in time, label the
+    event pixels again: ``scipy.ndimage.label(labels.data > 0, structure=np.ones((3, 3, 3)))``.
+    Saturated pixels (see :ref:`irispy-tutorial-saturated-data`) count at their value, as in IDL.
 
     Parameters
     ----------

@@ -46,22 +46,27 @@ def _candidates(cube_or_sequence, min_depth):
     with np.errstate(invalid="ignore", divide="ignore"):
         profile = sums / counts
     valid = np.isfinite(profile)
+    # The depth is the dip below the running median of the profile over _ROWS rows
     baseline = np.full(profile.shape, np.nan)
     baseline[valid] = ndimage.median_filter(profile[valid], size=_ROWS, mode="nearest")
     with np.errstate(invalid="ignore", divide="ignore"):
         depth = np.where(baseline > 0, 1 - profile / baseline, np.nan)
     valid = np.isfinite(depth)
+    # The scatter of the depth around a row: the scaled median, over 5 * _ROWS rows, of its absolute
+    # deviation from its running median over _ROWS rows
     scatter = np.full(depth.shape, np.nan)
     deviation = np.abs(depth[valid] - ndimage.median_filter(depth[valid], size=_ROWS, mode="nearest"))
     scatter[valid] = 1.4826 * ndimage.median_filter(deviation, size=5 * _ROWS, mode="nearest")
     peaks, _ = signal.find_peaks(np.nan_to_num(depth), height=min_depth, distance=_ROWS)
     peaks = peaks[(peaks > 0) & (peaks < depth.size - 1)]
     left, depths, right, scatter = depth[peaks - 1], depth[peaks], depth[peaks + 1], scatter[peaks]
-    # A mark darkens the rows either side, stands out from the noise and blocks no more than all the light
+    # A mark darkens the rows either side, one of them by more than 3 times the scatter, stands out
+    # from the noise by 5 times the scatter and blocks no more than all the light, within 3 times it
     keep = (np.fmin(left, right) > 0) & (np.fmax(left, right) > 3 * scatter)
     keep &= (depths >= 5 * scatter) & (depths <= 1 + 3 * scatter)
     left, depths, right, scatter = left[keep], depths[keep], right[keep], scatter[keep]
-    # The vertex of the parabola through the logarithms is the center of the Gaussian through the rows
+    # The vertex of the parabola through the logarithms is the center of the Gaussian through the
+    # deepest row and the rows either side
     logs = np.log([left, depths, right])
     curvature = logs[0] - 2 * logs[1] + logs[2]
     shift = np.divide(logs[0] - logs[2], 2 * curvature, out=np.zeros_like(curvature), where=curvature < 0)
@@ -76,11 +81,10 @@ def find_fiducials(cube, *, min_depth=0.5):
 
     The fiducial marks are two short gaps in the slit, one in each half, that let no light into the
     spectrograph, so they show up as dark rows across the whole spectrum :cite:p:`depontieu2014`.
-    The slit profile is the mean of the data over raster steps and wavelengths, and over the cubes
-    of a sequence, leaving out masked and non-finite values. It is divided by its running median
-    over 21 rows, and the marks are the dips in this ratio. Each dip is placed to a fraction of a
-    pixel at the center of the Gaussian through its deepest row and the rows either side, as the
-    IRIS team measures the marks (:cite:t:`depontieu2014`, Section 7.6.1).
+    The marks are the dips in the slit profile, the mean of the data over raster steps and
+    wavelengths, and over the cubes of a sequence, leaving out masked and non-finite values.
+    Each mark is placed to a fraction of a pixel, as the IRIS team measures the marks
+    (:cite:t:`depontieu2014`, Section 7.6.1).
 
     Parameters
     ----------
@@ -106,14 +110,9 @@ def find_fiducials(cube, *, min_depth=0.5):
 
     Notes
     -----
-    A dip counts as a mark if
-
-    * it blocks at least ``min_depth`` of the light, and at least 5 times the scatter of the
-      ratio around it, the scaled median absolute deviation from its running median over 105 rows;
-    * it blocks no more than all the light, within 3 times that scatter;
-    * the rows on either side are darker than the profile around them, one of them by more than
-      3 times the scatter, since the PSF spreads a mark over more than one row.
-
+    A dip counts as a mark if it blocks at least ``min_depth`` of the light, stands out from the
+    noise of the profile around it, and the rows on either side are darker too, since the PSF
+    spreads a mark over more than one row.
     The marks are 89.7″ apart, so when there are several dips the pair at that distance is taken,
     or else the most significant dip.
 

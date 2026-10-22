@@ -49,8 +49,11 @@ def calculate_wavelength_drift(raster):
     Parameters
     ----------
     raster : `~irispy.spectrograph.RasterCollection`
-        Level 2 spectra. They may be read with ``memmap=True``: only the fit ranges are read,
-        and scaled to DN.
+        Level 2 spectra: the whole collection that `irispy.io.read_files` returns for raster files,
+        not one window; the windows with the reference lines are found in it. They may be read with
+        ``memmap=True``: only the fit ranges are read, and scaled to DN. The spectra are averaged
+        along the whole slit; to leave out rows with flows, such as in a flare, slice the collection
+        along the slit first, such as ``raster[:, :, 300:700]``.
 
     Returns
     -------
@@ -59,8 +62,9 @@ def calculate_wavelength_drift(raster):
         indices. Each line's column (``"Ni I"`` ... ``"Fe II"``) holds its unsmoothed shift in Å,
         NaN if the line is in no window, too faint, has too few pixels, or its fit is rejected.
         ``"NUV"`` and ``"FUV"`` hold the drifts in Å, NaN if their line is in no window or, with a
-        warning, if no more shifts remain than the fit has parameters; adding a drift to its
-        detector's wavelengths corrects them. The drift of a window ``cube`` is the column
+        warning, if no more shifts remain than the fit has parameters. A drift holds both the offset
+        of the wavelength scale and its variation over the orbit; adding it to its detector's
+        wavelengths corrects them. The drift of a window ``cube`` is the column
         ``cube.meta.detector_band``, at the ``raster`` and ``step`` of each row.
 
     Raises

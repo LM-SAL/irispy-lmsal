@@ -71,12 +71,8 @@ def calculate_moments(
     * For :math:`\int I(\lambda) \, d\lambda`, multiply the 0th moment by the wavelength step:
       ``(moments["intensity"] * abs(cube.spectral_dispersion)).to(cube.unit * u.AA)``.
     * Negative, non-finite and masked samples are set to zero and add no uncertainty.
-    * Pixels with a saturated sample within ``velocity_range`` are NaN in every moment map and `True`
-      in ``"saturated"``. Saturated samples are those the mask and ``cube.meta["saturated"]`` both
-      mark: the level 2 readers mark the samples clipped at `irispy.utils.constants.SATURATION_LIMIT`
-      in both, keeping their value, and both survive
-      `~irispy.utils.spectrograph.subtract_background`, exposure time correction and calibration.
-      Other masked samples are left out without saturating the pixel.
+    * Pixels with a saturated sample (see :ref:`irispy-tutorial-saturated-data`) within
+      ``velocity_range`` are NaN in every moment map and `True` in ``"saturated"``.
     * Every map is masked where no sample within ``velocity_range`` is unmasked and not NaN, or
       saturated.
     * Uncertainties are propagated to first order, treating an `~astropy.nddata.UnknownUncertainty`
@@ -222,7 +218,8 @@ def average_window(cube, wavelength_range: u.AA, *, method="mean"):
     Notes
     -----
     * Masked and NaN samples are left out, so a sum over a partly masked window is low. Pixels with
-      no sample left are NaN and masked, as are pixels with a saturated sample (see `calculate_moments`).
+      no sample left are NaN and masked, as are pixels with a saturated sample (see
+      :ref:`irispy-tutorial-saturated-data`).
     * Uncertainties are propagated taking the samples as independent, treating an
       `~astropy.nddata.UnknownUncertainty` as a standard deviation, as in `calculate_moments`.
     * For :math:`\int I(\lambda) \, d\lambda`, multiply a sum by the wavelength step:
