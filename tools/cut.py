@@ -19,7 +19,9 @@ kept values and their neighbors are exactly those of the whole file:
 - The filename table of an AIA cube declares A0 columns, which astropy cannot read, so it
     is dropped, as the SOT fixtures do; irispy does not read it.
 
-Examples, run from the repository root with the whole files in it::
+Examples, run from the repository root with the whole files in it:
+
+.. code-block:: bash
 
     python tools/cut.py iris_l2_20130902_163935_4000255147_SJI_1400_t000.fits \
         bursts/iris_l2_20130902_163935_4000255147_SJI_1400_t000_test.fits --exposures 0,69,227
