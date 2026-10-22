@@ -45,10 +45,8 @@ def test_calculate_rgb_shape_and_range(si_iv_cube):
 
 
 def test_calculate_rgb_metadata_defaults(si_iv_cube):
-    rest_wavelength = si_iv_cube.meta.rest_wavelength
-    lower, upper = ([-100, 100] * u.km / u.s).to(u.AA, equivalencies=u.doppler_optical(rest_wavelength))
     expected, (_, _, expected_colorbar) = calculate_rgb(
-        si_iv_cube, wavelength_min=lower, wavelength_max=upper, rest_wavelength=rest_wavelength
+        si_iv_cube, velocity_range=[-100, 100] * u.km / u.s, rest_wavelength=si_iv_cube.meta.rest_wavelength
     )
     actual, (_, _, colorbar) = calculate_rgb(si_iv_cube)
     np.testing.assert_allclose(actual, expected)
@@ -77,8 +75,7 @@ def test_rgb_defaults_to_the_line_the_cube_covers(raster_sg_file):
     cube = read_files(raster_sg_file)["Mg II k 2796"][0]
     for limits, rest_wavelength in (((2802, 2805), 2803.53 * u.AA), ((2793, 2796.352), 2796.352 * u.AA)):
         crop = cube.crop(*([SpectralCoord(wavelength * u.AA), None] for wavelength in limits))
-        lower, upper = ([-100, 100] * u.km / u.s).to(u.AA, equivalencies=u.doppler_optical(rest_wavelength))
-        expected, _ = calculate_rgb(crop, rest_wavelength=rest_wavelength, wavelength_min=lower, wavelength_max=upper)
+        expected, _ = calculate_rgb(crop, rest_wavelength=rest_wavelength)
         np.testing.assert_allclose(calculate_rgb(crop)[0], expected)
         fig, ax = plt.subplots()
         plot_rgb(crop, ax=ax)
@@ -86,19 +83,29 @@ def test_rgb_defaults_to_the_line_the_cube_covers(raster_sg_file):
         plt.close(fig)
 
 
-def test_calculate_rgb_ignores_wavelengths_outside_the_window(si_iv_cube):
-    (wavelength,) = si_iv_cube.axis_world_coords("em.wl")
-    wavelength = wavelength.to(u.AA)
-    beyond = wavelength.max() + 10 * u.AA
-    rgb, _ = calculate_rgb(si_iv_cube, wavelength_min=beyond, wavelength_max=beyond + 1 * u.AA)
-    assert np.all(rgb == 0)
+@pytest.mark.parametrize("render", [calculate_rgb, plot_rgb])
+def test_rgb_rejects_a_velocity_range_outside_the_window(si_iv_cube, render):
+    """
+    The window ends 630 km/s to the red of Si IV 1402.77, so this range would be black.
+    """
+    with pytest.raises(
+        ValueError, match=r"velocity_range=\[700\. 800\.\] km / s of rest_wavelength=1402\.770 Angstrom; pass"
+    ):
+        render(si_iv_cube, velocity_range=[700, 800] * u.km / u.s)
 
 
-def test_calculate_rgb_rejects_wavelength_limits_without_units(si_iv_cube):
-    with pytest.raises(TypeError, match="wavelength_min"):
-        calculate_rgb(si_iv_cube, wavelength_min=1400)
-    with pytest.raises(u.UnitsError, match="wavelength_max"):
-        calculate_rgb(si_iv_cube, wavelength_max=1 * u.s)
+@pytest.mark.parametrize(
+    ("velocity_range", "error"),
+    [
+        ((-100, 100), TypeError),
+        ([-100, 100] * u.AA, u.UnitsError),
+        ([100, -100] * u.km / u.s, ValueError),
+        (100 * u.km / u.s, ValueError),
+    ],
+)
+def test_calculate_rgb_rejects_an_invalid_velocity_range(si_iv_cube, velocity_range, error):
+    with pytest.raises(error, match="velocity_range"):
+        calculate_rgb(si_iv_cube, velocity_range=velocity_range)
 
 
 def test_calculate_rgb_intensity_limits_in_dn(si_iv_cube):
@@ -190,13 +197,20 @@ def test_plot_rgb_options_update_image_and_colorbar(si_iv_cube, overrides):
     plt.close(fig)
 
 
-def test_plot_rgb_sliced_window_excludes_rest_wavelength(si_iv_cube):
+def test_plot_rgb_whole_window(si_iv_cube):
+    """
+    ``velocity_range=None`` maps the ends of the window, here a slice that ends 3.7 Å
+    short of the rest wavelength.
+    """
     si_iv_cube = si_iv_cube[:, :, :3]
     wavelength = si_iv_cube.spectral_axis.to(u.AA)
     assert si_iv_cube.meta.rest_wavelength > wavelength.max()
-    expected, _ = calculate_rgb(si_iv_cube, wavelength_min=wavelength.min(), wavelength_max=wavelength.max())
+    with pytest.raises(ValueError, match="No wavelength of the window"):
+        calculate_rgb(si_iv_cube)
+    expected, _ = calculate_rgb(si_iv_cube, velocity_range=None)
+    assert np.any(expected > 0)
     fig, ax = plt.subplots()
-    plot_rgb(si_iv_cube, ax=ax)
+    plot_rgb(si_iv_cube, ax=ax, velocity_range=None)
     np.testing.assert_allclose(ax.collections[0].get_array(), expected)
     cax = next(a for a in fig.axes if a.get_ylabel().startswith("Wavelength"))
     np.testing.assert_allclose(cax.get_ylim(), (wavelength.value.min(), wavelength.value.max()))
@@ -225,19 +239,8 @@ def _velocity_axis(fig):
 
 
 def test_plot_rgb_colorbar_velocity_axis(si_iv_cube):
-    rest_wavelength = 1402.77 * u.AA
-    doppler = u.doppler_optical(rest_wavelength)
-    wavelength_min = (-60 * u.km / u.s).to(u.AA, equivalencies=doppler)
-    wavelength_max = (40 * u.km / u.s).to(u.AA, equivalencies=doppler)
-
     fig, ax = plt.subplots()
-    plot_rgb(
-        si_iv_cube,
-        ax=ax,
-        rest_wavelength=rest_wavelength,
-        wavelength_min=wavelength_min,
-        wavelength_max=wavelength_max,
-    )
+    plot_rgb(si_iv_cube, ax=ax, rest_wavelength=1402.77 * u.AA, velocity_range=[-60, 40] * u.km / u.s)
     cax_velocity = _velocity_axis(fig)
     assert cax_velocity is not None
     np.testing.assert_allclose(cax_velocity.get_ylim(), (-60, 40))
@@ -287,13 +290,6 @@ def test_plot_rgb_colorbar_defaults_to_the_metadata_rest_wavelength(si_iv_cube):
     np.testing.assert_allclose(cax_velocity.get_ylim(), (-100, 100))
     plt.close(fig)
 
-    # A single explicit bound wins while the other keeps its metadata default.
-    doppler = u.doppler_optical(si_iv_cube.meta.rest_wavelength)
-    fig, ax = plt.subplots()
-    plot_rgb(si_iv_cube, ax=ax, wavelength_min=(-50 * u.km / u.s).to(u.AA, equivalencies=doppler))
-    np.testing.assert_allclose(_velocity_axis(fig).get_ylim(), (-50, 100))
-    plt.close(fig)
-
 
 def test_plot_rgb_without_a_velocity_axis(si_iv_cube):
     """
@@ -317,11 +313,7 @@ def test_plot_rgb_figure():
     fig, axes = plt.subplots(ncols=2, figsize=(14, 5), layout="constrained")
     plot_rgb(cube, ax=axes[0], vmax=100 * u.DN)
     axes[0].set_title("Default: +/-100 km/s, linear velocity")
-    doppler = u.doppler_optical(1402.77 * u.AA)
-    wavelength_min, wavelength_max = ([-50, 50] * u.km / u.s).to(u.AA, equivalencies=doppler)
-    plot_rgb(
-        cube, ax=axes[1], vmax=100 * u.DN, stretch=np.sqrt, wavelength_min=wavelength_min, wavelength_max=wavelength_max
-    )
+    plot_rgb(cube, ax=axes[1], vmax=100 * u.DN, stretch=np.sqrt, velocity_range=[-50, 50] * u.km / u.s)
     axes[1].set_title("+/-50 km/s, sqrt stretch")
     return fig
 

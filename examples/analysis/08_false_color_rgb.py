@@ -53,19 +53,16 @@ si_iv = read_files(raster_filename, spectral_windows="Si IV 1403")["Si IV 1403"]
 plot_rgb(si_iv)
 
 ###############################################################################
-# If you want to override the range, pass the wavelength limits, here +/-200 km/s.
+# If you want to override the range, pass ``velocity_range``, here +/-200 km/s.
 # ``velocity_norm`` replaces the default linear mapping of the velocity. Here an
 # arcsinh with a 25 km/s scale gives small shifts more of the color range and
 # compresses large ones; the scale is a display choice, not a physical one.
 # A square-root intensity stretch brightens faint signal, and wavelengths
-# outside the limits contribute no color.
+# outside the range contribute no color.
 
-doppler = u.doppler_optical(si_iv.meta.rest_wavelength)
-wavelength_min, wavelength_max = ([-200, 200] * u.km / u.s).to(u.AA, equivalencies=doppler)
 plot_rgb(
     si_iv,
-    wavelength_min=wavelength_min,
-    wavelength_max=wavelength_max,
+    velocity_range=[-200, 200] * u.km / u.s,
     velocity_norm=lambda v: np.arcsinh(v.to_value(u.km / u.s) / 25),
     stretch=np.sqrt,
 )
