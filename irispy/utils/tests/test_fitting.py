@@ -402,6 +402,28 @@ def test_starts_from_model_starts_blended_lines_at_their_own_peaks():
     assert np.all(starts.mean_1.value < starts.mean_2.value)
 
 
+@pytest.mark.parametrize("tied", [False, True])
+def test_starts_from_model_shares_the_peak_of_lines_with_one_center(bursts_si_iv_raster, tied):
+    cube = bursts_si_iv_raster[0]
+    broad = models.Gaussian1D(1 * cube.unit, 1402.77 * u.AA, 0.1 * u.AA)
+    one_line = starts_from_model(models.Const1D(0 * cube.unit) + broad, cube)
+    # A core 0.4 samples from the broad component, or the broad one 3 samples off with its center tied to the core's,
+    # as after a fit with both free.
+    core = models.Gaussian1D(3 * cube.unit, (1402.77 if tied else 1402.775) * u.AA, 0.03 * u.AA)
+    if tied:
+        broad = models.Gaussian1D(1 * cube.unit, (1402.77 + 3 * 0.01272) * u.AA, 0.1 * u.AA)
+    model = models.Const1D(0 * cube.unit) + core + broad
+    if tied:
+        model.mean_2.tied = lambda model: model.mean_1
+    starts = starts_from_model(model, cube)
+    # The peak that the broad component alone starts at, in the ratio of the model's amplitudes.
+    np.testing.assert_allclose(starts.amplitude_1.value, 0.75 * one_line.amplitude_1.value)
+    np.testing.assert_allclose(starts.amplitude_2.value, 0.25 * one_line.amplitude_1.value)
+    np.testing.assert_array_equal(starts.mean_1.value, one_line.mean_1.value)
+    if not tied:
+        np.testing.assert_array_equal(starts.mean_2.value, one_line.mean_1.value)
+
+
 @pytest.mark.parametrize("background", ["constant", "polynomial"])
 def test_starts_from_model_on_level_2_data(background):
     raster = read_spectrograph_lvl2(get_test_filepath(MG_FEATURES_FILE), uncertainty=True)
