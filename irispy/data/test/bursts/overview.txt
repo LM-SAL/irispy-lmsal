@@ -1,5 +1,6 @@
 Test data for irispy/utils/tests/test_bursts.py. The whole level 2 files are in
 https://www.lmsal.com/solarsoft/irisa/data/level2_compressed/2013/09/02/
+The "Made:" commands write the two FITS files byte for byte from them.
 
 iris_l2_20130902_182935_4000005156_raster_t000_r00000_si_iv_test.fits
 ---------------------------------------------------------------------
