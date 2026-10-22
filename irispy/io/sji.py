@@ -230,8 +230,10 @@ def read_sji_lvl2(filename, *, uncertainty=False, memmap=False):
         lot less memory. However, because FITS scaling is not done on-the-fly,
         IRIS data are the raw integers of the file, in ``DN_IRIS_SJI_UNSCALED``, not the usual
         data numbers (DN); AIA data are stored in DN and keep that unit.
-        When ``memmap=True``, missing pixels retain their original values and are marked in a
-        lazy Dask mask, computed only for the slices that are used.
+        When ``memmap=True``, missing pixels (the ``-200`` DN fill value and the ``-199`` DN floor
+        that lower samples are clipped to, the raw integers ``-32768`` and ``-32764`` in IRIS files)
+        retain their original values and are marked in a lazy Dask mask, computed only for the
+        slices that are used.
         With ``memmap=False``, missing pixels are marked in the mask and replaced with ``NaN`` for
         floating-point data or ``-200`` for integer data, and IRIS pixels at the level 2 ceiling,
         ``irispy.utils.constants.SATURATION_LIMIT``, keep their value and are marked in the mask

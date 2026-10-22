@@ -90,7 +90,8 @@ They are clear in the NUV windows but often not visible in the FUV windows: only
 Some FUV windows also show a dark row that is not a mark, about 61 rows (10″) below the lower mark.
 
 `irispy.utils.fiducials.find_fiducials` finds the marks in a spectral window; see :ref:`sphx_glr_generated_gallery_how_to_07_find_fiducials.py`.
-In the observations we checked, the FUV and NUV windows line up to a fraction of a pixel; see :ref:`irspy_known_issues`.
+In the three observations with marks in the FUV windows, the FUV marks are within 0.2 pixels (0.03″) of those in Mg II k, under a tenth of the 0.33″ spatial resolution in the FUV :cite:p:`depontieu2014`.
+If the alignment of the windows matters to your analysis, compare the rows `~irispy.utils.fiducials.find_fiducials` gives for your own observation.
 
 Cosmic rays
 ===========
