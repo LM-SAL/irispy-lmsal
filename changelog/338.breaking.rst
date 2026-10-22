@@ -1,0 +1,1 @@
+``irispy.utils.rgb.calculate_rgb`` now gives NaN for a spectrum with no unmasked, finite sample within ``velocity_range``, such as at the ends of the slit, and ``irispy.utils.rgb.plot_rgb`` leaves it blank; both made it black, like a spectrum without signal.
