@@ -64,38 +64,15 @@ Compressed SJI files are decompressed into memory once, so ``memmap=True`` canno
 
 Loading the scaled and masked data lazily, only when they are used, is tracked in `#14 <https://github.com/LM-SAL/irispy/issues/14>`__.
 
-SJI burst detection and IDL
-===========================
+Disk use of extracted archives
+==============================
 
-The Level 2 readers mask both ``-200`` and ``-199`` as missing data, including in AIA cutouts.
-The ``-199`` convention comes from IRIS SolarSoft, including ``iris_make_fits_level3`` v1.29 and ``iris_raster_browser``.
-The IDL SJI burst reference includes ``-199`` in its statistics, so excluding it can lower the detection threshold slightly.
+`irispy.io.read_files` extracts the raster, SDO and Hinode/SOT tarballs to disk before reading them, each into its own folder in the ``irispy`` cache folder, ``~/.cache/irispy`` unless ``XDG_CACHE_HOME`` is set.
+The extracted files take about twice the space of the archive, and up to three times: a 913 MB raster tarball extracts to 2.0 GB.
+They stay there until you delete them; an archive that is copied, moved or renamed is extracted again into a new folder, and the old folder stays.
 
-Offsets between FUV and NUV windows along the slit
-==================================================
+To use less disk space:
 
-The FUV and NUV spectra are recorded on different detectors, and the Level 2 pipeline shifts the FUV spectra along the slit so that their fiducial marks line up with those of the NUV spectra :cite:p:`wulser2018`.
-The shift is recorded in the ``HISTORY`` of each file as "FUVS Fiducial midpoint Y shift" and "FUVL Fiducial midpoint Y shift".
-We measured how well the windows line up afterwards in ten observations from 2013 to 2026, a small sample rather than a survey of the archive.
-`irispy.utils.fiducials.find_fiducials` gives the row of each fiducial mark in each spectral window, and we compared those rows with the rows in Mg II k.
-The pipeline had shifted the FUV spectra of these observations by 0.7 to 16.7 pixels.
-
-In seven of the ten observations no FUV window shows a mark, so the residual offset cannot be measured from the spectra.
-In the other three the FUV windows are within 0.2 pixels of Mg II k.
-A pixel is 0.16635″ and a positive offset puts the mark at a higher row than in Mg II k:
-
-.. list-table::
-   :header-rows: 1
-
-   * - Observation
-     - Offset (pixels)
-   * - 2014-07-08, OBS 3824262996
-     - C II 1336 −0.08, O I 1356 +0.18, Si IV 1394 −0.10, Si IV 1403 +0.04
-   * - 2015-01-30, OBS 3893010094
-     - C II 1336 −0.17, Si IV 1394 −0.15
-   * - 2021-04-29, OBS 3660259102
-     - C II 1336 +0.03, Si IV 1403 +0.06
-
-That is 0.03″ at most, a tenth of the spatial resolution of 0.33″ in the FUV and 0.4″ in the NUV :cite:p:`depontieu2014`.
-The NUV windows of all ten observations are within 0.3 pixels of Mg II k.
-If the alignment of the windows matters to your analysis, check your own observation the same way.
+* Delete the folders of the archives you no longer read, or the whole cache folder.
+* Pass ``extract_dir`` to extract the archives somewhere else, such as a scratch disk.
+  With ``memmap=False`` (the default) the data are read into memory, so ``extract_dir`` can be a `tempfile.TemporaryDirectory` on a disk with room (``dir=``), deleted with the extracted files at the end of its ``with`` block.
