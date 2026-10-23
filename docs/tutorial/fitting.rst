@@ -179,7 +179,8 @@ The fit may return them in either order, so the narrower one is the core:
 
 We remove the cosmic rays from the cube as well, and `~irispy.utils.fitting.starts_from_model` starts each of its spectra from its own background and peak, keeping the widths, fixed parameters and ties of this fit.
 These spectra are too faint to fit all seven parameters, so we fix the widths at those of the mean spectrum and give both components one center.
-Those widths also hold the spread of Doppler shifts over the region, so they describe the region and not each spectrum:
+Those widths also hold the spread of Doppler shifts over the region, so they describe the region and not each spectrum.
+Both components then start at the peak of each spectrum, shared in the ratio of their amplitudes in this fit:
 
 .. code-block:: python
 
@@ -200,7 +201,7 @@ Those widths also hold the spread of Doppler shifts over the region, so they des
     >>> cube_fit[core].amplitude.shape  # doctest: +REMOTE_DATA
     (16, 60)
 
-Fixing the widths lets almost every fit converge, but it does not make the line brighter: judged as above, most core amplitudes are still within their errors.
+Fixing the widths lets almost every fit converge, but it does not make the line brighter: judged as above, about half of the core amplitudes are still within their errors.
 The fit of the mean spectrum describes the region; to map a line this faint, average neighboring spectra first, as the Si IV gallery example does.
 
 Non-thermal velocities

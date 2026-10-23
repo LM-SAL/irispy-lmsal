@@ -185,7 +185,11 @@ def starts_from_model(model, cube):
     the peak's height, below the background for a line with a negative amplitude. Its width is
     that of ``model``. In a blend, such as the Mg II k2v and k2r peaks, each line searches only
     the samples nearer its own center in ``model`` than any other line's, so the lines start at
-    their own peaks.
+    their own peaks. Lines on the same side of the background whose centers in ``model``, a tied
+    one where its tie puts it, lie within a sample of each other, such as a narrow core and a
+    broad component with one center, search the samples within two widths of any of them and
+    share the peak, less the amplitudes of fixed ones, in the ratio of their amplitudes in
+    ``model``; where that leaves nothing, they keep the amplitudes of ``model``.
 
     Fixed and tied parameters and those of other components keep the values of ``model``, and the
     others are clipped to their bounds. Masked and non-finite samples are left out of the starts.
@@ -205,14 +209,17 @@ def starts_from_model(model, cube):
         raise ValueError(msg)
     wavelength = _wavelength(cube).value
     spectra = _spectra(cube)
-
-    def fitted(name, unit):
-        """
-        The value of parameter ``name`` of ``model`` in ``unit``, which a parameter
-        without units is taken to be in.
-        """
-        parameter = getattr(model, name)
-        return parameter.value if parameter.unit is None else parameter.quantity.to_value(unit)
+    # The values of model in Å and the unit of cube, a tied one where its tie puts it: the fitter evaluates the ties
+    # without units, in those of the wavelengths and data it is given. Like the fitter, convert only a model with
+    # units, as other components, such as a custom model, need not support the conversion.
+    if any(getattr(model, name).unit is not None for name in model.param_names):
+        untied = model.without_units_for_data(x=1 * u.AA, y=1 * cube.unit)
+    else:
+        untied = model.copy()
+    for name in model.param_names:
+        if model.tied[name]:
+            setattr(untied, name, model.tied[name](untied))
+    fitted = dict(zip(model.param_names, untied.parameters, strict=True))
 
     starts = {}
     leaves = [model[index] for index in range(model.n_submodels)] if compound else [model]
@@ -220,9 +227,7 @@ def starts_from_model(model, cube):
         [name + (f"_{index}" if compound else "") for name in leaf.param_names] for index, leaf in enumerate(leaves)
     ]
     lines = (models.Gaussian1D, models.Lorentz1D)
-    centers = [
-        fitted(leaf_names[1], u.AA) for leaf, leaf_names in zip(leaves, names, strict=True) if isinstance(leaf, lines)
-    ]
+    centers = [fitted[leaf_names[1]] for leaf, leaf_names in zip(leaves, names, strict=True) if isinstance(leaf, lines)]
     if outside := [center for center in centers if not wavelength.min() <= center <= wavelength.max()]:
         msg = (
             f"model has lines at {', '.join(f'{center:.2f}' for center in outside)} Å, outside the cube's "
@@ -239,13 +244,13 @@ def starts_from_model(model, cube):
             x = np.append(wavelength, wavelength.mean())
             if isinstance(leaf, models.Linear1D):
                 slope, constant = leaf_names
-                terms = fitted(slope, cube.unit / u.AA) * x
+                terms = fitted[slope] * x
             else:
                 constant, *powers = leaf_names
                 # In the polynomial's own variable, for one with a domain.
                 x = poly_map_domain(x, leaf.domain, leaf.window)
                 terms = sum(
-                    (fitted(term, cube.unit / u.AA**power) * x**power for power, term in enumerate(powers, 1)),
+                    (fitted[term] * x**power for power, term in enumerate(powers, 1)),
                     np.zeros_like(x),
                 )
             constants[constant] = terms[-1]
@@ -255,21 +260,44 @@ def starts_from_model(model, cube):
     for constant, rest in constants.items():
         starts[constant] = (background - rest) * cube.unit
     level = background[..., np.newaxis] + shape  # The started background at each wavelength.
-    for leaf, leaf_names in zip(leaves, names, strict=True):
-        if isinstance(leaf, lines):
-            amplitude, center, width = leaf_names
-            sign = np.sign(getattr(model, amplitude).value) or 1  # Negative for an absorption line.
-            distance = np.abs(wavelength - fitted(center, u.AA))
-            # In a blend, each line searches only the samples nearer its own center than any other's.
-            near = (distance <= 2 * abs(fitted(width, u.AA))) & np.all(
-                [distance <= np.abs(wavelength - other) for other in centers], axis=0
-            )
-            excess = np.where(near & ~np.isnan(spectra), sign * (spectra - level), -np.inf)
-            peak = np.argmax(excess, axis=-1)
-            height = np.take_along_axis(excess, peak[..., np.newaxis], axis=-1)[..., 0]
-            found = height > 0  # Otherwise no sample lies beyond the background on the side of the line.
-            starts[center] = np.where(found, wavelength[peak], fitted(center, u.AA)) * u.AA
-            starts[amplitude] = np.where(found, sign * height, fitted(amplitude, cube.unit)) * cube.unit
+    line_names = [leaf_names for leaf, leaf_names in zip(leaves, names, strict=True) if isinstance(leaf, lines)]
+    amplitudes = [fitted[amplitude] for amplitude, _, _ in line_names]
+    signs = [np.sign(amplitude) or 1 for amplitude in amplitudes]  # Negative for an absorption line.
+    # Lines on the same side of the background with centers within a sample of each other, such as a narrow core
+    # and a broad component of one line, share one peak rather than split the samples at the midpoint of their centers.
+    spacing = np.min(np.abs(np.diff(wavelength)), initial=np.inf)
+    groups = []
+    for index in sorted(range(len(centers)), key=lambda index: (signs[index], centers[index])):
+        # Against the group's lowest center, so that a group spans less than a sample.
+        first = groups[-1][0] if groups else None
+        if first is not None and signs[first] == signs[index] and centers[index] - centers[first] < spacing:
+            groups[-1].append(index)
+        else:
+            groups.append([index])
+    for group in groups:
+        sign = signs[group[0]]
+        distances = [np.abs(wavelength - centers[index]) for index in group]
+        within = [d <= 2 * abs(fitted[line_names[index][2]]) for index, d in zip(group, distances, strict=True)]
+        # In a blend, each line searches only the samples nearer its own center than any other line's.
+        distance = np.min(distances, axis=0)
+        near = np.any(within, axis=0) & np.all(
+            [distance <= np.abs(wavelength - other) for index, other in enumerate(centers) if index not in group],
+            axis=0,
+        )
+        excess = np.where(near & ~np.isnan(spectra), sign * (spectra - level), -np.inf)
+        peak = np.argmax(excess, axis=-1)
+        height = np.take_along_axis(excess, peak[..., np.newaxis], axis=-1)[..., 0]
+        found = height > 0  # Otherwise no sample lies beyond the background on the side of the line.
+        # Fixed amplitudes stay, and the others share what they leave of the peak, so that the starts add up to it.
+        free = [index for index in group if not model.fixed[line_names[index][0]]]
+        left = height - sum(abs(amplitudes[index]) for index in group if index not in free)
+        total = sum(abs(amplitudes[index]) for index in free)
+        for index in group:
+            amplitude, center, _ = line_names[index]
+            starts[center] = np.where(found, wavelength[peak], centers[index]) * u.AA
+            if index in free:
+                share = abs(amplitudes[index]) / total if total else 1 / len(free)
+                starts[amplitude] = np.where(found & (left > 0), sign * left * share, amplitudes[index]) * cube.unit
     values = {}
     for name in model.param_names:
         parameter = getattr(model, name)
