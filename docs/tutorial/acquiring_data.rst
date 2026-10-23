@@ -21,7 +21,7 @@ Importing `irispy.net` adds `~irispy.net.LMSALClient`, which searches the IRIS a
 
     >>> import irispy.net
 
-A search needs a time range, `a.Time <sunpy.net.attrs.Time>`, and finds the observations that overlap it; it also needs ``a.Instrument.iris`` or ``a.Provider("LMSAL")``, and the ``a.iris`` attributes below refine it.
+A search needs a time range, `a.Time <sunpy.net.attrs.Time>`, and ``a.Instrument.iris`` or ``a.Provider("LMSAL")``; it finds the observations that overlap the time range, and the ``a.iris`` attributes below narrow it.
 Here are the active region observations of the morning of 1 October 2021:
 
 .. code-block:: python
@@ -50,12 +50,9 @@ Here are the active region observations of the morning of 1 October 2021:
     <BLANKLINE>
     <BLANKLINE>
 
-Each row is one file of an observation: by default its raster tarball and its slit-jaw files, and with ``a.iris.Product`` only the files of that product.
-Printed, the table shows each file's ``Start Time`` and ``End Time``, the observation's ``OBSID``, ``Target``, ``NOAA AR`` and pointing (``XCen`` and ``YCen``), the file's field of view (``FOV X`` and ``FOV Y``), whether the archive has co-aligned AIA and Hinode/SOT data for the observation (``SDO`` and ``SOT``), the ``Product``, the ``Wavelength`` of a slit-jaw file, the ``Filename`` and the ``Size``.
-The sizes are those the archive gives, in whole MiB.
-
-The other columns are hidden: among them the observation's ``Title``, ``OBS Description`` and ``Planners``, the exposure times, cadences and raster steps, links to quick-look movies and images, and the ``URL`` of each file; `~irispy.net.LMSALClient` lists them all.
-``result["lmsal"].keys()`` lists every column; ``show`` with column names shows those columns, hidden or not, and ``show()`` shows them all:
+Each row is one file: by default the raster tarball and the slit-jaw files of each observation.
+Sizes are the archive's, in whole MiB, and what the archive does not give is masked.
+The printed table shows the main columns; ``result["lmsal"].keys()`` lists them all, and ``show`` shows those it is given, or all with no names:
 
 .. code-block:: python
 
@@ -68,9 +65,6 @@ The other columns are hidden: among them the observation's ``Title``, ``OBS Desc
     iris_l2_20211001_060925_3683602040_SJI_2796_t000.fits.gz      0.500259 6.97792      --    --
     iris_l2_20211001_060925_3683602040_SJI_2832_t000.fits.gz      0.500255 6.97871      --    --
             iris_l2_20211001_060925_3683602040_raster.tar.gz           ——— 27.7355       5    16
-
-``Cadence`` is the time between the images of a slit-jaw file and between the rasters of a raster tarball.
-The table masks what the archive does not give, such as the mean exposure time of a raster tarball or the number of rasters in a slit-jaw file.
 
 The other search attributes are:
 
@@ -87,14 +81,11 @@ The other search attributes are:
     The observations pointed within these solar x and y.
 
 ``a.iris.Product("sdo")``
-    The files to find in place of the raster tarball and the slit-jaw files: ``"raster"``, ``"sji"``, ``"deconvolved"`` (the deconvolved slit-jaw files), ``"sdo"`` (the tarball of AIA cubes co-aligned with the observation) or ``"sot"`` (the Hinode/SOT tarballs).
-    ``a.iris.Product("sdo")`` finds only the AIA tarballs; combine products with ``|``, and ``Fido`` returns one table for each.
+    Other files in place of the raster tarball and the slit-jaw files: ``"raster"``, ``"sji"``, ``"deconvolved"`` (deconvolved slit-jaw files), ``"sdo"`` (co-aligned AIA cubes) or ``"sot"`` (Hinode/SOT tarballs).
+    Combine products with ``|``; ``Fido`` returns one table for each.
 
-``a.Instrument.iris`` gives the results of the IRIS archive and of the Virtual Solar Observatory, which lists the same raster and slit-jaw files and the full-disk mosaics under the same provider, so the VSO answers ``a.Provider("LMSAL")`` too.
-With an ``a.iris`` attribute only the IRIS archive is searched, as the VSO does not know them.
-``result["lmsal"]`` holds the IRIS archive's files; fetch it to download only those into the observation folders.
-The archive answers about six observations a second, so a search of a month takes a minute; a search finds at most 5000 observations.
-``ObsID``, ``Target``, ``XCen`` and ``YCen`` are applied by the archive and make a search faster; ``Description`` is matched afterwards.
+The Virtual Solar Observatory lists the same files under the same instrument and provider, so a search without an ``a.iris`` attribute returns its table too; fetch ``result["lmsal"]`` to download the IRIS archive's files only.
+A search of a month takes about a minute and finds at most 5000 observations; ``ObsID``, ``Target``, ``XCen`` and ``YCen`` make it faster.
 
 For example, the Hinode/SOT and AIA data of the observations made with Hinode near the west limb on 3 March 2020:
 
@@ -165,7 +156,7 @@ If any files failed to download, the `parfive.Results` object lists the URLs tha
     >>> print(files.errors)  # doctest: +REMOTE_DATA
     []
 
-The download can be retried by passing the `parfive.Results` object back to `Fido.fetch <sunpy.net.fido_factory.UnifiedDownloaderFactory.fetch>`, which appends the files it downloads and replaces the ``errors`` with those of the second attempt:
+To retry, pass the `parfive.Results` object back to `Fido.fetch <sunpy.net.fido_factory.UnifiedDownloaderFactory.fetch>`:
 
 .. code-block:: python
 

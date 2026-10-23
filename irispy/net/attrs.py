@@ -2,8 +2,7 @@
 Search attributes for `irispy.net.LMSALClient`, available as ``a.iris`` once
 `irispy.net` is imported.
 
-They refine a search with ``a.Instrument("IRIS")`` or ``a.Provider("LMSAL")``; with them
-only the IRIS archive is searched, as the Virtual Solar Observatory does not know them.
+They narrow a search with ``a.Instrument("IRIS")`` or ``a.Provider("LMSAL")``.
 """
 
 import astropy.units as u
@@ -100,15 +99,11 @@ class Product(SimpleAttr):
     """
     The files to find in place of the raster tarball and slit-jaw files.
 
-    ``"raster"`` is the raster tarball, ``"sji"`` the slit-jaw files, ``"deconvolved"`` the
-    deconvolved slit-jaw files, ``"sdo"`` the tarball of AIA cubes co-aligned with the
-    observation and ``"sot"`` the Hinode/SOT tarballs (SOTFG images and SOTSP maps), where the
-    archive has them. A search with ``Product("sdo")`` finds only the AIA tarballs; combine
-    products with ``|``, such as ``Product("raster") | Product("sdo")``, for more.
-
-    The deconvolved slit-jaw files, ``*_deconvolved.fits.gz``, have ``meta["STATUS"]`` set to
-    ``"Deconvolved"``; `irispy.io.read_files` on a folder that holds both gives two cubes for
-    each band.
+    One of ``"raster"``, ``"sji"``, ``"deconvolved"`` (deconvolved slit-jaw files), ``"sdo"``
+    (co-aligned AIA cubes) or ``"sot"`` (Hinode/SOT tarballs); combine products with ``|``,
+    such as ``Product("raster") | Product("sdo")``.
+    `irispy.io.read_files` on a folder that holds both the slit-jaw and the deconvolved files
+    gives two cubes for each band.
 
     Parameters
     ----------

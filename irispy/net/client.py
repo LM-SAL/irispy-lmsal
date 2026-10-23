@@ -138,51 +138,12 @@ class LMSALClient(BaseClient):
     """
     Searches the IRIS archive at LMSAL for Level 2 data and downloads it.
 
-    Search with `a.Time <sunpy.net.attrs.Time>`, which finds the observations that overlap
-    the time range, and ``a.Instrument("IRIS")`` or ``a.Provider("LMSAL")``; the
-    `irispy.net.attrs` (``a.iris``) ``ObsID``, ``Description``, ``Target``, ``XCen``, ``YCen``
-    and ``Product`` refine the search. ``a.Instrument("IRIS")`` gives the results of the IRIS
-    archive and of the Virtual Solar Observatory, which lists IRIS under the same provider, so
-    the VSO answers ``a.Provider("LMSAL")`` too; with an ``a.iris`` attr only the IRIS archive
-    is searched, as the VSO does not know them. ``result["lmsal"]`` holds the IRIS archive's
-    files.
-    The archive answers about six observations a second, so a search of a month takes a minute.
-
-    Each row of the result is one file: the raster tarball and the slit-jaw files of each
-    observation, or with ``a.iris.Product`` only the files of that product, such as the
-    co-aligned AIA cubes. Full-disk mosaics are not found; they are listed on the
-    `IRIS mosaic page <https://iris.lmsal.com/mosaic.html>`__.
-
-    The table shows each file's ``Start Time`` and ``End Time``, the observation's ``OBSID``,
-    ``Target``, ``NOAA AR`` and pointing (``XCen``, ``YCen``), the file's field of view
-    (``FOV X``, ``FOV Y``), whether the observation has co-aligned AIA or Hinode/SOT data
-    (``SDO``, ``SOT``), the ``Product``, the slit-jaw ``Wavelength``, the ``Filename`` and the
-    ``Size``. Its other columns are hidden: ``result["lmsal"].keys()`` lists every column,
-    ``result["lmsal"].show("Filename", "Cadence")`` shows the columns named and
-    ``result["lmsal"].show()`` all of them. They are:
-
-    - The ``Observation Start``, ``Title``, ``OBS Description`` (such as
-      ``"Large dense 320-step raster"``), ``Science Objectives`` and ``Planners`` of the
-      observation.
-    - Its ``Roll Angle``, ``Duration``, ``Repeats`` (how many times the OBS ran) and
-      ``Total Frames`` (spectrograph exposures); ``Spatial Summing``, ``FUV Spectral Summing``
-      and ``NUV Spectral Summing`` (of the NUV spectra and the slit-jaw images);
-      ``Data Fraction``, the fraction of its data that the archive has, ``Bad Data`` and
-      ``Rotation Tracking``.
-    - The ``Images`` in a slit-jaw file; the ``Rasters`` in the raster tarball, their
-      ``Steps`` and ``Step Size``, and ``Lines``, the lines in the raster's spectral windows.
-    - ``Exposure Time`` (the mean, of slit-jaw files only), ``Min Exposure Time`` and
-      ``Max Exposure Time``; ``Cadence``, the time between images or between rasters, and
-      ``Planned Cadence``; ``Step Cadence``, the time between raster steps.
-    - ``SDO Size``, ``SOTFG Size`` and ``SOTSP Size``, the sizes of the observation's AIA and
-      Hinode/SOT tarballs.
-    - The ``URL`` of the file, the ``Movie URL``, ``Thumbnail URL`` and ``Context URL``
-      (slit-jaw files only) of its quick-look images, and the ``Timeline URL``, an image of
-      the IRIS timeline of the day.
-
-    The table masks what the archive does not give, such as the ``Wavelength`` of a raster
-    tarball, the field of view of the AIA and SOT tarballs or the ``Repeats`` of early
-    observations, so the table of every search that finds files has the same columns.
+    Search with `a.Time <sunpy.net.attrs.Time>` and ``a.Instrument("IRIS")`` or
+    ``a.Provider("LMSAL")``, and narrow the search with the `irispy.net.attrs` (``a.iris``).
+    The results are in ``result["lmsal"]``, one row per file: the raster tarball and the
+    slit-jaw files of each observation, or the files of the products asked for with
+    ``a.iris.Product``. ``result["lmsal"].keys()`` lists its columns, of which
+    ``result["lmsal"].show(...)`` shows the hidden ones.
 
     `Fido.fetch <sunpy.net.fido_factory.UnifiedDownloaderFactory.fetch>` puts the files of each
     observation in a folder named after it, such as ``20211001_060925_3683602040``, which

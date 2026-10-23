@@ -83,4 +83,4 @@ To use less disk space:
 Searching the IRIS archive
 ==========================
 
-Searches of the IRIS archive with `~irispy.net.LMSALClient` that run at the same time can return wrong start and end times, as the archive mixes up dates when it answers several requests at once, so run one search at a time.
+Searches of the IRIS archive run at the same time can return wrong start and end times; run one at a time.
