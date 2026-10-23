@@ -1,8 +1,12 @@
+from typing import NamedTuple
+
 import numpy as np
 import requests
 
 import astropy.units as u
+from astropy.table import MaskedColumn
 from astropy.time import Time
+from astropy.utils.masked import Masked
 
 from sunpy.net import attrs as a
 from sunpy.net.attr import AttrAnd, and_
@@ -41,20 +45,32 @@ class LMSALQueryResponseTable(QueryResponseTable):
     size_column = "Size"
 
 
-def _quantity(value, unit):
+class _Missing(NamedTuple):
+    # What a row holds where the HCR gives nothing: the column's empty value, which the
+    # table masks.
+    empty: object
+
+
+def _get(mapping, key, empty):
+    value = mapping.get(key)
+    return _Missing(empty) if value is None else value
+
+
+def _quantity(mapping, key, unit):
+    value = mapping.get(key)
     # Most of the HCR's numbers are single precision: drop the digits that the conversion to
     # double precision added.
-    return None if value is None else float(f"{value:.7g}") * unit
+    return _Missing(0 * unit) if value is None else float(f"{value:.7g}") * unit
 
 
 def _tarball_size(event, key):
     # The HCR gives sizes in whole MiB, and -1 or nothing when there is no tarball.
-    return _quantity(event.get(f"{key}_compsize_mb"), u.Mibyte) if f"{key}_compurl" in event else None
+    return _quantity(event, f"{key}_compsize_mb", u.Mibyte) if f"{key}_compurl" in event else _Missing(0 * u.Mibyte)
 
 
 def _row(event, product, group, url, size):
     """
-    The table row of one file, with `None` for what the HCR does not give.
+    The table row of one file.
 
     ``group`` is the HCR's entry for the file's product, empty for the AIA and SOT
     tarballs.
@@ -67,53 +83,53 @@ def _row(event, product, group, url, size):
         "End Time": Time(group.get("stop_time") or event["stopTime"]),
         "OBSID": int(event["obsId"]),
         "Target": event["target"],
-        "NOAA AR": int(event["noaaNum"]) if event.get("noaaNum") else None,
+        "NOAA AR": int(event["noaaNum"]) if event.get("noaaNum") else _Missing(0),
         "XCen": round(event["xCen"], 1) * u.arcsec,
         "YCen": round(event["yCen"], 1) * u.arcsec,
-        "FOV X": None if fov[0] is None else round(fov[0], 1) * u.arcsec,
-        "FOV Y": None if fov[1] is None else round(fov[1], 1) * u.arcsec,
+        "FOV X": _Missing(0 * u.arcsec) if fov[0] is None else round(fov[0], 1) * u.arcsec,
+        "FOV Y": _Missing(0 * u.arcsec) if fov[1] is None else round(fov[1], 1) * u.arcsec,
         "SDO": "martinaia_compurl" in event,
         "SOT": "martinsot_compurl" in event or "martinsp_compurl" in event,
         "Product": product,
         # The HCR's spectral_window_names lists the lines in a raster's windows, not the
         # windows, so it does not give the wavelength range of the raster.
-        "Wavelength": _quantity(group.get("wavelnth"), u.AA),
+        "Wavelength": _quantity(group, "wavelnth", u.AA),
         "Filename": url.rsplit("/", 1)[-1],
         # The HCR gives sizes in whole MiB.
         "Size": (np.nan if size is None else size) * u.Mibyte,
         "Observation Start": Time(event["startTime"]),
-        "Title": event.get("obsTitle"),
-        "OBS Description": event.get("goal"),
-        "Science Objectives": event.get("sciObjectives"),
-        "Planners": event.get("planners"),
-        "Roll Angle": _quantity(event.get("roll_angle"), u.deg),
-        "Duration": _quantity(event.get("duration_hours"), u.h),
-        "Repeats": event.get("iris_repeats"),
-        "Total Frames": event.get("iris_totframes"),
-        "Images": group.get("num_images"),
-        "Rasters": group.get("numrasters"),
-        "Steps": group.get("raster_numsteps"),
-        "Step Size": _quantity(group.get("raster_stepsize"), u.arcsec),
-        "Exposure Time": _quantity(group.get("mean_exptime"), u.s),
-        "Min Exposure Time": _quantity(group.get("min_exptime"), u.s),
-        "Max Exposure Time": _quantity(group.get("max_exptime"), u.s),
-        "Cadence": _quantity(group.get("cadence_avg_asrun"), u.s),
-        "Planned Cadence": _quantity(group.get("cadence_avg_planned"), u.s),
-        "Step Cadence": _quantity(group.get("basic_cadence_avg_asrun"), u.s),
-        "Spatial Summing": event.get("spat_sum"),
-        "FUV Spectral Summing": event.get("fuv_spec_sum"),
-        "NUV Spectral Summing": event.get("nuvsji_spec_sum"),
-        "Lines": lines and lines.strip("'"),
-        "Data Fraction": event.get("data_fraction_found"),
-        "Bad Data": event.get("iris_baddata"),
-        "Rotation Tracking": event.get("rotation_tracking"),
+        "Title": _get(event, "obsTitle", ""),
+        "OBS Description": _get(event, "goal", ""),
+        "Science Objectives": _get(event, "sciObjectives", ""),
+        "Planners": _get(event, "planners", ""),
+        "Roll Angle": _quantity(event, "roll_angle", u.deg),
+        "Duration": _quantity(event, "duration_hours", u.h),
+        "Repeats": _get(event, "iris_repeats", 0),
+        "Total Frames": _get(event, "iris_totframes", 0),
+        "Images": _get(group, "num_images", 0),
+        "Rasters": _get(group, "numrasters", 0),
+        "Steps": _get(group, "raster_numsteps", 0),
+        "Step Size": _quantity(group, "raster_stepsize", u.arcsec),
+        "Exposure Time": _quantity(group, "mean_exptime", u.s),
+        "Min Exposure Time": _quantity(group, "min_exptime", u.s),
+        "Max Exposure Time": _quantity(group, "max_exptime", u.s),
+        "Cadence": _quantity(group, "cadence_avg_asrun", u.s),
+        "Planned Cadence": _quantity(group, "cadence_avg_planned", u.s),
+        "Step Cadence": _quantity(group, "basic_cadence_avg_asrun", u.s),
+        "Spatial Summing": _get(event, "spat_sum", 0),
+        "FUV Spectral Summing": _get(event, "fuv_spec_sum", 0),
+        "NUV Spectral Summing": _get(event, "nuvsji_spec_sum", 0),
+        "Lines": lines.strip("'") if lines else _Missing(""),
+        "Data Fraction": _get(event, "data_fraction_found", 0.0),
+        "Bad Data": _get(event, "iris_baddata", empty=False),
+        "Rotation Tracking": _get(event, "rotation_tracking", empty=False),
         "SDO Size": _tarball_size(event, "martinaia"),
         "SOTFG Size": _tarball_size(event, "martinsot"),
         "SOTSP Size": _tarball_size(event, "martinsp"),
-        "Movie URL": group.get("url_mp4"),
-        "Thumbnail URL": group.get("url_thumb"),
-        "Context URL": group.get("url_context"),
-        "Timeline URL": event.get("timeline_gif_url"),
+        "Movie URL": _get(group, "url_mp4", ""),
+        "Thumbnail URL": _get(group, "url_thumb", ""),
+        "Context URL": _get(group, "url_context", ""),
+        "Timeline URL": _get(event, "timeline_gif_url", ""),
         "URL": url,
     }
 
@@ -166,7 +182,7 @@ class LMSALClient(BaseClient):
 
     The table masks what the archive does not give, such as the ``Wavelength`` of a raster
     tarball, the field of view of the AIA and SOT tarballs or the ``Repeats`` of early
-    observations, and leaves out a column that none of the files found has.
+    observations, so the table of every search that finds files has the same columns.
 
     `Fido.fetch <sunpy.net.fido_factory.UnifiedDownloaderFactory.fetch>` puts the files of each
     observation in a folder named after it, such as ``20211001_060925_3683602040``, which
@@ -288,11 +304,21 @@ class LMSALClient(BaseClient):
         # The HCR returns the observations in no fixed order; a file's name starts with the
         # start of its observation.
         rows.sort(key=lambda row: row["Filename"])
-        # Leave out what the HCR does not give, so that the table masks it, and the columns
-        # that no row has.
-        names = [key for key in rows[0] if any(row[key] is not None for row in rows)] if rows else None
-        rows = [{key: value for key, value in row.items() if value is not None} for row in rows]
-        return LMSALQueryResponseTable(rows=rows, names=names, client=self)
+        table = LMSALQueryResponseTable(
+            rows=[
+                {name: value.empty if isinstance(value, _Missing) else value for name, value in row.items()}
+                for row in rows
+            ],
+            client=self,
+        )
+        for name in table.colnames:
+            mask = [isinstance(row[name], _Missing) for row in rows]
+            if any(mask):
+                column = table[name]
+                table[name] = (
+                    Masked(column, mask=mask) if isinstance(column, u.Quantity) else MaskedColumn(column, mask=mask)
+                )
+        return table
 
     def fetch(self, query_results, *, path, downloader, **kwargs):  # NOQA: ARG002
         """

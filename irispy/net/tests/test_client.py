@@ -115,13 +115,14 @@ def test_search(hcr):
     assert sji["Exposure Time"] == 0.500276 * u.s
     assert u.allclose([sji["Cadence"], sji["Planned Cadence"]], [9.28359, 9.284] * u.s)
     assert sji["Context URL"].endswith("_context_1024.gif")
-    # Only the main columns are shown; no observation has a NOAA active region number.
+    # Only the main columns are shown.
     header = str(table).splitlines()[0]
     for name in ["Start Time", "End Time", "OBSID", "XCen", "FOV Y", "SDO", "SOT", "Wavelength", "Filename", "Size"]:
         assert name in header
     for name in ["Title", "Cadence", "Lines", "URL"]:
         assert name not in header
-    assert "NOAA AR" not in table.colnames
+    # No observation has a NOAA active region number.
+    assert table["NOAA AR"].mask.all()
     assert table.show("Filename", "Cadence").colnames == ["Filename", "Cadence"]
     assert u.isclose(table.total_size(), table["Size"].sum(), rtol=1e-3)
 
@@ -190,9 +191,11 @@ def test_search_products(hcr):
     # The tarballs have the observation's times and no field of view or wavelength.
     assert [time.isot for time in sdo["Start Time"]] == ["2016-01-08T17:35:44.000", "2016-01-08T19:12:11.000"]
     assert [time.isot for time in sdo["End Time"]] == ["2016-01-08T18:32:52.000", "2016-01-08T20:02:33.000"]
-    assert not {"FOV X", "FOV Y", "Wavelength", "Images", "Cadence"} & set(sdo.colnames)
+    for name in ["FOV X", "FOV Y", "Wavelength", "Images", "Cadence"]:
+        assert sdo[name].mask.all()
     raster = Fido.search(time, a.Provider("LMSAL"), a.iris.Product("raster"))["lmsal"]
     assert list(raster["Product"]) == ["raster", "raster"]
+    assert sot.colnames == sdo.colnames == raster.colnames
     with pytest.raises(ValueError, match="Product must be one of raster, sji, deconvolved, sdo, sot, not 'aia'"):
         a.iris.Product("aia")
 
