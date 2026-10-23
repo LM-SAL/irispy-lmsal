@@ -11,7 +11,7 @@ from sunpy.util.exceptions import warn_user
 
 from irispy.net import attrs as iris_attrs
 
-__all__ = ["IRISClient"]
+__all__ = ["LMSALClient"]
 
 # The Heliophysics Coverage Registry (HCR) at LMSAL, which the IRIS search page also queries.
 HCR_URL = "https://www.lmsal.com/hek/hcr"
@@ -19,18 +19,21 @@ HCR_URL = "https://www.lmsal.com/hek/hcr"
 HCR_LIMIT = 5000
 
 
-class IRISQueryResponseTable(QueryResponseTable):
+class LMSALQueryResponseTable(QueryResponseTable):
     hide_keys = ("URL",)
     size_column = "Size"
 
 
-class IRISClient(BaseClient):
+class LMSALClient(BaseClient):
     """
     Searches the IRIS archive at LMSAL for Level 2 data and downloads it.
 
     Search with `a.Time <sunpy.net.attrs.Time>`, which finds the observations that overlap
-    the time range, and ``a.Instrument("IRIS")`` or the `irispy.net.attrs` (``a.iris``):
-    ``ObsID``, ``Description``, ``Target``, ``XCen``, ``YCen`` and ``Product``.
+    the time range, and ``a.Instrument("IRIS")``, ``a.Provider("LMSAL")`` or the
+    `irispy.net.attrs` (``a.iris``): ``ObsID``, ``Description``, ``Target``, ``XCen``, ``YCen``
+    and ``Product``. ``a.Instrument("IRIS")`` gives the results of the IRIS archive and of the
+    Virtual Solar Observatory, which lists IRIS under the same provider, so the VSO answers
+    ``a.Provider("LMSAL")`` too; ``result["lmsal"]`` holds the IRIS archive's files.
     The archive answers about six observations a second, so a search of a month takes a minute.
 
     Each row of the result is one file: the raster tarball and the slit-jaw files of each
@@ -46,16 +49,13 @@ class IRISClient(BaseClient):
 
     Examples
     --------
-    An ``a.iris`` attr keeps the search to the IRIS archive; with only ``a.Instrument("IRIS")``
-    the Virtual Solar Observatory is searched too.
-
     >>> from sunpy.net import Fido, attrs as a
     >>> import irispy.net
     >>> result = Fido.search(
     ...     a.Time("2021-10-01 06:00", "2021-10-01 07:00"), a.iris.Target("AR")
     ... )  # doctest: +REMOTE_DATA
     >>> print(
-    ...     result["iris"]["OBSID", "Product", "Filename", "Size"]
+    ...     result["lmsal"]["OBSID", "Product", "Filename", "Size"]
     ... )  # doctest: +REMOTE_DATA
       OBSID    Product                         Filename                          Size
                                                                                 Mibyte
@@ -65,7 +65,7 @@ class IRISClient(BaseClient):
     3683602040     sji iris_l2_20211001_060925_3683602040_SJI_2796_t000.fits.gz    5.0
     3683602040     sji iris_l2_20211001_060925_3683602040_SJI_2832_t000.fits.gz    6.0
     3683602040  raster         iris_l2_20211001_060925_3683602040_raster.tar.gz   83.0
-    >>> files = Fido.fetch(result["iris"])  # doctest: +SKIP
+    >>> files = Fido.fetch(result["lmsal"])  # doctest: +SKIP
     """
 
     @property
@@ -100,6 +100,8 @@ class IRISClient(BaseClient):
             match attr:
                 case a.Instrument() if str(attr.value).upper() == "IRIS":
                     pass
+                case a.Provider() if str(attr.value).upper() == "LMSAL":
+                    pass
                 case a.Time():
                     params["startTime"], params["stopTime"] = attr.start.isot, attr.end.isot
                 case iris_attrs.ObsID():
@@ -116,7 +118,7 @@ class IRISClient(BaseClient):
                 case iris_attrs.Product():
                     products = {attr.value}
                 case _:
-                    msg = f"IRISClient cannot search with {attr!r}"
+                    msg = f"LMSALClient cannot search with {attr!r}"
                     raise ValueError(msg)
         # A search of three months takes about 200 seconds.
         response = requests.get(HCR_URL, params=params, timeout=600)
@@ -171,7 +173,7 @@ class IRISClient(BaseClient):
                     )
         # The HCR returns the observations in no fixed order.
         rows.sort(key=lambda row: (row["Start Time"], row["Filename"]))
-        return IRISQueryResponseTable(rows=rows, client=self)
+        return LMSALQueryResponseTable(rows=rows, client=self)
 
     def fetch(self, query_results, *, path, downloader, **kwargs):  # NOQA: ARG002
         """
@@ -190,6 +192,7 @@ class IRISClient(BaseClient):
     def _can_handle_query(cls, *query):
         optional = {
             a.Instrument,
+            a.Provider,
             iris_attrs.ObsID,
             iris_attrs.Description,
             iris_attrs.Target,
@@ -202,6 +205,7 @@ class IRISClient(BaseClient):
             cls.check_attr_types_in_query(query, {a.Time}, optional)
             and any(not isinstance(q, a.Time) for q in query)
             and all(str(q.value).upper() == "IRIS" for q in query if isinstance(q, a.Instrument))
+            and all(str(q.value).upper() == "LMSAL" for q in query if isinstance(q, a.Provider))
         )
 
     @classmethod
@@ -212,5 +216,6 @@ class IRISClient(BaseClient):
     def register_values(cls):
         return {
             a.Instrument: [("IRIS", "Interface Region Imaging Spectrograph")],
+            a.Provider: [("LMSAL", "Lockheed Martin Solar and Astrophysics Laboratory.")],
             iris_attrs.Product: list(iris_attrs._PRODUCTS.items()),
         }

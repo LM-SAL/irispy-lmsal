@@ -14,7 +14,7 @@ from sunpy.util.datatype_factory_base import NoMatchError
 
 from irispy.data.test import get_test_filepath
 from irispy.io import read_files
-from irispy.net import IRISClient, client
+from irispy.net import LMSALClient, client
 
 TIME = a.Time("2020-03-03 00:00", "2020-03-03 05:00")
 
@@ -38,7 +38,7 @@ def hcr(monkeypatch):
 
 def test_search(hcr):
     get = hcr("hcr_20200303.json")
-    table = IRISClient().search(TIME)
+    table = LMSALClient().search(TIME)
     assert get.call_args.kwargs["params"] == {
         "cmd": "search-events3",
         "outputformat": "json",
@@ -109,14 +109,14 @@ def test_search_attrs(hcr):
 )
 def test_search_description(hcr, text, observations):
     hcr("hcr_20200303.json")
-    table = Fido.search(TIME, a.iris.Description(text))["iris"]
+    table = Fido.search(TIME, a.iris.Description(text))["lmsal"]
     assert {name[8:34] for name in table["Filename"]} == observations
 
 
 def test_search_products(hcr):
     hcr("hcr_20160108.json")
     time = a.Time("2016-01-08 18:00", "2016-01-08 20:00")
-    sot = Fido.search(time, a.iris.Product("SOT"))["iris"]
+    sot = Fido.search(time, a.iris.Product("SOT"))["lmsal"]
     assert list(sot["Filename"]) == [
         "iris_l2_20160108_173544_3680100932_SOTFG.tar.gz",
         "iris_l2_20160108_191211_3680100932_SOTFG.tar.gz",
@@ -125,13 +125,13 @@ def test_search_products(hcr):
     assert list(sot["Size"].value) == [0, 2, 9]
     assert all(sot["SDO"])
     assert all(sot["SOT"])
-    sdo = Fido.search(time, a.iris.Product.sdo)["iris"]
+    sdo = Fido.search(time, a.iris.Product.sdo)["lmsal"]
     assert list(sdo["Filename"]) == [
         "iris_l2_20160108_173544_3680100932_SDO.tar.gz",
         "iris_l2_20160108_191211_3680100932_SDO.tar.gz",
     ]
     assert list(sdo["Size"].value) == [236, 216]
-    raster = Fido.search(time, a.iris.Product("raster"))["iris"]
+    raster = Fido.search(time, a.iris.Product("raster"))["lmsal"]
     assert list(raster["Product"]) == ["raster", "raster"]
     with pytest.raises(ValueError, match="Product must be one of raster, sji, deconvolved, sdo, sot, not 'aia'"):
         a.iris.Product("aia")
@@ -139,7 +139,7 @@ def test_search_products(hcr):
 
 def test_search_deconvolved(hcr):
     hcr("hcr_20200303.json")
-    table = Fido.search(TIME, a.iris.Product("deconvolved"))["iris"]
+    table = Fido.search(TIME, a.iris.Product("deconvolved"))["lmsal"]
     assert list(table["Filename"]) == [
         "iris_l2_20200303_041957_3882010194_SJI_2796_t000_deconvolved.fits.gz",
         "iris_l2_20200303_041957_3882010194_SJI_2832_t000_deconvolved.fits.gz",
@@ -151,22 +151,32 @@ def test_search_limit(hcr, monkeypatch):
     hcr("hcr_20200303.json")
     monkeypatch.setattr(client, "HCR_LIMIT", 4)
     with pytest.warns(UserWarning, match="returns at most 4 observations"):
-        IRISClient().search(TIME)
+        LMSALClient().search(TIME)
 
 
-@pytest.mark.parametrize("query", [(TIME,), (TIME, a.Instrument.aia)])
+@pytest.mark.parametrize("attr", [a.Instrument.iris, a.Provider("LMSAL"), a.Provider("lmsal")])
+def test_search_instrument_provider(hcr, monkeypatch, attr):
+    hcr("hcr_20200303.json")
+    # Only LMSALClient, so that no other client searches.
+    monkeypatch.setattr(Fido, "registry", {LMSALClient: LMSALClient._can_handle_query})
+    result = Fido.search(TIME, attr)
+    assert result.keys() == ["lmsal"]
+    assert len(result["lmsal"]) == 14
+
+
+@pytest.mark.parametrize("query", [(TIME,), (TIME, a.Instrument.aia), (TIME, a.Provider("VSO"))])
 def test_search_not_iris(hcr, monkeypatch, query):
     get = hcr("hcr_20200303.json")
-    # Only IRISClient, so that no other client searches.
-    monkeypatch.setattr(Fido, "registry", {IRISClient: IRISClient._can_handle_query})
+    # Only LMSALClient, so that no other client searches.
+    monkeypatch.setattr(Fido, "registry", {LMSALClient: LMSALClient._can_handle_query})
     with pytest.raises(NoMatchError):
         Fido.search(*query)
     get.assert_not_called()
 
 
 def test_search_other_attr():
-    with pytest.raises(ValueError, match="IRISClient cannot search with"):
-        IRISClient().search(TIME, a.Instrument.aia)
+    with pytest.raises(ValueError, match="LMSALClient cannot search with"):
+        LMSALClient().search(TIME, a.Instrument.aia)
 
 
 def test_fetch(hcr, tmp_path):
@@ -186,7 +196,7 @@ def test_fetch(hcr, tmp_path):
 @pytest.mark.remote_data
 def test_search_fetch_remote(tmp_path):
     result = Fido.search(a.Time("2021-10-01 06:09", "2021-10-01 06:12"), a.Instrument.iris, a.iris.Product.sji)
-    table = result["iris"]
+    table = result["lmsal"]
     assert set(table["OBSID"]) == {3683602040}
     files = Fido.fetch(
         table[table["Filename"] == "iris_l2_20211001_060925_3683602040_SJI_1400_t000.fits.gz"], path=tmp_path

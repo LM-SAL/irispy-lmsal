@@ -12,7 +12,7 @@ Searching and downloading with ``Fido``
 =======================================
 
 `~sunpy.net.Fido` is sunpy's interface for searching and downloading solar data; :ref:`sunpy-tutorial-acquiring-data-index` introduces it.
-Importing `irispy.net` adds `~irispy.net.IRISClient`, which searches the IRIS archive, to ``Fido``, and the IRIS search attributes to ``a.iris``:
+Importing `irispy.net` adds `~irispy.net.LMSALClient`, which searches the IRIS archive, to ``Fido``, and the IRIS search attributes to ``a.iris``:
 
 .. code-block:: python
 
@@ -21,7 +21,7 @@ Importing `irispy.net` adds `~irispy.net.IRISClient`, which searches the IRIS ar
 
     >>> import irispy.net
 
-A search needs a time range, `a.Time <sunpy.net.attrs.Time>`, and finds the observations that overlap it; it also needs ``a.Instrument.iris`` or one of the ``a.iris`` attributes below.
+A search needs a time range, `a.Time <sunpy.net.attrs.Time>`, and finds the observations that overlap it; it also needs ``a.Instrument.iris``, ``a.Provider("LMSAL")`` or one of the ``a.iris`` attributes below.
 Here are the active region observations of the morning of 1 October 2021:
 
 .. code-block:: python
@@ -33,7 +33,7 @@ Here are the active region observations of the morning of 1 October 2021:
     <sunpy.net.fido_factory.UnifiedResponse object at ...>
     Results from 1 Provider:
     <BLANKLINE>
-    5 Results from the IRISClient:
+    5 Results from the LMSALClient:
     Source: https://iris.lmsal.com/search/
     Total estimated size: 104.858 Mbyte
     <BLANKLINE>
@@ -70,8 +70,8 @@ The other search attributes are:
     The files to find in place of the raster tarball and the slit-jaw files: ``"raster"``, ``"sji"``, ``"deconvolved"`` (the deconvolved slit-jaw files), ``"sdo"`` (the tarball of AIA cubes co-aligned with the observation) or ``"sot"`` (the Hinode/SOT tarballs).
     ``a.iris.Product("sdo")`` finds only the AIA tarballs; combine products with ``|``, and ``Fido`` returns one table for each.
 
-A search with ``a.Time`` and ``a.Instrument.iris`` also goes to the Virtual Solar Observatory, which lists the same raster and slit-jaw files and the full-disk mosaics; fetch ``result["iris"]`` to download only the IRIS archive's files into the observation folders.
-An ``a.iris`` attribute keeps the search to the IRIS archive.
+``a.Instrument.iris`` gives the results of the IRIS archive and of the Virtual Solar Observatory, which lists the same raster and slit-jaw files and the full-disk mosaics under the same provider, so the VSO answers ``a.Provider("LMSAL")`` too.
+``result["lmsal"]`` holds the IRIS archive's files; fetch it to download only those into the observation folders.
 The archive answers about six observations a second, so a search of a month takes a minute; a search finds at most 5000 observations.
 ``ObsID``, ``Target``, ``XCen`` and ``YCen`` are applied by the archive and make a search faster; ``Description`` is matched afterwards.
 
@@ -89,7 +89,7 @@ For example, the Hinode/SOT and AIA data of the observations made with Hinode ne
     <sunpy.net.fido_factory.UnifiedResponse object at ...>
     Results from 2 Providers:
     <BLANKLINE>
-    6 Results from the IRISClient:
+    6 Results from the LMSALClient:
     Source: https://iris.lmsal.com/search/
     Total estimated size: 39.846 Mbyte
     <BLANKLINE>
@@ -103,7 +103,7 @@ For example, the Hinode/SOT and AIA data of the observations made with Hinode ne
     2020-03-03 21:18:35.000  783.7 iris_l2_20200303_211835_3605202860_SOTSP.tar.gz    4.0
     2020-03-03 22:53:35.000  790.8 iris_l2_20200303_225335_3605202860_SOTSP.tar.gz    9.0
     <BLANKLINE>
-    6 Results from the IRISClient:
+    6 Results from the LMSALClient:
     Source: https://iris.lmsal.com/search/
     Total estimated size: 4.948 Gbyte
     <BLANKLINE>
@@ -129,7 +129,7 @@ Here we download the 1400 slit-jaw file, 3 MiB, of the active region observation
 
 .. code-block:: python
 
-    >>> table = result["iris"]  # doctest: +REMOTE_DATA
+    >>> table = result["lmsal"]  # doctest: +REMOTE_DATA
     >>> sji_1400 = table[table["Filename"] == "iris_l2_20211001_060925_3683602040_SJI_1400_t000.fits.gz"]  # doctest: +REMOTE_DATA
     >>> files = Fido.fetch(sji_1400)  # doctest: +REMOTE_DATA
     >>> files  # doctest: +REMOTE_DATA

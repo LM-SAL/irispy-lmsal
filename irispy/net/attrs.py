@@ -1,6 +1,6 @@
 """
-Search attributes for `irispy.net.IRISClient`, available as ``a.iris`` once `irispy.net`
-is imported.
+Search attributes for `irispy.net.LMSALClient`, available as ``a.iris`` once
+`irispy.net` is imported.
 """
 
 import astropy.units as u
@@ -9,7 +9,7 @@ from sunpy.net.attr import Range, SimpleAttr
 
 __all__ = ["Description", "ObsID", "Product", "Target", "XCen", "YCen"]
 
-# The products IRISClient registers with Fido.
+# The products LMSALClient registers with Fido.
 _PRODUCTS = {
     "raster": "The raster tarball of the observation.",
     "sji": "The slit-jaw files of the observation.",
