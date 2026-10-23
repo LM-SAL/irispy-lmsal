@@ -110,8 +110,4 @@ class Product(SimpleAttr):
     """
 
     def __init__(self, value):
-        value = value.lower()
-        if value not in _PRODUCTS:
-            msg = f"Product must be one of {', '.join(_PRODUCTS)}, not {value!r}"
-            raise ValueError(msg)
-        super().__init__(value)
+        super().__init__(value.lower())

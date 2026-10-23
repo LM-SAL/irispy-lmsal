@@ -200,10 +200,6 @@ class LMSALClient(BaseClient):
         text = None
         for attr in query.attrs if isinstance(query, AttrAnd) else [query]:
             match attr:
-                case a.Instrument() if str(attr.value).upper() == "IRIS":
-                    pass
-                case a.Provider() if str(attr.value).upper() == "LMSAL":
-                    pass
                 case a.Time():
                     params["startTime"], params["stopTime"] = attr.start.isot, attr.end.isot
                 case iris_attrs.ObsID():
@@ -219,9 +215,6 @@ class LMSALClient(BaseClient):
                     text = attr.value.lower()
                 case iris_attrs.Product():
                     products = {attr.value}
-                case _:
-                    msg = f"LMSALClient cannot search with {attr!r}"
-                    raise ValueError(msg)
         # A search of three months takes about 200 seconds.
         response = requests.get(HCR_URL, params=params, timeout=600)
         response.raise_for_status()
