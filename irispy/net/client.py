@@ -46,11 +46,25 @@ class IRISClient(BaseClient):
 
     Examples
     --------
+    An ``a.iris`` attr keeps the search to the IRIS archive; with only ``a.Instrument("IRIS")``
+    the Virtual Solar Observatory is searched too.
+
     >>> from sunpy.net import Fido, attrs as a
     >>> import irispy.net
     >>> result = Fido.search(
     ...     a.Time("2021-10-01 06:00", "2021-10-01 07:00"), a.iris.Target("AR")
-    ... )  # doctest: +SKIP
+    ... )  # doctest: +REMOTE_DATA
+    >>> print(
+    ...     result["iris"]["OBSID", "Product", "Filename", "Size"]
+    ... )  # doctest: +REMOTE_DATA
+      OBSID    Product                         Filename                          Size
+                                                                                Mibyte
+    ---------- ------- -------------------------------------------------------- ------
+    3683602040     sji iris_l2_20211001_060925_3683602040_SJI_1330_t000.fits.gz    3.0
+    3683602040     sji iris_l2_20211001_060925_3683602040_SJI_1400_t000.fits.gz    3.0
+    3683602040     sji iris_l2_20211001_060925_3683602040_SJI_2796_t000.fits.gz    5.0
+    3683602040     sji iris_l2_20211001_060925_3683602040_SJI_2832_t000.fits.gz    6.0
+    3683602040  raster         iris_l2_20211001_060925_3683602040_raster.tar.gz   83.0
     >>> files = Fido.fetch(result["iris"])  # doctest: +SKIP
     """
 
