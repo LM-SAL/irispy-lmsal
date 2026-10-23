@@ -43,7 +43,8 @@ def calculate_moments(
     rest_wavelength : `astropy.units.Quantity`, optional
         Rest wavelength of the line. Defaults to ``cube.meta.rest_wavelength``, or to the one
         documented line the cube covers (`~irispy.utils.lines.get_lines`) if it does not cover
-        ``cube.meta.rest_wavelength``.
+        ``cube.meta.rest_wavelength``; a blend of lines within 0.1 Å of each other counts as its
+        strongest line.
     velocity_range : `astropy.units.Quantity` or `None`
         ``(lower, upper)`` Doppler velocities from ``rest_wavelength`` within which to use the samples,
         such as ``(-100, 100) * u.km / u.s``, or `None` to use the whole window.

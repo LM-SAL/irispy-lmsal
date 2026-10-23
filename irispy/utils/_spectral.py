@@ -14,7 +14,7 @@ from astropy.nddata import StdDevUncertainty, UnknownUncertainty
 from ndcube import ExtraCoords
 
 from irispy.spectrograph import SpectrogramCube, _wavelength_indices
-from irispy.utils.lines import get_lines
+from irispy.utils.lines import _BLEND_WIDTH, get_lines
 from irispy.utils.utils import _boolean_mask
 
 
@@ -142,7 +142,7 @@ def _fit_background(cube, windows, degree):
 def default_rest_wavelength(cube):
     """
     ``cube.meta.rest_wavelength``, or the one documented line ``cube`` covers if it does
-    not cover ``cube.meta.rest_wavelength``.
+    not cover ``cube.meta.rest_wavelength``, or its strongest line for a blend.
     """
     # A crop of a window can leave out its line, as a crop to Mg II h leaves out Mg II k. The cube covers
     # its pixels' full width, as a crop at a line keeps the pixel holding it although its center can be past it.
@@ -152,8 +152,11 @@ def default_rest_wavelength(cube):
     rest = getattr(cube.meta, "rest_wavelength", None)
     if rest is not None and low <= rest <= high:
         return rest
-    lines = get_lines([low, high], main_only=True)["wavelength"]
-    return lines[0] if len(lines) == 1 else rest
+    lines = get_lines([low, high], main_only=True)
+    if not len(lines) or np.ptp(lines["wavelength"]) > _BLEND_WIDTH:
+        return rest
+    # Every reference model of the catalog ranks the lines of each blend alike.
+    return lines["wavelength"][np.argmax(lines["intensity_quiet_sun_coronal"])]
 
 
 def standard_deviation(cube):

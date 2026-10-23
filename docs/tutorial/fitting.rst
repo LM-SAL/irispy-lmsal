@@ -105,7 +105,8 @@ The velocities of each component are against the rest wavelength of the line it 
     >>> maps["velocity_1"].meta["fit_rest_wavelength"]  # doctest: +REMOTE_DATA
     <Quantity 139.376 nm>
 
-A component without a name, or not named after a documented line, is against the one documented line that the cube covers.
+A component without a name, or not named after a documented line, is against the line of the cube's spectral window, ``cube.meta.rest_wavelength``, or, for a crop that leaves that line out, the one documented line that the cube covers.
+If its fitted center is nearer another documented line, `~irispy.utils.fitting.maps_from_fit` raises a `ValueError` instead: name it after its line, or pass its rest wavelength.
 ``rest_wavelength`` sets the rest wavelength of every component, or, as a dict, of the components it names, such as ``rest_wavelength={"broad": si_iv}`` for a component named ``"broad"``.
 ``"quality"`` holds a `~irispy.utils.fitting.FitQualityFlag` for each spectrum: whether it has no fit (its fit failed or it has no usable sample), its fit did not converge or stopped at a bound, or it has masked samples.
 ``"residual"`` is the cube minus the fitted model, to check the fits.

@@ -197,6 +197,7 @@ def test_calculate_moments_velocity_range_no_meta_no_rest_wavelength():
         ((2793, 2796.352), 2796.352 * u.AA),  # Ends in the pixel holding it, whose center is short of it
         ((2802, 2805), 2803.53 * u.AA),  # Mg II h
         ((2800, 2802), 2796.352 * u.AA),  # A wing between documented lines keeps the window's line
+        ((2798.6, 2799.0), 2798.823 * u.AA),  # The Mg II triplet lines at 2798.75 and 2798.82 Å, one blend
     ],
 )
 def test_calculate_moments_default_rest_wavelength(raster_sg_file, limits, rest_wavelength):

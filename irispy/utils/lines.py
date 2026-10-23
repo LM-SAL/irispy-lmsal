@@ -18,6 +18,10 @@ _ABUNDANCES = ("coronal", "photospheric")
 _PASSBANDS = ("FUV1", "FUV2", "NUV")
 # The share of a passband's strongest predicted line below which a ranked query leaves a line out
 _MINIMUM_STRENGTH = 0.02
+# Documented lines closer than this are one blended line: the catalog's blends, C II 1335.66 and 1335.71, O IV and
+# S IV 1404.81 and the Mg II triplet lines at 2798.75 and 2798.82, are at most 0.07 Å wide, and its other lines at
+# least 0.2 Å apart.
+_BLEND_WIDTH = 0.1 * u.AA
 
 
 @cache
