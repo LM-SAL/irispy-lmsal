@@ -43,16 +43,34 @@ Here are the active region observations of the morning of 1 October 2021:
                                                                                                                          Mibyte
     ----------------------- ---------- ---------------- ------- -------------------------------------------------------- ------
     2021-10-01 06:09:25.000 3683602040 Observation test     sji iris_l2_20211001_060925_3683602040_SJI_1330_t000.fits.gz    3.0
-    2021-10-01 06:09:25.000 3683602040 Observation test     sji iris_l2_20211001_060925_3683602040_SJI_1400_t000.fits.gz    3.0
-    2021-10-01 06:09:25.000 3683602040 Observation test     sji iris_l2_20211001_060925_3683602040_SJI_2796_t000.fits.gz    5.0
-    2021-10-01 06:09:25.000 3683602040 Observation test     sji iris_l2_20211001_060925_3683602040_SJI_2832_t000.fits.gz    6.0
+    2021-10-01 06:09:30.000 3683602040 Observation test     sji iris_l2_20211001_060925_3683602040_SJI_1400_t000.fits.gz    3.0
+    2021-10-01 06:09:26.000 3683602040 Observation test     sji iris_l2_20211001_060925_3683602040_SJI_2796_t000.fits.gz    5.0
+    2021-10-01 06:09:28.000 3683602040 Observation test     sji iris_l2_20211001_060925_3683602040_SJI_2832_t000.fits.gz    6.0
     2021-10-01 06:09:25.000 3683602040 Observation test  raster         iris_l2_20211001_060925_3683602040_raster.tar.gz   83.0
     <BLANKLINE>
     <BLANKLINE>
 
 Each row is one file of an observation: by default its raster tarball and its slit-jaw files, and with ``a.iris.Product`` only the files of that product.
-The table also has the observation's ``End Time``, its ``Target``, its pointing (``XCen`` and ``YCen``) and whether the archive has co-aligned AIA and Hinode/SOT data for it (``SDO`` and ``SOT``); ``result.show()`` shows every column, including the ``URL`` of each file.
+Printed, the table shows each file's ``Start Time`` and ``End Time``, the observation's ``OBSID``, ``Target``, ``NOAA AR`` and pointing (``XCen`` and ``YCen``), the file's field of view (``FOV X`` and ``FOV Y``), whether the archive has co-aligned AIA and Hinode/SOT data for the observation (``SDO`` and ``SOT``), the ``Product``, the ``Wavelength`` of a slit-jaw file, the ``Filename`` and the ``Size``.
 The sizes are those the archive gives, in whole MiB.
+
+The other columns are hidden: among them the observation's ``Title``, ``OBS Description`` and ``Planners``, the exposure times, cadences and raster steps, links to quick-look movies and images, and the ``URL`` of each file; `~irispy.net.LMSALClient` lists them all.
+``result["lmsal"].keys()`` lists every column; ``show`` with column names shows those columns, hidden or not, and ``show()`` shows them all:
+
+.. code-block:: python
+
+    >>> print(result["lmsal"].show("Filename", "Exposure Time", "Cadence", "Rasters", "Steps"))  # doctest: +REMOTE_DATA
+                            Filename                         Exposure Time Cadence Rasters Steps
+                                                                   s          s
+    -------------------------------------------------------- ------------- ------- ------- -----
+    iris_l2_20211001_060925_3683602040_SJI_1330_t000.fits.gz      0.500264 6.97684      --    --
+    iris_l2_20211001_060925_3683602040_SJI_1400_t000.fits.gz      0.500267 6.97897      --    --
+    iris_l2_20211001_060925_3683602040_SJI_2796_t000.fits.gz      0.500259 6.97792      --    --
+    iris_l2_20211001_060925_3683602040_SJI_2832_t000.fits.gz      0.500255 6.97871      --    --
+            iris_l2_20211001_060925_3683602040_raster.tar.gz           ——— 27.7355       5    16
+
+``Cadence`` is the time between the images of a slit-jaw file and between the rasters of a raster tarball.
+The table masks what the archive does not give, such as the mean exposure time of a raster tarball or the number of rasters in a slit-jaw file.
 
 The other search attributes are:
 
@@ -170,11 +188,11 @@ The files of each observation go into a folder named after the observation, its 
     >>> read_files(folder).meta.observing_mode_id  # doctest: +REMOTE_DATA
     3683602040
 
-To keep the archive's own layout, ``level2/YYYY/MM/DD/<observation>/``, put the date of the observation in ``path``:
+To keep the archive's own layout, ``level2/YYYY/MM/DD/<observation>/``, put the date of the observation, from the hidden ``Observation Start`` column, in ``path``:
 
 .. code-block:: python
 
-    >>> files = Fido.fetch(result, path="~/iris/level2/{start_time.datetime:%Y/%m/%d}/{file}")  # doctest: +SKIP
+    >>> files = Fido.fetch(result, path="~/iris/level2/{observation_start.datetime:%Y/%m/%d}/{file}")  # doctest: +SKIP
 
 which puts the files in ``~/iris/level2/2021/10/01/20211001_060925_3683602040/``.
 

@@ -20,8 +20,102 @@ HCR_LIMIT = 5000
 
 
 class LMSALQueryResponseTable(QueryResponseTable):
-    hide_keys = ("URL",)
+    # The other columns are hidden.
+    display_keys = (
+        "Start Time",
+        "End Time",
+        "OBSID",
+        "Target",
+        "NOAA AR",
+        "XCen",
+        "YCen",
+        "FOV X",
+        "FOV Y",
+        "SDO",
+        "SOT",
+        "Product",
+        "Wavelength",
+        "Filename",
+        "Size",
+    )
     size_column = "Size"
+
+
+def _quantity(value, unit):
+    # Most of the HCR's numbers are single precision: drop the digits that the conversion to
+    # double precision added.
+    return None if value is None else float(f"{value:.7g}") * unit
+
+
+def _tarball_size(event, key):
+    # The HCR gives sizes in whole MiB, and -1 or nothing when there is no tarball.
+    return _quantity(event.get(f"{key}_compsize_mb"), u.Mibyte) if f"{key}_compurl" in event else None
+
+
+def _row(event, product, group, url, size):
+    """
+    The table row of one file, with `None` for what the HCR does not give.
+
+    ``group`` is the HCR's entry for the file's product, empty for the AIA and SOT
+    tarballs.
+    """
+    raster = product == "raster"
+    fov = (event.get("raster_fovx"), event.get("raster_fovy")) if raster else (group.get("fovx"), group.get("fovy"))
+    lines = event.get("spectral_window_names") if raster else None
+    return {
+        "Start Time": Time(group.get("start_time") or event["startTime"]),
+        "End Time": Time(group.get("stop_time") or event["stopTime"]),
+        "OBSID": int(event["obsId"]),
+        "Target": event["target"],
+        "NOAA AR": int(event["noaaNum"]) if event.get("noaaNum") else None,
+        "XCen": round(event["xCen"], 1) * u.arcsec,
+        "YCen": round(event["yCen"], 1) * u.arcsec,
+        "FOV X": None if fov[0] is None else round(fov[0], 1) * u.arcsec,
+        "FOV Y": None if fov[1] is None else round(fov[1], 1) * u.arcsec,
+        "SDO": "martinaia_compurl" in event,
+        "SOT": "martinsot_compurl" in event or "martinsp_compurl" in event,
+        "Product": product,
+        # The HCR's spectral_window_names lists the lines in a raster's windows, not the
+        # windows, so it does not give the wavelength range of the raster.
+        "Wavelength": _quantity(group.get("wavelnth"), u.AA),
+        "Filename": url.rsplit("/", 1)[-1],
+        # The HCR gives sizes in whole MiB.
+        "Size": (np.nan if size is None else size) * u.Mibyte,
+        "Observation Start": Time(event["startTime"]),
+        "Title": event.get("obsTitle"),
+        "OBS Description": event.get("goal"),
+        "Science Objectives": event.get("sciObjectives"),
+        "Planners": event.get("planners"),
+        "Roll Angle": _quantity(event.get("roll_angle"), u.deg),
+        "Duration": _quantity(event.get("duration_hours"), u.h),
+        "Repeats": event.get("iris_repeats"),
+        "Total Frames": event.get("iris_totframes"),
+        "Images": group.get("num_images"),
+        "Rasters": group.get("numrasters"),
+        "Steps": group.get("raster_numsteps"),
+        "Step Size": _quantity(group.get("raster_stepsize"), u.arcsec),
+        "Exposure Time": _quantity(group.get("mean_exptime"), u.s),
+        "Min Exposure Time": _quantity(group.get("min_exptime"), u.s),
+        "Max Exposure Time": _quantity(group.get("max_exptime"), u.s),
+        "Cadence": _quantity(group.get("cadence_avg_asrun"), u.s),
+        "Planned Cadence": _quantity(group.get("cadence_avg_planned"), u.s),
+        "Step Cadence": _quantity(group.get("basic_cadence_avg_asrun"), u.s),
+        "Spatial Summing": event.get("spat_sum"),
+        "FUV Spectral Summing": event.get("fuv_spec_sum"),
+        "NUV Spectral Summing": event.get("nuvsji_spec_sum"),
+        "Lines": lines and lines.strip("'"),
+        "Data Fraction": event.get("data_fraction_found"),
+        "Bad Data": event.get("iris_baddata"),
+        "Rotation Tracking": event.get("rotation_tracking"),
+        "SDO Size": _tarball_size(event, "martinaia"),
+        "SOTFG Size": _tarball_size(event, "martinsot"),
+        "SOTSP Size": _tarball_size(event, "martinsp"),
+        "Movie URL": group.get("url_mp4"),
+        "Thumbnail URL": group.get("url_thumb"),
+        "Context URL": group.get("url_context"),
+        "Timeline URL": event.get("timeline_gif_url"),
+        "URL": url,
+    }
 
 
 class LMSALClient(BaseClient):
@@ -40,9 +134,39 @@ class LMSALClient(BaseClient):
 
     Each row of the result is one file: the raster tarball and the slit-jaw files of each
     observation, or with ``a.iris.Product`` only the files of that product, such as the
-    co-aligned AIA cubes. The ``SDO`` and ``SOT`` columns say whether the observation has
-    co-aligned AIA or Hinode/SOT data. Full-disk mosaics are not found; they are listed on the
+    co-aligned AIA cubes. Full-disk mosaics are not found; they are listed on the
     `IRIS mosaic page <https://iris.lmsal.com/mosaic.html>`__.
+
+    The table shows each file's ``Start Time`` and ``End Time``, the observation's ``OBSID``,
+    ``Target``, ``NOAA AR`` and pointing (``XCen``, ``YCen``), the file's field of view
+    (``FOV X``, ``FOV Y``), whether the observation has co-aligned AIA or Hinode/SOT data
+    (``SDO``, ``SOT``), the ``Product``, the slit-jaw ``Wavelength``, the ``Filename`` and the
+    ``Size``. Its other columns are hidden: ``result["lmsal"].keys()`` lists every column,
+    ``result["lmsal"].show("Filename", "Cadence")`` shows the columns named and
+    ``result["lmsal"].show()`` all of them. They are:
+
+    - The ``Observation Start``, ``Title``, ``OBS Description`` (such as
+      ``"Large dense 320-step raster"``), ``Science Objectives`` and ``Planners`` of the
+      observation.
+    - Its ``Roll Angle``, ``Duration``, ``Repeats`` (how many times the OBS ran) and
+      ``Total Frames`` (spectrograph exposures); ``Spatial Summing``, ``FUV Spectral Summing``
+      and ``NUV Spectral Summing`` (of the NUV spectra and the slit-jaw images);
+      ``Data Fraction``, the fraction of its data that the archive has, ``Bad Data`` and
+      ``Rotation Tracking``.
+    - The ``Images`` in a slit-jaw file; the ``Rasters`` in the raster tarball, their
+      ``Steps`` and ``Step Size``, and ``Lines``, the lines in the raster's spectral windows.
+    - ``Exposure Time`` (the mean, of slit-jaw files only), ``Min Exposure Time`` and
+      ``Max Exposure Time``; ``Cadence``, the time between images or between rasters, and
+      ``Planned Cadence``; ``Step Cadence``, the time between raster steps.
+    - ``SDO Size``, ``SOTFG Size`` and ``SOTSP Size``, the sizes of the observation's AIA and
+      Hinode/SOT tarballs.
+    - The ``URL`` of the file, the ``Movie URL``, ``Thumbnail URL`` and ``Context URL``
+      (slit-jaw files only) of its quick-look images, and the ``Timeline URL``, an image of
+      the IRIS timeline of the day.
+
+    The table masks what the archive does not give, such as the ``Wavelength`` of a raster
+    tarball, the field of view of the AIA and SOT tarballs or the ``Repeats`` of early
+    observations, and leaves out a column that none of the files found has.
 
     `Fido.fetch <sunpy.net.fido_factory.UnifiedDownloaderFactory.fetch>` puts the files of each
     observation in a folder named after it, such as ``20211001_060925_3683602040``, which
@@ -145,39 +269,30 @@ class LMSALClient(BaseClient):
                     else "deconvolved"
                     if group["group_name"].endswith("_deconvolved")
                     else "sji",
+                    group,
                     group.get("comp_data_url"),
                     group.get("comp_data_size_mb"),
                 )
                 for group in event["groups"]
             ]
             files += [
-                ("sdo", event.get("martinaia_compurl"), event.get("martinaia_compsize_mb")),
-                ("sot", event.get("martinsot_compurl"), event.get("martinsot_compsize_mb")),
-                ("sot", event.get("martinsp_compurl"), event.get("martinsp_compsize_mb")),
+                ("sdo", {}, event.get("martinaia_compurl"), event.get("martinaia_compsize_mb")),
+                ("sot", {}, event.get("martinsot_compurl"), event.get("martinsot_compsize_mb")),
+                ("sot", {}, event.get("martinsp_compurl"), event.get("martinsp_compsize_mb")),
             ]
-            for product, url, size in files:
-                if product in products and url:
-                    rows.append(
-                        {
-                            "Start Time": Time(event["startTime"]),
-                            "End Time": Time(event["stopTime"]),
-                            "OBSID": int(event["obsId"]),
-                            "Title": event.get("obsTitle") or "",
-                            "Target": event["target"],
-                            "XCen": round(event["xCen"], 1) * u.arcsec,
-                            "YCen": round(event["yCen"], 1) * u.arcsec,
-                            "SDO": "martinaia_compurl" in event,
-                            "SOT": "martinsot_compurl" in event or "martinsp_compurl" in event,
-                            "Product": product,
-                            "Filename": url.rsplit("/", 1)[-1],
-                            # The HCR gives sizes in whole MiB.
-                            "Size": (np.nan if size is None else size) * u.Mibyte,
-                            "URL": url,
-                        }
-                    )
-        # The HCR returns the observations in no fixed order.
-        rows.sort(key=lambda row: (row["Start Time"], row["Filename"]))
-        return LMSALQueryResponseTable(rows=rows, client=self)
+            rows += [
+                _row(event, product, group, url, size)
+                for product, group, url, size in files
+                if product in products and url
+            ]
+        # The HCR returns the observations in no fixed order; a file's name starts with the
+        # start of its observation.
+        rows.sort(key=lambda row: row["Filename"])
+        # Leave out what the HCR does not give, so that the table masks it, and the columns
+        # that no row has.
+        names = [key for key in rows[0] if any(row[key] is not None for row in rows)] if rows else None
+        rows = [{key: value for key, value in row.items() if value is not None} for row in rows]
+        return LMSALQueryResponseTable(rows=rows, names=names, client=self)
 
     def fetch(self, query_results, *, path, downloader, **kwargs):  # NOQA: ARG002
         """
