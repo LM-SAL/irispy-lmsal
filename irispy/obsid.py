@@ -1,3 +1,4 @@
+import textwrap
 import importlib.resources
 
 import numpy as np
@@ -88,10 +89,11 @@ class ObsID(dict):
         self.options = options
 
     def __repr__(self) -> str:
+        description = ("\n" + " " * 19).join(f"{line:>45}" for line in textwrap.wrap(self["raster_fulldesc"], 45))
         return (
             "IRIS OBS ID {obsid}\n"
             "----------------------\n"
-            "Description:       {raster_fulldesc:>45}\n"
+            "Description:       {description}\n"
             "SJI filters:       {sjis:>45}\n"
             "SJI field of view: {sji_fov:>45}\n"
             "Exposure time:     {exptime!s:>45}\n"
@@ -100,7 +102,7 @@ class ObsID(dict):
             "SJI cadence:       {sji_cadence:>45}\n"
             "Compression:       {compression:>45}\n"
             "Linelist:          {linelist:>45}"
-        ).format(**self)
+        ).format(description=description, **self)
 
     @staticmethod
     def _exptime_to_quant(exptime):
