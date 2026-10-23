@@ -11,7 +11,6 @@ from sunpy.net.attr import Range, SimpleAttr
 
 __all__ = ["Description", "ObsID", "Product", "Target", "XCen", "YCen"]
 
-# The products LMSALClient registers with Fido.
 _PRODUCTS = {
     "raster": "The raster tarball of the observation.",
     "sji": "The slit-jaw files of the observation.",

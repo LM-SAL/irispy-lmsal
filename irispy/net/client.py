@@ -17,14 +17,13 @@ from irispy.net import attrs as iris_attrs
 
 __all__ = ["LMSALClient"]
 
-# The Heliophysics Coverage Registry (HCR) at LMSAL, which the IRIS search page also queries.
+# The Heliophysics Coverage Registry, which the IRIS search page also queries.
 HCR_URL = "https://www.lmsal.com/hek/hcr"
 # The HCR returns 400 observations unless asked for more, and at most 5000 (SolarSoft's iris_time2hcr.pro).
 HCR_LIMIT = 5000
 
 
 class LMSALQueryResponseTable(QueryResponseTable):
-    # The other columns are hidden.
     display_keys = (
         "Start Time",
         "End Time",
@@ -46,8 +45,7 @@ class LMSALQueryResponseTable(QueryResponseTable):
 
 
 class _Missing(NamedTuple):
-    # What a row holds where the HCR gives nothing: the column's empty value, which the
-    # table masks.
+    # A value the HCR does not give, masked in the table.
     empty: object
 
 
@@ -95,7 +93,6 @@ def _row(event, product, group, url, size):
         # windows, so it does not give the wavelength range of the raster.
         "Wavelength": _quantity(group, "wavelnth", u.AA),
         "Filename": url.rsplit("/", 1)[-1],
-        # The HCR gives sizes in whole MiB.
         "Size": (np.nan if size is None else size) * u.Mibyte,
         "Observation Start": Time(event["startTime"]),
         "Title": _get(event, "obsTitle", ""),

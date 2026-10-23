@@ -78,7 +78,6 @@ def test_search(hcr):
     assert not raster["SOT"]
     assert np.ma.is_masked(raster["Wavelength"])
     assert raster["Size"] == 410 * u.Mibyte
-    # The hidden columns
     assert raster["Title"] == raster["Science Objectives"] == "Jets in QS/CH near disk center"
     assert raster["OBS Description"].startswith("Very large sparse 64-step raster 63x175 64s")
     assert raster["Planners"] == "Paola Testa"
@@ -104,7 +103,6 @@ def test_search(hcr):
     )
     sji = table[-4]
     assert sji["Filename"] == "iris_l2_20200303_044800_3605202860_SJI_1400_t000.fits.gz"
-    # The file's own times
     assert sji["Start Time"].isot == "2020-03-03T04:48:06.000"
     assert sji["End Time"].isot == "2020-03-03T05:25:04.000"
     assert sji["Observation Start"].isot == "2020-03-03T04:48:00.000"
@@ -115,7 +113,6 @@ def test_search(hcr):
     assert sji["Exposure Time"] == 0.500276 * u.s
     assert u.allclose([sji["Cadence"], sji["Planned Cadence"]], [9.28359, 9.284] * u.s)
     assert sji["Context URL"].endswith("_context_1024.gif")
-    # Only the main columns are shown.
     header = str(table).splitlines()[0]
     for name in ["Start Time", "End Time", "OBSID", "XCen", "FOV Y", "SDO", "SOT", "Wavelength", "Filename", "Size"]:
         assert name in header
