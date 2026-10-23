@@ -120,8 +120,10 @@ def test_values_have_one_type(obsid):
 
 @pytest.mark.parametrize("obsid", OBSIDS)
 def test_repr_values_end_in_one_column(obsid):
-    # Every value but the description, which can run past it, ends in the same column
-    assert {len(line) for line in repr(ObsID(obsid)).splitlines()[3:]} == {64}
+    # Every value ends in the same column; 4050607445, 4180000056 and 4191006128 wrap their long descriptions
+    decoded = ObsID(obsid)
+    assert {len(line) for line in repr(decoded).splitlines()[2:]} == {64}
+    assert " ".join(decoded["raster_fulldesc"].split()) in " ".join(repr(decoded).split())
 
 
 @pytest.mark.parametrize(
