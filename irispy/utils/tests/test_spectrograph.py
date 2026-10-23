@@ -268,9 +268,10 @@ def test_subtract_background_rounds_the_float64_fit_to_float32(sns_sg_file):
     assert result.data.dtype == np.float32
     # Rounded to float32 once in the background and once in the difference
     background = cube.data - expected.data
-    rounding = np.spacing(np.maximum(np.abs(background), np.abs(expected.data)).astype(np.float32))
+    # Only the fitted samples, as np.spacing warns about NaN on Windows
     fitted = np.isfinite(expected.data)
-    assert np.all(np.abs(result.data - expected.data)[fitted] <= rounding[fitted])
+    rounding = np.spacing(np.maximum(np.abs(background), np.abs(expected.data))[fitted].astype(np.float32))
+    assert np.all(np.abs(result.data - expected.data)[fitted] <= rounding)
 
 
 def test_subtract_background_integer_mask():
