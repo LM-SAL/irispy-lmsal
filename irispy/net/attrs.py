@@ -1,6 +1,9 @@
 """
 Search attributes for `irispy.net.LMSALClient`, available as ``a.iris`` once
 `irispy.net` is imported.
+
+They refine a search with ``a.Instrument("IRIS")`` or ``a.Provider("LMSAL")``; with them
+only the IRIS archive is searched, as the Virtual Solar Observatory does not know them.
 """
 
 import astropy.units as u

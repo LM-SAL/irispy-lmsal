@@ -29,11 +29,13 @@ class LMSALClient(BaseClient):
     Searches the IRIS archive at LMSAL for Level 2 data and downloads it.
 
     Search with `a.Time <sunpy.net.attrs.Time>`, which finds the observations that overlap
-    the time range, and ``a.Instrument("IRIS")``, ``a.Provider("LMSAL")`` or the
-    `irispy.net.attrs` (``a.iris``): ``ObsID``, ``Description``, ``Target``, ``XCen``, ``YCen``
-    and ``Product``. ``a.Instrument("IRIS")`` gives the results of the IRIS archive and of the
-    Virtual Solar Observatory, which lists IRIS under the same provider, so the VSO answers
-    ``a.Provider("LMSAL")`` too; ``result["lmsal"]`` holds the IRIS archive's files.
+    the time range, and ``a.Instrument("IRIS")`` or ``a.Provider("LMSAL")``; the
+    `irispy.net.attrs` (``a.iris``) ``ObsID``, ``Description``, ``Target``, ``XCen``, ``YCen``
+    and ``Product`` refine the search. ``a.Instrument("IRIS")`` gives the results of the IRIS
+    archive and of the Virtual Solar Observatory, which lists IRIS under the same provider, so
+    the VSO answers ``a.Provider("LMSAL")`` too; with an ``a.iris`` attr only the IRIS archive
+    is searched, as the VSO does not know them. ``result["lmsal"]`` holds the IRIS archive's
+    files.
     The archive answers about six observations a second, so a search of a month takes a minute.
 
     Each row of the result is one file: the raster tarball and the slit-jaw files of each
@@ -52,7 +54,9 @@ class LMSALClient(BaseClient):
     >>> from sunpy.net import Fido, attrs as a
     >>> import irispy.net
     >>> result = Fido.search(
-    ...     a.Time("2021-10-01 06:00", "2021-10-01 07:00"), a.iris.Target("AR")
+    ...     a.Time("2021-10-01 06:00", "2021-10-01 07:00"),
+    ...     a.Provider("LMSAL"),
+    ...     a.iris.Target("AR"),
     ... )  # doctest: +REMOTE_DATA
     >>> print(
     ...     result["lmsal"]["OBSID", "Product", "Filename", "Size"]
@@ -200,10 +204,11 @@ class LMSALClient(BaseClient):
             iris_attrs.YCen,
             iris_attrs.Product,
         }
-        # A search by time alone is left to the other clients.
+        # As sunpy's GOES XRSClient does, the client's own attrs only refine a search for the
+        # instrument or the provider.
         return (
             cls.check_attr_types_in_query(query, {a.Time}, optional)
-            and any(not isinstance(q, a.Time) for q in query)
+            and any(isinstance(q, a.Instrument | a.Provider) for q in query)
             and all(str(q.value).upper() == "IRIS" for q in query if isinstance(q, a.Instrument))
             and all(str(q.value).upper() == "LMSAL" for q in query if isinstance(q, a.Provider))
         )

@@ -109,14 +109,14 @@ def test_search_attrs(hcr):
 )
 def test_search_description(hcr, text, observations):
     hcr("hcr_20200303.json")
-    table = Fido.search(TIME, a.iris.Description(text))["lmsal"]
+    table = Fido.search(TIME, a.Provider("LMSAL"), a.iris.Description(text))["lmsal"]
     assert {name[8:34] for name in table["Filename"]} == observations
 
 
 def test_search_products(hcr):
     hcr("hcr_20160108.json")
     time = a.Time("2016-01-08 18:00", "2016-01-08 20:00")
-    sot = Fido.search(time, a.iris.Product("SOT"))["lmsal"]
+    sot = Fido.search(time, a.Provider("LMSAL"), a.iris.Product("SOT"))["lmsal"]
     assert list(sot["Filename"]) == [
         "iris_l2_20160108_173544_3680100932_SOTFG.tar.gz",
         "iris_l2_20160108_191211_3680100932_SOTFG.tar.gz",
@@ -125,13 +125,13 @@ def test_search_products(hcr):
     assert list(sot["Size"].value) == [0, 2, 9]
     assert all(sot["SDO"])
     assert all(sot["SOT"])
-    sdo = Fido.search(time, a.iris.Product.sdo)["lmsal"]
+    sdo = Fido.search(time, a.Provider("LMSAL"), a.iris.Product.sdo)["lmsal"]
     assert list(sdo["Filename"]) == [
         "iris_l2_20160108_173544_3680100932_SDO.tar.gz",
         "iris_l2_20160108_191211_3680100932_SDO.tar.gz",
     ]
     assert list(sdo["Size"].value) == [236, 216]
-    raster = Fido.search(time, a.iris.Product("raster"))["lmsal"]
+    raster = Fido.search(time, a.Provider("LMSAL"), a.iris.Product("raster"))["lmsal"]
     assert list(raster["Product"]) == ["raster", "raster"]
     with pytest.raises(ValueError, match="Product must be one of raster, sji, deconvolved, sdo, sot, not 'aia'"):
         a.iris.Product("aia")
@@ -139,7 +139,7 @@ def test_search_products(hcr):
 
 def test_search_deconvolved(hcr):
     hcr("hcr_20200303.json")
-    table = Fido.search(TIME, a.iris.Product("deconvolved"))["lmsal"]
+    table = Fido.search(TIME, a.Provider("LMSAL"), a.iris.Product("deconvolved"))["lmsal"]
     assert list(table["Filename"]) == [
         "iris_l2_20200303_041957_3882010194_SJI_2796_t000_deconvolved.fits.gz",
         "iris_l2_20200303_041957_3882010194_SJI_2832_t000_deconvolved.fits.gz",
@@ -154,12 +154,21 @@ def test_search_limit(hcr, monkeypatch):
         LMSALClient().search(TIME)
 
 
-@pytest.mark.parametrize("attr", [a.Instrument.iris, a.Provider("LMSAL"), a.Provider("lmsal")])
-def test_search_instrument_provider(hcr, monkeypatch, attr):
+@pytest.mark.parametrize(
+    "query",
+    [
+        (a.Instrument.iris,),
+        (a.Provider("LMSAL"),),
+        (a.Provider("lmsal"),),
+        (a.Provider("LMSAL"), a.iris.Target("QS")),
+        (a.Instrument.iris, a.iris.ObsID(3605202860)),
+    ],
+)
+def test_search_instrument_provider(hcr, monkeypatch, query):
     hcr("hcr_20200303.json")
     # Only LMSALClient, so that no other client searches.
     monkeypatch.setattr(Fido, "registry", {LMSALClient: LMSALClient._can_handle_query})
-    result = Fido.search(TIME, attr)
+    result = Fido.search(TIME, *query)
     assert result.keys() == ["lmsal"]
     assert len(result["lmsal"]) == 14
 
@@ -174,6 +183,14 @@ def test_search_not_iris(hcr, monkeypatch, query):
     get.assert_not_called()
 
 
+def test_search_iris_attr_only(hcr):
+    get = hcr("hcr_20200303.json")
+    # No client answers: the a.iris attrs only refine a search for IRIS, and the VSO does not know them.
+    with pytest.raises(NoMatchError):
+        Fido.search(TIME, a.iris.Target("AR"))
+    get.assert_not_called()
+
+
 def test_search_other_attr():
     with pytest.raises(ValueError, match="LMSALClient cannot search with"):
         LMSALClient().search(TIME, a.Instrument.aia)
@@ -181,7 +198,7 @@ def test_search_other_attr():
 
 def test_fetch(hcr, tmp_path):
     hcr("hcr_20200303.json")
-    result = Fido.search(TIME, a.iris.Product("raster"))
+    result = Fido.search(TIME, a.Provider("LMSAL"), a.iris.Product("raster"))
     downloader = mock.create_autospec(parfive.Downloader, instance=True)
     Fido.fetch(result, path=tmp_path, downloader=downloader)
     assert [(call.args[0], call.kwargs["filename"]) for call in downloader.enqueue_file.call_args_list] == [

@@ -21,13 +21,15 @@ Importing `irispy.net` adds `~irispy.net.LMSALClient`, which searches the IRIS a
 
     >>> import irispy.net
 
-A search needs a time range, `a.Time <sunpy.net.attrs.Time>`, and finds the observations that overlap it; it also needs ``a.Instrument.iris``, ``a.Provider("LMSAL")`` or one of the ``a.iris`` attributes below.
+A search needs a time range, `a.Time <sunpy.net.attrs.Time>`, and finds the observations that overlap it; it also needs ``a.Instrument.iris`` or ``a.Provider("LMSAL")``, and the ``a.iris`` attributes below refine it.
 Here are the active region observations of the morning of 1 October 2021:
 
 .. code-block:: python
 
     >>> result = Fido.search(
-    ...     a.Time("2021-10-01 06:00", "2021-10-01 07:00"), a.iris.Target("AR")
+    ...     a.Time("2021-10-01 06:00", "2021-10-01 07:00"),
+    ...     a.Provider("LMSAL"),
+    ...     a.iris.Target("AR"),
     ... )  # doctest: +REMOTE_DATA
     >>> result.show("Start Time", "OBSID", "Title", "Product", "Filename", "Size")  # doctest: +REMOTE_DATA
     <sunpy.net.fido_factory.UnifiedResponse object at ...>
@@ -71,6 +73,7 @@ The other search attributes are:
     ``a.iris.Product("sdo")`` finds only the AIA tarballs; combine products with ``|``, and ``Fido`` returns one table for each.
 
 ``a.Instrument.iris`` gives the results of the IRIS archive and of the Virtual Solar Observatory, which lists the same raster and slit-jaw files and the full-disk mosaics under the same provider, so the VSO answers ``a.Provider("LMSAL")`` too.
+With an ``a.iris`` attribute only the IRIS archive is searched, as the VSO does not know them.
 ``result["lmsal"]`` holds the IRIS archive's files; fetch it to download only those into the observation folders.
 The archive answers about six observations a second, so a search of a month takes a minute; a search finds at most 5000 observations.
 ``ObsID``, ``Target``, ``XCen`` and ``YCen`` are applied by the archive and make a search faster; ``Description`` is matched afterwards.
@@ -81,6 +84,7 @@ For example, the Hinode/SOT and AIA data of the observations made with Hinode ne
 
     >>> limb_result = Fido.search(
     ...     a.Time("2020-03-03", "2020-03-04"),
+    ...     a.Provider("LMSAL"),
     ...     a.iris.Description("Hinode"),
     ...     a.iris.XCen(700 * u.arcsec, 1000 * u.arcsec),
     ...     a.iris.Product("sot") | a.iris.Product("sdo"),
