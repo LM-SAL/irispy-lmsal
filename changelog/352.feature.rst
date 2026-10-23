@@ -1,0 +1,1 @@
+Added ``irispy.net.LMSALClient``, a ``sunpy.net.Fido`` client for the IRIS archive at LMSAL: after ``import irispy.net``, ``Fido.search`` with ``a.Instrument.iris`` or ``a.Provider("LMSAL")``, narrowed by the ``a.iris`` attrs, finds its files, one row per file in ``result["lmsal"]``, and ``Fido.fetch`` puts the files of each observation in a folder named after it.
